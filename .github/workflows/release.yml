@@ -2,8 +2,6 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      - 'release-*'
 
 name: Create Release
 
@@ -39,12 +37,15 @@ jobs:
         run: |
           npm install
           npm run build
+        env:
+          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Setup Version
         run: |
           node_modules/.bin/json -I -f package.json -e "this.version='$VERSION'"
         env:
           VERSION: ${{ steps.semver_parser.outputs.semver }}
-          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish NPM
         run: npm publish

@@ -9,6 +9,9 @@ jobs:
   release:
     name: Build And Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
