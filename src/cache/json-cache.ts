@@ -40,4 +40,7 @@ export const jsonCache: Cache = {
     load() {
         libMap = loadCache()
     },
+    getAll() {
+        return libMap
+    },
 }
