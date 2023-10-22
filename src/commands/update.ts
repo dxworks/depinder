@@ -37,6 +37,7 @@ export async function updateLibs(updated_before: string, plugins: string[]): Pro
     const lastUpdateMoment = updated_before ? moment(updated_before) : moment().subtract(1, 'month')
 
     mongoCache.load()
+
     const ids = await getLibraryIdsToUpdate(lastUpdateMoment)
 
     const selectedPlugins = getPluginsFromNames(plugins)

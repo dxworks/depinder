@@ -34,6 +34,21 @@ export interface LibraryInfo {
     requiresLicenseAcceptance?: boolean
 }
 
+export interface ProjectInfo {
+    projectPath: string,
+    name: string,
+    directDeps: number,
+    indirectDeps: number,
+    directOutdatedDeps: number,
+    directOutdatedDepsPercentage: number,
+    indirectOutdatedDeps: number,
+    indirectOutdatedDepsPercentage: number,
+    directVulnerableDeps: number,
+    indirectVulnerableDeps: number,
+    directOutOfSupport: number,
+    indirectOutOfSupport: number,
+}
+
 export abstract class AbstractRegistrar implements Registrar {
 
     private readonly next: Registrar | null = null

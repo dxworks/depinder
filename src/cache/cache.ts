@@ -1,18 +1,17 @@
-import {LibraryInfo} from '../extension-points/registrar'
-
 export interface Cache {
-    get: (key: string) => LibraryInfo | Promise<LibraryInfo> | undefined | any
-    set: (key: string, value: LibraryInfo) => void | Promise<void>
+    get: (key: string) => Promise<any> | undefined | any
+    set: (key: string, value: any) => void | Promise<void>
     has: (key: string) => boolean | Promise<boolean>
     load: () => void | Promise<void>,
     write: () => void | Promise<void>,
+    getAll: () => Promise<any> | undefined | any,
 }
 
 export const noCache: Cache = {
-    get(key: string): LibraryInfo | undefined {
+    get(key: string): any | undefined {
         return undefined
     },
-    set(key: string, value: LibraryInfo): void {
+    set(key: string, value: any): void {
 
     },
     has(key: string): boolean {
@@ -21,5 +20,8 @@ export const noCache: Cache = {
     load() {
     },
     write() {
+    },
+    getAll() {
+
     },
 }

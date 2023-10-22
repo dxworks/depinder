@@ -1,6 +1,6 @@
 import {Cache} from './cache'
 import mongoose, { Model, Schema } from 'mongoose'
-import {LibraryInfo} from '../extension-points/registrar'
+import {LibraryInfo, ProjectInfo} from '../extension-points/registrar'
 
 const LibraryVersionSchema = new Schema({
     version: String,
@@ -42,7 +42,33 @@ const LibraryInfoSchema = new Schema({
     requiresLicenseAcceptance: Boolean,
 }, {timestamps: true})
 
+const DependencySchema = new Schema({
+    name: String,
+    version: String,
+    type: String,
+    directDep: Boolean,
+})
+
+const ProjectInfoSchema = new Schema({
+    _id: String,
+    projectPath: String,
+    name: String,
+    directDeps: Number,
+    indirectDeps: Number,
+    directOutdatedDeps: Number,
+    directOutdatedDepsPercentage: Number,
+    indirectOutdatedDeps: Number,
+    indirectOutdatedDepsPercentage: Number,
+    directVulnerableDeps: Number,
+    indirectVulnerableDeps: Number,
+    directOutOfSupport: Number,
+    indirectOutOfSupport: Number,
+    dependencies: [DependencySchema],
+})
+
 export const LibraryInfoModel: Model<LibraryInfo> = mongoose.model<LibraryInfo>('LibraryInfo', LibraryInfoSchema)
+
+export const ProjectInfoModel: Model<ProjectInfo> = mongoose.model<ProjectInfo>('ProjectInfo', ProjectInfoSchema)
 
 const MONGO_USER = process.env.MONGO_USER ?? 'root'
 const MONGO_PASSWORD = process.env.MONGO_PASSWORD ?? 'secret'
@@ -73,5 +99,36 @@ export const mongoCache: Cache = {
         if (mongoose.connection.readyState === 1) {
             await mongoose.disconnect()
         }
+    },
+    async getAll() { },
+}
+
+export const mongoCacheProject: Cache = {
+    async get(key: string) {
+        return await ProjectInfoModel.findById(key).exec()
+    },
+    async set(key: string, value: any) {
+        await ProjectInfoModel.findByIdAndUpdate(key, value, { upsert: true }).exec()
+    },
+    async has(key: string) {
+        return (await ProjectInfoModel.exists({ _id: key }) !== null)
+    },
+    async load() {
+        if (mongoose.connection.readyState === 0) {
+            await mongoose.connect(MONGO_URI, {
+                dbName: DATABASE_NAME,
+                user: MONGO_USER,
+                pass: MONGO_PASSWORD,
+                authSource: 'admin',
+            })
+        }
+    },
+    async write() {
+        if (mongoose.connection.readyState === 1) {
+            await mongoose.disconnect()
+        }
+    },
+    async getAll() {
+        return await ProjectInfoModel.find().exec()
     },
 }
