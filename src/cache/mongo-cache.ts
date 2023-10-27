@@ -43,6 +43,7 @@ const LibraryInfoSchema = new Schema({
 }, {timestamps: true})
 
 const DependencySchema = new Schema({
+    _id: String,
     name: String,
     version: String,
     type: String,
@@ -100,7 +101,9 @@ export const mongoCache: Cache = {
             await mongoose.disconnect()
         }
     },
-    async getAll() { },
+    async getAll() {
+        return await LibraryInfoModel.find().exec()
+    },
 }
 
 export const mongoCacheProject: Cache = {
