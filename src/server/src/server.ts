@@ -1,7 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import {analyseFilesToCache, saveToCsv} from '../../commands/analyse'
-import {mongoCacheProject} from '../../cache/mongo-cache'
+import {mongoCache, mongoCacheProject} from '../../cache/mongo-cache'
 
 const app = express()
 const PORT = 3000
@@ -68,7 +68,6 @@ app.post('/analyse/csv', async (req, res) => {
     }
 })
 
-
 app.post('/analyse', async (req, res) => {
     try {
         const folders = req.body.folders || []
@@ -88,6 +87,32 @@ app.post('/analyse', async (req, res) => {
         res.status(200).json({ data: 'ok' })
     } catch (error) {
         res.status(500).send(`Error: ${error}`)
+    }
+})
+
+app.post('/library', async (_req, res) => {
+    try {
+        const id = _req.body.id
+
+        mongoCache.load()
+        const value = await mongoCache.get(id)
+
+        res.status(200).json({ data: value })
+    } catch (err) {
+        console.error(`Error: ${err}`)
+        res.status(500).send('Internal Server Error')
+    }
+})
+
+app.get('/library/all', async (_req, res) => {
+    try {
+        mongoCache.load()
+        const value = await mongoCache.getAll()
+
+        res.status(200).json({ data: value })
+    } catch (err) {
+        console.error(`Error: ${err}`)
+        res.status(500).send('Internal Server Error')
     }
 })
 

@@ -290,6 +290,7 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
         indirectOutOfSupport: projectInfo.indirectOutOfSupport,
         dependencies: Object.values(project.dependencies).map(dep => {
             return {
+                _id: `${plugin.name}:${dep.name}`,
                 name: dep.name,
                 version: dep.version,
                 type: dep.type,
