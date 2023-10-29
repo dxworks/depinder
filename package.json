@@ -38,6 +38,7 @@
     "@dxworks/nuget-inspector": "^1.2.0",
     "@octokit/graphql": "^4.8.0",
     "@snyk/gemfile": "^1.2.0",
+    "@types/express": "^4.17.20",
     "chalk": "^4.1.2",
     "cli-progress": "^3.11.2",
     "commander": "^11.1.0",
