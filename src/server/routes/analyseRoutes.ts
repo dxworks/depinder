@@ -5,6 +5,6 @@ const router = express.Router()
 
 router.post('/csv', analyseController.saveAnalysisToCsv)
 
-router.post('/', analyseController.completeAnalysis)
+router.post('/', analyseController.analyse)
 
 export default router

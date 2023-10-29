@@ -5,20 +5,20 @@ export const saveAnalysisToCsv = async (_req: Request, res: Response): Promise<a
     try {
         const folders = _req.body.folders || []
         const options = {
-            plugins: [],
-            results: 'results',
-            refresh: false,
+            plugins: _req.body.options.plugins ?? [],
+            results: _req.body.options.results ?? 'results',
+            refresh: _req.body.options.refresh ?? false,
         }
-        // const plugins = req.body.plugins || [];
+        const cache = _req.body.cache || true
 
         await saveToCsv(
             folders,
             {
-                plugins: [],
+                plugins: options.plugins,
                 results: options.results,
-                refresh: false,
+                refresh: options.refresh,
             },
-            options.refresh || true
+            cache
         )
 
         res.status(200).json({ data: 'ok' })
@@ -27,20 +27,23 @@ export const saveAnalysisToCsv = async (_req: Request, res: Response): Promise<a
     }
 }
 
-// saving to cache + csv
-export const completeAnalysis = async (_req: Request, res: Response): Promise<any>  => {
+export const analyse = async (_req: Request, res: Response): Promise<any>  => {
     try {
         const folders = _req.body.folders || []
-        const options = 'results'
-        const cache = _req.body.refresh || true
-        // const plugins = req.body.plugins || [];
+        const options = {
+            plugins: _req.body.options.plugins ?? [],
+            results: _req.body.options.results ?? 'results',
+            refresh: _req.body.options.refresh ?? false,
+        }
+        const cache = _req.body.cache || true
 
         await analyseFilesToCache(
             folders,
             {
-                plugins: [],
-                results: options,
-                refresh: false,
+                plugins: options.plugins,
+                // not used in analyse, only in saveAnalysisToCsv
+                results: options.results,
+                refresh: options.refresh,
             },
             cache
         )
