@@ -76,7 +76,7 @@ const MONGO_PASSWORD = process.env.MONGO_PASSWORD ?? 'secret'
 const DATABASE_NAME = 'depinder'
 const MONGO_URI = process.env.MONGO_URI ?? `mongodb://localhost:27018/${DATABASE_NAME}`
 
-export const mongoCache: Cache = {
+export const mongoCacheLibrary: Cache = {
     async get(key: string) {
         return await LibraryInfoModel.findById(key).exec()
     },

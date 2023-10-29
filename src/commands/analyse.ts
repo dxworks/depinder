@@ -13,13 +13,13 @@ import moment from 'moment'
 import {Plugin} from '../extension-points/plugin'
 import {Cache, noCache} from '../cache/cache'
 import {getMongoDockerContainerStatus} from './cache'
-import {jsonCache} from '../cache/json-cache'
+import {jsonCacheLibrary, jsonCacheProject} from '../cache/json-cache'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {MultiBar, Presets} from 'cli-progress'
 import {walkDir} from '../utils/utils'
 import {blacklistedGlobs} from '../utils/blacklist'
 import minimatch from 'minimatch'
-import {mongoCache, mongoCacheProject} from '../cache/mongo-cache'
+import {mongoCacheLibrary, mongoCacheProject} from '../cache/mongo-cache'
 // import {defaultPlugins} from '../extension-points/plugin-loader'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
@@ -72,17 +72,17 @@ function chooseLibsCacheOption(): Cache {
 
     if (getMongoDockerContainerStatus() != 'running') {
         log.warn('Mongo cache is not running, using in-memory cache')
-        return jsonCache
+        return jsonCacheLibrary
     }
     log.info('Mongo cache is up and running, using Mongo cache')
-    return mongoCache
+    return mongoCacheLibrary
 }
 
 function chooseProjectsCacheOption(): Cache {
 
     if (getMongoDockerContainerStatus() != 'running') {
         log.warn('Mongo cache is not running, using in-memory cache')
-        return jsonCache
+        return jsonCacheProject
     }
     log.info('Mongo cache is up and running, using Mongo cache')
     return mongoCacheProject
