@@ -2,7 +2,7 @@ import {Command} from 'commander'
 import {log} from '@dxworks/cli-common'
 import chalk from 'chalk'
 import {getMongoDockerContainerStatus} from './cache'
-import {LibraryInfoModel, mongoCache} from '../cache/mongo-cache'
+import {LibraryInfoModel, mongoCacheLibrary} from '../cache/mongo-cache'
 import moment, {Moment} from 'moment'
 import {getPluginsFromNames} from '../plugins'
 import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
@@ -36,7 +36,7 @@ export async function updateLibs(updated_before: string, plugins: string[]): Pro
 
     const lastUpdateMoment = updated_before ? moment(updated_before) : moment().subtract(1, 'month')
 
-    mongoCache.load()
+    mongoCacheLibrary.load()
 
     const ids = await getLibraryIdsToUpdate(lastUpdateMoment)
 
@@ -50,7 +50,7 @@ export async function updateLibs(updated_before: string, plugins: string[]): Pro
         log.info('No libraries to update.')
     }
 
-    mongoCache.write()
+    mongoCacheLibrary.write()
 }
 
 async function getLibraryIdsToUpdate(lastUpdateMoment: Moment): Promise<string[]> {
@@ -77,7 +77,7 @@ async function updateLibrariesFor(selectedPlugins: Plugin[], idsToUpdate: string
                     if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
                         lib.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, lib.name)
                     }
-                    await mongoCache.set(id, lib)
+                    await mongoCacheLibrary.set(id, lib)
                 } catch (e: any) {
                     log.warn(`Exception getting remote info for ${libraryName}`)
                     log.error(e)
