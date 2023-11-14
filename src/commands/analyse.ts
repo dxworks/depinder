@@ -68,6 +68,10 @@ export const analyseCommand = new Command()
     .action(analyseFilesToCache)
     .action(saveToCsv)
 
+const outOfSupportThreshold = 24
+const outdatedThreshold = 15
+const dateFormat = 'MMM YYYY'
+
 function chooseLibsCacheOption(): Cache {
 
     if (getMongoDockerContainerStatus() != 'running') {
@@ -136,8 +140,6 @@ function extractProjectStats(proj: DepinderProject): ProjectInfo {
     const directDeps = enhancedDeps.filter(dep => dep.direct)
     const indirectDeps = enhancedDeps.filter(dep => !dep.direct)
 
-    const outdatedThreshold = 15
-
     const directOutdated = directDeps.filter(dep => dep.latest_used > outdatedThreshold)
     const directOutDatedPercent = directDeps.length == 0 ? 0 : directOutdated.length / directDeps.length * 100
     const indirectOutdated = indirectDeps.filter(dep => dep.latest_used > outdatedThreshold)
@@ -145,7 +147,6 @@ function extractProjectStats(proj: DepinderProject): ProjectInfo {
     const directVulnerable = directDeps.filter(dep => dep.vulnerabilities && dep.vulnerabilities.length > 0)
     const indirectVulnerable = indirectDeps.filter(dep => dep.vulnerabilities && dep.vulnerabilities.length > 0)
 
-    const outOfSupportThreshold = 24
     const directOutOfSupport = directDeps.filter(dep => dep.now_latest > outOfSupportThreshold)
     const indirectOutOfSupport = indirectDeps.filter(dep => dep.now_latest > outOfSupportThreshold)
 
@@ -172,7 +173,6 @@ function extractProjectLibs(proj: DepinderProject, dep: DepinderDependency): Pro
     const currentVersionMoment = moment(currentVersion?.timestamp)
     const now = moment()
 
-    const dateFormat = 'MMM YYYY'
     const vulnerabilities = dep.vulnerabilities?.map(v => `${v.severity} - ${v.permalink}`).join('\n')
     const directDep: boolean = !dep.requestedBy || dep.requestedBy.some(it => it.startsWith(`${proj.name}@${proj.version}`))
 
@@ -275,6 +275,7 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
 
     log.info('Project data saving in mongo db...')
 
+    //todo save project info separate, stats + dependencies
     await cacheProjects.set(`${project.name}@${project.version}`, {
         name: project.name,
         projectPath: project.path,
@@ -288,13 +289,27 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
         indirectVulnerableDeps: projectInfo.indirectVulnerableDeps,
         directOutOfSupport: projectInfo.directOutOfSupport,
         indirectOutOfSupport: projectInfo.indirectOutOfSupport,
+    })
+
+    const outOfSupportDate = moment().subtract(outOfSupportThreshold, 'months').format(dateFormat)
+    const outdatedDate = moment().subtract(outdatedThreshold, 'months').format(dateFormat)
+
+    await cacheProjects.set(`${project.name}@${project.version}`, {
         dependencies: Object.values(project.dependencies).map(dep => {
+            const libraryInfo = dep.libraryInfo?.versions.find(version => dep.version === version.version)
+            if (libraryInfo !== undefined) {
+                console.log(new Date(libraryInfo.timestamp) > new Date(outOfSupportThreshold))
+            }
             return {
                 _id: `${plugin.name}:${dep.name}`,
                 name: dep.name,
                 version: dep.version,
                 type: dep.type,
                 directDep: !dep.requestedBy || dep.requestedBy.some(it => it.startsWith(`${project.name}@${project.version}`)),
+                requestedBy:dep.requestedBy.filter((value, index, array) => array.indexOf(value) === index),
+                vulnerabilities: (dep.libraryInfo?.vulnerabilities ?? []).length > 0,
+                outOfSupport: libraryInfo !== undefined ? new Date(libraryInfo.timestamp) < new Date(outOfSupportDate) : undefined,
+                outdated: libraryInfo !== undefined ? new Date(libraryInfo.timestamp) < new Date(outdatedDate) : undefined,
             }
         }),
     })

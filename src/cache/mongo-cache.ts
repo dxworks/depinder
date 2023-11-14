@@ -48,6 +48,10 @@ const DependencySchema = new Schema({
     version: String,
     type: String,
     directDep: Boolean,
+    requestedBy: [String],
+    vulnerabilities: Boolean,
+    outOfSupport: Boolean,
+    outdated: Boolean,
 })
 
 const ProjectInfoSchema = new Schema({
