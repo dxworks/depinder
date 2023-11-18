@@ -54,6 +54,13 @@ const DependencySchema = new Schema({
     outdated: Boolean,
 })
 
+const SystemSchema = new Schema({
+    _id: String,
+    name: String,
+    projectPath: String,
+    projects: [String],
+})
+
 const ProjectInfoSchema = new Schema({
     _id: String,
     projectPath: String,
@@ -74,6 +81,8 @@ const ProjectInfoSchema = new Schema({
 export const LibraryInfoModel: Model<LibraryInfo> = mongoose.model<LibraryInfo>('LibraryInfo', LibraryInfoSchema)
 
 export const ProjectInfoModel: Model<ProjectInfo> = mongoose.model<ProjectInfo>('ProjectInfo', ProjectInfoSchema)
+
+export const SystemInfoModel: Model<ProjectInfo> = mongoose.model<ProjectInfo>('SystemInfo', SystemSchema)
 
 const MONGO_USER = process.env.MONGO_USER ?? 'root'
 const MONGO_PASSWORD = process.env.MONGO_PASSWORD ?? 'secret'
@@ -137,5 +146,35 @@ export const mongoCacheProject: Cache = {
     },
     async getAll() {
         return await ProjectInfoModel.find().exec()
+    },
+}
+
+export const mongoCacheSystem: Cache = {
+    async get(key: string) {
+        return await SystemInfoModel.findById(key).exec()
+    },
+    async set(key: string, value: any) {
+        await SystemInfoModel.findByIdAndUpdate(key, value, { upsert: true }).exec()
+    },
+    async has(key: string) {
+        return (await SystemInfoModel.exists({ _id: key }) !== null)
+    },
+    async load() {
+        if (mongoose.connection.readyState === 0) {
+            await mongoose.connect(MONGO_URI, {
+                dbName: DATABASE_NAME,
+                user: MONGO_USER,
+                pass: MONGO_PASSWORD,
+                authSource: 'admin',
+            })
+        }
+    },
+    async write() {
+        if (mongoose.connection.readyState === 1) {
+            await mongoose.disconnect()
+        }
+    },
+    async getAll() {
+        return await SystemInfoModel.find().exec()
     },
 }

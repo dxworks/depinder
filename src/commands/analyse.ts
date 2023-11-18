@@ -13,13 +13,13 @@ import moment from 'moment'
 import {Plugin} from '../extension-points/plugin'
 import {Cache, noCache} from '../cache/cache'
 import {getMongoDockerContainerStatus} from './cache'
-import {jsonCacheLibrary, jsonCacheProject} from '../cache/json-cache'
+import {jsonCacheLibrary, jsonCacheProject, jsonCacheSystem} from '../cache/json-cache'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {MultiBar, Presets} from 'cli-progress'
 import {walkDir} from '../utils/utils'
 import {blacklistedGlobs} from '../utils/blacklist'
 import minimatch from 'minimatch'
-import {mongoCacheLibrary, mongoCacheProject} from '../cache/mongo-cache'
+import {mongoCacheLibrary, mongoCacheProject, mongoCacheSystem} from '../cache/mongo-cache'
 // import {defaultPlugins} from '../extension-points/plugin-loader'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
@@ -92,6 +92,16 @@ function chooseProjectsCacheOption(): Cache {
     return mongoCacheProject
 }
 
+function chooseSystemsCacheOption(): Cache {
+
+    if (getMongoDockerContainerStatus() != 'running') {
+        log.warn('Mongo cache is not running, using in-memory cache')
+        return jsonCacheSystem
+    }
+    log.info('Mongo cache is up and running, using Mongo cache')
+    return mongoCacheSystem
+}
+
 function extractLicenses(dep: DepinderDependency) {
     return dep.libraryInfo?.licenses?.map(it => {
         if (typeof it === 'string') return it.substring(0, 100); else return JSON.stringify(it)
@@ -116,6 +126,7 @@ async function extractProjects(plugin: Plugin, files: string[]) {
             log.error(e)
         }
     }
+
     return projects
 }
 
@@ -297,9 +308,6 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
     await cacheProjects.set(`${project.name}@${project.version}`, {
         dependencies: Object.values(project.dependencies).map(dep => {
             const libraryInfo = dep.libraryInfo?.versions.find(version => dep.version === version.version)
-            if (libraryInfo !== undefined) {
-                console.log(new Date(libraryInfo.timestamp) > new Date(outOfSupportThreshold))
-            }
             return {
                 _id: `${plugin.name}:${dep.name}`,
                 name: dep.name,
@@ -315,6 +323,36 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
     })
 
     log.info('Project data saving in mongo db done!')
+}
+
+async function processSystem(projects: DepinderProject[], useCache: boolean) {
+    const cache: Cache = useCache ? chooseSystemsCacheOption() : noCache
+
+    await cache.load()
+
+    const strings: string[] = []
+
+    for (const project of projects) {
+        strings.push(project.path)
+    }
+
+
+    let systemName = strings[0]
+
+    for (let i = 1; i < strings.length; i++) {
+        while (strings[i].indexOf(systemName) !== 0) {
+            systemName = systemName.substring(0, systemName.length - 1)
+            if (systemName === '') return ''
+        }
+    }
+
+    console.log('system name' + systemName)
+
+    await cache.set(systemName, {
+        name: systemName,
+        projectPath: systemName,
+        projects: projects.map(it => `${it.name}@${it.version}`),
+    })
 }
 
 function filterFilesForPlugin(allFiles: string[], plugin: any): string[] {
@@ -337,6 +375,8 @@ export async function analyseFilesToCache(folders: string[], options: AnalyseOpt
 
     await cache.load()
 
+    const allProjects = [] as DepinderProject[]
+
     for (const plugin of selectedPlugins) {
         log.info(`Plugin ${plugin.name} starting`)
         const refreshedLibs: string[] = []
@@ -344,8 +384,14 @@ export async function analyseFilesToCache(folders: string[], options: AnalyseOpt
         const files = filterFilesForPlugin(allFiles, plugin)
         const projects: DepinderProject[] = await extractProjects(plugin, files)
 
+        allProjects.push(...projects)
+
         await processProjects(projects, plugin, cache, refreshedLibs, options, cacheProjects)
     }
+
+    console.log('Projects in the system:', allProjects.length)
+
+    await processSystem(allProjects, useCache)
 
     log.info('Done')
 }

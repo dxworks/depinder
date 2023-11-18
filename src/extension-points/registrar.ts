@@ -49,6 +49,12 @@ export interface ProjectInfo {
     indirectOutOfSupport: number,
 }
 
+export interface SystemInfo {
+    projectPath: string,
+    name: string,
+    projects: string[],
+}
+
 export abstract class AbstractRegistrar implements Registrar {
 
     private readonly next: Registrar | null = null
