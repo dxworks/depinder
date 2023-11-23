@@ -1,0 +1,44 @@
+<div *ngIf="libraryInfo">
+  <h1>{{ libraryInfo.name }}</h1>
+
+  <p *ngIf="libraryInfo.description">Description: {{ libraryInfo.description }}</p>
+
+  <div *ngIf="libraryInfo.versions.length > 0">
+    <h2>Versions</h2>
+    <ul>
+      <li *ngFor="let version of libraryInfo.versions">{{ version.version }}</li>
+    </ul>
+  </div>
+
+  <div>
+    <h2>Licenses</h2>
+    <ul>
+      <li *ngFor="let license of libraryInfo.licenses">{{ license }}</li>
+    </ul>
+  </div>
+
+  <div *ngIf="libraryInfo.keywords.length > 0">
+    <h2>Keywords</h2>
+    <ul>
+      <li *ngFor="let keyword of libraryInfo.keywords">{{ keyword }}</li>
+    </ul>
+  </div>
+
+  <!-- Other fields... -->
+
+  <div *ngIf="libraryInfo.authors.length > 0">
+    <h2>Authors</h2>
+    <ul>
+      <li *ngFor="let author of libraryInfo.authors">{{ author }}</li>
+    </ul>
+  </div>
+
+  <div *ngIf="libraryInfo.vulnerabilities.length > 0">
+    <h2>Vulnerabilities</h2>
+    <ul>
+      <li *ngFor="let vul of libraryInfo.vulnerabilities">{{ vul }}</li>
+    </ul>
+  </div>
+
+  <p *ngIf="libraryInfo.requiresLicenseAcceptance">This library requires license acceptance.</p>
+</div>

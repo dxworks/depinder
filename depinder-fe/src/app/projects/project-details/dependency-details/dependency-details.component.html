@@ -1,0 +1,118 @@
+<div *ngIf="selectedDependency !== undefined">
+  <h2>Dependency Details</h2>
+  <table>
+    <colgroup>
+      <col style="width:10%">
+      <col style="width:20%">
+      <col style="width:20%">
+      <col style="width:15%">
+      <col style="width:15%">
+      <col style="width:20%">
+    </colgroup>
+    <thead>
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Version</th>
+      <th>Type</th>
+      <th>Requested By</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td>{{ selectedDependency!._id }}</td>
+      <td>{{ selectedDependency!.name }}</td>
+      <td>{{ selectedDependency!.version }}</td>
+<!--      <td>{{ selectedDependency!.version }}</td>-->
+      <td>{{ selectedDependency!.type}}</td>
+      <td>{{ selectedDependency!.requestedBy.join(', ') }}</td>
+    </tr>
+    </tbody>
+  </table>
+
+  <div *ngIf="libraryInfo" class="library-info">
+    <h1>{{ libraryInfo.name }} details</h1>
+    <p *ngIf="libraryInfo.description">{{ libraryInfo.description }}</p>
+
+    <section *ngIf="libraryInfo.vulnerabilities && libraryInfo.vulnerabilities.length">
+      <h2>Vulnerabilities</h2>
+      <ul>
+        <li *ngFor="let vulnerability of libraryInfo.vulnerabilities">{{ vulnerability }}</li>
+      </ul>
+    </section>
+
+    <section *ngIf="libraryInfo.licenses && libraryInfo.licenses.length">
+      <h2>Licenses</h2>
+      <ul>
+        <li *ngFor="let license of libraryInfo.licenses">{{ license }}</li>
+      </ul>
+    </section>
+
+    <section *ngIf="libraryInfo.keywords && libraryInfo.keywords.length">
+      <h2>Keywords</h2>
+      <ul>
+        <li *ngFor="let keyword of libraryInfo.keywords">{{ keyword }}</li>
+      </ul>
+    </section>
+
+    <section *ngIf="libraryInfo.issuesUrl && libraryInfo.issuesUrl.length">
+      <h2>Issue Tracker</h2>
+      <ul>
+        <li *ngFor="let url of libraryInfo.issuesUrl">
+          <a href="{{ url }}" target="_blank">{{ url }}</a>
+        </li>
+      </ul>
+    </section>
+
+    <section *ngIf="libraryInfo.reposUrl && libraryInfo.reposUrl.length">
+      <h2>Repository URLs</h2>
+      <ul>
+        <li *ngFor="let url of libraryInfo.reposUrl">
+          <a href="{{ url }}" target="_blank">{{ url }}</a>
+        </li>
+      </ul>
+    </section>
+
+    <div *ngIf="libraryInfo.homepageUrl.length > 0">
+      <h2>Homepage</h2>
+      <a href="{{ libraryInfo.homepageUrl }}" target="_blank">{{ libraryInfo.homepageUrl }}</a>
+    </div>
+
+    <div *ngIf="libraryInfo.documentationUrl.length > 0">
+      <h2>Documentation</h2>
+      <a href="{{ libraryInfo.documentationUrl }}" target="_blank">{{ libraryInfo.documentationUrl }}</a>
+    </div>
+
+    <div *ngIf="libraryInfo.packageUrl.length > 0">
+      <h2>Package URL</h2>
+      <a href="{{ libraryInfo.packageUrl }}" target="_blank">{{ libraryInfo.packageUrl }}</a>
+    </div>
+
+    <div *ngIf="libraryInfo.downloads">
+      <h2>Downloads</h2>
+      <p>{{ libraryInfo.downloads }}</p>
+    </div>
+
+    <section *ngIf="libraryInfo.authors && libraryInfo.authors.length">
+      <h2>Authors</h2>
+      <ul>
+        <li *ngFor="let author of libraryInfo.authors">{{ author }}</li>
+      </ul>
+    </section>
+
+    <div *ngIf="libraryInfo.requiresLicenseAcceptance !== undefined">
+      <h2>Requires License Acceptance</h2>
+      <p>{{ libraryInfo.requiresLicenseAcceptance ? 'Yes' : 'No' }}</p>
+    </div>
+
+    <section *ngIf="libraryInfo.versions && libraryInfo.versions.length">
+      <h2>Versions</h2>
+      <ul>
+        <div *ngFor="let version of libraryInfo.versions">
+          <p>{{ version.version }}, Downloads: {{ version.downloads }}, Date: {{ version.timestamp }}</p>
+        </div>
+      </ul>
+    </section>
+  </div>
+
+</div>

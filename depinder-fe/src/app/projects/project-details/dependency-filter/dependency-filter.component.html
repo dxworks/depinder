@@ -1,0 +1,21 @@
+<mat-form-field>
+  <mat-label>Name</mat-label>
+  <input matInput type="text" [(ngModel)]="filter.searchField">
+</mat-form-field>
+
+<mat-form-field>
+  <mat-label>Filter by vulnerabilities</mat-label>
+  <mat-select [(value)]="filter.filterByVulnerabilities">
+    <mat-option>None</mat-option>
+    <mat-option value="true">With vulnerabilities</mat-option>
+    <mat-option value="false">Without vulnerabilities</mat-option>
+  </mat-select>
+</mat-form-field>
+
+<mat-checkbox [(ngModel)]="filter.filterByOutdated" (change)="onCheckboxChange($event, 'filterByOutdated')">Outdated</mat-checkbox>
+
+<mat-checkbox [(ngModel)]="filter.filterByOutOfSupport" (change)="onCheckboxChange($event, 'filterByOutOfSupport')">Out of support</mat-checkbox>
+
+<button mat-button (click)="sendFilter()">Filter</button>
+
+<button mat-button (click)="resetFilters()">Reset</button>

@@ -211,8 +211,6 @@ async function getLib(cache: Cache, plugin: Plugin, dep: DepinderDependency, opt
     if (await cacheHit(cache, plugin, dep, options.refresh, refreshedLibs)) {
         lib = await cache.get(`${plugin.name}:${dep.name}`) as LibraryInfo
     } else {
-        // log.info(`Getting remote information on ${dep.name}`)
-
         lib = await plugin.registrar.retrieve(dep.name)
         if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
             // log.info(`Getting vulnerabilities for ${lib.name}`)
@@ -454,7 +452,7 @@ export async function saveToCsv(folders: string[], options: AnalyseOptions, useC
                 }
 
             }
-                }
+        }
 
 
         const allLibsInfo = projects.flatMap(proj => Object.values(proj.dependencies).map(dep => dep.libraryInfo))

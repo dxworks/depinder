@@ -30,7 +30,9 @@
     "local": "npm run build && npm link && npx dx-depinder --help",
     "refresh": "rm -rf ./node_modules ./package-lock.json && npm install",
     "test": "jest --passWithNoTests",
-    "test:dev": "jest --watch"
+    "test:dev": "jest --watch",
+    "start-fe": "cd ./depinder-fe && ng serve",
+    "start-be": "node ./src/server/src/server.js"
   },
   "dependencies": {
     "@dxworks/cli-common": "^0.0.20",
