@@ -5,7 +5,6 @@ on:
     tags:
       - 'v*'
 
-
 jobs:
   Publish-and-Release:
     name: Publish NPM Package and Create Release

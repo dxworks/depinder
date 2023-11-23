@@ -59,29 +59,29 @@ This file will be processed by GradleMiner to generate the a `gradle.json` file,
 ## Usage
 The following commands can be used either as standalone, or with the `dxw` prefix ahead.
 
-### Redis Cache
+### Cache command
 
-To check if the Redis cache is running:
+To check if the MongoDB cache is running:
 ```shell
-depinder redis
+depinder cache
 ```
 
 To initalise the Redis cache:
 ```shell
-depinder redis init
+depinder cache init
 ```
 
-To start the Redis cache:
+To start the MongoDB cache:
 ```shell
-depinder redis start
+depinder cache start
 ```
 
-To stop the Redis cache:
+To stop the MongoDB cache:
 ```shell
-depinder redis stop
+depinder cache stop
 ```
 
-To see what is available in the cache, please visit the [Redis Stack Dashboard](http://localhost:8001/).
+To see what is available in the cache, please visit the [Mongo Express Dashboard](http://localhost:8002/).
 
 ### Analyse
 To analyse a project, run the following command:
