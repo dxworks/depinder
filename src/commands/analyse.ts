@@ -4,7 +4,7 @@ import path from 'path'
 import {getPluginsFromNames} from '../plugins'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
 import {log} from '@dxworks/cli-common'
-import {LibraryInfo, ProjectInfo} from '../extension-points/registrar'
+import {LibraryInfo} from '../extension-points/registrar'
 import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
 import {Range} from 'semver'
 import _ from 'lodash'
@@ -20,6 +20,7 @@ import {walkDir} from '../utils/utils'
 import {blacklistedGlobs} from '../utils/blacklist'
 import minimatch from 'minimatch'
 import {mongoCacheLibrary, mongoCacheProject, mongoCacheSystem} from '../cache/mongo-cache'
+import {Project} from '../../core/project'
 // import {defaultPlugins} from '../extension-points/plugin-loader'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
@@ -130,7 +131,7 @@ async function extractProjects(plugin: Plugin, files: string[]) {
     return projects
 }
 
-function extractProjectStats(proj: DepinderProject): ProjectInfo {
+function extractProjectStats(proj: DepinderProject): Project {
     const enhancedDeps: DependencyInfo[] = Object.values(proj.dependencies).map(dep => {
         const latestVersion = dep.libraryInfo?.versions.find(it => it.latest)
         const currentVersion = dep.libraryInfo?.versions.find(it => it.version == dep.version.trim())
@@ -174,7 +175,7 @@ function extractProjectStats(proj: DepinderProject): ProjectInfo {
         indirectVulnerableDeps: indirectVulnerable.length,
         name: proj.name,
         projectPath: proj.path,
-    } as ProjectInfo
+    } as Project
 }
 
 function extractProjectLibs(proj: DepinderProject, dep: DepinderDependency): ProjectLibs {

@@ -1,7 +1,9 @@
 import {Cache} from './cache'
 import path from 'path'
 import fs from 'fs'
-import {LibraryInfo, ProjectInfo, SystemInfo} from '../extension-points/registrar'
+import {LibraryInfo} from '../extension-points/registrar'
+import {System} from '../../core/system'
+import {Project} from '../../core/project'
 
 const CACHE_FILE_NAME_LIBS = 'libs.json'
 const CACHE_FILE_NAME_PROJECTS = 'projects.json'
@@ -17,7 +19,7 @@ function loadCacheLibrary(): Map<string, LibraryInfo> {
     return new Map(Object.entries(json))
 }
 
-function loadCacheProject(): Map<string, ProjectInfo> {
+function loadCacheProject(): Map<string, Project> {
     const cacheFile = path.resolve(process.cwd(), 'cache', CACHE_FILE_NAME_PROJECTS)
     if(!fs.existsSync(cacheFile)) {
         fs.mkdirSync(path.resolve(process.cwd(), 'cache'), {recursive: true})
@@ -27,7 +29,7 @@ function loadCacheProject(): Map<string, ProjectInfo> {
     return new Map(Object.entries(json))
 }
 
-function loadCacheSystem(): Map<string, SystemInfo> {
+function loadCacheSystem(): Map<string, System> {
     const cacheFile = path.resolve(process.cwd(), 'cache', CACHE_FILE_NAME_SYSTEMS)
     if(!fs.existsSync(cacheFile)) {
         fs.mkdirSync(path.resolve(process.cwd(), 'cache'), {recursive: true})
@@ -38,8 +40,8 @@ function loadCacheSystem(): Map<string, SystemInfo> {
 }
 
 let libMapLibrary: Map<string, LibraryInfo>
-let libMapProject: Map<string, ProjectInfo>
-let libMapSystem: Map<string, SystemInfo>
+let libMapProject: Map<string, Project>
+let libMapSystem: Map<string, System>
 
 export const jsonCacheLibrary: Cache = {
     get(key: string): LibraryInfo | undefined {
@@ -71,7 +73,7 @@ export const jsonCacheLibrary: Cache = {
 }
 
 export const jsonCacheProject: Cache = {
-    get(key: string): ProjectInfo | undefined {
+    get(key: string): Project | undefined {
         if (!libMapProject) {
             this.load()
         }
@@ -100,7 +102,7 @@ export const jsonCacheProject: Cache = {
 }
 
 export const jsonCacheSystem: Cache = {
-    get(key: string): SystemInfo | undefined {
+    get(key: string): System | undefined {
         if (!libMapSystem) {
             this.load()
         }

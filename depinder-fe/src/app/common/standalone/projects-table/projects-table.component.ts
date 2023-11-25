@@ -2,7 +2,7 @@ import {Component, Input} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {MatTableModule} from "@angular/material/table";
 import {Router} from "@angular/router";
-import {Project} from "../../models/project";
+import {Project} from '../../../../../../core/project'
 
 @Component({
   selector: 'app-projects-table',

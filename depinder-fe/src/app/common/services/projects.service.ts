@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import {HttpClient} from "@angular/common/http";
 import {API_URL} from "../constants";
-import {Dependency, Project} from "../models/project";
+import {Dependency} from '../../../../../core/project'
 
 const BASE_URL = API_URL;
 

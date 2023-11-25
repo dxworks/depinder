@@ -1,8 +1,8 @@
 import {Component, OnInit} from '@angular/core';
 import {ProjectsService} from "../common/services/projects.service";
-import {Project} from "../common/models/project";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {AnalysisService} from "../common/services/analysis.service";
+import {Project} from '../../../../core/project'
 
 @Component({
   selector: 'app-projects',

@@ -1,6 +1,7 @@
 import {Cache} from './cache'
 import mongoose, { Model, Schema } from 'mongoose'
-import {LibraryInfo, ProjectInfo} from '../extension-points/registrar'
+import {LibraryInfo} from '../extension-points/registrar'
+import {Project} from '../../core/project'
 
 const LibraryVersionSchema = new Schema({
     version: String,
@@ -80,9 +81,9 @@ const ProjectInfoSchema = new Schema({
 
 export const LibraryInfoModel: Model<LibraryInfo> = mongoose.model<LibraryInfo>('LibraryInfo', LibraryInfoSchema)
 
-export const ProjectInfoModel: Model<ProjectInfo> = mongoose.model<ProjectInfo>('ProjectInfo', ProjectInfoSchema)
+export const ProjectInfoModel: Model<Project> = mongoose.model<Project>('ProjectInfo', ProjectInfoSchema)
 
-export const SystemInfoModel: Model<ProjectInfo> = mongoose.model<ProjectInfo>('SystemInfo', SystemSchema)
+export const SystemInfoModel: Model<Project> = mongoose.model<Project>('SystemInfo', SystemSchema)
 
 const MONGO_USER = process.env.MONGO_USER ?? 'root'
 const MONGO_PASSWORD = process.env.MONGO_PASSWORD ?? 'secret'

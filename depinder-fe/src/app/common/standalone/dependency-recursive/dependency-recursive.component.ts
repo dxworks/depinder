@@ -1,11 +1,11 @@
 import {Component, EventEmitter, Input, Output} from '@angular/core';
-import {Dependency} from "../../models/project";
 import {TreeNode} from "../../models/tree";
 import {of} from "rxjs";
 import {MatIconModule} from "@angular/material/icon";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {JsonPipe, NgClass, NgIf} from "@angular/common";
 import {DependencyFilter} from "../../models/dependency-filter";
+import {Dependency} from '../../../../../../core/project'
 
 @Component({
   selector: 'app-dependency-recursive',

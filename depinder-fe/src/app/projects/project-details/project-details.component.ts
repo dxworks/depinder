@@ -1,12 +1,12 @@
 import {Component, OnChanges, OnInit, SimpleChanges} from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { ProjectsService } from "../../common/services/projects.service";
-import {Dependency, Project} from "../../common/models/project";
 import {animate, state, style, transition, trigger} from "@angular/animations";
 import {TreeNode} from "../../common/models/tree";
 import {LibraryInfo, LibraryVersion} from "../../common/models/library";
 import {LibrariesService} from "../../common/services/libraries.service";
 import {DependencyFilter} from "../../common/models/dependency-filter";
+import {Dependency, Project} from '../../../../../core/project'
 
 @Component({
   selector: 'app-project-details',
