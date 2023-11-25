@@ -1,7 +1,6 @@
-import {Component, Input, OnChanges, OnInit} from '@angular/core';
-import {LibrariesService} from "../../../common/services/libraries.service";
-import {Dependency} from '../../../../../../core/project'
-import {LibraryInfo, LibraryVersion} from '../../../../../../core/library'
+import {Component, Input, OnInit} from '@angular/core';
+import { LibraryInfo, LibraryVersion } from '@core/library';
+import { Dependency } from '@core/project';
 
 @Component({
   selector: 'app-dependency-details',
@@ -10,7 +9,6 @@ import {LibraryInfo, LibraryVersion} from '../../../../../../core/library'
 })
 export class DependencyDetailsComponent implements OnInit {
   @Input() selectedDependency? : Dependency;
-
   @Input() libraryInfo?: LibraryInfo;
 
   selectedVersion?: LibraryVersion;
@@ -26,6 +24,7 @@ export class DependencyDetailsComponent implements OnInit {
   }
 
   findUsedVersion(version: string) {
+
     // if (this.libraryInfo !== undefined) {
       this.selectedVersion = this.libraryInfo?.versions.find(v => v.version === version);
       console.log(this.selectedVersion);

@@ -5,7 +5,7 @@ import {MatIconModule} from "@angular/material/icon";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {JsonPipe, NgClass, NgIf} from "@angular/common";
 import {DependencyFilter} from "../../models/dependency-filter";
-import {Dependency} from '../../../../../../core/project'
+import { Dependency } from '@core/project';
 
 @Component({
   selector: 'app-dependency-recursive',

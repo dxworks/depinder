@@ -1,4 +1,4 @@
-import {Dependency} from '../../../../../core/project'
+import { Dependency } from "@core/project";
 
 export class TreeNode {
   data: Dependency;

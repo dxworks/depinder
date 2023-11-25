@@ -2,8 +2,8 @@ import {Component, Input, OnInit} from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { ProjectsTableComponent } from '../../../common/standalone/projects-table/projects-table.component'
 import {ProjectsService} from '../../../common/services/projects.service'
-import {System} from '../../../../../../core/system'
-import {Project} from '../../../../../../core/project'
+import { Project } from '@core/project';
+import { System } from '@core/system';
 
 @Component({
   selector: 'app-system-info',

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import {SystemsService} from "../../common/services/systems.service";
 import {ProjectsTableComponent} from "../../common/standalone/projects-table/projects-table.component";
 import {SystemInfoComponent} from "./system-info/system-info.component";
-import {System} from '../../../../../core/system'
+import { System } from '@core/system';
 
 @Component({
   selector: 'app-systems',

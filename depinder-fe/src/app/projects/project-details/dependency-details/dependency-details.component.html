@@ -73,17 +73,17 @@
       </ul>
     </section>
 
-    <div *ngIf="libraryInfo.homepageUrl.length > 0">
+    <div *ngIf="(libraryInfo.homepageUrl ?? []).length > 0">
       <h2>Homepage</h2>
       <a href="{{ libraryInfo.homepageUrl }}" target="_blank">{{ libraryInfo.homepageUrl }}</a>
     </div>
 
-    <div *ngIf="libraryInfo.documentationUrl.length > 0">
+    <div *ngIf="(libraryInfo.documentationUrl ?? []).length > 0">
       <h2>Documentation</h2>
       <a href="{{ libraryInfo.documentationUrl }}" target="_blank">{{ libraryInfo.documentationUrl }}</a>
     </div>
 
-    <div *ngIf="libraryInfo.packageUrl.length > 0">
+    <div *ngIf="(libraryInfo.packageUrl ?? []).length > 0">
       <h2>Package URL</h2>
       <a href="{{ libraryInfo.packageUrl }}" target="_blank">{{ libraryInfo.packageUrl }}</a>
     </div>
