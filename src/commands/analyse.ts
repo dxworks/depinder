@@ -4,7 +4,7 @@ import path from 'path'
 import {getPluginsFromNames} from '../plugins'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
 import {log} from '@dxworks/cli-common'
-import {LibraryInfo} from '../extension-points/registrar'
+
 import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
 import {Range} from 'semver'
 import _ from 'lodash'
@@ -21,6 +21,7 @@ import minimatch from 'minimatch'
 import {mongoCacheLibrary, mongoCacheProject, mongoCacheSystem} from '../cache/mongo-cache'
 import {Project} from '../../core/project'
 import {Vulnerability} from '../../core/vulnerability-checker'
+import {LibraryInfo} from '../../core/library'
 // import {defaultPlugins} from '../extension-points/plugin-loader'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')

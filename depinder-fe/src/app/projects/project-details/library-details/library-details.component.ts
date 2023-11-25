@@ -1,5 +1,5 @@
 import {Component, Input} from '@angular/core';
-import {LibraryInfo} from "../../../common/models/library";
+import {LibraryInfo} from '../../../../../../core/library'
 
 @Component({
   selector: 'app-library-details',

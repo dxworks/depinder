@@ -1,7 +1,7 @@
 import {Cache} from './cache'
 import mongoose, { Model, Schema } from 'mongoose'
-import {LibraryInfo} from '../extension-points/registrar'
 import {Project} from '../../core/project'
+import {LibraryInfo} from '../../core/library'
 
 const LibraryVersionSchema = new Schema({
     version: String,

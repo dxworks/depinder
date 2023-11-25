@@ -7,12 +7,13 @@ import {
 } from '../../extension-points/extract'
 import path from 'path'
 import fs from 'fs'
-import {AbstractRegistrar, LibrariesIORegistrar, LibraryInfo, Registrar} from '../../extension-points/registrar'
+import {AbstractRegistrar, LibrariesIORegistrar, Registrar} from '../../extension-points/registrar'
 import {Plugin} from '../../extension-points/plugin'
 import {Composer, ComposerLock} from '../../info/php/parser'
 import {getPackageDetails, IPackagistPackageDetails} from './php-interfaces'
 import {getPackageSemver} from '../../utils/utils'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
+import {LibraryInfo} from '../../../core/library'
 
 const extractor: Extractor = {
     files: ['composer.json', 'composer.lock'],

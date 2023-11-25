@@ -1,7 +1,7 @@
 import {Component, Input, OnChanges, OnInit} from '@angular/core';
-import {LibraryInfo, LibraryVersion} from "../../../common/models/library";
 import {LibrariesService} from "../../../common/services/libraries.service";
 import {Dependency} from '../../../../../../core/project'
+import {LibraryInfo, LibraryVersion} from '../../../../../../core/library'
 
 @Component({
   selector: 'app-dependency-details',

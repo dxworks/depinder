@@ -1,6 +1,6 @@
 import axios from 'axios'
 import {Plugin} from '../../extension-points/plugin'
-import {AbstractRegistrar, LibrariesIORegistrar, LibraryInfo, Registrar} from '../../extension-points/registrar'
+import {AbstractRegistrar, LibrariesIORegistrar, Registrar} from '../../extension-points/registrar'
 import {
     DependencyFileContext,
     DepinderDependency,
@@ -16,6 +16,7 @@ import path from 'path'
 import {getPackageSemver} from '../../utils/utils'
 import {log} from '@dxworks/cli-common'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
+import {LibraryInfo} from '../../../core/library'
 
 const extractor: Extractor = {
     files: ['*.csproj', '*.fsproj', '*.vbproj'],

@@ -7,7 +7,7 @@ import {
 } from '../../extension-points/extract'
 // @ts-ignore
 import path from 'path'
-import {AbstractRegistrar, LibrariesIORegistrar, LibraryInfo, Registrar} from '../../extension-points/registrar'
+import {AbstractRegistrar, LibrariesIORegistrar, Registrar} from '../../extension-points/registrar'
 import fetch from 'node-fetch'
 import {Plugin} from '../../extension-points/plugin'
 import fs from 'fs'
@@ -17,6 +17,7 @@ import {execSync} from 'child_process'
 import * as toml from 'toml'
 import {getPackageSemver} from '../../utils/utils'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
+import {LibraryInfo} from '../../../core/library'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 

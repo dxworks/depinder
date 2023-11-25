@@ -1,7 +1,7 @@
 import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
 // @ts-ignore
 import path from 'path'
-import {AbstractRegistrar, LibrariesIORegistrar, LibraryInfo} from '../../extension-points/registrar'
+import {AbstractRegistrar, LibrariesIORegistrar} from '../../extension-points/registrar'
 import fetch from 'node-fetch'
 import {Plugin} from '../../extension-points/plugin'
 import fs from 'fs'
@@ -9,6 +9,7 @@ import {depinderTempFolder} from '../../utils/utils'
 import {log} from '@dxworks/cli-common'
 import {parseMavenDependencyTree} from './parsers/maven'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
+import {LibraryInfo} from '../../../core/library'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pomParser = require('pom-parser')

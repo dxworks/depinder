@@ -1,9 +1,9 @@
 import {Cache} from './cache'
 import path from 'path'
 import fs from 'fs'
-import {LibraryInfo} from '../extension-points/registrar'
 import {System} from '../../core/system'
 import {Project} from '../../core/project'
+import {LibraryInfo} from '../../core/library'
 
 const CACHE_FILE_NAME_LIBS = 'libs.json'
 const CACHE_FILE_NAME_PROJECTS = 'projects.json'

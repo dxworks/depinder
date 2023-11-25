@@ -9,10 +9,11 @@ import {
 import * as gemfile from '@snyk/gemfile'
 import path from 'path'
 import semver from 'semver/preload'
-import {LibraryInfo, Registrar} from '../../extension-points/registrar'
+import {Registrar} from '../../extension-points/registrar'
 import fetch from 'node-fetch'
 import {Plugin} from '../../extension-points/plugin'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
+import {LibraryInfo} from '../../../core/library'
 
 const extractor: Extractor = {
     files: ['Gemfile', '*.gemspec', 'Gemfile.lock'],
