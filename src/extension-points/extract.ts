@@ -1,6 +1,6 @@
 import {SemVer} from 'semver'
 import {LibraryInfo} from './registrar'
-import {Vulnerability} from './vulnerability-checker'
+import {Vulnerability} from '../../core/vulnerability-checker'
 
 export interface Extractor {
     files: string[]

@@ -12,10 +12,10 @@ import {DepTreeDep} from 'snyk-nodejs-lockfile-parser/dist/parsers'
 import {log} from '@dxworks/cli-common'
 import {LibraryInfo, Registrar} from '../../extension-points/registrar'
 import {json} from 'npm-registry-fetch'
-import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
 import {Plugin} from '../../extension-points/plugin'
 import {npm} from '../../utils/npm'
 import fs from 'fs'
+import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 
 const extractor: Extractor = {
     files: ['package.json', 'package-lock.json', 'yarn.lock'],

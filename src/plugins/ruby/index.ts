@@ -11,8 +11,8 @@ import path from 'path'
 import semver from 'semver/preload'
 import {LibraryInfo, Registrar} from '../../extension-points/registrar'
 import fetch from 'node-fetch'
-import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
 import {Plugin} from '../../extension-points/plugin'
+import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 
 const extractor: Extractor = {
     files: ['Gemfile', '*.gemspec', 'Gemfile.lock'],

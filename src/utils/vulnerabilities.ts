@@ -1,6 +1,6 @@
 import {graphql} from '@octokit/graphql'
 import axios from 'axios'
-import {Vulnerability} from '../extension-points/vulnerability-checker'
+import {Vulnerability} from '../../core/vulnerability-checker'
 
 export async function getVulnerabilitiesFromGithub(ecosystem: string, packageName: string): Promise<Vulnerability[]> {
     const authGraphql = graphql.defaults({

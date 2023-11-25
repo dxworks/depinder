@@ -1,7 +1,7 @@
 import {Extractor, Parser} from './extract'
 import {Registrar} from './registrar'
-import {VulnerabilityChecker} from './vulnerability-checker'
 import {CodeFinder} from './code-impact'
+import {VulnerabilityChecker} from '../../core/vulnerability-checker'
 
 export interface Plugin {
     name: string // the name of the technology (could be language name or package manager name)

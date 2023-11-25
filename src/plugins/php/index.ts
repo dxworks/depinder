@@ -8,11 +8,11 @@ import {
 import path from 'path'
 import fs from 'fs'
 import {AbstractRegistrar, LibrariesIORegistrar, LibraryInfo, Registrar} from '../../extension-points/registrar'
-import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
 import {Plugin} from '../../extension-points/plugin'
 import {Composer, ComposerLock} from '../../info/php/parser'
 import {getPackageDetails, IPackagistPackageDetails} from './php-interfaces'
 import {getPackageSemver} from '../../utils/utils'
+import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 
 const extractor: Extractor = {
     files: ['composer.json', 'composer.lock'],

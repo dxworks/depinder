@@ -1,7 +1,7 @@
-import {Vulnerability} from './vulnerability-checker'
 import fetch from 'node-fetch'
 import moment from 'moment/moment'
 import {delay} from '../utils/utils'
+import {Vulnerability} from '../../core/vulnerability-checker'
 
 export interface Registrar {
     retrieve: RegistryRetriever

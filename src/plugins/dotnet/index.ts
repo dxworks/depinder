@@ -8,7 +8,6 @@ import {
     Extractor,
     Parser,
 } from '../../extension-points/extract'
-import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
 import moment from 'moment'
 
 import {runNuGetInspectorProgrammatically} from '@dxworks/nuget-inspector'
@@ -16,6 +15,7 @@ import fs from 'fs'
 import path from 'path'
 import {getPackageSemver} from '../../utils/utils'
 import {log} from '@dxworks/cli-common'
+import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 
 const extractor: Extractor = {
     files: ['*.csproj', '*.fsproj', '*.vbproj'],
