@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { mongoCacheLibrary } from '../../cache/mongo-cache'
+import { mongoCacheLibrary } from '../../src/cache/mongo-cache'
 
 export const getAllLibraries = async (_req: Request, res: Response): Promise<any> => {
     try {

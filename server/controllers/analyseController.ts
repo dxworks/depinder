@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import {analyseFilesToCache, saveToCsv} from '../../commands/analyse'
+import {analyseFilesToCache, saveToCsv} from '../../src/commands/analyse'
 
 export const saveAnalysisToCsv = async (_req: Request, res: Response): Promise<any> => {
     try {

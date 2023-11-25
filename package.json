@@ -36,7 +36,7 @@
     "test": "jest --passWithNoTests",
     "test:dev": "jest --watch",
     "start-fe": "cd ./depinder-fe && ng serve",
-    "start-be": "node ./src/server/src/server.js"
+    "start-be": "node ./server/src/server.js"
   },
   "dependencies": {
     "@dxworks/cli-common": "^0.0.20",

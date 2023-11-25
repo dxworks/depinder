@@ -1,5 +1,5 @@
 import {Request, Response} from 'express'
-import {mongoCacheSystem} from '../../cache/mongo-cache'
+import {mongoCacheSystem} from '../../src/cache/mongo-cache'
 
 export const getProjectById = async (_req: Request, res: Response): Promise<any> => {
     try {
