@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import {HttpClient} from "@angular/common/http";
 import {API_URL} from "../constants";
+import {System} from "@core/system";
 
 const BASE_URL = API_URL;
 
@@ -18,6 +19,14 @@ export class SystemsService {
 
   find(id: string) {
     return this.http.get(this.getUrlWithID(id));
+  }
+
+  createSystem(system: System) {
+    return this.http.post(this.getUrl(), {
+      "_id": system._id,
+      "name": system.name,
+      "projectPaths": system.projectPaths,
+    });
   }
 
   getUrl() {

@@ -67,8 +67,18 @@ export const analyseCommand = new Command()
     .option('--results, -r', 'The results folder', 'results')
     .option('--refresh', 'Refresh the cache', false)
     .option('--plugins, -p [plugins...]', 'A list of plugins')
-    .action(analyseFilesToCache)
-    .action(saveToCsv)
+    .action((folders: string[], options: AnalyseOptions) => {
+        // Call analyseFilesToCache and handle the result, but do not return anything.
+        analyseFilesToCache(folders, options).then((result) => {
+            // Handle the result as needed, e.g., log it or process it
+            console.log(result);
+        }).catch(error => {
+            // Handle any errors
+            console.error(error);
+        });
+        // No return statement here
+    })
+    .action(saveToCsv);
 
 const outOfSupportThreshold = 24
 const outdatedThreshold = 15
@@ -233,13 +243,14 @@ async function cacheHit(cache: Cache, plugin: Plugin, dep: DepinderDependency, r
 }
 
 async function processProjects(projects: DepinderProject[], plugin: Plugin, cache: Cache, refreshedLibs: string[], options: AnalyseOptions, cacheProjects: Cache) {
+    const newProjectIds: string[] = []
     const multiProgressBar = new MultiBar({}, Presets.shades_grey)
 
     const projectsBar = multiProgressBar.create(projects.length, 0, {name: 'Projects', state: 'Analysing'})
 
 
     for (const project of projects) {
-        await processSingleProject(project, plugin, cache, refreshedLibs, options, cacheProjects)
+        newProjectIds.push(await processSingleProject(project, plugin, cache, refreshedLibs, options, cacheProjects))
         projectsBar.increment()
     }
 
@@ -247,9 +258,11 @@ async function processProjects(projects: DepinderProject[], plugin: Plugin, cach
 
     await cacheProjects.write()
     await cache.write()
+
+    return newProjectIds
 }
 
-async function processSingleProject(project: DepinderProject, plugin: any, cache: Cache, refreshedLibs: string[], options: AnalyseOptions, cacheProjects: Cache): Promise<void> {
+async function processSingleProject(project: DepinderProject, plugin: any, cache: Cache, refreshedLibs: string[], options: AnalyseOptions, cacheProjects: Cache): Promise<string> {
     log.info(`Plugin ${plugin.name} analyzing project ${project.name}@${project.version}`)
     const dependencies = Object.values(project.dependencies)
     const filteredDependencies = dependencies.filter(it => !blacklistedGlobs.some(glob => minimatch(it.name, glob)))
@@ -323,6 +336,8 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
     })
 
     log.info('Project data saving in mongo db done!')
+
+    return `${project.name}@${project.version}`;
 }
 
 async function processSystem(projects: DepinderProject[], useCache: boolean) {
@@ -366,7 +381,8 @@ function filterFilesForPlugin(allFiles: string[], plugin: any): string[] {
     })
 }
 
-export async function analyseFilesToCache(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
+export async function analyseFilesToCache(folders: string[], options: AnalyseOptions, useCache = true): Promise<string[]> {
+    const projectIds: string[] = []
     const allFiles = folders.flatMap(walkDir)
     const selectedPlugins = getPluginsFromNames(options.plugins)
 
@@ -386,14 +402,16 @@ export async function analyseFilesToCache(folders: string[], options: AnalyseOpt
 
         allProjects.push(...projects)
 
-        await processProjects(projects, plugin, cache, refreshedLibs, options, cacheProjects)
+        projectIds.push(...await processProjects(projects, plugin, cache, refreshedLibs, options, cacheProjects))
     }
 
     console.log('Projects in the system:', allProjects.length)
 
-    await processSystem(allProjects, useCache)
+    // await processSystem(allProjects, useCache)
 
     log.info('Done')
+
+    return projectIds
 }
 
 export async function saveToCsv(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
