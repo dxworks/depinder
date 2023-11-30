@@ -4,33 +4,7 @@
     <h3 style="text-align: center;">{{project.projectPath}}</h3>
   </div>
 
-  <div class="col" style="display: flex">
-    <div class="col1" style="flex-shrink: 0; flex-grow: 0">
-      @defer {
-        <app-dependency-filter
-          (filterEmitter)="receiveFilter($event)"
-        ></app-dependency-filter>
-
-        <p>{{filter | json}}</p>
-
-        <app-dependency-recursive [allDependencies]="treeNodes"
-                                  [showMore]="true"
-                                  (childEvent)="receiveInfo($event)"
-                                  [filter]="filter">
-        </app-dependency-recursive>
-      } @loading (minimum 1s) {
-        <p>Loading...</p>
-      }
-
-
-    </div>
-    <div style="width: 3rem"></div>
-    <div class="col2" style="flex: 1">
-      <app-dependency-details
-        [selectedDependency]="selectedDependency"
-        [libraryInfo]="selectedLibrary">
-      </app-dependency-details>
-
-    </div>
-  </div>
+  <app-dependencies
+    [allDependencies]="project.dependencies"
+  ></app-dependencies>
 </ng-container>

@@ -1,10 +1,16 @@
 import {Component, Input, OnInit} from '@angular/core';
 import { LibraryInfo, LibraryVersion } from '@core/library';
 import { Dependency } from '@core/project';
+import {NgForOf, NgIf} from "@angular/common";
 
 @Component({
+  standalone: true,
   selector: 'app-dependency-details',
   templateUrl: './dependency-details.component.html',
+  imports: [
+    NgForOf,
+    NgIf
+  ],
   styleUrls: ['./dependency-details.component.css']
 })
 export class DependencyDetailsComponent implements OnInit {
