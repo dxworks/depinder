@@ -53,13 +53,17 @@ export const createSystem = async (_req: Request, res: Response): Promise<any> =
 
         await mongoCacheSystem.set(id, {
             name: name,
-            projectPaths: projectPaths,
-            projects: projectIds,
+            runs: [
+                {
+                    date: Date.now(),
+                    projects: projectIds,
+                },
+            ]
         })
 
-        res.status(200).send('Resource created')
+        res.status(200).json({ data: "System created" })
     } catch (err) {
         console.error(`Error: ${err}`)
-        res.status(500).send('Internal Server Error')
+        res.status(500).json({ data: "Internal Server Error" })
     }
 }

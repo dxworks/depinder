@@ -56,10 +56,15 @@ const DependencySchema = new Schema({
     outdated: Boolean,
 })
 
+const SystemRun = new Schema({
+    date: String,
+    projects: [String]
+})
+
 const SystemSchema = new Schema({
     _id: String,
     name: String,
-    projects: [String],
+    runs: [SystemRun]
 })
 
 const ProjectInfoSchema = new Schema({
@@ -155,7 +160,12 @@ export const mongoCacheSystem: Cache = {
         return await SystemInfoModel.findById(key).exec()
     },
     async set(key: string, value: any) {
-        await SystemInfoModel.findByIdAndUpdate(key, value, { upsert: true }).exec()
+        await SystemInfoModel.findByIdAndUpdate(
+            key,
+            { $push: { runs: value.runs } },
+            { new: false, upsert: true } // options: does not return the updated document, do not upsert
+        )
+        // await SystemInfoModel.findByIdAndUpdate(key, value, { upsert: true }).exec()
     },
     async has(key: string) {
         return (await SystemInfoModel.exists({ _id: key }) !== null)
