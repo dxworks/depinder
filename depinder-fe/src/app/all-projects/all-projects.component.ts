@@ -2,14 +2,15 @@ import {Component, OnInit} from '@angular/core';
 import {ProjectsService} from "../common/services/projects.service";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {AnalysisService} from "../common/services/analysis.service";
-import {Project} from '../../../../core/project'
+import {Project} from '@core/project'
+import { ProjectsTableComponent } from '../common/standalone/projects-table/projects-table.component';
 
 @Component({
-  selector: 'app-projects',
-  templateUrl: './projects.component.html',
-  styleUrls: ['./projects.component.css']
+  selector: 'app-all-projects',
+  templateUrl: './all-projects.component.html',
+  styleUrls: ['./all-projects.component.css']
 })
-export class ProjectsComponent implements OnInit {
+export class AllProjectsComponent implements OnInit {
   projects$: Project[] = [];
   folderPath: string = '';
 

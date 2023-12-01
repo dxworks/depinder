@@ -1,18 +1,18 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import {ProjectDetailsComponent} from "./projects/project-details/project-details.component";
-import {ProjectsComponent} from "./projects/projects.component";
-import {SystemsDetailsComponent} from "./projects/system-collection/systems-details.component";
-import {CreateSystemComponent} from "./projects/system-collection/create-system/create-system.component";
-import {SystemInfoComponent} from "./projects/system-collection/system-info/system-info.component";
+import {ProjectDetailsComponent} from "./all-projects/project-details/project-details.component";
+import {AllProjectsComponent} from "./all-projects/all-projects.component";
+import {AllSystemsComponent} from "./all-systems/all-systems.component";
+import {CreateSystemComponent} from "./create-system/create-system.component";
+import {SystemInfoComponent} from "./all-systems/system-info/system-info.component";
 
 const routes: Routes = [
   { path: 'project/:projectId', component: ProjectDetailsComponent },
-  { path: 'projects', component: ProjectsComponent},
+  { path: 'projects', component: AllProjectsComponent},
   { path: 'create-system', component: CreateSystemComponent},
-  { path: 'systems', component: SystemsDetailsComponent},
+  { path: 'systems', component: AllSystemsComponent},
   { path: 'systems/:id', component: SystemInfoComponent},
-  { path: '**', component: ProjectsComponent }
+  { path: '**', component: AllProjectsComponent }
   // { path: '**', component: AppComponent }
 ];
 

@@ -13,9 +13,9 @@ import {
 import {MatInputModule} from "@angular/material/input";
 import {ErrorStateMatcher} from "@angular/material/core";
 import {MatButtonModule} from "@angular/material/button";
-import {SystemsService} from "../../../common/services/systems.service";
+import {SystemsService} from "../common/services/systems.service";
 import {System} from "@core/system";
-import { alphaNumericUnderscoreValidator } from 'src/app/common/validators';
+import { alphaNumericUnderscoreValidator } from '../common/validators';
 
 export class MyErrorStateMatcher implements ErrorStateMatcher {
   isErrorState(control: FormControl | null, form: FormGroupDirective | NgForm | null): boolean {

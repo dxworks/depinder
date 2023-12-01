@@ -3,8 +3,8 @@ import { BrowserModule } from '@angular/platform-browser';
 import {HttpClientModule} from "@angular/common/http";
 import { AppComponent } from './app.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { ProjectsComponent } from './projects/projects.component';
-import { ProjectDetailsComponent } from './projects/project-details/project-details.component';
+import { AllProjectsComponent } from './all-projects/all-projects.component';
+import { ProjectDetailsComponent } from './all-projects/project-details/project-details.component';
 import { AppRoutingModule } from './app-routing.module';
 import {MatTableModule} from "@angular/material/table";
 import {MatButtonModule} from "@angular/material/button";
@@ -16,16 +16,16 @@ import {MatCardModule} from "@angular/material/card";
 import { MatIconModule } from '@angular/material/icon';
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {MatSnackBarModule} from "@angular/material/snack-bar";
-import { LibraryDetailsComponent } from './projects/project-details/library-details/library-details.component';
+import { LibraryDetailsComponent } from './all-projects/project-details/library-details/library-details.component';
 import { DependencyRecursiveComponent } from './common/standalone/dependency-recursive/dependency-recursive.component';
 import {MatTreeModule} from "@angular/material/tree";
 import {MatSelectModule} from "@angular/material/select";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MAT_FORM_FIELD_DEFAULT_OPTIONS} from "@angular/material/form-field";
-import {SystemsDetailsComponent} from "./projects/system-collection/systems-details.component";
+import {AllSystemsComponent} from "./all-systems/all-systems.component";
 import {ProjectsTableComponent} from "./common/standalone/projects-table/projects-table.component";
 import {DependencyFilterComponent} from "./common/standalone/dependencies/dependency-filter/dependency-filter.component";
-import {CreateSystemComponent} from "./projects/system-collection/create-system/create-system.component";
+import {CreateSystemComponent} from "./create-system/create-system.component";
 import {DependencyDetailsComponent} from "./common/standalone/dependencies/dependency-details/dependency-details.component";
 import {DependenciesComponent} from "./common/standalone/dependencies/dependencies.component";
 import {MatToolbarModule} from "@angular/material/toolbar";
@@ -33,7 +33,7 @@ import {MatToolbarModule} from "@angular/material/toolbar";
 @NgModule({
   declarations: [
     AppComponent,
-    ProjectsComponent,
+    AllProjectsComponent,
     ProjectDetailsComponent,
     LibraryDetailsComponent,
   ],
@@ -56,7 +56,7 @@ import {MatToolbarModule} from "@angular/material/toolbar";
     MatSelectModule,
     MatCheckboxModule,
     DependencyRecursiveComponent,
-    SystemsDetailsComponent,
+    AllSystemsComponent,
     ProjectsTableComponent,
     DependencyFilterComponent,
     CreateSystemComponent,

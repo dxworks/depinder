@@ -1,14 +1,14 @@
 import {Component, Input, OnInit} from '@angular/core'
 import { CommonModule } from '@angular/common'
-import { ProjectsTableComponent } from '../../../common/standalone/projects-table/projects-table.component'
-import {ProjectsService} from '../../../common/services/projects.service'
+import { ProjectsTableComponent } from '../../common/standalone/projects-table/projects-table.component'
+import {ProjectsService} from '../../common/services/projects.service'
 import {Dependency, Project} from '@core/project';
 import {System, SystemRun} from '@core/system';
 import {
   DependencyRecursiveComponent
-} from "../../../common/standalone/dependency-recursive/dependency-recursive.component";
-import {DependenciesComponent} from "../../../common/standalone/dependencies/dependencies.component";
-import {SystemsService} from "../../../common/services/systems.service";
+} from "../../common/standalone/dependency-recursive/dependency-recursive.component";
+import {DependenciesComponent} from "../../common/standalone/dependencies/dependencies.component";
+import {SystemsService} from "../../common/services/systems.service";
 import {ActivatedRoute} from "@angular/router";
 
 @Component({
@@ -56,7 +56,7 @@ export class SystemInfoComponent implements OnInit{
                 }
               )
             })
-            console.log('projects ' + this.projects$.length);
+            console.log('all-projects ' + this.projects$.length);
           }
         }
       )

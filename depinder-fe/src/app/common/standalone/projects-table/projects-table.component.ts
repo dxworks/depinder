@@ -22,5 +22,4 @@ export class ProjectsTableComponent {
   navigate(projectId: string) {
     this.router.navigate(['/project', projectId]);
   }
-
 }
