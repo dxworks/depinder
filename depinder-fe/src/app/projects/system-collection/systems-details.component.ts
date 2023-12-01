@@ -4,6 +4,7 @@ import {SystemsService} from "../../common/services/systems.service";
 import {ProjectsTableComponent} from "../../common/standalone/projects-table/projects-table.component";
 import {SystemInfoComponent} from "./system-info/system-info.component";
 import { System } from '@core/system';
+import {ActivatedRoute, Router} from "@angular/router";
 
 @Component({
   selector: 'app-systems',
@@ -14,7 +15,7 @@ import { System } from '@core/system';
 })
 export class SystemsDetailsComponent implements OnInit{
   systems$: System[] = [];
-  constructor(private systemService: SystemsService) {
+  constructor(private systemService: SystemsService, private router: Router, private route: ActivatedRoute) {
   }
 
   ngOnInit() {
@@ -25,4 +26,7 @@ export class SystemsDetailsComponent implements OnInit{
     )
   }
 
+  navigate(path: string) {
+    this.router.navigate([path], { relativeTo: this.route });
+  }
 }

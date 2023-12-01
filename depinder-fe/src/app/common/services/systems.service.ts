@@ -18,7 +18,7 @@ export class SystemsService {
   }
 
   find(id: string) {
-    return this.http.get(this.getUrlWithID(id));
+    return this.http.get(this.getUrlWithID(id), { observe: 'response' });
   }
 
   //todo fix any

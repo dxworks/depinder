@@ -1,4 +1,4 @@
-import {ChangeDetectorRef, Component, Input, OnInit} from '@angular/core'
+import {Component, Input, OnInit} from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { ProjectsTableComponent } from '../../../common/standalone/projects-table/projects-table.component'
 import {ProjectsService} from '../../../common/services/projects.service'
@@ -8,7 +8,8 @@ import {
   DependencyRecursiveComponent
 } from "../../../common/standalone/dependency-recursive/dependency-recursive.component";
 import {DependenciesComponent} from "../../../common/standalone/dependencies/dependencies.component";
-import {Observable} from "rxjs";
+import {SystemsService} from "../../../common/services/systems.service";
+import {ActivatedRoute} from "@angular/router";
 
 @Component({
   selector: 'app-system-info',
@@ -20,27 +21,45 @@ import {Observable} from "rxjs";
 export class SystemInfoComponent implements OnInit{
   projects$: Project[] = [];
   dependencies$: Dependency[] = [];
-  @Input() system: System | undefined;
-  constructor(private projectsService: ProjectsService) { }
+  system$: System | undefined;
+  id: string | undefined;
+  constructor(private projectsService: ProjectsService, private systemService: SystemsService, private route: ActivatedRoute) { }
 
   ngOnInit() {
-    if (this.system !== undefined) {
-      this.system.runs.sort(
-        (a: SystemRun, b) => a.date < b.date ? 1 : -1
-      )[0].projects.forEach((projectId, index2) => {
-        this.projectsService.find(projectId).subscribe(
-          {
-            next: (res2: any) => {
-              this.projects$ = [res2, ...this.projects$]
-              this.dependencies$ = [
-                ...this.dependencies$,
-                ...res2.dependencies
-              ]
-            }
+    this.route.params.subscribe(params => {
+      this.id = params['id'];
+    });
+
+    console.log('id ' + this.id);
+
+    if (this.id) {
+      this.systemService.find(this.id).subscribe(
+        (res: any) => {
+          this.system$ = res.body;
+          console.log('res.body ' + JSON.stringify(res.body));
+
+          console.log('system ' + this.system$);
+
+          if (this.system$ !== undefined) {
+            this.system$.runs.sort(
+              (a: SystemRun, b) => a.date < b.date ? 1 : -1
+            )[0].projects.forEach((projectId, index2) => {
+              this.projectsService.find(projectId).subscribe(
+                {
+                  next: (res2: any) => {
+                    this.projects$ = [res2, ...this.projects$]
+                    this.dependencies$ = [
+                      ...this.dependencies$,
+                      ...res2.dependencies
+                    ]
+                  }
+                }
+              )
+            })
+            console.log('projects ' + this.projects$.length);
           }
-        )
-      })
-      console.log('projects ' + this.projects$.length);
+        }
+      )
     }
   }
 }

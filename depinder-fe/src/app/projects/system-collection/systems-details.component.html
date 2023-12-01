@@ -1,6 +1,6 @@
 <p>Total number of systems: {{systems$.length}}</p>
 
 @for (system of systems$; track $index) {
-  <app-system-info [system]="system"></app-system-info>
+  <p (click)="navigate(system._id)"> {{system | json}} </p>
 }
 
