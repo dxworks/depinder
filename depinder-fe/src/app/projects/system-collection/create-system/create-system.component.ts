@@ -59,18 +59,21 @@ export class CreateSystemComponent {
     this.filePaths.removeAt(index);
   }
 
-  async onSubmit(): Promise<void> {
+  onSubmit() {
     if (this.form.valid) {
-      const systemData: System = {
+      const systemData = {
         _id: this.form.value.id,
         name: this.form.value.name,
         projectPaths: this.filePaths.value.map((filePath: any) => filePath.path),
-        projects: []
       };
       this.systemsService.createSystem(systemData).subscribe(
-        res => console.log(res),
-        err => console.error(err)
+        (res: any) => {
+          console.log(res);
+        }
       );
+    }
+    else {
+      alert('Please fill out all required fields.');
     }
   }
 }

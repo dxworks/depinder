@@ -4,7 +4,7 @@
   <mat-form-field class="example-full-width">
     <mat-label>ID</mat-label>
     <input type="text" matInput formControlName="id" [errorStateMatcher]="matcher">
-    @if (form.get('id')?.hasError('invalidAlphaNumericUnderscore') && !form.get('id')?.hasError('required')) {
+    @if (form.get('id')?.hasError('invalidAlphaNumericUnderscore') && form.get('id')?.hasError('required')) {
       <mat-error>The ID can contain letters, numbers, and underscores</mat-error>
     }
     @if (form.get('id')?.hasError('required')) {
@@ -12,7 +12,13 @@
     }
   </mat-form-field>
 
-  <!-- Similar structure for 'name' form field -->
+  <mat-form-field class="example-full-width">
+    <mat-label>Name</mat-label>
+    <input type="text" matInput formControlName="name" [errorStateMatcher]="matcher">
+    @if (form.get('name')?.hasError('required')) {
+      <mat-error>Name is <strong>required</strong></mat-error>
+    }
+  </mat-form-field>
 
   <div formArrayName="filePaths">
     @for (control of filePaths.controls; track $index) {

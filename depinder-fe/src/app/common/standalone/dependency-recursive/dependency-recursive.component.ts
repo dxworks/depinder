@@ -1,4 +1,4 @@
-import {Component, EventEmitter, Input, Output} from '@angular/core';
+import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
 import {TreeNode} from "../../models/tree";
 import {of} from "rxjs";
 import {MatIconModule} from "@angular/material/icon";
@@ -20,7 +20,7 @@ import { Dependency } from '@core/project';
     JsonPipe
   ]
 })
-export class DependencyRecursiveComponent {
+export class DependencyRecursiveComponent implements OnInit {
   @Input() depth: number = 0;
 
   @Input() dependency?: Dependency;
@@ -35,6 +35,10 @@ export class DependencyRecursiveComponent {
   @Input() filter!: DependencyFilter;
 
   constructor() { }
+
+  ngOnInit(): void {
+    this.allDependencies.sort((a, b) => a.data.name.localeCompare(b.data.name));
+  }
 
   containsFilters(index: number): boolean {
     const searchFieldTrimmed = this.filter.searchField?.trim()

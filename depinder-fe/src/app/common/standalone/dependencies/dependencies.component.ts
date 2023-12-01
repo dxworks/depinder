@@ -1,11 +1,11 @@
-import {Component, Input, OnInit} from "@angular/core";
+import {Component, Input, OnChanges, OnInit, SimpleChanges} from "@angular/core";
 import {Dependency} from "@core/project";
 import {TreeNode} from "../../models/tree";
 import {ProjectsService} from "../../services/projects.service";
 import {LibraryInfo} from "@core/library";
 import {DependencyFilter} from "../../models/dependency-filter";
 import {LibrariesService} from "../../services/libraries.service";
-import {DependencyFilterComponent} from "../../../projects/project-details/dependency-filter/dependency-filter.component";
+import {DependencyFilterComponent} from "./dependency-filter/dependency-filter.component";
 import {
   DependencyRecursiveComponent
 } from "../dependency-recursive/dependency-recursive.component";
@@ -24,7 +24,7 @@ import {DependencyDetailsComponent} from "./dependency-details/dependency-detail
   ],
   styleUrl: './dependencies.component.css'
 })
-export class DependenciesComponent implements OnInit {
+export class DependenciesComponent implements OnInit, OnChanges {
   @Input() allDependencies: Dependency[] = [];
   treeNodes: TreeNode[] = [];
   selectedDependency?: Dependency;
@@ -43,7 +43,18 @@ export class DependenciesComponent implements OnInit {
     this.fetchProject();
   }
 
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes["allDependencies"]) {
+      this.fetchProject();
+    }
+  }
+
   fetchProject() {
+    // Convert the array into a Map, using _id as the key
+    const uniqueDependenciesMap = new Map(this.allDependencies.map(dep => [dep._id, dep]));
+
+    // Convert the Map back into an array
+    this.allDependencies = Array.from(uniqueDependenciesMap.values());
     for (let dependency of this.allDependencies) {
       if (dependency.directDep) {
         let testDependencies = this.projectsService.getDependenciesByRequestedBy(

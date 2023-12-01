@@ -24,10 +24,11 @@ import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MAT_FORM_FIELD_DEFAULT_OPTIONS} from "@angular/material/form-field";
 import {SystemsDetailsComponent} from "./projects/system-collection/systems-details.component";
 import {ProjectsTableComponent} from "./common/standalone/projects-table/projects-table.component";
-import {DependencyFilterComponent} from "./projects/project-details/dependency-filter/dependency-filter.component";
+import {DependencyFilterComponent} from "./common/standalone/dependencies/dependency-filter/dependency-filter.component";
 import {CreateSystemComponent} from "./projects/system-collection/create-system/create-system.component";
 import {DependencyDetailsComponent} from "./common/standalone/dependencies/dependency-details/dependency-details.component";
 import {DependenciesComponent} from "./common/standalone/dependencies/dependencies.component";
+import {MatToolbarModule} from "@angular/material/toolbar";
 
 @NgModule({
   declarations: [
@@ -61,6 +62,7 @@ import {DependenciesComponent} from "./common/standalone/dependencies/dependenci
     CreateSystemComponent,
     DependenciesComponent,
     DependencyDetailsComponent,
+    MatToolbarModule,
   ],
   providers: [
     {provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: {appearance: 'outline'}}

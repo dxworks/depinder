@@ -8,7 +8,7 @@ import {MatIconModule} from "@angular/material/icon";
 import {MatInputModule} from "@angular/material/input";
 import {MatOptionModule} from "@angular/material/core";
 import {MatSelectModule} from "@angular/material/select";
-import {DependencyFilter} from "../../../common/models/dependency-filter";
+import {DependencyFilter} from "../../../models/dependency-filter";
 
 @Component({
   selector: 'app-dependency-filter',

@@ -1,6 +1,10 @@
+<h3>{{system?._id}}</h3>
 <h3>{{system?.name}}</h3>
 <div style="padding-bottom: 2rem">
   <app-projects-table
     [projects]="projects$"
   ></app-projects-table>
 </div>
+<app-dependencies
+  [allDependencies]="dependencies$">
+</app-dependencies>

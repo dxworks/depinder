@@ -21,7 +21,8 @@ export class SystemsService {
     return this.http.get(this.getUrlWithID(id));
   }
 
-  createSystem(system: System) {
+  //todo fix any
+  createSystem(system: any) {
     return this.http.post(this.getUrl(), {
       "_id": system._id,
       "name": system.name,
