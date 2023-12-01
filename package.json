@@ -37,7 +37,7 @@
     "test:dev": "jest --watch"
   },
   "dependencies": {
-    "@dxworks/cli-common": "^0.0.20",
+    "@dxworks/cli-common": "^0.1.1",
     "@dxworks/ktextensions": "^0.1.0",
     "@dxworks/nuget-inspector": "^1.2.0",
     "@octokit/graphql": "^4.8.0",
