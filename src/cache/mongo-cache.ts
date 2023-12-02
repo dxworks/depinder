@@ -57,7 +57,7 @@ const DependencySchema = new Schema({
 })
 
 const SystemRun = new Schema({
-    date: String,
+    date: Number,
     projects: [String]
 })
 
@@ -160,12 +160,17 @@ export const mongoCacheSystem: Cache = {
         return await SystemInfoModel.findById(key).exec()
     },
     async set(key: string, value: any) {
+        const updateQuery: any = { $push: { runs: value.runs } };
+
+        if (value.name !== undefined) {
+            updateQuery['$set'] = { name: value.name };
+        }
+
         await SystemInfoModel.findByIdAndUpdate(
             key,
-            { $push: { runs: value.runs } },
-            { new: false, upsert: true } // options: does not return the updated document, do not upsert
-        )
-        // await SystemInfoModel.findByIdAndUpdate(key, value, { upsert: true }).exec()
+            updateQuery,
+            { new: true, upsert: true }
+        );
     },
     async has(key: string) {
         return (await SystemInfoModel.exists({ _id: key }) !== null)

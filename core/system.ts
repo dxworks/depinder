@@ -5,6 +5,6 @@ export interface System {
 }
 
 export interface SystemRun {
-  date: string,
+  date: number,
   projects: string[]
 }
