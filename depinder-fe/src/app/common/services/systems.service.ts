@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import {HttpClient} from "@angular/common/http";
 import {API_URL} from "../constants";
 import {System} from "@core/system";
+import {map, Observable} from "rxjs";
 
 const BASE_URL = API_URL;
 
@@ -17,8 +18,10 @@ export class SystemsService {
     return this.http.get(`${this.getUrl()}/all `, { observe: 'response' });
   }
 
-  find(id: string) {
-    return this.http.get(this.getUrlWithID(id), { observe: 'response' });
+  find(id: string): Observable<System> {
+    return this.http.get<System>(this.getUrlWithID(id), { observe: 'response' }).pipe(
+      map(response => response.body as System)
+    );
   }
 
   //todo fix any

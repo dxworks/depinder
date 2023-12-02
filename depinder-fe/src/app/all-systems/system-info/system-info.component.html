@@ -1,10 +1,33 @@
-<h3>{{system$?._id}}</h3>
-<h3>{{system$?.name}}</h3>
-<div style="padding-bottom: 2rem">
-  <app-projects-table
-    [projects]="projects$"
-  ></app-projects-table>
+<div class="row-container">
+  <h1>{{system?.name ?? "No name"}}</h1>
+
+  <mat-form-field class="full-width-select">
+    <mat-label>Run date</mat-label>
+    <select matNativeControl required [(ngModel)]="selectedRunDate" (ngModelChange)="getRunData()">
+      @for (run of system?.runs; track run.date) {
+        <option [value]="run.date">{{ convertToDateString(run.date) | date:'full'}}</option>
+      }
+    </select>
+  </mat-form-field>
 </div>
-<app-dependencies
-  [allDependencies]="dependencies$">
-</app-dependencies>
+
+<h3>id : {{system?._id}}</h3>
+
+
+@if (projects.length > 0) {
+  <h2>Projects in this system</h2>
+
+  <div style="padding-bottom: 2rem">
+    <app-projects-table
+      [projects]="projects"
+    ></app-projects-table>
+  </div>
+}
+
+@if (dependencies.length > 0) {
+  <h2>Dependencies</h2>
+
+  <app-dependencies
+    [allDependencies]="dependencies">
+  </app-dependencies>
+}

@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import {HttpClient} from "@angular/common/http";
 import {API_URL} from "../constants";
-import { Dependency } from '@core/project';
+import {Dependency, Project} from '@core/project';
+import {Observable} from "rxjs";
 
 const BASE_URL = API_URL;
 
@@ -16,8 +17,8 @@ export class ProjectsService {
     return this.http.get(`${this.getUrl()}/all `, { observe: 'response' });
   }
 
-  find(id: string) {
-    return this.http.get(this.getUrlWithID(id));
+  find(id: string): Observable<Project> {
+    return this.http.get(this.getUrlWithID(id)) as Observable<Project>;
   }
 
   getUrl() {

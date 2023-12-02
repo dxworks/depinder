@@ -1,0 +1,12 @@
+.full-width-select {
+  padding-left: 2rem;
+  width: 25rem;
+  max-width: 100%; /* Ensures it doesn't overflow the parent container */
+}
+
+.row-container {
+  display: flex;
+  align-items: center; /* Align items vertically in the center */
+  justify-content: start; /* Distribute space between elements */
+  flex-wrap: wrap; /* Wrap items to the next line on smaller screens */
+}

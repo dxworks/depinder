@@ -1,4 +1,4 @@
-import {Component, Input, OnInit} from '@angular/core'
+import {Component, OnChanges, OnInit, SimpleChanges} from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { ProjectsTableComponent } from '../../common/standalone/projects-table/projects-table.component'
 import {ProjectsService} from '../../common/services/projects.service'
@@ -10,19 +10,25 @@ import {
 import {DependenciesComponent} from "../../common/standalone/dependencies/dependencies.component";
 import {SystemsService} from "../../common/services/systems.service";
 import {ActivatedRoute} from "@angular/router";
+import {MatFormFieldModule} from "@angular/material/form-field";
+import {MatInputModule} from "@angular/material/input";
+import {FormsModule} from "@angular/forms";
 
 @Component({
   selector: 'app-system-info',
   standalone: true,
-  imports: [CommonModule, ProjectsTableComponent, DependencyRecursiveComponent, DependenciesComponent],
+  imports: [CommonModule, ProjectsTableComponent, DependencyRecursiveComponent, DependenciesComponent, MatFormFieldModule, MatInputModule, FormsModule],
   templateUrl: './system-info.component.html',
   styleUrl: './system-info.component.css'
 })
-export class SystemInfoComponent implements OnInit{
-  projects$: Project[] = [];
-  dependencies$: Dependency[] = [];
-  system$: System | undefined;
+export class SystemInfoComponent implements OnInit {
+  projects: Project[] = [];
+  dependencies: Dependency[] = [];
+  system: System | undefined;
   id: string | undefined;
+  selectedRun: SystemRun | undefined;
+  selectedRunDate: number | undefined;
+
   constructor(private projectsService: ProjectsService, private systemService: SystemsService, private route: ActivatedRoute) { }
 
   ngOnInit() {
@@ -30,36 +36,47 @@ export class SystemInfoComponent implements OnInit{
       this.id = params['id'];
     });
 
-    console.log('id ' + this.id);
-
     if (this.id) {
       this.systemService.find(this.id).subscribe(
-        (res: any) => {
-          this.system$ = res.body;
-          console.log('res.body ' + JSON.stringify(res.body));
+        (system: System) => {
+          this.system = system;
 
-          console.log('system ' + this.system$);
-
-          if (this.system$ !== undefined) {
-            this.system$.runs.sort(
-              (a: SystemRun, b) => a.date < b.date ? 1 : -1
-            )[0].projects.forEach((projectId, index2) => {
-              this.projectsService.find(projectId).subscribe(
-                {
-                  next: (res2: any) => {
-                    this.projects$ = [res2, ...this.projects$]
-                    this.dependencies$ = [
-                      ...this.dependencies$,
-                      ...res2.dependencies
-                    ]
-                  }
-                }
-              )
-            })
-            console.log('all-projects ' + this.projects$.length);
+          if (this.system !== undefined && this.system.runs.length > 0) {
+            this.selectedRunDate = this.getLatestRunDate();
+            this.getRunData();
           }
         }
       )
     }
+  }
+
+  getRunData() {
+      this.selectedRun = this.getRunByDate(this.selectedRunDate!);
+      this.projects = [];
+      this.dependencies = [];
+      this.selectedRun.projects.forEach((projectId: string) => {
+        this.projectsService.find(projectId).subscribe(
+          {
+            next: (project: Project) => {
+              this.projects = [project, ...this.projects]
+              this.dependencies = [...this.dependencies, ...project.dependencies]
+            }
+          }
+        )
+      })
+  }
+
+  getLatestRunDate(): number {
+      return this.system!.runs.sort((a, b) => {
+        return b.date - a.date;
+      })[0].date;
+  }
+
+  getRunByDate(date: number): SystemRun {
+    return this.system!.runs.filter(run => run.date == date)[0];
+  }
+
+  convertToDateString(timestamp: number): Date {
+    return new Date(timestamp);
   }
 }

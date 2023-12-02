@@ -33,21 +33,26 @@ export class MyErrorStateMatcher implements ErrorStateMatcher {
 })
 
 export class CreateSystemComponent {
-  form: FormGroup = this.fb.group({
-    id: ['', [Validators.required, alphaNumericUnderscoreValidator]],
-    name: ['', Validators.required],
-    filePaths: this.fb.array([this.createFilePath()])
-  });
-
+  form!: FormGroup;
   matcher = new MyErrorStateMatcher();
 
-  constructor(private fb: FormBuilder, private systemsService: SystemsService) {}
+  constructor(private fb: FormBuilder, private systemsService: SystemsService) {
+    this.initializeForm();
+  }
 
-  get filePaths() {
+  private initializeForm(): void {
+    this.form = this.fb.group({
+      id: ['', [Validators.required, alphaNumericUnderscoreValidator]],
+      name: ['', Validators.required],
+      filePaths: this.fb.array([this.createFilePath()])
+    });
+  }
+
+  get filePaths(): FormArray {
     return this.form.get('filePaths') as FormArray;
   }
 
-  createFilePath(): FormGroup {
+  private createFilePath(): FormGroup {
     return this.fb.group({ path: '' });
   }
 
@@ -59,21 +64,29 @@ export class CreateSystemComponent {
     this.filePaths.removeAt(index);
   }
 
-  onSubmit() {
+  onSubmit(): void {
     if (this.form.valid) {
-      const systemData = {
-        _id: this.form.value.id,
-        name: this.form.value.name,
-        projectPaths: this.filePaths.value.map((filePath: any) => filePath.path),
-      };
+      const systemData = this.getSystemData();
       this.systemsService.createSystem(systemData).subscribe(
-        (res: any) => {
-          console.log(res);
-        }
+        res => console.log(res),
+        err => console.log(err)
       );
+    } else {
+      alert('Form is invalid')
     }
-    else {
-      alert('Please fill out all required fields.');
-    }
+  }
+
+  private getSystemData(): any {
+    return {
+      _id: this.form.value.id,
+      name: this.form.value.name,
+      projectPaths: this.getValidFilePaths(),
+    };
+  }
+
+  private getValidFilePaths(): string[] {
+    return this.filePaths.value
+      .map((filePath: any) => filePath.path)
+      .filter((path: any) => path);
   }
 }
