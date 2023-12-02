@@ -7,6 +7,5 @@
 .row-container {
   display: flex;
   align-items: center; /* Align items vertically in the center */
-  justify-content: start; /* Distribute space between elements */
   flex-wrap: wrap; /* Wrap items to the next line on smaller screens */
 }

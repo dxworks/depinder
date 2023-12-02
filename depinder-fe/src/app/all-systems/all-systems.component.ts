@@ -5,11 +5,12 @@ import {SystemInfoComponent} from "./system-info/system-info.component";
 import { System } from '@core/system';
 import {ActivatedRoute, Router} from "@angular/router";
 import {ProjectsTableComponent} from "../common/standalone/projects-table/projects-table.component";
+import {MatListModule} from "@angular/material/list";
 
 @Component({
   selector: 'app-systems',
   standalone: true,
-  imports: [CommonModule, ProjectsTableComponent, SystemInfoComponent,],
+  imports: [CommonModule, ProjectsTableComponent, SystemInfoComponent, MatListModule,],
   templateUrl: './all-systems.component.html',
   styleUrl: './all-systems.component.css'
 })

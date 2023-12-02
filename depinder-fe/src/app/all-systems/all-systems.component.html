@@ -2,7 +2,11 @@
 
 <h3>Total number of systems: {{systems$.length}}</h3>
 
-@for (system of systems$; track $index) {
-  <p (click)="navigate(system._id)"> {{system | json}} </p>
-}
-
+<mat-list>
+  @for (system of systems$; track $index) {
+    <mat-list-item (click)="navigate(system._id)">
+      <strong>{{system._id}}</strong>: {{system.name ?? 'Unknown name'}}
+    </mat-list-item>
+    <mat-divider></mat-divider>
+  }
+</mat-list>

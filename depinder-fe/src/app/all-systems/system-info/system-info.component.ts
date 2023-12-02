@@ -64,6 +64,7 @@ export class SystemInfoComponent implements OnInit {
           }
         )
       })
+    this.dependencies
   }
 
   getLatestRunDate(): number {
