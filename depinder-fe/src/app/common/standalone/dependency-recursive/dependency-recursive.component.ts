@@ -3,7 +3,7 @@ import {TreeNode} from "../../models/tree";
 import {of} from "rxjs";
 import {MatIconModule} from "@angular/material/icon";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
-import {JsonPipe, NgClass, NgIf} from "@angular/common";
+import {JsonPipe, NgClass, NgIf, NgStyle} from "@angular/common";
 import {DependencyFilter} from "../../models/dependency-filter";
 import { Dependency } from '@core/project';
 
@@ -17,7 +17,8 @@ import { Dependency } from '@core/project';
     MatProgressSpinnerModule,
     NgIf,
     NgClass,
-    JsonPipe
+    JsonPipe,
+    NgStyle
   ]
 })
 export class DependencyRecursiveComponent implements OnInit {
@@ -88,4 +89,9 @@ export class DependencyRecursiveComponent implements OnInit {
   receiveInfo($event: any) {
     this.childEvent.emit($event);
   }
+
+  public getPadding(): object {
+    return this.depth > 0 ? {'padding-left': '2rem'} : {'padding-left': '0rem'};
+  }
+
 }

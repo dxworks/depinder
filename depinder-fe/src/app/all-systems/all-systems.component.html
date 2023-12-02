@@ -5,7 +5,7 @@
 <mat-list>
   @for (system of systems$; track $index) {
     <mat-list-item (click)="navigate(system._id)">
-      <strong>{{system._id}}</strong>: {{system.name ?? 'Unknown name'}}
+      <strong>{{system._id}}</strong>: {{system.name}}
     </mat-list-item>
     <mat-divider></mat-divider>
   }

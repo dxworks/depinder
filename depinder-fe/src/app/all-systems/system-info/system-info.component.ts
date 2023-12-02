@@ -54,17 +54,18 @@ export class SystemInfoComponent implements OnInit {
       this.selectedRun = this.getRunByDate(this.selectedRunDate!);
       this.projects = [];
       this.dependencies = [];
+
       this.selectedRun.projects.forEach((projectId: string) => {
         this.projectsService.find(projectId).subscribe(
           {
             next: (project: Project) => {
+              console.log(project._id);
               this.projects = [project, ...this.projects]
-              this.dependencies = [...this.dependencies, ...project.dependencies]
+              this.dependencies = [...project.dependencies, ...this.dependencies]
             }
           }
         )
       })
-    this.dependencies
   }
 
   getLatestRunDate(): number {

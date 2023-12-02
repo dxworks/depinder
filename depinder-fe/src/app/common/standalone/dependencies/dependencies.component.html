@@ -5,8 +5,6 @@
         (filterEmitter)="receiveFilter($event)"
       ></app-dependency-filter>
 
-      <p>{{filter | json}}</p>
-
       <app-dependency-recursive [allDependencies]="treeNodes"
                                 [showMore]="true"
                                 (childEvent)="receiveInfo($event)"

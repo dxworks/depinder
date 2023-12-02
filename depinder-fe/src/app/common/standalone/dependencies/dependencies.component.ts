@@ -50,6 +50,7 @@ export class DependenciesComponent implements OnInit, OnChanges {
   }
 
   fetchProject() {
+    this.treeNodes = [];
     // Convert the array into a Map, using _id as the key
     const uniqueDependenciesMap = new Map(this.allDependencies.map(dep => [dep._id, dep]));
 

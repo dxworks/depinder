@@ -15,7 +15,7 @@
 
   @for(dependency of allDependencies; track $index) {
     @if (showMore && (containsFilters($index) || ((this.filter | json) === '{}'))) {
-      <div style="padding-left: 2rem; margin-left: 2rem">
+      <div [ngStyle]="getPadding()">
         @defer (on viewport){
           <app-dependency-recursive
           [depth]="depth + 1"
