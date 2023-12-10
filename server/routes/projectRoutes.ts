@@ -4,6 +4,8 @@ import express from 'express'
 const router = express.Router()
 
 router.get('/all', projectController.getAllProjects)
+router.get('/:id/path', projectController.getPathById)
 router.get('/:id', projectController.getProjectById)
+
 
 export default router

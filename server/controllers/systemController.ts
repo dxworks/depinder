@@ -63,7 +63,6 @@ export const createSystem = async (_req: Request, res: Response): Promise<any> =
 
         res.status(200).json({ data: "System created" })
     } catch (err) {
-        console.error(`Error: ${err}`)
-        res.status(500).json({ data: "Internal Server Error" })
+        res.status(500).json({ data: err })
     }
 }
