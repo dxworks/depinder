@@ -1,0 +1,44 @@
+<h1>Edit system <strong>{{system?._id}}</strong></h1>
+
+<form class="example-form" [formGroup]="form" (ngSubmit)="onSubmit()">
+
+  <mat-form-field class="example-full-width">
+    <mat-label>Name</mat-label>
+    <input type="text" matInput formControlName="name" [errorStateMatcher]="matcher">
+    @if (form.get('name')?.hasError('required')) {
+      <mat-error>Name is <strong>required</strong></mat-error>
+    }
+  </mat-form-field>
+
+  <h2>Existing projects</h2>
+
+  @for (project of existingProjects; track $index) {
+    <div class="row" style="display: flex; justify-content: start; align-content: center">
+      <button mat-icon-button color="warn" type="button" (click)="deleteProject(project)">
+        <mat-icon>delete</mat-icon>
+      </button>
+      <p>{{project}}</p>
+    </div>
+  }
+
+  <h2>Add new projects</h2>
+  <div formArrayName="filePaths">
+    @for (control of filePaths.controls; track $index) {
+      <div class="row">
+        <mat-form-field [formGroupName]="$index">
+          <mat-label>File Path {{ $index + 1 }}</mat-label>
+          <input matInput formControlName="path">
+        </mat-form-field>
+        <button mat-button type="button" (click)="removeFilePath($index)">Remove</button>
+      </div>
+    }
+  </div>
+
+  <button mat-raised-button type="button" (click)="addFilePath()">Add File Path</button>
+
+
+  <div class="row" style="padding-top: 3rem">
+    <button mat-raised-button type="button" color="warn" style="margin-right: 1rem">Delete system</button>
+    <button mat-raised-button type="submit" color="primary">Save System</button>
+  </div>
+</form>

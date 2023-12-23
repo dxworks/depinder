@@ -29,7 +29,16 @@ export class SystemsService {
     return this.http.post(this.getUrl(), {
       "_id": system._id,
       "name": system.name,
-      "projectPaths": system.projectPaths,
+      "projectPaths": system.projectPaths ?? [],
+    });
+  }
+
+  updateSystem(id: string, name: string, newProjects: string[], deletedProjects: string[]) {
+    return this.http.post(this.getUrlWithID(id), {
+      "_id": id,
+      "name": name,
+      "newProjects": newProjects,
+      "deletedProjects": deletedProjects
     });
   }
 

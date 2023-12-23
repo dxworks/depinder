@@ -21,6 +21,10 @@ export class ProjectsService {
     return this.http.get(this.getUrlWithID(id)) as Observable<Project>;
   }
 
+  getPath(id: string): Observable<JSON> {
+    return this.http.get(`${this.getUrlWithID(id)}/path`) as Observable<JSON>;
+  }
+
   getUrl() {
     return `${BASE_URL}/${this.model}`;
   }

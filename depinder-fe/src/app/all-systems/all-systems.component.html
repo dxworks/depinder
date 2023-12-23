@@ -4,8 +4,9 @@
 
 <mat-list>
   @for (system of systems$; track $index) {
-    <mat-list-item (click)="navigate(system._id)">
+    <mat-list-item (click)="navigate([system._id])">
       <strong>{{system._id}}</strong>: {{system.name}}
+      <mat-icon fontIcon="edit" (click)="navigate([system._id, 'edit'])"></mat-icon>
     </mat-list-item>
     <mat-divider></mat-divider>
   }

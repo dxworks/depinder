@@ -5,6 +5,7 @@ import {AllProjectsComponent} from "./all-projects/all-projects.component";
 import {AllSystemsComponent} from "./all-systems/all-systems.component";
 import {CreateSystemComponent} from "./create-system/create-system.component";
 import {SystemInfoComponent} from "./all-systems/system-info/system-info.component";
+import {SystemEditComponent} from "./all-systems/system-edit/system-edit.component";
 
 const routes: Routes = [
   { path: 'project/:projectId', component: ProjectDetailsComponent },
@@ -12,6 +13,7 @@ const routes: Routes = [
   { path: 'create-system', component: CreateSystemComponent},
   { path: 'systems', component: AllSystemsComponent},
   { path: 'systems/:id', component: SystemInfoComponent},
+  { path: 'systems/:id/edit', component: SystemEditComponent},
   { path: '**', component: AllProjectsComponent }
   // { path: '**', component: AppComponent }
 ];
