@@ -49,4 +49,8 @@ export class SystemsService {
   getUrlWithID(id: string) {
     return `${this.getUrl()}/${id}`;
   }
+
+  deleteSystem(id: string) {
+    return this.http.delete(this.getUrlWithID(id));
+  }
 }

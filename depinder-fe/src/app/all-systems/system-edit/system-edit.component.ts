@@ -127,4 +127,21 @@ export class SystemEditComponent implements OnInit {
     this.existingProjects = this.existingProjects.filter(id => id !== projectId);
     this.deletedProjects.push(projectId);
   }
+
+  deleteSystem(): void {
+    if (this.system) {
+      this.systemsService.deleteSystem(this.system._id).subscribe(
+        {
+          next: () => {
+            this.openSnackBar("System deleted!");
+            this.router.navigate(['/..'])
+          },
+          error: (error: any) => {
+            this.openSnackBar("Error deleting system!");
+            console.log(error);
+          }
+        }
+      );
+    }
+  }
 }
