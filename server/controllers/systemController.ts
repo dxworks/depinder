@@ -114,3 +114,17 @@ export const updateSystem = async (_req: Request, res: Response): Promise<any> =
         res.status(500).json({ data: err })
     }
 }
+
+export const deleteSystem = async (_req: Request, res: Response): Promise<any> => {
+    try {
+        const id = _req.params.id
+
+        await mongoCacheSystem.load()
+
+        await mongoCacheSystem.delete(id)
+
+        res.status(200).json({ data: "System deleted" })
+    } catch (err) {
+        res.status(500).json({ data: err })
+    }
+}

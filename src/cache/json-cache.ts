@@ -70,6 +70,12 @@ export const jsonCacheLibrary: Cache = {
     getAll() {
         return libMapLibrary
     },
+    delete(key: string) {
+        if (!libMapLibrary) {
+            this.load()
+        }
+        libMapLibrary.delete(key)
+    }
 }
 
 export const jsonCacheProject: Cache = {
@@ -99,6 +105,12 @@ export const jsonCacheProject: Cache = {
     getAll() {
         return libMapProject
     },
+    delete(key: string) {
+        if (!libMapProject) {
+            this.load()
+        }
+        libMapProject.delete(key)
+    }
 }
 
 export const jsonCacheSystem: Cache = {
@@ -128,4 +140,10 @@ export const jsonCacheSystem: Cache = {
     getAll() {
         return libMapProject
     },
+    delete(key: string) {
+        if (!libMapSystem) {
+            this.load()
+        }
+        libMapSystem.delete(key)
+    }
 }

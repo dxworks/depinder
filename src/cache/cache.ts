@@ -5,6 +5,7 @@ export interface Cache {
     load: () => void | Promise<void>,
     write: () => void | Promise<void>,
     getAll: () => Promise<any> | undefined | any,
+    delete: (key: string) => void | Promise<void>,
 }
 
 export const noCache: Cache = {
@@ -24,4 +25,7 @@ export const noCache: Cache = {
     getAll() {
 
     },
+    delete(key: string) {
+
+    }
 }

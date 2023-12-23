@@ -123,6 +123,9 @@ export const mongoCacheLibrary: Cache = {
     async getAll() {
         return await LibraryInfoModel.find().exec()
     },
+    async delete(key: string) {
+        await LibraryInfoModel.findByIdAndDelete(key).exec();
+    }
 }
 
 export const mongoCacheProject: Cache = {
@@ -153,6 +156,9 @@ export const mongoCacheProject: Cache = {
     async getAll() {
         return await ProjectInfoModel.find().exec()
     },
+    async delete(key: string) {
+        await ProjectInfoModel.findByIdAndDelete(key).exec();
+    }
 }
 
 export const mongoCacheSystem: Cache = {
@@ -193,4 +199,7 @@ export const mongoCacheSystem: Cache = {
     async getAll() {
         return await SystemInfoModel.find().exec()
     },
+    async delete(key: string) {
+        await SystemInfoModel.findByIdAndDelete(key).exec();
+    }
 }
