@@ -1,4 +1,4 @@
-<div *ngIf="selectedDependency !== undefined">
+<div *ngIf="selectedDependency !== undefined" style="margin: 3rem">
   <h2>Dependency Details</h2>
   <table>
     <colgroup>
@@ -109,7 +109,7 @@
       <h2>Versions</h2>
       <ul>
         <div *ngFor="let version of libraryInfo.versions">
-          <p>{{ version.version }}, Downloads: {{ version.downloads }}, Date: {{ version.timestamp }}</p>
+          <p>{{ version.version }}, Downloads: {{ version.downloads }}, Date: {{ convertToDateString(version.timestamp) | date:'full'}}</p>
         </div>
       </ul>
     </section>

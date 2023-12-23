@@ -1,6 +1,6 @@
 <div *ngIf="true">
   <div *ngIf="depth > 0">
-    <div (click)="toggle()">
+    <div class="hover-parent" (click)="showMoreToggle()">
       <mat-icon
         *ngIf="allDependencies.length > 0"
         class="mat-icon-rtl-mirror">
@@ -10,6 +10,7 @@
         [ngClass]="{'highlight': isHighlighted()}">
         {{dependency?.name}} at {{dependency?.version}}
       </span>
+      <button mat-button class="hover-button" (click)="toggle()">See details</button>
     </div>
   </div>
 

@@ -11,6 +11,7 @@ import {
 } from "../dependency-recursive/dependency-recursive.component";
 import {JsonPipe} from "@angular/common";
 import {DependencyDetailsComponent} from "./dependency-details/dependency-details.component";
+import {MatDialog} from "@angular/material/dialog";
 
 @Component({
   standalone: true,
@@ -37,7 +38,10 @@ export class DependenciesComponent implements OnInit, OnChanges {
   };
   maxDepth: number = 10;
 
-  constructor(private projectsService: ProjectsService, private librariesService: LibrariesService) {
+  constructor(private projectsService: ProjectsService,
+              private librariesService: LibrariesService,
+              public dialog: MatDialog) {
+    this.openDialog = this.openDialog.bind(this);
   }
   ngOnInit(): void {
     this.fetchProject();
@@ -104,7 +108,7 @@ export class DependenciesComponent implements OnInit, OnChanges {
       this.librariesService.find(this.selectedDependency?._id).subscribe({
           next: (libraryInfo: LibraryInfo) => {
             this.selectedLibrary = libraryInfo;
-            // console.log(this.libraryInfo);
+            this.openDialog();
           },
           error: (err: any) => {
             console.error(err);
@@ -115,5 +119,22 @@ export class DependenciesComponent implements OnInit, OnChanges {
   }
   receiveFilter($event: DependencyFilter) {
     this.filter = $event;
+  }
+
+  openDialog(): void {
+    console.log("OPEN DIALOG");
+
+    const dialogRef = this.dialog.open(DependencyDetailsComponent, {
+      width: '80vw',
+      height: '60vh',
+      data: {
+        selectedDependency: this.selectedDependency,
+        libraryInfo: this.selectedLibrary
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      this.selectedDependency = undefined;
+    });
   }
 }

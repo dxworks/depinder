@@ -1,7 +1,10 @@
-import {Component, Input, OnInit} from '@angular/core';
+import {Component, Inject, Input, OnInit} from '@angular/core';
 import { LibraryInfo, LibraryVersion } from '@core/library';
 import { Dependency } from '@core/project';
-import {NgForOf, NgIf} from "@angular/common";
+import {DatePipe, NgForOf, NgIf} from "@angular/common";
+import {MAT_DIALOG_DATA} from "@angular/material/dialog";
+import {ReactiveFormsModule} from "@angular/forms";
+import {convertToDateString} from "../../../utils";
 
 @Component({
   standalone: true,
@@ -9,7 +12,9 @@ import {NgForOf, NgIf} from "@angular/common";
   templateUrl: './dependency-details.component.html',
   imports: [
     NgForOf,
-    NgIf
+    NgIf,
+    DatePipe,
+    ReactiveFormsModule
   ],
   styleUrls: ['./dependency-details.component.css']
 })
@@ -19,7 +24,15 @@ export class DependencyDetailsComponent implements OnInit {
 
   selectedVersion?: LibraryVersion;
 
-  constructor() {}
+  constructor(
+    @Inject(MAT_DIALOG_DATA) public data: any
+  ) {
+    if (data) {
+      console.log("aici" + data);
+      this.selectedDependency = data.selectedDependency;
+      this.libraryInfo = data.libraryInfo;
+    }
+  }
 
   ngOnInit() {
     if (this.selectedDependency !== undefined)
@@ -30,10 +43,11 @@ export class DependencyDetailsComponent implements OnInit {
   }
 
   findUsedVersion(version: string) {
-
     // if (this.libraryInfo !== undefined) {
       this.selectedVersion = this.libraryInfo?.versions.find(v => v.version === version);
       console.log(this.selectedVersion);
     // }
   }
+
+  protected readonly convertToDateString = convertToDateString;
 }

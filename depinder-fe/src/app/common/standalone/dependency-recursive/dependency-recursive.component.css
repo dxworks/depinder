@@ -9,3 +9,12 @@
 .no-vulnerability {
   color: green;
 }
+
+.hover-parent .hover-button {
+  visibility: hidden;  /* Hide the button initially */
+  /* Other styling for the button */
+}
+
+.hover-parent:hover .hover-button {
+  visibility: visible; /* Show the button on hover */
+}

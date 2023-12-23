@@ -29,6 +29,7 @@ import {CreateSystemComponent} from "./create-system/create-system.component";
 import {DependencyDetailsComponent} from "./common/standalone/dependencies/dependency-details/dependency-details.component";
 import {DependenciesComponent} from "./common/standalone/dependencies/dependencies.component";
 import {MatToolbarModule} from "@angular/material/toolbar";
+import {MAT_DIALOG_DATA, MatDialogModule} from "@angular/material/dialog";
 
 @NgModule({
   declarations: [
@@ -63,9 +64,11 @@ import {MatToolbarModule} from "@angular/material/toolbar";
     DependenciesComponent,
     DependencyDetailsComponent,
     MatToolbarModule,
+    MatDialogModule,
   ],
   providers: [
-    {provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: {appearance: 'outline'}}
+    {provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: {appearance: 'outline'}},
+    {provide: MAT_DIALOG_DATA, useValue: {}}
   ],
   exports: [
     DependencyDetailsComponent

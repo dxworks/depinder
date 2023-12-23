@@ -1,4 +1,4 @@
-import {Component, OnChanges, OnInit, SimpleChanges} from '@angular/core'
+import {Component, OnInit} from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { ProjectsTableComponent } from '../../common/standalone/projects-table/projects-table.component'
 import {ProjectsService} from '../../common/services/projects.service'
@@ -13,6 +13,7 @@ import {ActivatedRoute} from "@angular/router";
 import {MatFormFieldModule} from "@angular/material/form-field";
 import {MatInputModule} from "@angular/material/input";
 import {FormsModule} from "@angular/forms";
+import {convertToDateString} from "../../common/utils";
 
 @Component({
   selector: 'app-system-info',
@@ -78,7 +79,5 @@ export class SystemInfoComponent implements OnInit {
     return this.system!.runs.filter(run => run.date == date)[0];
   }
 
-  convertToDateString(timestamp: number): Date {
-    return new Date(timestamp);
-  }
+  protected readonly convertToDateString = convertToDateString;
 }

@@ -1,11 +1,11 @@
 import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
 import {TreeNode} from "../../models/tree";
-import {of} from "rxjs";
 import {MatIconModule} from "@angular/material/icon";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {JsonPipe, NgClass, NgIf, NgStyle} from "@angular/common";
 import {DependencyFilter} from "../../models/dependency-filter";
 import { Dependency } from '@core/project';
+import {MatButtonModule} from "@angular/material/button";
 
 @Component({
   selector: 'app-dependency-recursive',
@@ -18,7 +18,8 @@ import { Dependency } from '@core/project';
     NgIf,
     NgClass,
     JsonPipe,
-    NgStyle
+    NgStyle,
+    MatButtonModule
   ]
 })
 export class DependencyRecursiveComponent implements OnInit {
@@ -65,6 +66,9 @@ export class DependencyRecursiveComponent implements OnInit {
 
   toggle() {
     this.sendInfo();
+  }
+
+  showMoreToggle() {
     this.showMore = !this.showMore;
   }
 
