@@ -5,6 +5,7 @@ const router = express.Router()
 
 router.get('/all', projectController.getAllProjects)
 router.get('/:id/path', projectController.getPathById)
+router.delete('/:id', projectController.deleteProjectById)
 router.get('/:id', projectController.getProjectById)
 
 

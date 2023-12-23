@@ -66,3 +66,51 @@ export const createSystem = async (_req: Request, res: Response): Promise<any> =
         res.status(500).json({ data: err })
     }
 }
+
+export const updateSystem = async (_req: Request, res: Response): Promise<any> => {
+    try {
+        const id = _req.body._id
+        const name = _req.body.name
+        const newProjects = _req.body.newProjects
+        const deletedProjects = _req.body.deletedProjects
+
+        //todo check analyse options
+        const projectIds = await analyseFilesToCache(
+            newProjects,
+            {
+                plugins: [],
+                // not used in analyse, only in saveAnalysisToCsv
+                results: 'results',
+                refresh: false,
+            },
+            true
+        )
+
+        await mongoCacheSystem.load()
+
+        console.log("Projects ids" + projectIds.filter((id: string) => !deletedProjects.includes(id)))
+
+        const latestRun = (await mongoCacheSystem.get(id)).runs.sort((a: any, b: any) => b.date - a.date)[0];
+
+        const existingProjects = latestRun.projects.filter((id: string) => !deletedProjects.includes(id))
+
+        console.log("Existing projects " + latestRun.projects)
+        console.log("Deleted projects " + deletedProjects)
+        console.log("After filtering " + existingProjects)
+        console.log("Without duplicates " + [...new Set(projectIds.concat(existingProjects))])
+
+        await mongoCacheSystem.set(id, {
+            name: name,
+            runs: [
+                {
+                    date: Date.now(),
+                    projects: [...new Set(projectIds.concat(existingProjects))]
+                },
+            ]
+        })
+
+        res.status(200).json({ data: "System created" })
+    } catch (err) {
+        res.status(500).json({ data: err })
+    }
+}

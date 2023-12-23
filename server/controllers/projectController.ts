@@ -47,3 +47,22 @@ export const getPathById = async (_req: Request, res: Response): Promise<any> =>
         res.status(500).send('Internal Server Error')
     }
 }
+
+export const deleteProjectById = async (_req: Request, res: Response): Promise<any> => {
+    try {
+        const id = _req.params.id
+
+        await mongoCacheProject.load()
+
+        const value = await mongoCacheProject.get(id)
+        if (value) {
+            await mongoCacheProject.set(id, null)
+            res.status(200).send('Resource deleted')
+        } else {
+            res.status(404).send('Resource not found')
+        }
+    } catch (err) {
+        console.error(`Error: ${err}`)
+        res.status(500).send('Internal Server Error')
+    }
+}

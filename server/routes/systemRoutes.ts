@@ -5,6 +5,7 @@ const router = express.Router()
 
 router.get('/all', systemController.getAllSystems)
 router.get('/:id', systemController.getSystemById)
+router.post('/:id', systemController.updateSystem)
 router.post('/', systemController.createSystem)
 
 export default router
