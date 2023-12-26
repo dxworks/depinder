@@ -7,6 +7,7 @@ import {CreateSystemComponent} from "./create-system/create-system.component";
 import {SystemInfoComponent} from "./all-systems/system-info/system-info.component";
 import {SystemEditComponent} from "./all-systems/system-edit/system-edit.component";
 import {LicencesComponent} from "./licences/licences.component";
+import {AddLicenceComponent} from "./licences/add-licence/add-licence.component";
 
 const routes: Routes = [
   { path: 'project/:projectId', component: ProjectDetailsComponent },
@@ -15,6 +16,7 @@ const routes: Routes = [
   { path: 'systems', component: AllSystemsComponent},
   { path: 'systems/:id', component: SystemInfoComponent},
   { path: 'systems/:id/edit', component: SystemEditComponent},
+  { path: 'licences/new', component: AddLicenceComponent},
   { path: 'licences', component: LicencesComponent},
   { path: '**', component: AllProjectsComponent }
   // { path: '**', component: AppComponent }

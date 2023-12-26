@@ -11,7 +11,7 @@ import {
 } from "../dependency-recursive/dependency-recursive.component";
 import {JsonPipe} from "@angular/common";
 import {DependencyDetailsComponent} from "./dependency-details/dependency-details.component";
-import {MatDialog} from "@angular/material/dialog";
+import {MatDialog, MatDialogRef} from "@angular/material/dialog";
 
 @Component({
   standalone: true,
@@ -37,6 +37,7 @@ export class DependenciesComponent implements OnInit, OnChanges {
     filterByOutOfSupport: undefined,
   };
   maxDepth: number = 10;
+  dialogRef?: MatDialogRef<DependencyDetailsComponent, any>;
 
   constructor(private projectsService: ProjectsService,
               private librariesService: LibrariesService,
@@ -122,18 +123,16 @@ export class DependenciesComponent implements OnInit, OnChanges {
   }
 
   openDialog(): void {
-    console.log("OPEN DIALOG");
-
-    const dialogRef = this.dialog.open(DependencyDetailsComponent, {
+    this.dialogRef = this.dialog.open(DependencyDetailsComponent, {
       width: '80vw',
       height: '60vh',
       data: {
         selectedDependency: this.selectedDependency,
-        libraryInfo: this.selectedLibrary
+        libraryInfo: this.selectedLibrary,
       }
     });
 
-    dialogRef.afterClosed().subscribe(result => {
+    this.dialogRef.afterClosed().subscribe(() => {
       this.selectedDependency = undefined;
     });
   }

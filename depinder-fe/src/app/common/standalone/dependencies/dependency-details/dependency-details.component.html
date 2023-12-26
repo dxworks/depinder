@@ -44,7 +44,9 @@
     <section *ngIf="libraryInfo.licenses && libraryInfo.licenses.length">
       <h2>Licenses</h2>
       <ul>
-        <li *ngFor="let license of libraryInfo.licenses">{{ license }}</li>
+        <li *ngFor="let license of libraryInfo.licenses">
+          <app-licence-label [id]="license"></app-licence-label>
+        </li>
       </ul>
     </section>
 

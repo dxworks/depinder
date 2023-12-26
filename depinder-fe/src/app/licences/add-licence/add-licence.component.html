@@ -1,0 +1,39 @@
+<p>add-licence works!</p>
+<p>{{id}}</p>
+
+<form [formGroup]="licenseForm" (ngSubmit)="onSubmit()" class="form-container">
+  <mat-form-field>
+    <mat-label>License ID</mat-label>
+    <input matInput formControlName="_id">
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Name</mat-label>
+    <input matInput formControlName="name">
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>Reference URL</mat-label>
+    <input matInput formControlName="reference">
+  </mat-form-field>
+
+  <mat-checkbox formControlName="isDeprecatedLicenseId">Is Deprecated</mat-checkbox>
+
+  <mat-form-field>
+    <mat-label>Details URL</mat-label>
+    <input matInput formControlName="detailsUrl">
+  </mat-form-field>
+
+  <div formArrayName="seeAlso">
+    <mat-form-field *ngFor="let control of seeAlso.controls; let i = index">
+      <mat-label>See Also URL {{i + 1}}</mat-label>
+      <input matInput [formControlName]="i">
+    </mat-form-field>
+  </div>
+
+  <button mat-raised-button color="primary" type="button" (click)="addSeeAlsoUrl('')">Add See Also URL</button>
+
+  <mat-checkbox formControlName="isOsiApproved">Is OSI Approved</mat-checkbox>
+
+  <button mat-raised-button color="accent" type="submit">Submit</button>
+</form>
