@@ -4,6 +4,7 @@ import analyseRoutes from '../routes/analyseRoutes'
 import libraryRoutes from '../routes/libraryRoutes'
 import projectRoutes from '../routes/projectRoutes'
 import systemRoutes from '../routes/systemRoutes'
+import licenceRoutes from "../routes/licenceRoutes";
 
 const app = express()
 const PORT = 3000
@@ -15,6 +16,7 @@ app.use('/analyse', analyseRoutes)
 app.use('/library', libraryRoutes)
 app.use('/project', projectRoutes)
 app.use('/system', systemRoutes)
+app.use('/licence', licenceRoutes)
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`)
