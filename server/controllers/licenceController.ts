@@ -15,7 +15,7 @@ export const all = async (_req: Request, res: Response): Promise<any> => {
 
 export const newLicense = async (_req: Request, res: Response): Promise<any> => {
     try {
-        const id = _req.body.id
+        const id = _req.body._id
         const reference = _req.body.reference
         const isDeprecatedLicenseId = _req.body.isDeprecatedLicenseId
         const detailsUrl = _req.body.detailsUrl

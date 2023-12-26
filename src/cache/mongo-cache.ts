@@ -58,13 +58,13 @@ const DependencySchema = new Schema({
 
 const SystemRun = new Schema({
     date: Number,
-    projects: [String]
+    projects: [String],
 })
 
 const SystemSchema = new Schema({
     _id: String,
     name: String,
-    runs: [SystemRun]
+    runs: [SystemRun],
 })
 
 const ProjectInfoSchema = new Schema({
@@ -84,11 +84,24 @@ const ProjectInfoSchema = new Schema({
     dependencies: [DependencySchema],
 })
 
+const LicenseSchema = new Schema({
+    reference: String,
+    isDeprecatedLicenseId: Boolean,
+    detailsUrl: String,
+    referenceNumber: Number,
+    name: String,
+    _id: String,
+    seeAlso: [String],
+    isOsiApproved: Boolean,
+})
+
 export const LibraryInfoModel: Model<LibraryInfo> = mongoose.model<LibraryInfo>('LibraryInfo', LibraryInfoSchema)
 
 export const ProjectInfoModel: Model<Project> = mongoose.model<Project>('ProjectInfo', ProjectInfoSchema)
 
 export const SystemInfoModel: Model<System> = mongoose.model<System>('SystemInfo', SystemSchema)
+
+export const LicenceModel: Model<LibraryInfo> = mongoose.model<LibraryInfo>('LicenceInfo', LicenseSchema)
 
 const MONGO_USER = process.env.MONGO_USER ?? 'root'
 const MONGO_PASSWORD = process.env.MONGO_PASSWORD ?? 'secret'
@@ -124,8 +137,8 @@ export const mongoCacheLibrary: Cache = {
         return await LibraryInfoModel.find().exec()
     },
     async delete(key: string) {
-        await LibraryInfoModel.findByIdAndDelete(key).exec();
-    }
+        await LibraryInfoModel.findByIdAndDelete(key).exec()
+    },
 }
 
 export const mongoCacheProject: Cache = {
@@ -157,8 +170,8 @@ export const mongoCacheProject: Cache = {
         return await ProjectInfoModel.find().exec()
     },
     async delete(key: string) {
-        await ProjectInfoModel.findByIdAndDelete(key).exec();
-    }
+        await ProjectInfoModel.findByIdAndDelete(key).exec()
+    },
 }
 
 export const mongoCacheSystem: Cache = {
@@ -166,17 +179,17 @@ export const mongoCacheSystem: Cache = {
         return await SystemInfoModel.findById(key).exec()
     },
     async set(key: string, value: any) {
-        const updateQuery: any = { $push: { runs: value.runs } };
+        const updateQuery: any = { $push: { runs: value.runs } }
 
         if (value.name !== undefined) {
-            updateQuery['$set'] = { name: value.name };
+            updateQuery['$set'] = { name: value.name }
         }
 
         await SystemInfoModel.findByIdAndUpdate(
             key,
             updateQuery,
             { new: true, upsert: true }
-        );
+        )
     },
     async has(key: string) {
         return (await SystemInfoModel.exists({ _id: key }) !== null)
@@ -200,6 +213,39 @@ export const mongoCacheSystem: Cache = {
         return await SystemInfoModel.find().exec()
     },
     async delete(key: string) {
-        await SystemInfoModel.findByIdAndDelete(key).exec();
-    }
+        await SystemInfoModel.findByIdAndDelete(key).exec()
+    },
+}
+
+export const mongoCacheLicense: Cache = {
+    async get(key: string) {
+        return await LicenceModel.findById(key).exec()
+    },
+    async set(key: string, value: any) {
+        await LicenceModel.findByIdAndUpdate(key, value, { upsert: true }).exec()
+    },
+    async has(key: string) {
+        return (await LicenceModel.exists({ _id: key }) !== null)
+    },
+    async load() {
+        if (mongoose.connection.readyState === 0) {
+            await mongoose.connect(MONGO_URI, {
+                dbName: DATABASE_NAME,
+                user: MONGO_USER,
+                pass: MONGO_PASSWORD,
+                authSource: 'admin',
+            })
+        }
+    },
+    async write() {
+        if (mongoose.connection.readyState === 1) {
+            await mongoose.disconnect()
+        }
+    },
+    async getAll() {
+        return await LicenceModel.find().exec()
+    },
+    async delete(key: string) {
+        await LicenceModel.findByIdAndDelete(key).exec()
+    },
 }
