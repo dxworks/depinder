@@ -19,11 +19,20 @@ export class LicencesService {
     return this.http.get(`${this.getUrl()}/${id}`, { observe: 'response' });
   }
 
-  getUrl() {
-    return `${BASE_URL}/${this.model}`;
+  findSimilar(id: string) {
+    return this.http.get(`${this.getUrl()}/similar/${id}`, { observe: 'response' });
   }
 
   create(licence: any) {
     return this.http.post(`${this.getUrl()}`, licence, { observe: 'response' });
+  }
+
+  addAlias(id: string, alias: string) {
+    console.log(id, alias);
+    return this.http.post(`${this.getUrl()}/alias`, { id: id, alias: alias }, { observe: 'response' });
+  }
+
+  getUrl() {
+    return `${BASE_URL}/${this.model}`;
   }
 }

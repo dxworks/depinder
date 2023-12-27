@@ -24,6 +24,7 @@ export class LicenceLabelComponent implements OnInit {
   ngOnInit() {
     if (this.id) {
       this.licencesService.getById(this.id).subscribe(response => {
+        console.log(response);
         this.licence = response.body as Licence;
       });
     }

@@ -6,17 +6,20 @@ import {MatInputModule} from "@angular/material/input";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatButtonModule} from "@angular/material/button";
 import {LicencesService} from "../../common/services/licences.service";
+import {SuggestedLicence} from "@core/licence";
+import {MatListModule} from "@angular/material/list";
 
 @Component({
   selector: 'app-add-licence',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatInputModule, MatCheckboxModule, MatButtonModule],
+  imports: [CommonModule, ReactiveFormsModule, MatInputModule, MatCheckboxModule, MatButtonModule, MatListModule],
   templateUrl: './add-licence.component.html',
   styleUrl: './add-licence.component.css'
 })
 export class AddLicenceComponent implements OnInit {
   id?: string;
   licenseForm!: FormGroup;
+  suggestedLicenses?: SuggestedLicence[];
 
   constructor(private router: Router,
               private fb: FormBuilder,
@@ -36,6 +39,21 @@ export class AddLicenceComponent implements OnInit {
       seeAlso: this.fb.array([]),
       isOsiApproved: [false]
     });
+
+    if (this.id) {
+      this.licenseService.findSimilar(this.id).subscribe(
+        {
+          next: data => {
+            console.log(data);
+            this.suggestedLicenses = data.body as SuggestedLicence[];
+            // this.licenseForm.patchValue(data.body);
+          },
+          error: error => {
+            console.log(error);
+          }
+        }
+      );
+    }
   }
 
   addSeeAlsoUrl(url: string): void {
@@ -48,7 +66,6 @@ export class AddLicenceComponent implements OnInit {
     this.licenseService.create(this.licenseForm.value).subscribe(
       {
         next: data => {
-          console.log(data);
           this.router.navigate(['/licences']);
         },
         error: error => {
@@ -56,6 +73,27 @@ export class AddLicenceComponent implements OnInit {
         }
       }
     );
+  }
+
+  addAlias(oldId: string): void {
+    console.log(oldId);
+    console.log(this.id);
+    if (this.id !== undefined) {
+        this.licenseService.addAlias(oldId, this.id!).subscribe(
+          {
+            next: data => {
+              console.log(data);
+              this.router.navigate(['/licences']);
+            },
+            error: error => {
+              console.log(error);
+            }
+          }
+        );
+      }
+    else {
+      console.log('No id');
+    }
   }
 
   get seeAlso(): FormArray {
