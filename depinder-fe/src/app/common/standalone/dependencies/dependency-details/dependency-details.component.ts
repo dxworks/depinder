@@ -6,6 +6,7 @@ import {MAT_DIALOG_DATA, MatDialogRef} from "@angular/material/dialog";
 import {ReactiveFormsModule} from "@angular/forms";
 import {convertToDateString} from "../../../utils";
 import {LicenceLabelComponent} from "../../licence-label/licence-label.component";
+import {MatButtonModule} from "@angular/material/button";
 
 @Component({
   standalone: true,
@@ -16,7 +17,8 @@ import {LicenceLabelComponent} from "../../licence-label/licence-label.component
     NgIf,
     DatePipe,
     ReactiveFormsModule,
-    LicenceLabelComponent
+    LicenceLabelComponent,
+    MatButtonModule
   ],
   styleUrls: ['./dependency-details.component.css']
 })
@@ -25,6 +27,7 @@ export class DependencyDetailsComponent implements OnInit {
   @Input() libraryInfo?: LibraryInfo;
   @Input() dialogRef?: MatDialogRef<DependencyDetailsComponent, any>;
   selectedVersion?: LibraryVersion;
+  displayLimit = 5;
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: any
@@ -43,6 +46,10 @@ export class DependencyDetailsComponent implements OnInit {
     if (this.selectedDependency !== undefined)
       this.findUsedVersion(this.selectedDependency!.version);
 
+    this.libraryInfo?.versions.sort((a, b) => {
+      return b.timestamp - a.timestamp;
+    });
+
     console.log('dependency: ' + this.selectedDependency);
     console.log('libraryInfo: ' + this.libraryInfo);
   }
@@ -52,6 +59,14 @@ export class DependencyDetailsComponent implements OnInit {
       this.selectedVersion = this.libraryInfo?.versions.find(v => v.version === version);
       console.log(this.selectedVersion);
     // }
+  }
+
+  loadMore() {
+    this.displayLimit += 5; // Increase the limit by 5 each time
+  }
+
+  isString(value: any): boolean {
+    return typeof value === 'string';
   }
 
   protected readonly convertToDateString = convertToDateString;

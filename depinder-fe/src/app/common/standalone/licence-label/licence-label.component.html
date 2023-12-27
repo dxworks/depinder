@@ -1,10 +1,14 @@
 @if (licence != undefined) {
-  <p>{{licence.name}} found</p>
+  <div style="color: green">
+    <p>{{licence.name}}</p>
+  </div>
 }
 @else {
-  <p>{{id}} - unknown licence
-    <button mat-button (click)="addLicence()">
-      <mat-icon>add</mat-icon>
-    </button>
-  </p>
+  <div style="color: red">
+    <p>{{id}}
+      <button mat-button (click)="addLicence()">
+        <mat-icon>add</mat-icon>
+      </button>
+    </p>
+  </div>
 }

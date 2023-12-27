@@ -1,38 +1,38 @@
 <div *ngIf="selectedDependency !== undefined" style="margin: 3rem">
-  <h2>Dependency Details</h2>
-  <table>
-    <colgroup>
-      <col style="width:10%">
-      <col style="width:20%">
-      <col style="width:20%">
-      <col style="width:15%">
-      <col style="width:15%">
-      <col style="width:20%">
-    </colgroup>
-    <thead>
-    <tr>
-      <th>ID</th>
-      <th>Name</th>
-      <th>Version</th>
-      <th>Type</th>
-      <th>Requested By</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr>
-      <td>{{ selectedDependency!._id }}</td>
-      <td>{{ selectedDependency!.name }}</td>
-      <td>{{ selectedDependency!.version }}</td>
-<!--      <td>{{ selectedDependency!.version }}</td>-->
-      <td>{{ selectedDependency!.type}}</td>
-      <td>{{ selectedDependency!.requestedBy.join(', ') }}</td>
-    </tr>
-    </tbody>
-  </table>
-
   <div *ngIf="libraryInfo" class="library-info">
     <h1>{{ libraryInfo.name }} details</h1>
     <p *ngIf="libraryInfo.description">{{ libraryInfo.description }}</p>
+
+    <h2>Dependency Details</h2>
+    <table>
+      <colgroup>
+        <col style="width:10%">
+        <col style="width:20%">
+        <col style="width:20%">
+        <col style="width:15%">
+        <col style="width:15%">
+        <col style="width:20%">
+      </colgroup>
+      <thead>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Version</th>
+        <th>Type</th>
+        <th>Requested By</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+        <td>{{ selectedDependency!._id }}</td>
+        <td>{{ selectedDependency!.name }}</td>
+        <td>{{ selectedDependency!.version }}</td>
+        <!--      <td>{{ selectedDependency!.version }}</td>-->
+        <td>{{ selectedDependency!.type}}</td>
+        <td>{{ selectedDependency!.requestedBy.join(', ') }}</td>
+      </tr>
+      </tbody>
+    </table>
 
     <section *ngIf="libraryInfo.vulnerabilities && libraryInfo.vulnerabilities.length">
       <h2>Vulnerabilities</h2>
@@ -110,9 +110,36 @@
     <section *ngIf="libraryInfo.versions && libraryInfo.versions.length">
       <h2>Versions</h2>
       <ul>
-        <div *ngFor="let version of libraryInfo.versions">
-          <p>{{ version.version }}, Downloads: {{ version.downloads }}, Date: {{ convertToDateString(version.timestamp) | date:'full'}}</p>
-        </div>
+        @for (version of libraryInfo.versions; track version.version) {
+          @if ($index < displayLimit) {
+            <li>Version: {{version.version}}</li>
+            <ul>
+              <li>Release date: {{convertToDateString(version.timestamp)}}</li>
+              @if (version.downloads) {
+                <li>Downloads: {{version.downloads}}</li>
+              }
+              @if (version.licenses) {
+                @if (isString(version.licenses)) {
+                  <li>
+                    Licence:
+                    <app-licence-label [id]="version.licenses.toString()"></app-licence-label>
+                  </li>
+                } @else {
+                  <li>Licences:
+                    <ul>
+                      @for (licence of version.licenses; track licence) {
+                        <li>
+                          <app-licence-label [id]="licence"></app-licence-label>
+                        </li>
+                      }
+                    </ul>
+                  </li>
+                }
+              }
+            </ul>
+          }
+        }
+        <button mat-flat-button color="accent" *ngIf="libraryInfo.versions.length > displayLimit" (click)="loadMore()">Load More</button>
       </ul>
     </section>
   </div>

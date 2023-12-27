@@ -1,3 +1,4 @@
-export function convertToDateString(timestamp: number): Date {
-  return new Date(timestamp);
+export function convertToDateString(timestamp: number): string {
+  const date = new Date(timestamp);
+  return date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
 }
