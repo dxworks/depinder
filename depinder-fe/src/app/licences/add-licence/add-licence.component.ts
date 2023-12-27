@@ -63,16 +63,18 @@ export class AddLicenceComponent implements OnInit {
   // Submit method
   onSubmit(): void {
     console.log(this.licenseForm.value);
-    this.licenseService.create(this.licenseForm.value).subscribe(
-      {
-        next: data => {
-          this.router.navigate(['/licences']);
-        },
-        error: error => {
-          console.log(error);
+    if (this.id !== undefined) {
+      this.licenseService.create(this.licenseForm.value).subscribe(
+        {
+          next: data => {
+            this.router.navigate(['/licences']);
+          },
+          error: error => {
+            console.log(error);
+          }
         }
-      }
-    );
+      );
+    }
   }
 
   addAlias(oldId: string): void {
