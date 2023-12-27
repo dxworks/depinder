@@ -33,7 +33,7 @@ export class SystemsService {
     });
   }
 
-  updateSystem(id: string, name: string, newProjects: string[], deletedProjects: string[]) {
+  updateSystem(id: string, name?: string, newProjects?: string[], deletedProjects?: string[]) {
     return this.http.post(this.getUrlWithID(id), {
       "_id": id,
       "name": name,

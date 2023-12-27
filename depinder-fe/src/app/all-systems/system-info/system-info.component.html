@@ -1,14 +1,21 @@
-<div class="row-container">
-  <h1>{{system?.name ?? "No name"}}</h1>
+<div>
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <h1>
+      {{system?.name ?? "No name"}}
+      <button mat-icon-button (click)="updateSystem()">
+        <mat-icon>refresh</mat-icon>
+      </button>
+    </h1>
 
-  <mat-form-field class="full-width-select">
-    <mat-label>Run date</mat-label>
-    <select matNativeControl required [(ngModel)]="selectedRunDate" (ngModelChange)="getRunData()">
-      @for (run of system?.runs; track run.date) {
-        <option [value]="run.date">{{ convertToDateString(run.date) | date:'full'}}</option>
-      }
-    </select>
-  </mat-form-field>
+    <mat-form-field class="run-date">
+      <mat-label>Run date</mat-label>
+      <select matNativeControl [(ngModel)]="selectedRunDate" (ngModelChange)="getRunData()">
+        @for (run of system?.runs; track run.date) {
+          <option [value]="run.date">{{ convertToDateString(run.date) | date:'full'}}</option>
+        }
+      </select>
+    </mat-form-field>
+  </div>
 </div>
 
 <h3>id : {{system?._id}}</h3>

@@ -1,11 +1,11 @@
-.full-width-select {
+.run-date {
   padding-left: 2rem;
   width: 25rem;
-  max-width: 100%; /* Ensures it doesn't overflow the parent container */
+  max-width: 40vw;
 }
 
 .row-container {
   display: flex;
-  align-items: center; /* Align items vertically in the center */
-  flex-wrap: wrap; /* Wrap items to the next line on smaller screens */
+  align-items: center;
+  flex-wrap: wrap;
 }

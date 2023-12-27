@@ -71,8 +71,8 @@ export const updateSystem = async (_req: Request, res: Response): Promise<any> =
     try {
         const id = _req.body._id
         const name = _req.body.name
-        const newProjects = _req.body.newProjects
-        const deletedProjects = _req.body.deletedProjects
+        const newProjects = _req.body.newProjects ?? []
+        const deletedProjects = _req.body.deletedProjects ?? []
 
         //todo check analyse options
         const projectIds = await analyseFilesToCache(
@@ -100,7 +100,7 @@ export const updateSystem = async (_req: Request, res: Response): Promise<any> =
         console.log("Without duplicates " + [...new Set(projectIds.concat(existingProjects))])
 
         await mongoCacheSystem.set(id, {
-            name: name,
+            name: name ?? latestRun.name,
             runs: [
                 {
                     date: Date.now(),

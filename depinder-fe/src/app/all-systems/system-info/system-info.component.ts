@@ -14,23 +14,27 @@ import {MatFormFieldModule} from "@angular/material/form-field";
 import {MatInputModule} from "@angular/material/input";
 import {FormsModule} from "@angular/forms";
 import {convertToDateString} from "../../common/utils";
+import {MatIconModule} from "@angular/material/icon";
+import {MatButtonModule} from "@angular/material/button";
 
 @Component({
   selector: 'app-system-info',
   standalone: true,
-  imports: [CommonModule, ProjectsTableComponent, DependencyRecursiveComponent, DependenciesComponent, MatFormFieldModule, MatInputModule, FormsModule],
+  imports: [CommonModule, ProjectsTableComponent, DependencyRecursiveComponent, DependenciesComponent, MatFormFieldModule, MatInputModule, FormsModule, MatIconModule, MatButtonModule],
   templateUrl: './system-info.component.html',
   styleUrl: './system-info.component.css'
 })
 export class SystemInfoComponent implements OnInit {
   projects: Project[] = [];
   dependencies: Dependency[] = [];
-  system: System | undefined;
-  id: string | undefined;
-  selectedRun: SystemRun | undefined;
-  selectedRunDate: number | undefined;
+  system?: System;
+  id?: string;
+  selectedRun?: SystemRun;
+  selectedRunDate?: number;
 
-  constructor(private projectsService: ProjectsService, private systemService: SystemsService, private route: ActivatedRoute) { }
+  constructor(private projectsService: ProjectsService,
+              private systemService: SystemsService,
+              private route: ActivatedRoute) { }
 
   ngOnInit() {
     this.route.params.subscribe(params => {
@@ -77,6 +81,19 @@ export class SystemInfoComponent implements OnInit {
 
   getRunByDate(date: number): SystemRun {
     return this.system!.runs.filter(run => run.date == date)[0];
+  }
+
+  updateSystem() {
+    console.log(this.system);
+    console.log(this.id);
+    this.systemService.updateSystem(this.id!).subscribe(
+      {
+        next: () => {
+          //refresh page
+          window.location.reload();
+        }
+      }
+    )
   }
 
   protected readonly convertToDateString = convertToDateString;

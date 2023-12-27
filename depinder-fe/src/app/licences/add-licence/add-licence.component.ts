@@ -66,7 +66,7 @@ export class AddLicenceComponent implements OnInit {
     if (this.id !== undefined) {
       this.licenseService.create(this.licenseForm.value).subscribe(
         {
-          next: data => {
+          next: () => {
             this.router.navigate(['/licences']);
           },
           error: error => {
