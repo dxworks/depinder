@@ -6,6 +6,12 @@ export interface Licence {
     _id: string,
     seeAlso?: string[],
     isOsiApproved?: boolean,
+    other_ids?: string[],
+}
+
+export interface SuggestedLicence {
+    rating: number,
+    target: string
 }
 
 export interface LicenceList {

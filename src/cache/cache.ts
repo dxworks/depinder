@@ -6,6 +6,7 @@ export interface Cache {
     write: () => void | Promise<void>,
     getAll: () => Promise<any> | undefined | any,
     delete: (key: string) => void | Promise<void>,
+    findByField: (key: string, value: any) => Promise<any> | undefined | any,
 }
 
 export const noCache: Cache = {
@@ -27,5 +28,8 @@ export const noCache: Cache = {
     },
     delete(key: string) {
 
-    }
+    },
+    findByField(key: string, value: any) {
+
+    },
 }

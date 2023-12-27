@@ -45,6 +45,7 @@
     "@octokit/graphql": "^4.8.0",
     "@snyk/gemfile": "^1.2.0",
     "@types/express": "^4.17.20",
+    "@types/string-similarity": "^4.0.2",
     "chalk": "^4.1.2",
     "cli-progress": "^3.11.2",
     "commander": "^11.1.0",
