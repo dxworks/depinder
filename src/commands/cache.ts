@@ -1,11 +1,10 @@
 import {Command} from 'commander'
 import {execSync} from 'child_process'
-import {log} from '@dxworks/cli-common'
 import chalk from 'chalk'
 import fs from 'fs'
 import {getAssetFile, getHomeDir} from '../utils/utils'
 import path from 'path'
-
+import {log} from '../utils/logging'
 
 export async function cacheUpAction(): Promise<void> {
     execSync('docker-compose up -d', {cwd: path.resolve(getHomeDir(), 'cache'), stdio: 'inherit'})

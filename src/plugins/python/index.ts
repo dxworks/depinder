@@ -5,7 +5,6 @@ import {
     Extractor,
     Parser,
 } from '../../extension-points/extract'
-// @ts-ignore
 import path from 'path'
 import {AbstractRegistrar, LibrariesIORegistrar, LibraryInfo, Registrar} from '../../extension-points/registrar'
 import fetch from 'node-fetch'
@@ -13,12 +12,10 @@ import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker
 import {Plugin} from '../../extension-points/plugin'
 import fs from 'fs'
 import moment from 'moment'
-import {log} from '@dxworks/cli-common'
 import {execSync} from 'child_process'
 import * as toml from 'toml'
 import {getPackageSemver} from '../../utils/utils'
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+import {log} from '../../utils/logging'
 
 const extractor: Extractor = {
     files: ['requirements.txt', 'setup.py', 'Pipfile', 'Pipfile.lock', 'pyproject.toml', 'poetry.lock'],

@@ -3,7 +3,6 @@ import fs from 'fs'
 import path from 'path'
 import {getPluginsFromNames} from '../plugins'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
-import {log} from '@dxworks/cli-common'
 import {LibraryInfo} from '../extension-points/registrar'
 import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
 import {Range} from 'semver'
@@ -20,7 +19,7 @@ import {walkDir} from '../utils/utils'
 import {blacklistedGlobs} from '../utils/blacklist'
 import minimatch from 'minimatch'
 import {mongoCache} from '../cache/mongo-cache'
-// import {defaultPlugins} from '../extension-points/plugin-loader'
+import {log} from '../utils/logging'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
 

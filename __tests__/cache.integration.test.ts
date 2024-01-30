@@ -4,15 +4,15 @@ describe('test cache commands', () => {
     const runOnlyLocally = process.env.CI ? test.skip : test
 
     runOnlyLocally('test cache info', async () => {
-        // cacheInfoAction()
+        cacheInfoAction()
     })
     runOnlyLocally('test cache init', async () => {
-        // cacheInitAction()
+        cacheInitAction()
     })
     runOnlyLocally('test cache up', async () => {
-        // await cacheUpAction()
+        await cacheUpAction()
     })
     runOnlyLocally('test cache down', async () => {
-        // await cacheDownAction()
+        await cacheDownAction()
     })
 })

@@ -15,7 +15,7 @@ import {runNuGetInspectorProgrammatically} from '@dxworks/nuget-inspector'
 import fs from 'fs'
 import path from 'path'
 import {getPackageSemver} from '../../utils/utils'
-import {log} from '@dxworks/cli-common'
+import {log} from '../../utils/logging'
 
 const extractor: Extractor = {
     files: ['*.csproj', '*.fsproj', '*.vbproj'],

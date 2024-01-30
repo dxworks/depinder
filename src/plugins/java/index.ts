@@ -7,8 +7,8 @@ import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker
 import {Plugin} from '../../extension-points/plugin'
 import fs from 'fs'
 import {depinderTempFolder} from '../../utils/utils'
-import {log} from '@dxworks/cli-common'
 import {parseMavenDependencyTree} from './parsers/maven'
+import {log} from '../../utils/logging'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pomParser = require('pom-parser')
