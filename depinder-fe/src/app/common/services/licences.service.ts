@@ -24,6 +24,7 @@ export class LicencesService {
   }
 
   create(licence: any) {
+    console.log("here");
     return this.http.post(`${this.getUrl()}`, licence, { observe: 'response' });
   }
 

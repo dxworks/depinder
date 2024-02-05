@@ -3,17 +3,17 @@ import { RouterModule, Routes } from '@angular/router';
 import {ProjectDetailsComponent} from "./all-projects/project-details/project-details.component";
 import {AllProjectsComponent} from "./all-projects/all-projects.component";
 import {AllSystemsComponent} from "./all-systems/all-systems.component";
-import {CreateSystemComponent} from "./create-system/create-system.component";
+import {CreateSystemComponent} from "./all-systems/create-system/create-system.component";
 import {SystemInfoComponent} from "./all-systems/system-info/system-info.component";
 import {SystemEditComponent} from "./all-systems/system-edit/system-edit.component";
-import {LicencesComponent} from "./licences/licences.component";
-import {AddLicenceComponent} from "./licences/add-licence/add-licence.component";
+import {LicencesComponent} from "./all-licences/licences.component";
+import {AddLicenceComponent} from "./all-licences/add-licence/add-licence.component";
 
 const routes: Routes = [
   { path: 'project/:projectId', component: ProjectDetailsComponent },
   { path: 'projects', component: AllProjectsComponent},
-  { path: 'create-system', component: CreateSystemComponent},
   { path: 'systems', component: AllSystemsComponent},
+  { path: 'systems/new', component: CreateSystemComponent},
   { path: 'systems/:id', component: SystemInfoComponent},
   { path: 'systems/:id/edit', component: SystemEditComponent},
   { path: 'licences/new', component: AddLicenceComponent},

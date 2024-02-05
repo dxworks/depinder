@@ -33,12 +33,13 @@ export class SystemsService {
     });
   }
 
-  updateSystem(id: string, name?: string, newProjects?: string[], deletedProjects?: string[]) {
+  updateSystem(id: string, name?: string, newProjects?: string[], deletedProjects?: string[], refresh?: boolean) {
     return this.http.post(this.getUrlWithID(id), {
       "_id": id,
       "name": name,
       "newProjects": newProjects,
-      "deletedProjects": deletedProjects
+      "deletedProjects": deletedProjects,
+      "refresh": refresh ?? false
     });
   }
 

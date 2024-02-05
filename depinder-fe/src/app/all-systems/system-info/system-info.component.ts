@@ -39,20 +39,19 @@ export class SystemInfoComponent implements OnInit {
   ngOnInit() {
     this.route.params.subscribe(params => {
       this.id = params['id'];
-    });
+      if (this.id) {
+        this.systemService.find(this.id).subscribe(
+          (system: System) => {
+            this.system = system;
 
-    if (this.id) {
-      this.systemService.find(this.id).subscribe(
-        (system: System) => {
-          this.system = system;
-
-          if (this.system !== undefined && this.system.runs.length > 0) {
-            this.selectedRunDate = this.getLatestRunDate();
-            this.getRunData();
+            if (this.system !== undefined && this.system.runs.length > 0) {
+              this.selectedRunDate = this.getLatestRunDate();
+              this.getRunData();
+            }
           }
-        }
-      )
-    }
+        )
+      }
+    });
   }
 
   getRunData() {
@@ -86,7 +85,7 @@ export class SystemInfoComponent implements OnInit {
   updateSystem() {
     console.log(this.system);
     console.log(this.id);
-    this.systemService.updateSystem(this.id!).subscribe(
+    this.systemService.updateSystem(this.id!, undefined, undefined, undefined, true).subscribe(
       {
         next: () => {
           //refresh page

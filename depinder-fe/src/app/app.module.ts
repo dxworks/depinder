@@ -25,12 +25,17 @@ import {MAT_FORM_FIELD_DEFAULT_OPTIONS} from "@angular/material/form-field";
 import {AllSystemsComponent} from "./all-systems/all-systems.component";
 import {ProjectsTableComponent} from "./common/standalone/projects-table/projects-table.component";
 import {DependencyFilterComponent} from "./common/standalone/dependencies/dependency-filter/dependency-filter.component";
-import {CreateSystemComponent} from "./create-system/create-system.component";
+import {CreateSystemComponent} from "./all-systems/create-system/create-system.component";
 import {DependencyDetailsComponent} from "./common/standalone/dependencies/dependency-details/dependency-details.component";
 import {DependenciesComponent} from "./common/standalone/dependencies/dependencies.component";
 import {MatToolbarModule} from "@angular/material/toolbar";
 import {MAT_DIALOG_DATA, MatDialogModule} from "@angular/material/dialog";
 import {LicenceLabelComponent} from "./common/standalone/licence-label/licence-label.component";
+import {LateralDrawerComponent} from "./common/standalone/lateral-drawer/lateral-drawer.component";
+import {MatSidenavModule} from "@angular/material/sidenav";
+import {MatListModule} from "@angular/material/list";
+import {MatMenuModule} from "@angular/material/menu";
+import {MatLineModule} from "@angular/material/core";
 
 @NgModule({
   declarations: [
@@ -39,35 +44,40 @@ import {LicenceLabelComponent} from "./common/standalone/licence-label/licence-l
     ProjectDetailsComponent,
     LibraryDetailsComponent,
   ],
-    imports: [
-        BrowserModule,
-        BrowserAnimationsModule,
-        HttpClientModule,
-        AppRoutingModule,
-        MatTableModule,
-        MatButtonModule,
-        MatInputModule,
-        FormsModule,
-        MatPaginatorModule,
-        MatSortModule,
-        MatCardModule,
-        MatIconModule,
-        MatProgressSpinnerModule,
-        MatSnackBarModule,
-        MatTreeModule,
-        MatSelectModule,
-        MatCheckboxModule,
-        DependencyRecursiveComponent,
-        AllSystemsComponent,
-        ProjectsTableComponent,
-        DependencyFilterComponent,
-        CreateSystemComponent,
-        DependenciesComponent,
-        DependencyDetailsComponent,
-        MatToolbarModule,
-        MatDialogModule,
-        LicenceLabelComponent,
-    ],
+  imports: [
+    BrowserModule,
+    BrowserAnimationsModule,
+    HttpClientModule,
+    AppRoutingModule,
+    MatTableModule,
+    MatButtonModule,
+    MatInputModule,
+    FormsModule,
+    MatPaginatorModule,
+    MatSortModule,
+    MatCardModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+    MatSnackBarModule,
+    MatTreeModule,
+    MatSelectModule,
+    MatCheckboxModule,
+    DependencyRecursiveComponent,
+    AllSystemsComponent,
+    ProjectsTableComponent,
+    DependencyFilterComponent,
+    CreateSystemComponent,
+    DependenciesComponent,
+    DependencyDetailsComponent,
+    MatToolbarModule,
+    MatDialogModule,
+    LicenceLabelComponent,
+    LateralDrawerComponent,
+    MatSidenavModule,
+    MatListModule,
+    MatMenuModule,
+    MatLineModule,
+  ],
   providers: [
     {provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: {appearance: 'outline'}},
     {provide: MAT_DIALOG_DATA, useValue: {}}

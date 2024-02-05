@@ -5,7 +5,7 @@ import {MatButtonModule} from "@angular/material/button";
 import {MatFormFieldModule} from "@angular/material/form-field";
 import {MatInputModule} from "@angular/material/input";
 import {SystemsService} from "../../common/services/systems.service";
-import {MyErrorStateMatcher} from "../../create-system/create-system.component";
+import {MyErrorStateMatcher} from "../create-system/create-system.component";
 import {System, SystemRun} from "@core/system";
 import {ActivatedRoute, Router} from "@angular/router";
 import {MatIconModule} from "@angular/material/icon";
@@ -103,7 +103,7 @@ export class SystemEditComponent implements OnInit {
   }
 
   openSnackBar(message: string) {
-    this._snackBar.open(message)
+    this._snackBar.open(message)._dismissAfter(2000)
   }
 
   private getSystemData(): any {

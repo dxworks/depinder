@@ -7,11 +7,12 @@ import {ActivatedRoute, Router} from "@angular/router";
 import {ProjectsTableComponent} from "../common/standalone/projects-table/projects-table.component";
 import {MatListModule} from "@angular/material/list";
 import {MatIconModule} from "@angular/material/icon";
+import {MatButtonModule} from "@angular/material/button";
 
 @Component({
   selector: 'app-systems',
   standalone: true,
-  imports: [CommonModule, ProjectsTableComponent, SystemInfoComponent, MatListModule, MatIconModule,],
+    imports: [CommonModule, ProjectsTableComponent, SystemInfoComponent, MatListModule, MatIconModule, MatButtonModule,],
   templateUrl: './all-systems.component.html',
   styleUrl: './all-systems.component.css'
 })
@@ -26,6 +27,10 @@ export class AllSystemsComponent implements OnInit{
         this.systems$ = res.body['data'];
       }
     )
+  }
+
+  newSystem() {
+    this.router.navigate(['systems/new'])
   }
 
   navigate(path: string[]) {

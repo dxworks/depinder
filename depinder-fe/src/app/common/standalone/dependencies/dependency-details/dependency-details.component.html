@@ -1,6 +1,15 @@
 <div *ngIf="selectedDependency !== undefined" style="margin: 3rem">
   <div *ngIf="libraryInfo" class="library-info">
-    <h1>{{ libraryInfo.name }} details</h1>
+    <h1>
+      @if (libraryInfo.homepageUrl && libraryInfo.homepageUrl.length) {
+        <a href="{{ libraryInfo.homepageUrl }}" target="_blank">{{ libraryInfo.name }}</a>
+      } @else {
+        {{ libraryInfo.name }}
+      }
+    </h1>
+    <p>
+      <a href="https://www.npmjs.com/package/{{libraryInfo.name}}" target="_blank">npm link</a>
+    </p>
     <p *ngIf="libraryInfo.description">{{ libraryInfo.description }}</p>
 
     <h2>Dependency Details</h2>
