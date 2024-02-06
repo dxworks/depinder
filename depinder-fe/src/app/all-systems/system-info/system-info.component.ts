@@ -16,6 +16,7 @@ import {FormsModule} from "@angular/forms";
 import {convertToDateString} from "../../common/utils";
 import {MatIconModule} from "@angular/material/icon";
 import {MatButtonModule} from "@angular/material/button";
+import {SharedService} from "../../common/services/shared.service";
 
 @Component({
   selector: 'app-system-info',
@@ -34,7 +35,8 @@ export class SystemInfoComponent implements OnInit {
 
   constructor(private projectsService: ProjectsService,
               private systemService: SystemsService,
-              private route: ActivatedRoute) { }
+              private route: ActivatedRoute,
+              private sharedService: SharedService) { }
 
   ngOnInit() {
     this.route.params.subscribe(params => {
@@ -44,12 +46,14 @@ export class SystemInfoComponent implements OnInit {
           (system: System) => {
             this.system = system;
 
+            this.sharedService.updateTitle(system.name);
+
             if (this.system !== undefined && this.system.runs.length > 0) {
               this.selectedRunDate = this.getLatestRunDate();
               this.getRunData();
             }
           }
-        )
+        );
       }
     });
   }

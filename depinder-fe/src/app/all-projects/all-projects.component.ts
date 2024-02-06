@@ -4,6 +4,7 @@ import {MatSnackBar} from "@angular/material/snack-bar";
 import {AnalysisService} from "../common/services/analysis.service";
 import {Project} from '@core/project'
 import { ProjectsTableComponent } from '../common/standalone/projects-table/projects-table.component';
+import {SharedService} from "../common/services/shared.service";
 
 @Component({
   selector: 'app-all-projects',
@@ -14,10 +15,14 @@ export class AllProjectsComponent implements OnInit {
   projects$: Project[] = [];
   folderPath: string = '';
 
-  constructor(private projectsService: ProjectsService, private analysisService: AnalysisService, private _snackBar: MatSnackBar) {
+  constructor(private projectsService: ProjectsService,
+              private analysisService: AnalysisService,
+              private _snackBar: MatSnackBar,
+              private sharedService: SharedService) {
   }
 
   ngOnInit() {
+    this.sharedService.updateTitle('Projects');
     this.fetchProjects();
   }
 

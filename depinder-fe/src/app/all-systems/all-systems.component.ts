@@ -8,6 +8,7 @@ import {ProjectsTableComponent} from "../common/standalone/projects-table/projec
 import {MatListModule} from "@angular/material/list";
 import {MatIconModule} from "@angular/material/icon";
 import {MatButtonModule} from "@angular/material/button";
+import {SharedService} from "../common/services/shared.service";
 
 @Component({
   selector: 'app-systems',
@@ -18,10 +19,14 @@ import {MatButtonModule} from "@angular/material/button";
 })
 export class AllSystemsComponent implements OnInit{
   systems$: System[] = [];
-  constructor(private systemService: SystemsService, private router: Router, private route: ActivatedRoute) {
+  constructor(private systemService: SystemsService,
+              private router: Router,
+              private route: ActivatedRoute,
+              private sharedService: SharedService) {
   }
 
   ngOnInit() {
+    this.sharedService.updateTitle('Systems');
     this.systemService.all().subscribe(
       (res: any) => {
         this.systems$ = res.body['data'];
