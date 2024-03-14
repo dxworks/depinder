@@ -48,8 +48,9 @@
   <ng-container matColumnDef="actions">
     <th mat-header-cell *matHeaderCellDef> Actions </th>
     <td mat-cell *matCellDef="let element">
-      <button mat-button>Edit</button>
-      <button mat-button>Delete</button>
+      <button mat-icon-button (click)="navigateToSave(element.name)">
+        <mat-icon>save</mat-icon>
+      </button>
     </td>
   </ng-container>
 

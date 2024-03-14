@@ -15,11 +15,13 @@ import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {TableElement} from "../system-licences-2.component";
 import {LicencesService} from "../../../../common/services/licences.service";
 import {concatMap, from} from "rxjs";
+import {MatIconModule} from "@angular/material/icon";
+import {Router} from "@angular/router";
 
 @Component({
   selector: 'app-other-licences',
   standalone: true,
-    imports: [CommonModule, MatButtonModule, MatCheckboxModule, MatTableModule],
+  imports: [CommonModule, MatButtonModule, MatCheckboxModule, MatTableModule, MatIconModule],
   templateUrl: './other-licences.component.html',
   styleUrl: './other-licences.component.css'
 })
@@ -32,6 +34,7 @@ export class OtherLicencesComponent implements OnChanges {
 
   constructor(
     private licenceService: LicencesService,
+    private router: Router,
   ) { }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -80,5 +83,11 @@ export class OtherLicencesComponent implements OnChanges {
     else {
       console.log('No id');
     }
+  }
+
+  navigateToSave(id: string) {
+    this.router.navigate(['licences/new'], {state: { id: id }}).catch(error => {
+      console.error('Error navigating to save page:', error);
+    });
   }
 }
