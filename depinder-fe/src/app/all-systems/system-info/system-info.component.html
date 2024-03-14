@@ -11,45 +11,43 @@
   </button>
 </mat-toolbar>
 
-<div style="margin: 2rem">
-  <div style="display: flex; justify-content: space-between; align-items: center;">
-    <mat-form-field class="run-date">
-      <mat-label>Run date</mat-label>
-      <select matNativeControl [(ngModel)]="selectedRunDate" (ngModelChange)="getRunData()">
-        @for (run of system?.runs; track run.date) {
-          <option [value]="run.date">{{ convertToDateString(run.date) | date:'full'}}</option>
-        }
-      </select>
-    </mat-form-field>
-  </div>
-
-  <mat-tab-group>
-    <mat-tab label="Projects">
-      @if (projects.length > 0) {
-        <h2>Projects in this system</h2>
-
-        <div style="padding-bottom: 2rem">
-          <app-projects-table
-            [projects]="projects"
-          ></app-projects-table>
-        </div>
+<div style="padding-top: 1rem">
+  <mat-form-field class="run-date">
+    <mat-label>Run date</mat-label>
+    <select matNativeControl [(ngModel)]="selectedRunDate" (ngModelChange)="getRunData()">
+      @for (run of system?.runs; track run.date) {
+        <option [value]="run.date">{{ convertToDateString(run.date) | date:'full'}}</option>
       }
-    </mat-tab>
-    <mat-tab label="Dependencies">
-      @if (dependencies.length > 0) {
-        <h2>Dependencies</h2>
-
-        <app-dependencies
-          [allDependencies]="dependencies">
-        </app-dependencies>
-      }
-    </mat-tab>
-    <mat-tab label="Licences">
-      @if (dependencies.length > 0) {
-        <app-system-licences-2
-          [dependencies]="dependencies" [systemId]="id!" [projectIds]="projectIds">
-        </app-system-licences-2>
-      }
-    </mat-tab>
-  </mat-tab-group>
+    </select>
+  </mat-form-field>
 </div>
+
+<mat-tab-group style="margin-left: 2rem; margin-right: 2rem">
+  <mat-tab label="Projects">
+    @if (projects.length > 0) {
+      <h2>Projects in this system</h2>
+
+      <div style="padding-bottom: 2rem">
+        <app-projects-table
+          [projects]="projects"
+        ></app-projects-table>
+      </div>
+    }
+  </mat-tab>
+  <mat-tab label="Dependencies">
+    @if (dependencies.length > 0) {
+      <h2>Dependencies</h2>
+
+      <app-dependencies
+        [allDependencies]="dependencies">
+      </app-dependencies>
+    }
+  </mat-tab>
+  <mat-tab label="Licences">
+    @if (dependencies.length > 0) {
+      <app-system-licences-2
+        [dependencies]="dependencies" [systemId]="id!" [projectIds]="projectIds">
+      </app-system-licences-2>
+    }
+  </mat-tab>
+</mat-tab-group>

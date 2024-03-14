@@ -3,10 +3,10 @@
 
   <app-existing-licence [data]="existingLicences()"></app-existing-licence>
 
-
-  <h1 style="padding-top: 3rem">New licences</h1>
+  <div style="height: 2rem"></div>
 
   <app-other-licences [data]="otherLicences()" (refreshParent)="refreshLicence($event)"></app-other-licences>
+
 } @else {
   <h1>Loading...</h1>
 }

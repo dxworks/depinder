@@ -15,7 +15,7 @@ export interface TableElement {
   name: string;
   libraries: Set<string>;
   isChecked: boolean;
-  isCustom: boolean;
+  isCustom?: boolean;
   licenceInfo?: any,
   suggestedLicences?: SuggestedLicence[] | null;
   // symbol: string;
@@ -72,7 +72,7 @@ export class SystemLicences2Component implements OnInit {
                     name: licence.name ?? licence._id,
                     libraries: new Set(licence.libraries),
                     isChecked: false,
-                    isCustom: licence.custom ?? true,
+                    isCustom: licence.custom,
                     licenceInfo: licence,
                     suggestedLicences: licence.suggestedLicences
                   } as TableElement);
@@ -92,10 +92,10 @@ export class SystemLicences2Component implements OnInit {
   }
 
   otherLicences() {
-    return this.licences.filter(d => d.isCustom);
+    return this.licences.filter(d => d.isCustom === undefined);
   }
 
   existingLicences() {
-    return this.licences.filter(d => !d.isCustom);
+    return this.licences.filter(d => d.isCustom !== undefined);
   }
 }

@@ -17,6 +17,7 @@ import {LicencesService} from "../../../../common/services/licences.service";
 import {concatMap, from} from "rxjs";
 import {MatIconModule} from "@angular/material/icon";
 import {Router} from "@angular/router";
+import {SelectionModel} from "@angular/cdk/collections";
 
 @Component({
   selector: 'app-other-licences',
@@ -26,10 +27,11 @@ import {Router} from "@angular/router";
   styleUrl: './other-licences.component.css'
 })
 export class OtherLicencesComponent implements OnChanges {
-  displayedColumns: string[] = ['check', 'name', 'dependencies', 'other-dependencies', 'actions'];
+  displayedColumns: string[] = ['select', 'name', 'dependencies', 'other-dependencies', 'actions'];
   //todo change in a better suited type
   @Output() refreshParent: EventEmitter<Array<string>> = new EventEmitter();
   @Input() data: TableElement[] = [];
+  selection = new SelectionModel<TableElement>(true, []);
   dataSource: MatTableDataSource<TableElement> = new MatTableDataSource<TableElement>();
 
   constructor(
@@ -43,12 +45,30 @@ export class OtherLicencesComponent implements OnChanges {
     }
   }
 
-  selectAll() {
-    this.dataSource.data.forEach(licence => licence.isChecked = true);
+  isAllSelected() {
+    const numSelected = this.selection.selected.length;
+    const numRows = this.dataSource.data.length;
+    return numSelected === numRows;
+  }
+
+  toggleAllRows() {
+    if (this.isAllSelected()) {
+      this.selection.clear();
+      return;
+    }
+
+    this.selection.select(...this.dataSource.data);
+  }
+
+  checkboxLabel(row?: TableElement): string {
+    if (!row) {
+      return `${this.isAllSelected() ? 'deselect' : 'select'} all`;
+    }
+    return `${this.selection.isSelected(row) ? 'deselect' : 'select'} row ${this.getPosition(row.name)}`;
   }
 
   saveCustomLicences() {
-    const licences = this.dataSource.data.filter(licence => licence.isChecked);
+    const licences = this.selection.selected;
 
     from(licences).pipe(
       concatMap(data =>
@@ -59,7 +79,10 @@ export class OtherLicencesComponent implements OnChanges {
         })
       )
     ).subscribe({
-      next: () => console.log('Licence created'),
+      next: () => {
+        console.log('Licence created');
+        this.refreshParent.emit();
+      },
       complete: () => console.log('All licences created'),
       error: err => console.error('Error creating a licence', err),
     });
@@ -89,5 +112,9 @@ export class OtherLicencesComponent implements OnChanges {
     this.router.navigate(['licences/new'], {state: { id: id }}).catch(error => {
       console.error('Error navigating to save page:', error);
     });
+  }
+
+  getPosition(id: string) {
+    return this.dataSource.data.findIndex((element) => element.name === id) + 1;
   }
 }
