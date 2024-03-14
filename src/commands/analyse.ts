@@ -71,14 +71,14 @@ export const analyseCommand = new Command()
         // Call analyseFilesToCache and handle the result, but do not return anything.
         analyseFilesToCache(folders, options).then((result) => {
             // Handle the result as needed, e.g., log it or process it
-            console.log(result);
+            console.log(result)
         }).catch(error => {
             // Handle any errors
-            console.error(error);
-        });
+            console.error(error)
+        })
         // No return statement here
     })
-    .action(saveToCsv);
+    .action(saveToCsv)
 
 const outOfSupportThreshold = 24
 const outdatedThreshold = 15
@@ -116,7 +116,7 @@ function chooseSystemsCacheOption(): Cache {
 
 function extractLicenses(dep: DepinderDependency) {
     return dep.libraryInfo?.licenses?.map(it => {
-        if (typeof it === 'string') return it.substring(0, 100); else return JSON.stringify(it)
+        return it.substring(0, 100)
     })
 }
 
@@ -221,14 +221,14 @@ function extractProjectLibs(proj: DepinderProject, dep: DepinderDependency): Pro
 async function getLib(cache: Cache, plugin: Plugin, dep: DepinderDependency, options: AnalyseOptions, refreshedLibs: any[]) {
     let lib
     if (await cacheHit(cache, plugin, dep, options.refresh, refreshedLibs)) {
-        lib = await cache.get(`${plugin.name}:${dep.name}`) as LibraryInfo
+        lib = await cache.get?.(`${plugin.name}:${dep.name}`) as LibraryInfo
     } else {
         lib = await plugin.registrar.retrieve(dep.name)
         if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
             // log.info(`Getting vulnerabilities for ${lib.name}`)
             lib.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, lib.name)
         }
-        await cache.set(`${plugin.name}:${dep.name}`, lib)
+        await cache.set?.(`${plugin.name}:${dep.name}`, lib)
         if (options.refresh) refreshedLibs.push(dep.name)
     }
 
@@ -265,7 +265,7 @@ async function processProjects(projects: DepinderProject[], plugin: Plugin, cach
 async function processSingleProject(project: DepinderProject, plugin: any, cache: Cache, refreshedLibs: string[], options: AnalyseOptions, cacheProjects: Cache): Promise<string> {
     log.info(`Plugin ${plugin.name} analyzing project ${project.name}@${project.version}`)
     const dependencies = Object.values(project.dependencies)
-    const filteredDependencies = dependencies.filter(it => !blacklistedGlobs.some(glob => minimatch(it.name, glob)))
+    const filteredDependencies = options.refresh ? dependencies.filter(it => !blacklistedGlobs.some(glob => minimatch(it.name, glob))) : []
 
     const multiProgressBar = new MultiBar({}, Presets.shades_grey)
 
@@ -300,7 +300,7 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
     log.info('Project data saving in mongo db...')
 
     //todo save project info separate, stats + dependencies
-    await cacheProjects.set(`${project.name}@${project.version}`, {
+    await cacheProjects.set?.(`${project.name}@${project.version}`, {
         name: project.name,
         projectPath: project.path,
         directDeps: projectInfo.directDeps,
@@ -318,7 +318,7 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
     const outOfSupportDate = moment().subtract(outOfSupportThreshold, 'months').format(dateFormat)
     const outdatedDate = moment().subtract(outdatedThreshold, 'months').format(dateFormat)
 
-    await cacheProjects.set(`${project.name}@${project.version}`, {
+    await cacheProjects.set?.(`${project.name}@${project.version}`, {
         dependencies: Object.values(project.dependencies).map(dep => {
             const libraryInfo = dep.libraryInfo?.versions.find(version => dep.version === version.version)
             return {
@@ -337,37 +337,7 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
 
     log.info('Project data saving in mongo db done!')
 
-    return `${project.name}@${project.version}`;
-}
-
-async function processSystem(projects: DepinderProject[], useCache: boolean) {
-    const cache: Cache = useCache ? chooseSystemsCacheOption() : noCache
-
-    await cache.load()
-
-    const strings: string[] = []
-
-    for (const project of projects) {
-        strings.push(project.path)
-    }
-
-
-    let systemName = strings[0]
-
-    for (let i = 1; i < strings.length; i++) {
-        while (strings[i].indexOf(systemName) !== 0) {
-            systemName = systemName.substring(0, systemName.length - 1)
-            if (systemName === '') return ''
-        }
-    }
-
-    console.log('system name' + systemName)
-
-    await cache.set(systemName, {
-        name: systemName,
-        projectPath: systemName,
-        projects: projects.map(it => `${it.name}@${it.version}`),
-    })
+    return `${project.name}@${project.version}`
 }
 
 function filterFilesForPlugin(allFiles: string[], plugin: any): string[] {
@@ -385,6 +355,8 @@ export async function analyseFilesToCache(folders: string[], options: AnalyseOpt
     const projectIds: string[] = []
     const allFiles = folders.flatMap(walkDir)
     const selectedPlugins = getPluginsFromNames(options.plugins)
+
+    log.info('Analyse options' + options)
 
     const cache: Cache = useCache ? chooseLibsCacheOption() : noCache
     const cacheProjects = useCache ? chooseProjectsCacheOption() : noCache
@@ -480,7 +452,7 @@ export async function saveToCsv(folders: string[], options: AnalyseOptions, useC
 
         const allLicenses = _.groupBy(allLibsInfo, (lib: LibraryInfo) => {
             const license: string | undefined = lib.versions.flatMap(it => it.licenses).find(() => true)
-            if (!license || typeof license !== 'string')
+            if (!license)
                 return 'unknown'
             if (!licenseIds.includes(license))
                 return spdxCorrect(license || 'unknown') || 'unknown'

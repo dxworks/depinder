@@ -77,7 +77,7 @@ async function updateLibrariesFor(selectedPlugins: Plugin[], idsToUpdate: string
                     if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
                         lib.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, lib.name)
                     }
-                    await mongoCacheLibrary.set(id, lib)
+                    await mongoCacheLibrary.set?.(id, lib)
                 } catch (e: any) {
                     log.warn(`Exception getting remote info for ${libraryName}`)
                     log.error(e)

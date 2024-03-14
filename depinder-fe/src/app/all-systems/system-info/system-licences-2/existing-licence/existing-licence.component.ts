@@ -6,6 +6,7 @@ import {MatButtonModule} from "@angular/material/button";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatIconModule} from "@angular/material/icon";
 import {MatMenuModule} from "@angular/material/menu";
+import {Router} from "@angular/router";
 
 @Component({
   selector: 'app-existing-licence',
@@ -19,7 +20,7 @@ export class ExistingLicenceComponent implements OnInit {
   @Input() data: TableElement[] = [];
   dataSource = new MatTableDataSource<TableElement>([]);
 
-  constructor() {
+  constructor(private router: Router) {
   }
 
   ngOnInit() {
@@ -28,5 +29,11 @@ export class ExistingLicenceComponent implements OnInit {
 
   getPosition(id: string) {
     return this.dataSource.data.findIndex((element) => element.name === id) + 1;
+  }
+
+  navigateToEdit(id: string) {
+    this.router.navigate(['licences/edit'], {state: { id: id }}).catch(error => {
+      console.error('Error navigating to edit page:', error);
+    });
   }
 }

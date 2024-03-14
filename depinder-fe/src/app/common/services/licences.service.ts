@@ -19,6 +19,10 @@ export class LicencesService {
     return this.http.get(`${this.getUrl()}/${id}`, { observe: 'response' });
   }
 
+  patchById(id: string, data: any) {
+    return this.http.patch(`${this.getUrl()}/${id}`, data, { observe: 'response' });
+  }
+
   getByProjectId(id: string) {
     return this.http.get(`${this.getUrl()}/project/${id}`, { observe: 'response' });
   }
@@ -28,7 +32,6 @@ export class LicencesService {
   }
 
   create(licence: any) {
-    console.log("here");
     return this.http.post(`${this.getUrl()}`, licence, { observe: 'response' });
   }
 

@@ -76,10 +76,6 @@ export const jsonCacheLibrary: Cache = {
         }
         libMapLibrary.delete(key)
     },
-    findByField(key: string, value: any) {
-        /// TODO: Implement or remove
-        return undefined
-    }
 }
 
 export const jsonCacheProject: Cache = {
@@ -115,10 +111,6 @@ export const jsonCacheProject: Cache = {
         }
         libMapProject.delete(key)
     },
-    findByField(key: string, value: any) {
-        /// TODO: Implement or remove
-        return undefined
-    }
 }
 
 export const jsonCacheSystem: Cache = {
@@ -154,8 +146,4 @@ export const jsonCacheSystem: Cache = {
         }
         libMapSystem.delete(key)
     },
-    findByField(key: string, value: any) {
-        /// TODO: Implement or remove
-        return undefined
-    }
 }

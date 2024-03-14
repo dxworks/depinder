@@ -142,11 +142,22 @@ export async function retrieveFromNpm(libraryName: string): Promise<LibraryInfo>
             }
         }),
         description: response.description,
-        issuesUrl: [],
-        licenses: [response.license],
+        issuesUrl: [response.bugs?.url],
+        licenses: processSingleLicenseData(response.license),
         reposUrl: [],
         keywords: response.keywords,
+        homepageUrl: response.homepage ?? response.homepageUrl,
     }
+}
+
+function processSingleLicenseData(expression: string): string[] {
+    const cleanedExpression = expression.replace(/\b(AND|OR)\b/gi, '')
+
+    const licenseRegex = /[\w.-]+/g
+
+    const matches = cleanedExpression.match(licenseRegex)
+
+    return matches ? matches : []
 }
 
 const registrar: Registrar = {

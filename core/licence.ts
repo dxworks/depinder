@@ -7,6 +7,7 @@ export interface Licence {
     seeAlso?: string[],
     isOsiApproved?: boolean,
     other_ids?: string[],
+    custom?: boolean,
 }
 
 export interface SuggestedLicence {

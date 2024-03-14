@@ -1,12 +1,12 @@
 export interface Cache {
-    get: (key: string) => Promise<any> | undefined | any
-    set: (key: string, value: any) => void | Promise<void>
+    get?: (key: string) => Promise<any> | undefined | any
+    set?: (key: string, value: any) => void | Promise<void>
     has: (key: string) => boolean | Promise<boolean>
     load: () => void | Promise<void>,
     write: () => void | Promise<void>,
-    getAll: () => Promise<any> | undefined | any,
-    delete: (key: string) => void | Promise<void>,
-    findByField: (key: string, value: any) => Promise<any> | undefined | any,
+    getAll?: () => Promise<any> | undefined | any,
+    delete?: (key: string) => void | Promise<void>,
+    findByField?: (key: string, value: any) => Promise<any> | undefined | any,
 }
 
 export const noCache: Cache = {
@@ -22,14 +22,5 @@ export const noCache: Cache = {
     load() {
     },
     write() {
-    },
-    getAll() {
-
-    },
-    delete(key: string) {
-
-    },
-    findByField(key: string, value: any) {
-
     },
 }

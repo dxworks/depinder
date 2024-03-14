@@ -94,6 +94,7 @@ const LicenseSchema = new Schema({
     seeAlso: [String],
     isOsiApproved: Boolean,
     other_ids: [String],
+    custom: Boolean,
 })
 
 export const LibraryInfoModel: Model<LibraryInfo> = mongoose.model<LibraryInfo>('LibraryInfo', LibraryInfoSchema)
@@ -140,9 +141,6 @@ export const mongoCacheLibrary: Cache = {
     async delete(key: string) {
         await LibraryInfoModel.findByIdAndDelete(key).exec()
     },
-    async findByField(key: string, value: any) {
-        return await LibraryInfoModel.find({ key: value }).exec();
-    }
 }
 
 export const mongoCacheProject: Cache = {
@@ -176,9 +174,6 @@ export const mongoCacheProject: Cache = {
     async delete(key: string) {
         await ProjectInfoModel.findByIdAndDelete(key).exec()
     },
-    async findByField(key: string, value: any) {
-        return await ProjectInfoModel.find({ key: value }).exec();
-    }
 }
 
 export const mongoCacheSystem: Cache = {
@@ -222,9 +217,6 @@ export const mongoCacheSystem: Cache = {
     async delete(key: string) {
         await SystemInfoModel.findByIdAndDelete(key).exec()
     },
-    async findByField(key: string, value: any) {
-        return await SystemInfoModel.find({ key: value }).exec();
-    }
 }
 
 export const mongoCacheLicense: Cache = {
@@ -261,5 +253,5 @@ export const mongoCacheLicense: Cache = {
     async findByField(key: string, value: any) {
         const query = { [key]: { $in: [value] } }
         return await LicenceModel.findOne(query).exec()
-    }
+    },
 }

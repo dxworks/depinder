@@ -17,6 +17,7 @@ const routes: Routes = [
   { path: 'systems/:id', component: SystemInfoComponent},
   { path: 'systems/:id/edit', component: SystemEditComponent},
   { path: 'licences/new', component: AddLicenceComponent},
+  { path: 'licences/edit', component: AddLicenceComponent, data: {editMode: true}},
   { path: 'licences', component: LicencesComponent},
   { path: '**', component: AllProjectsComponent }
   // { path: '**', component: AppComponent }

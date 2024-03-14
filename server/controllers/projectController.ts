@@ -7,7 +7,7 @@ export const getProjectById = async (_req: Request, res: Response): Promise<any>
 
         await mongoCacheProject.load()
 
-        const value = await mongoCacheProject.get(id)
+        const value = await mongoCacheProject.get?.(id)
         if (value) {
             res.status(200).send(value)
         } else {
@@ -22,7 +22,7 @@ export const getProjectById = async (_req: Request, res: Response): Promise<any>
 export const getAllProjects = async (_req: Request, res: Response): Promise<any> => {
     try {
         await mongoCacheProject.load()
-        const value = await mongoCacheProject.getAll()
+        const value = await mongoCacheProject.getAll?.()
         res.status(200).json({ data: value })
     } catch (err) {
         console.error(`Error: ${err}`)
@@ -36,7 +36,7 @@ export const getPathById = async (_req: Request, res: Response): Promise<any> =>
 
         await mongoCacheProject.load()
 
-        const value = await mongoCacheProject.get(id)
+        const value = await mongoCacheProject.get?.(id)
         if (value) {
             res.status(200).send({data: value.projectPath})
         } else {
@@ -54,9 +54,9 @@ export const deleteProjectById = async (_req: Request, res: Response): Promise<a
 
         await mongoCacheProject.load()
 
-        const value = await mongoCacheProject.get(id)
+        const value = await mongoCacheProject.get?.(id)
         if (value) {
-            await mongoCacheProject.set(id, null)
+            mongoCacheProject.set?.(id, null)
             res.status(200).send('Resource deleted')
         } else {
             res.status(404).send('Resource not found')
