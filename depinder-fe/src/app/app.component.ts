@@ -1,20 +1,27 @@
-import {Component, OnInit} from '@angular/core';
+import {AfterViewInit, Component, OnInit, ViewChild} from '@angular/core';
 import {Router} from "@angular/router";
-import {SharedService} from "./common/services/shared.service";
+import {ToolbarService} from "./common/services/toolbar.service";
+import {MatSidenav} from "@angular/material/sidenav";
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
-export class AppComponent implements OnInit {
-  title = 'Default Title';
-  constructor(private router: Router, private sharedService: SharedService) {}
+export class AppComponent implements OnInit, AfterViewInit {
+  title = '';
+  htmlContent = '';
+
+  @ViewChild('sidenav') sidenav!: MatSidenav;
+
+  constructor(private router: Router, protected toolbarService: ToolbarService) {}
 
   ngOnInit() {
-    this.sharedService.currentTitle.subscribe(title => {
-      this.title = title;
-    });
+    this.toolbarService.currentTitle.subscribe(title => this.title = title);
+  }
+
+  ngAfterViewInit() {
+    this.toolbarService.sidebar = this.sidenav;
   }
 
   navigate(path: string) {

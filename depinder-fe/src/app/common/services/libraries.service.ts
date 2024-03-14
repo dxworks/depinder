@@ -22,6 +22,12 @@ export class LibrariesService {
     );
   }
 
+  findByDependency(id: string) {
+    return this.http.post(`${this.getUrl()}/by-dependency`, {'id': id}).pipe(
+      map(response => (<any>response).data)
+    );
+  }
+
   getUrl() {
     return `${BASE_URL}/${this.model}`;
   }

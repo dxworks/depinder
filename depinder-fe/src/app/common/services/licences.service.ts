@@ -19,6 +19,10 @@ export class LicencesService {
     return this.http.get(`${this.getUrl()}/${id}`, { observe: 'response' });
   }
 
+  getByProjectId(id: string) {
+    return this.http.get(`${this.getUrl()}/project/${id}`, { observe: 'response' });
+  }
+
   findSimilar(id: string) {
     return this.http.get(`${this.getUrl()}/similar/${id}`, { observe: 'response' });
   }

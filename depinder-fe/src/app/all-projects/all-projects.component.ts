@@ -3,8 +3,6 @@ import {ProjectsService} from "../common/services/projects.service";
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {AnalysisService} from "../common/services/analysis.service";
 import {Project} from '@core/project'
-import { ProjectsTableComponent } from '../common/standalone/projects-table/projects-table.component';
-import {SharedService} from "../common/services/shared.service";
 
 @Component({
   selector: 'app-all-projects',
@@ -17,12 +15,10 @@ export class AllProjectsComponent implements OnInit {
 
   constructor(private projectsService: ProjectsService,
               private analysisService: AnalysisService,
-              private _snackBar: MatSnackBar,
-              private sharedService: SharedService) {
+              private _snackBar: MatSnackBar) {
   }
 
   ngOnInit() {
-    this.sharedService.updateTitle('Projects');
     this.fetchProjects();
   }
 

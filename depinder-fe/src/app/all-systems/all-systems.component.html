@@ -1,20 +1,29 @@
-<h1>
+<mat-toolbar>
+  <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
+    <mat-icon>menu</mat-icon>
+  </button>
+  <span style="color: black; margin-right: 4px">
+    Systems
+  </span>
+  <span [ngStyle]="{'color': 'grey'}">
+    ({{systems$.length}})
+  </span>
+  <span style="flex: 1 1 auto"></span>
   <button
     mat-icon-button
     (click)="newSystem()">
     <mat-icon>add</mat-icon>
   </button>
-  Systems
-</h1>
+</mat-toolbar>
 
-<h3>Total number of systems: {{systems$.length}}</h3>
-
-<mat-list>
-  @for (system of systems$; track $index) {
-    <mat-list-item (click)="navigate([system._id])">
-      <strong>{{system._id}}</strong>: {{system.name}}
-      <mat-icon fontIcon="edit" (click)="navigate([system._id, 'edit'])"></mat-icon>
-    </mat-list-item>
-    <mat-divider></mat-divider>
-  }
-</mat-list>
+<div style="padding: 2rem">
+  <mat-list>
+    @for (system of systems$; track $index) {
+      <mat-list-item (click)="navigate([system._id])">
+        <strong>{{system._id}}</strong>: {{system.name}}
+        <mat-icon fontIcon="edit" (click)="navigate([system._id, 'edit'])"></mat-icon>
+      </mat-list-item>
+      <mat-divider></mat-divider>
+    }
+  </mat-list>
+</div>

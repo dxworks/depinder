@@ -14,8 +14,10 @@ import {MatInputModule} from "@angular/material/input";
 import {ErrorStateMatcher} from "@angular/material/core";
 import {MatButtonModule} from "@angular/material/button";
 import {SystemsService} from "../../common/services/systems.service";
-import {System} from "@core/system";
 import { alphaNumericUnderscoreValidator } from '../../common/validators';
+import {MatIconModule} from "@angular/material/icon";
+import {MatToolbarModule} from "@angular/material/toolbar";
+import {ToolbarService} from "../../common/services/toolbar.service";
 
 export class MyErrorStateMatcher implements ErrorStateMatcher {
   isErrorState(control: FormControl | null, form: FormGroupDirective | NgForm | null): boolean {
@@ -27,7 +29,7 @@ export class MyErrorStateMatcher implements ErrorStateMatcher {
 @Component({
   selector: 'app-create-system',
   standalone: true,
-  imports: [CommonModule, MatFormFieldModule, ReactiveFormsModule, MatInputModule, MatButtonModule],
+    imports: [CommonModule, MatFormFieldModule, ReactiveFormsModule, MatInputModule, MatButtonModule, MatIconModule, MatToolbarModule],
   templateUrl: './create-system.component.html',
   styleUrl: './create-system.component.css'
 })
@@ -36,7 +38,9 @@ export class CreateSystemComponent {
   form!: FormGroup;
   matcher = new MyErrorStateMatcher();
 
-  constructor(private fb: FormBuilder, private systemsService: SystemsService) {
+  constructor(private fb: FormBuilder,
+              private systemsService: SystemsService,
+              protected toolbarService: ToolbarService,) {
     this.initializeForm();
   }
 

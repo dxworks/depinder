@@ -1,0 +1,12 @@
+@if (this.licences.length > 0) {
+  <h1>Existing licences</h1>
+
+  <app-existing-licence [data]="existingLicences()"></app-existing-licence>
+
+
+  <h1 style="padding-top: 3rem">New licences</h1>
+
+  <app-other-licences [data]="otherLicences()" (refreshParent)="refreshLicence($event)"></app-other-licences>
+} @else {
+  <h1>Loading...</h1>
+}

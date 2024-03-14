@@ -1,37 +1,46 @@
-<h1>Create a New System</h1>
+<mat-toolbar>
+  <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
+    <mat-icon>menu</mat-icon>
+  </button>
+  <span style="color: black; margin-right: 4px">
+    Create a New System
+  </span>
+</mat-toolbar>
 
-<form class="example-form" [formGroup]="form" (ngSubmit)="onSubmit()">
-  <mat-form-field class="example-full-width">
-    <mat-label>ID</mat-label>
-    <input type="text" matInput formControlName="id" [errorStateMatcher]="matcher">
-    @if (form.get('id')?.hasError('invalidAlphaNumericUnderscore') && form.get('id')?.hasError('required')) {
-      <mat-error>The ID can contain letters, numbers, and underscores</mat-error>
-    }
-    @if (form.get('id')?.hasError('required')) {
-      <mat-error>ID is <strong>required</strong></mat-error>
-    }
-  </mat-form-field>
-
-  <mat-form-field class="example-full-width">
-    <mat-label>Name</mat-label>
-    <input type="text" matInput formControlName="name" [errorStateMatcher]="matcher">
-    @if (form.get('name')?.hasError('required')) {
-      <mat-error>Name is <strong>required</strong></mat-error>
-    }
-  </mat-form-field>
-
-  <div formArrayName="filePaths">
-    @for (control of filePaths.controls; track $index) {
-      <mat-form-field [formGroupName]="$index">
-        <mat-label>File Path {{ $index + 1 }}</mat-label>
-        <input matInput formControlName="path">
-      </mat-form-field>
-      @if (filePaths.length > 1) {
-        <button mat-button type="button" (click)="removeFilePath($index)">Remove</button>
+<div style="margin: 2rem;">
+  <form class="example-form" [formGroup]="form" (ngSubmit)="onSubmit()">
+    <mat-form-field class="example-full-width">
+      <mat-label>ID</mat-label>
+      <input type="text" matInput formControlName="id" [errorStateMatcher]="matcher">
+      @if (form.get('id')?.hasError('invalidAlphaNumericUnderscore') && form.get('id')?.hasError('required')) {
+        <mat-error>The ID can contain letters, numbers, and underscores</mat-error>
       }
-    }
-  </div>
+      @if (form.get('id')?.hasError('required')) {
+        <mat-error>ID is <strong>required</strong></mat-error>
+      }
+    </mat-form-field>
 
-  <button mat-raised-button type="button" (click)="addFilePath()">Add File Path</button>
-  <button mat-raised-button type="submit">Create System</button>
-</form>
+    <mat-form-field class="example-full-width">
+      <mat-label>Name</mat-label>
+      <input type="text" matInput formControlName="name" [errorStateMatcher]="matcher">
+      @if (form.get('name')?.hasError('required')) {
+        <mat-error>Name is <strong>required</strong></mat-error>
+      }
+    </mat-form-field>
+
+    <div formArrayName="filePaths">
+      @for (control of filePaths.controls; track $index) {
+        <mat-form-field [formGroupName]="$index">
+          <mat-label>File Path {{ $index + 1 }}</mat-label>
+          <input matInput formControlName="path">
+        </mat-form-field>
+        @if (filePaths.length > 1) {
+          <button mat-button type="button" (click)="removeFilePath($index)">Remove</button>
+        }
+      }
+    </div>
+
+    <button mat-raised-button type="button" (click)="addFilePath()">Add File Path</button>
+    <button mat-raised-button type="submit">Create System</button>
+  </form>
+</div>

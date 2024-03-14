@@ -16,12 +16,17 @@ import {FormsModule} from "@angular/forms";
 import {convertToDateString} from "../../common/utils";
 import {MatIconModule} from "@angular/material/icon";
 import {MatButtonModule} from "@angular/material/button";
-import {SharedService} from "../../common/services/shared.service";
+import {MatTabsModule} from "@angular/material/tabs";
+import {catchError, forkJoin, of, switchMap, tap} from "rxjs";
+import {LicenceLabelComponent} from "../../common/standalone/licence-label/licence-label.component";
+import {SystemLicences2Component} from "./system-licences-2/system-licences-2.component";
+import {MatToolbarModule} from "@angular/material/toolbar";
+import {ToolbarService} from "../../common/services/toolbar.service";
 
 @Component({
   selector: 'app-system-info',
   standalone: true,
-  imports: [CommonModule, ProjectsTableComponent, DependencyRecursiveComponent, DependenciesComponent, MatFormFieldModule, MatInputModule, FormsModule, MatIconModule, MatButtonModule],
+    imports: [CommonModule, ProjectsTableComponent, DependencyRecursiveComponent, DependenciesComponent, MatFormFieldModule, MatInputModule, FormsModule, MatIconModule, MatButtonModule, MatTabsModule, LicenceLabelComponent, SystemLicences2Component, MatToolbarModule],
   templateUrl: './system-info.component.html',
   styleUrl: './system-info.component.css'
 })
@@ -36,44 +41,57 @@ export class SystemInfoComponent implements OnInit {
   constructor(private projectsService: ProjectsService,
               private systemService: SystemsService,
               private route: ActivatedRoute,
-              private sharedService: SharedService) { }
+              protected toolbarService: ToolbarService) { }
 
   ngOnInit() {
-    this.route.params.subscribe(params => {
-      this.id = params['id'];
-      if (this.id) {
-        this.systemService.find(this.id).subscribe(
-          (system: System) => {
-            this.system = system;
+    this.route.params.pipe(
+      tap(params => this.id = params['id']),
+      switchMap(params => this.id ? this.systemService.find(this.id) : of(null)),
+      tap(system => {
+        this.system = system ?? undefined;
+        if (this.system && this.system.runs.length > 0) {
+          this.selectedRunDate = this.getLatestRunDate();
+        }
+      }),
+      switchMap(() => this.selectedRunDate ? this.getRunDataObservable(this.selectedRunDate) : of(null)),
+      catchError(error => {
+        console.error('Error fetching data', error);
+        return of(null); // Handle the error or return a default value
+      })
+    ).subscribe();
+  }
 
-            this.sharedService.updateTitle(system.name);
+  getRunDataObservable(date: number) {
+    this.selectedRun = this.getRunByDate(date);
+    this.projects = [];
+    this.dependencies = [];
 
-            if (this.system !== undefined && this.system.runs.length > 0) {
-              this.selectedRunDate = this.getLatestRunDate();
-              this.getRunData();
-            }
-          }
-        );
-      }
-    });
+    return forkJoin(this.selectedRun.projects.map(projectId => this.projectsService.find(projectId))).pipe(
+      tap(results => {
+        this.projects = results;
+        this.dependencies = results.flatMap(project => project.dependencies);
+      }),
+      catchError(error => {
+        console.error('Error fetching projects data', error);
+        return of([]); // Handle the error or return a default value
+      })
+    );
   }
 
   getRunData() {
-      this.selectedRun = this.getRunByDate(this.selectedRunDate!);
-      this.projects = [];
-      this.dependencies = [];
+    this.selectedRun = this.getRunByDate(this.selectedRunDate!);
+    this.projects = [];
+    this.dependencies = [];
 
-      this.selectedRun.projects.forEach((projectId: string) => {
-        this.projectsService.find(projectId).subscribe(
-          {
-            next: (project: Project) => {
-              console.log(project._id);
-              this.projects = [project, ...this.projects]
-              this.dependencies = [...project.dependencies, ...this.dependencies]
-            }
-          }
-        )
-      })
+    const projectObservables = this.selectedRun!.projects.map(projectId => this.projectsService.find(projectId));
+
+    forkJoin(projectObservables).subscribe(results => {
+      results.forEach((project: Project) => {
+        console.log(project._id);
+        this.projects = [project, ...this.projects];
+        this.dependencies = [...project.dependencies, ...this.dependencies];
+      });
+    });
   }
 
   getLatestRunDate(): number {
@@ -99,5 +117,10 @@ export class SystemInfoComponent implements OnInit {
     )
   }
 
+  get projectIds() {
+    return this.projects.map(project => project._id);
+  }
+
   protected readonly convertToDateString = convertToDateString;
+  protected readonly of = of;
 }
