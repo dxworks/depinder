@@ -9,7 +9,7 @@ import {
 } from "../../common/standalone/dependency-recursive/dependency-recursive.component";
 import {DependenciesComponent} from "../../common/standalone/dependencies/dependencies.component";
 import {SystemsService} from "../../common/services/systems.service";
-import {ActivatedRoute} from "@angular/router";
+import {ActivatedRoute, Router} from "@angular/router";
 import {MatFormFieldModule} from "@angular/material/form-field";
 import {MatInputModule} from "@angular/material/input";
 import {FormsModule} from "@angular/forms";
@@ -41,7 +41,8 @@ export class SystemInfoComponent implements OnInit {
   constructor(private projectsService: ProjectsService,
               private systemService: SystemsService,
               private route: ActivatedRoute,
-              protected toolbarService: ToolbarService) { }
+              protected toolbarService: ToolbarService,
+              private router: Router,) { }
 
   ngOnInit() {
     this.route.params.pipe(
@@ -119,6 +120,10 @@ export class SystemInfoComponent implements OnInit {
 
   get projectIds() {
     return this.projects.map(project => project._id);
+  }
+
+  navigateToEdit() {
+    this.router.navigate(['edit'], { relativeTo: this.route });
   }
 
   protected readonly convertToDateString = convertToDateString;

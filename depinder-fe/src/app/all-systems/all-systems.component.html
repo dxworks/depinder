@@ -16,14 +16,30 @@
   </button>
 </mat-toolbar>
 
+
 <div style="padding: 2rem">
-  <mat-list>
-    @for (system of systems$; track $index) {
-      <mat-list-item (click)="navigate([system._id])">
-        <strong>{{system._id}}</strong>: {{system.name}}
-        <mat-icon fontIcon="edit" (click)="navigate([system._id, 'edit'])"></mat-icon>
-      </mat-list-item>
-      <mat-divider></mat-divider>
-    }
-  </mat-list>
+  <table mat-table [dataSource]="dataSource">
+    <ng-container matColumnDef="position">
+      <th mat-header-cell *matHeaderCellDef> No. </th>
+      <td mat-cell *matCellDef="let element"> {{getPosition(element._id)}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="id">
+      <th mat-header-cell *matHeaderCellDef> ID </th>
+      <td mat-cell *matCellDef="let element"> {{element._id}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef> Name </th>
+      <td mat-cell *matCellDef="let element"> {{element.name}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="latestRun">
+      <th mat-header-cell *matHeaderCellDef> Latest Run Date </th>
+      <td mat-cell *matCellDef="let element"> {{getLatestRunDate(element._id)}} </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;" (click)="navigate([row._id])"></tr>
+  </table>
 </div>

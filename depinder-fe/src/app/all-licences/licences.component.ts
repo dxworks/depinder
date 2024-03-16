@@ -22,9 +22,11 @@ import {MatSort, MatSortModule} from "@angular/material/sort";
 })
 export class LicencesComponent implements OnInit, AfterViewInit{
   @Input() licences?: Licence[];
+
   licences$: Licence[] = [];
   dataSource: MatTableDataSource<Licence> = new MatTableDataSource<Licence>();
   displayedColumns: string[] = ['_id', 'name', 'isDeprecatedLicenseId', 'isOsiApproved', 'custom', 'other_ids'];
+
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 

@@ -49,8 +49,8 @@ export class DependenciesTableComponent implements AfterViewInit, OnChanges {
       if (this.paginator) {
         this.dataSource.paginator = this.paginator;
       }
-      this.updateDisplayedColumns();
       this.selectedColumns = this.allColumns.filter(c => c.couldBeVisible() === true).map(c => c.columnDef)
+      this.updateDisplayedColumns();
     }
   }
 
@@ -63,6 +63,10 @@ export class DependenciesTableComponent implements AfterViewInit, OnChanges {
 
   updateDisplayedColumns(): void {
     this.displayedColumns = this.allColumns.filter(c => c.couldBeVisible() === true).map(c => c.columnDef);
+  }
+
+  allCouldBeVisible() {
+    return this.allColumns.filter(c => c.couldBeVisible() === true)
   }
 
   public selectedColumns: string[] = this.allColumns.filter(c => c.couldBeVisible() === true).map(c => c.columnDef);
