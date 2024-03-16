@@ -40,6 +40,11 @@ export class LicencesService {
     return this.http.post(`${this.getUrl()}/alias`, { id: id, alias: alias }, { observe: 'response' });
   }
 
+  getLicenceDetails(detailsUrl: string) {
+    const url = 'https://corsproxy.io/?' + encodeURIComponent(detailsUrl);
+    return this.http.get(url, { observe: 'response' });
+  }
+
   getUrl() {
     return `${BASE_URL}/${this.model}`;
   }

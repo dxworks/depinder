@@ -16,6 +16,10 @@ export class LibrariesService {
     return this.http.get(`${this.getUrl()}/all`);
   }
 
+  allWithLicence(licenceId: string) {
+    return this.http.post(`${this.getUrl()}/all`, {'licenceId': licenceId});
+  }
+
   find(id: string) {
     return this.http.post(this.getUrl(), {'id': id}).pipe(
       map(response => (<any>response).data)

@@ -1,0 +1,69 @@
+<mat-toolbar>
+  <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
+    <mat-icon>menu</mat-icon>
+  </button>
+  <span style="color: black; margin-right: 4px">
+    {{licence?.name}}
+  </span>
+</mat-toolbar>
+
+<div style="margin: 2rem">
+  @if (licenceDetails !== undefined) {
+    <div class="card">
+      <p class="stat-name">Licence Text</p>
+      <p [innerHTML]="licenceDetails.licenseTextHtml"></p>
+    </div>
+    <div class="card">
+      <div class="stats" style="height: 43px; width: 90%;padding-right: 12px; justify-content: space-between; align-items: flex-start; display: inline-flex">
+        <div class="stat">
+          <div class="stat-container">
+            <div class="stat-name">Is deprecated</div>
+          </div>
+          <div class="stat-value">{{licenceDetails.isDeprecatedLicenseId}}</div>
+        </div>
+        <div class="stat">
+          <div class="stat-container">
+            <div class="stat-name">Is OSI approved</div>
+          </div>
+          <div class="stat-value">{{licenceDetails.isOsiApproved}}</div>
+        </div>
+        <div class="stat">
+          <div class="stat-container">
+            <div class="stat-name">Is custom</div>
+          </div>
+          <div class="stat-value">{{licence?.custom}}</div>
+        </div>
+      </div>
+      @if (licence !== undefined && licence!.other_ids!.length > 0) {
+        <div class="stat">
+          <div class="stat-container">
+            <div class="stat-name">Other IDs</div>
+          </div>
+          <div class="stat-value">{{licence.other_ids}}</div>
+        </div>
+      }
+      @if (licenceDetails.seeAlso !== undefined && licenceDetails.seeAlso.length > 0) {
+        <div class="stat">
+          <div class="stat-container">
+            <div class="stat-name">See also</div>
+          </div>
+          @for (url of licenceDetails.seeAlso; track url) {
+            <button mat-button style="background-color: #252B36; color: white" (click)="navigateToUrl(url)">
+              <mat-icon>link</mat-icon>
+              {{ extractDomain(url) }}
+            </button>
+          } @empty {
+            <li>There are no items.</li>
+          }
+        </div>
+      }
+    </div>
+  }
+
+<!--  @if ()-->
+  <div class="card">
+    <p class="stat-name">Dependencies using this licence</p>
+    <app-dependencies-table [dependencies]="dependencies"></app-dependencies-table>
+  </div>
+
+</div>

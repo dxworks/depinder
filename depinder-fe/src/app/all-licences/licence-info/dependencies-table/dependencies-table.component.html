@@ -1,0 +1,97 @@
+<mat-form-field style="width: 100%">
+  <mat-label>Columns</mat-label>
+  <mat-select [multiple]="true" [(value)]="selectedColumns" (selectionChange)="updateDisplayedColumns()">
+    <mat-option *ngFor="let column of allColumns" [value]="column.columnDef">
+      {{column.header}}
+    </mat-option>
+  </mat-select>
+</mat-form-field>
+
+<div>
+  <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
+
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by name">
+        Name
+      </th>
+      <td mat-cell *matCellDef="let element"> {{element.name}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="description">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by description">
+        Description
+      </th>
+      <td mat-cell *matCellDef="let element"> {{element.description}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="keywords">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by keywords">
+        Description
+      </th>
+      <td mat-cell *matCellDef="let element"> {{element.keywords}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="reposUrl">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by reposUrl">
+        Repository URL
+      </th>
+      <td mat-cell *matCellDef="let element"> {{element.reposUrl}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="homepageUrl">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by homepageUrl">
+        Homepage URL
+      </th>
+      <td mat-cell *matCellDef="let element"> {{element.homepageUrl}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="documentationUrl">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by documentationUrl">
+        documentationUrl
+      </th>
+      <td mat-cell *matCellDef="let element"> {{element.documentationUrl}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="packageUrl">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by packageUrl">
+        packageUrl
+      </th>
+      <td mat-cell *matCellDef="let element"> {{element.packageUrl}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="downloads">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by downloads">
+        Downloads
+      </th>
+      <td mat-cell *matCellDef="let element"> {{element.downloads}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="authors">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by authors">
+        authors
+      </th>
+      <td mat-cell *matCellDef="let element"> {{element.authors}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="vulnerabilities">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by vulnerabilities">
+        Vulnerabilities
+      </th>
+      <td mat-cell *matCellDef="let element">
+        <ul>
+          @for(vulnerability of element.vulnerabilities; track vulnerability.timestamp) {
+            <li>
+              <a href="{{vulnerability.permalink}}" target="_blank">{{vulnerability.summary}}</a>
+            </li>
+          }
+        </ul>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+  </table>
+  <mat-paginator [pageSizeOptions]="[10, 25, 50]"
+                 aria-label="Select page of periodic elements">
+  </mat-paginator>
+</div>

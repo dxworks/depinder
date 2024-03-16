@@ -70,6 +70,10 @@ export class LicencesComponent implements OnInit, AfterViewInit{
     this.router.navigate(['licences/new'])
   }
 
+  navigateToLicence(id: string) {
+    this.router.navigate([`licences/${id}`])
+  }
+
   applyFilter(event: Event) {
     const filterValue = (event.target as HTMLInputElement).value;
     this.dataSource.filter = filterValue.trim().toLowerCase();
