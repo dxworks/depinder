@@ -62,7 +62,7 @@ export class DependenciesTableComponent implements AfterViewInit, OnChanges {
   }
 
   updateDisplayedColumns(): void {
-    this.displayedColumns = this.allColumns.filter(c => c.couldBeVisible() === true).map(c => c.columnDef);
+    this.displayedColumns = this.selectedColumns;
   }
 
   allCouldBeVisible() {

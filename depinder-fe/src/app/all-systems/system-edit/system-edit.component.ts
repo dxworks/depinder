@@ -10,11 +10,13 @@ import {System, SystemRun} from "@core/system";
 import {ActivatedRoute, Router} from "@angular/router";
 import {MatIconModule} from "@angular/material/icon";
 import {MatSnackBar} from "@angular/material/snack-bar";
+import {MatToolbarModule} from "@angular/material/toolbar";
+import {ToolbarService} from "../../common/services/toolbar.service";
 
 @Component({
   selector: 'app-system-edit',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, ReactiveFormsModule, MatIconModule],
+  imports: [CommonModule, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, ReactiveFormsModule, MatIconModule, MatToolbarModule],
   templateUrl: './system-edit.component.html',
   styleUrl: './system-edit.component.css'
 })
@@ -30,7 +32,8 @@ export class SystemEditComponent implements OnInit {
               private systemsService: SystemsService,
               private route: ActivatedRoute,
               private router: Router,
-              private _snackBar: MatSnackBar) {
+              private _snackBar: MatSnackBar,
+              protected toolbarService: ToolbarService) {
     this.route.params.subscribe(params => {
       this.id = params['id'];
     });
