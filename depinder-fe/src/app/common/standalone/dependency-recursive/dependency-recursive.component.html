@@ -10,7 +10,7 @@
         [ngClass]="{'highlight': isHighlighted()}">
         {{dependency?.name}} at {{dependency?.version}}
       </span>
-      <button mat-button class="hover-button" (click)="toggle()">See details</button>
+      <button mat-button class="hover-button" (click)="navigateToDependency()">See details</button>
     </div>
   </div>
 

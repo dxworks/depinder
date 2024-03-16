@@ -9,6 +9,10 @@ import {SystemEditComponent} from "./all-systems/system-edit/system-edit.compone
 import {LicencesComponent} from "./all-licences/licences.component";
 import {AddLicenceComponent} from "./all-licences/add-licence/add-licence.component";
 import {LicenceInfoComponent} from "./all-licences/licence-info/licence-info.component";
+import {
+  DependencyDetailsComponent
+} from "./common/standalone/dependencies/dependency-details/dependency-details.component";
+import {DependencyDetails2Component} from "./common/standalone/dependency-details-2/dependency-details-2.component";
 
 const routes: Routes = [
   { path: 'project/:projectId', component: ProjectDetailsComponent },
@@ -16,6 +20,7 @@ const routes: Routes = [
   { path: 'systems', component: AllSystemsComponent},
   { path: 'systems/new', component: CreateSystemComponent},
   { path: 'systems/:id', component: SystemInfoComponent},
+  { path: 'dependency/:depId', component: DependencyDetails2Component},
   { path: 'systems/:id/edit', component: SystemEditComponent},
   { path: 'licences/new', component: AddLicenceComponent},
   { path: 'licences/edit', component: AddLicenceComponent, data: {editMode: true}},

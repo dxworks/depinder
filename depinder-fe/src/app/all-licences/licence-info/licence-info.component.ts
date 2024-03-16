@@ -11,6 +11,7 @@ import {LibrariesService} from "../../common/services/libraries.service";
 import {Dependency} from "@core/project";
 import {DependenciesTableComponent} from "./dependencies-table/dependencies-table.component";
 import {LibraryInfo} from "@core/library";
+import {extractDomain, navigateToUrl} from "../../common/utils";
 
 @Component({
   selector: 'app-licence-info',
@@ -55,12 +56,6 @@ export class LicenceInfoComponent implements OnInit{
     });
   }
 
-  extractDomain(url: string): string {
-    const urlObj = new URL(url);
-    return urlObj.hostname;
-  }
-
-  navigateToUrl(url: string): void {
-    window.open(url, '_blank');
-  }
+  protected readonly navigateToUrl = navigateToUrl;
+  protected readonly extractDomain = extractDomain;
 }

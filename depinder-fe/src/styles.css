@@ -2,3 +2,58 @@
 
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+.card {
+  width: 90%;
+  padding: 2rem;
+  background: rgba(37, 43, 54, 0.09);
+  border-radius: 8px;
+
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 20px;
+  display: inline-flex;
+  margin-bottom: 2rem;
+
+  font-family: SF Pro Text, sans-serif;
+}
+
+.card .stat-value {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 21px;
+  word-wrap: break-word;
+}
+
+.card .stat-name {
+  color: #123a73;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  word-wrap: break-word;
+}
+
+.card .stat-container {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  display: inline-flex
+}
+
+.card .stat {
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 4px;
+  display: inline-flex;
+}
+
+.stats {
+  height: 43px;
+  width: 90%;
+  justify-content: space-between;
+  align-items: flex-start;
+  display: inline-flex;
+  padding-bottom: 12px;
+}

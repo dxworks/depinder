@@ -6,6 +6,7 @@ import {JsonPipe, NgClass, NgIf, NgStyle} from "@angular/common";
 import {DependencyFilter} from "../../models/dependency-filter";
 import { Dependency } from '@core/project';
 import {MatButtonModule} from "@angular/material/button";
+import {ActivatedRoute, Router} from "@angular/router";
 
 @Component({
   selector: 'app-dependency-recursive',
@@ -36,7 +37,10 @@ export class DependencyRecursiveComponent implements OnInit {
 
   @Input() filter!: DependencyFilter;
 
-  constructor() { }
+  constructor(
+    private router: Router,
+    private route: ActivatedRoute,
+  ) { }
 
   ngOnInit(): void {
     this.allDependencies.sort((a, b) => a.data.name.localeCompare(b.data.name));
@@ -98,4 +102,8 @@ export class DependencyRecursiveComponent implements OnInit {
     return this.depth > 0 ? {'padding-left': '2rem'} : {'padding-left': '0rem'};
   }
 
+  navigateToDependency() {
+    const url = this.router.createUrlTree(['/dependency', this.dependency?._id], {relativeTo: this.route}).toString();
+    window.open(url, '_blank');
+  }
 }
