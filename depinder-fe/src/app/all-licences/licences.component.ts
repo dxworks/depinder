@@ -20,7 +20,7 @@ import {MatSort, MatSortModule} from "@angular/material/sort";
   templateUrl: './licences.component.html',
   styleUrl: './licences.component.css'
 })
-export class LicencesComponent implements OnInit, AfterViewInit{
+export class LicencesComponent implements OnInit {
   @Input() licences?: Licence[];
 
   licences$: Licence[] = [];
@@ -47,25 +47,10 @@ export class LicencesComponent implements OnInit, AfterViewInit{
         this.toolbarService.changeTitle(`Licences (${this.licences$.length})`);
 
         this.dataSource = new MatTableDataSource<Licence>(this.licences$);
-        this.dataSource.paginator = this.paginator; // assign paginator here
+        this.dataSource.paginator = this.paginator;
+        this.dataSource.sort = this.sort;
       }
     )
-  }
-
-  ngAfterViewInit() {
-    this.dataSource.paginator = this.paginator;
-    this.dataSource.sort = this.sort;
-    this.dataSource.sortingDataAccessor = ((item: Licence, property: string) => {
-      console.log(item, property);
-      switch (property) {
-        case 'isDeprecatedLicenseId': return `${item.isDeprecatedLicenseId}`;
-        case 'isOsiApproved': return `${item.isOsiApproved}`;
-        case 'custom': return `${item.custom}`;
-        case 'other_ids': return `${item.other_ids}`;
-        default: return item._id;
-      }
-    });
-    this.cdRef.detectChanges();
   }
 
   newLicence() {

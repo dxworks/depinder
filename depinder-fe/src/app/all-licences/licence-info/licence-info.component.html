@@ -60,10 +60,12 @@
     </div>
   }
 
-<!--  @if ()-->
-  <div class="card">
-    <p class="stat-name">Dependencies using this licence</p>
-    <app-dependencies-table [dependencies]="dependencies"></app-dependencies-table>
-  </div>
+  @if (dependencies.length > 0) {
+    <div class="card">
+      <p class="stat-name">Dependencies using this licence</p>
+      <app-dependencies-table [dependencies]="dependencies"></app-dependencies-table>
+    </div>
+  }
+
 
 </div>
