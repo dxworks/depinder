@@ -1,4 +1,4 @@
-import { Dependency } from "@core/project";
+import { Dependency } from '@core/project';
 
 export class TreeNode {
   data: Dependency;
@@ -25,7 +25,7 @@ export class TreeNode {
       return true;
     }
 
-    for (let child of this.children) {
+    for (const child of this.children) {
       if (child.contains(name, vulnerabilities, outOfSupport, outdated)) {
         return true;
       }

@@ -1,0 +1,15 @@
+{{projects.length}}
+
+<mat-accordion style="margin: 2rem">
+  <mat-expansion-panel hideToggle>
+    <mat-expansion-panel-header style="margin: 16px">
+      <mat-panel-title>
+        Operational Risk
+      </mat-panel-title>
+      <mat-panel-description>
+        Highlight libraries that haven't been updated in the last {{OUTDATED_MONTHS}} months and the distinct count of such libraries across all projects.
+      </mat-panel-description>
+    </mat-expansion-panel-header>
+    <app-operational-risk [projects]="projects"></app-operational-risk>
+  </mat-expansion-panel>
+</mat-accordion>

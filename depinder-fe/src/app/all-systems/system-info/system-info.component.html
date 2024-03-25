@@ -12,6 +12,8 @@
   <mat-icon fontIcon="edit" (click)="navigateToEdit()"></mat-icon>
 </mat-toolbar>
 
+<p>{{dependencies[0] | json}}</p>
+
 <div style="padding-top: 1rem">
   <mat-form-field class="run-date">
     <mat-label>Run date</mat-label>
@@ -24,6 +26,9 @@
 </div>
 
 <mat-tab-group style="margin-left: 2rem; margin-right: 2rem">
+  <mat-tab label="Dashboard">
+    <app-system-dashboard [projects]="projects"></app-system-dashboard>
+  </mat-tab>
   <mat-tab label="Projects">
     @if (projects.length > 0) {
       <h2>Projects in this system</h2>

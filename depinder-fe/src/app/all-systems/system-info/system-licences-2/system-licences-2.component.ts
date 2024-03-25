@@ -65,7 +65,6 @@ export class SystemLicences2Component implements OnInit {
                     ...this.licences[existingEntryIndex],
                     libraries: new Set([...(existingLibraries ?? []), ...(newLibraries ?? [])])
                   }
-                  console.log(this.licences[existingEntryIndex]);
                 } else {
                   this.licences.push({
                     // index: licence.index,

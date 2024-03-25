@@ -22,11 +22,12 @@ import {LicenceLabelComponent} from "../../common/standalone/licence-label/licen
 import {SystemLicences2Component} from "./system-licences-2/system-licences-2.component";
 import {MatToolbarModule} from "@angular/material/toolbar";
 import {ToolbarService} from "../../common/services/toolbar.service";
+import {SystemDashboardComponent} from "./system-dashboard/system-dashboard.component";
 
 @Component({
   selector: 'app-system-info',
   standalone: true,
-    imports: [CommonModule, ProjectsTableComponent, DependencyRecursiveComponent, DependenciesComponent, MatFormFieldModule, MatInputModule, FormsModule, MatIconModule, MatButtonModule, MatTabsModule, LicenceLabelComponent, SystemLicences2Component, MatToolbarModule],
+  imports: [CommonModule, ProjectsTableComponent, DependencyRecursiveComponent, DependenciesComponent, MatFormFieldModule, MatInputModule, FormsModule, MatIconModule, MatButtonModule, MatTabsModule, LicenceLabelComponent, SystemLicences2Component, MatToolbarModule, SystemDashboardComponent],
   templateUrl: './system-info.component.html',
   styleUrl: './system-info.component.css'
 })
@@ -74,7 +75,7 @@ export class SystemInfoComponent implements OnInit {
       }),
       catchError(error => {
         console.error('Error fetching projects data', error);
-        return of([]); // Handle the error or return a default value
+        return of([]);
       })
     );
   }

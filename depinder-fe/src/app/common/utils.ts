@@ -11,3 +11,7 @@ export function extractDomain(url: string): string {
 export function navigateToUrl(url: string): void {
   window.open(url, '_blank');
 }
+
+export function convertNumberToDate(timestamp: number): Date {
+  return new Date(timestamp);
+}
