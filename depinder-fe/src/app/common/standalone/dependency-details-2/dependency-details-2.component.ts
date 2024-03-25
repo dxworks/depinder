@@ -1,4 +1,4 @@
-import {AfterViewInit, ChangeDetectorRef, Component, OnChanges, OnInit, SimpleChanges, ViewChild} from '@angular/core';
+import {Component, OnInit} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {MatButtonModule} from "@angular/material/button";
 import {MatIconModule} from "@angular/material/icon";
@@ -6,11 +6,10 @@ import {MatToolbarModule} from "@angular/material/toolbar";
 import {ToolbarService} from "../../services/toolbar.service";
 import {ActivatedRoute} from "@angular/router";
 import {LibrariesService} from "../../services/libraries.service";
-import {LibraryInfo, LibraryVersion} from "@core/library";
-import {convertToDateString, extractDomain, navigateToUrl} from "../../utils";
-import {MatTableDataSource, MatTableModule} from "@angular/material/table";
-import {MatPaginator, MatPaginatorModule} from "@angular/material/paginator";
-import {Vulnerability} from "@core/vulnerability-checker";
+import {LibraryInfo} from "@core/library";
+import {extractDomain, navigateToUrl} from "../../utils";
+import {MatTableModule} from "@angular/material/table";
+import {MatPaginatorModule} from "@angular/material/paginator";
 import {VulnerabilitiesTableComponent} from "./vulnerabilities-table/vulnerabilities-table.component";
 import {VersionsTableComponent} from "./versions-table/versions-table.component";
 
@@ -42,5 +41,4 @@ export class DependencyDetails2Component implements OnInit {
 
   protected readonly extractDomain = extractDomain;
   protected readonly navigateToUrl = navigateToUrl;
-  protected readonly convertToDateString = convertToDateString;
 }
