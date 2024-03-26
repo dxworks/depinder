@@ -4,7 +4,7 @@ import {MatExpansionModule} from "@angular/material/expansion";
 import {Dependency, Project} from "@core/project";
 import {MatTableModule} from "@angular/material/table";
 import {OperationalRiskComponent} from "./operational-risk/operational-risk.component";
-import {OUTDATED_MONTHS} from "@core/constants";
+import {OUT_OF_SUPPORT_MONTHS, OUTDATED_MONTHS} from "@core/constants";
 
 @Component({
   selector: 'app-system-dashboard',
@@ -16,4 +16,5 @@ import {OUTDATED_MONTHS} from "@core/constants";
 export class SystemDashboardComponent {
   @Input() projects: Project[] = [];
   protected readonly OUTDATED_MONTHS = OUTDATED_MONTHS;
+  protected readonly OUT_OF_SUPPORT_MONTHS = OUT_OF_SUPPORT_MONTHS;
 }

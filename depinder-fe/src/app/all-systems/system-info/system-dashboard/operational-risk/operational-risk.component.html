@@ -1,16 +1,3 @@
-<p>Outdated months: {{OUTDATED_MONTHS}}</p>
-<p>Out of support months: {{OUT_OF_SUPPORT_MONTHS}}</p>
-
-<mat-form-field>
-  <mat-label>State</mat-label>
-  <mat-select [(value)]="selectedState" (valueChange)="filterByState()">
-    <mat-option>None</mat-option>
-    @for (state of states; track state) {
-      <mat-option [value]="state">{{state}}</mat-option>
-    }
-  </mat-select>
-</mat-form-field>
-
 <table mat-table [dataSource]="dataSource">
 
   <ng-container matColumnDef="position">
@@ -20,22 +7,38 @@
 
   <ng-container matColumnDef="name">
     <th mat-header-cell *matHeaderCellDef> Name </th>
-    <td mat-cell *matCellDef="let element"> {{element.name}} {{element.version}} </td>
-  </ng-container>
-
-  <ng-container matColumnDef="state">
-    <th mat-header-cell *matHeaderCellDef> State </th>
-    <td mat-cell *matCellDef="let element"> {{outdatedOrOutOfSupport(element)}} </td>
+    <td mat-cell *matCellDef="let element"> {{element.dependency.name}} {{element.dependency.version}} </td>
   </ng-container>
 
   <ng-container matColumnDef="timestamp">
     <th mat-header-cell *matHeaderCellDef> Last updated </th>
-    <td mat-cell *matCellDef="let element"> {{dateToString(element.timestamp)}} </td>
+    <td mat-cell *matCellDef="let element"> {{dateToString(element.dependency.timestamp)}} </td>
   </ng-container>
 
-  <ng-container matColumnDef="uses">
-    <th mat-header-cell *matHeaderCellDef> Number of uses </th>
-    <td mat-cell *matCellDef="let element"> {{getNumberOfProjects(element)}} </td>
+  <ng-container matColumnDef="months-from-today">
+    <th mat-header-cell *matHeaderCellDef> Months from today </th>
+    <td mat-cell *matCellDef="let element"> {{getMonthsFromToday(element.dependency)}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="projects-affected">
+    <th mat-header-cell *matHeaderCellDef>Projects Affected (Count)</th>
+    <td mat-cell *matCellDef="let element">
+      {{element.projects.length}}
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="direct-deps">
+    <th mat-header-cell *matHeaderCellDef>Direct Deps (Count)</th>
+    <td mat-cell *matCellDef="let element">
+      {{element.directDep.length}}
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="indirect-deps">
+    <th mat-header-cell *matHeaderCellDef>Indirect Deps (Count)</th>
+    <td mat-cell *matCellDef="let element">
+      {{element.indirectDep.length}}
+    </td>
   </ng-container>
 
   <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
