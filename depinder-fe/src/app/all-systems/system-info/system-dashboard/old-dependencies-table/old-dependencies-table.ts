@@ -1,9 +1,8 @@
-import {Component, Input, OnChanges, OnInit, SimpleChanges, ViewChild} from '@angular/core';
+import {Component, Input, OnChanges, SimpleChanges, ViewChild} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {Dependency, Project} from "@core/project";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {monthYearToString} from "../../../../common/utils";
-import {OUT_OF_SUPPORT_MONTHS, OUTDATED_MONTHS} from "@core/constants";
 import {MatPaginator, MatPaginatorModule} from "@angular/material/paginator";
 import {MatInputModule} from "@angular/material/input";
 import {MatSelectModule} from "@angular/material/select";
@@ -20,14 +19,15 @@ interface OperationalRiskDependencies {
 }
 
 @Component({
-  selector: 'app-operational-risk',
+  selector: 'app-old-dependencies-table',
   standalone: true,
   imports: [CommonModule, MatTableModule, MatPaginatorModule, MatInputModule, MatSelectModule, FormsModule, MatButtonModule, MatTooltipModule, MatIconModule],
-  templateUrl: './operational-risk.component.html',
-  styleUrl: './operational-risk.component.css'
+  templateUrl: './old-dependencies-table.html',
+  styleUrl: './old-dependencies-table.css'
 })
-export class OperationalRiskComponent implements OnChanges, OnChanges {
+export class OldDependenciesTable implements OnChanges, OnChanges {
   @Input() projects: Project[] = [];
+  @Input() filter!: (dep: Dependency) => boolean;
 
   dependencies: Map<string, OperationalRiskDependencies> = new Map<string, OperationalRiskDependencies>();
   dataSource!: MatTableDataSource<OperationalRiskDependencies>;
@@ -36,8 +36,6 @@ export class OperationalRiskComponent implements OnChanges, OnChanges {
   @ViewChild(MatPaginator) paginator!: MatPaginator;
 
   private currentDate = new Date();
-  private outOfSupportThreshold =  new Date(this.currentDate.getFullYear(),
-    this.currentDate.getMonth() - OUT_OF_SUPPORT_MONTHS, this.currentDate.getDate());
   private MILLISECONDS_IN_A_MONTH = 1000 * 60 * 60 * 24 * 30;
 
   ngOnChanges(changes: SimpleChanges) {
@@ -53,31 +51,29 @@ export class OperationalRiskComponent implements OnChanges, OnChanges {
   getDependencies() {
     let dependencies = new Map<string, OperationalRiskDependencies>();
     this.projects.forEach(project => {
-      project.dependencies.forEach(dependency => {
-          if (this.getOutOfSupport(dependency)) {
-            if (!dependencies.has(dependency._id)) {
-              dependencies.set(dependency._id, {
-                dependency: dependency,
-                projects: [],
-                directDep: [],
-                indirectDep: []
-              });
-            }
+      project.dependencies.filter(dependency => this.filter(dependency)).forEach(dependency => {
+        if (!dependencies.has(dependency._id)) {
+          dependencies.set(dependency._id, {
+            dependency: dependency,
+            projects: [],
+            directDep: [],
+            indirectDep: []
+          });
+        }
 
-            let savedDep = dependencies.get(dependency._id)!;
+        let savedDep = dependencies.get(dependency._id)!;
 
-            if (!savedDep.projects.includes(project._id)) {
-              !savedDep.projects.push(project._id);
-            }
+        if (!savedDep.projects.includes(project._id)) {
+          !savedDep.projects.push(project._id);
+        }
 
-            if (dependency.requestedBy.includes(project._id)) {
-              savedDep.directDep.push(project._id);
-              savedDep.indirectDep.push(...dependency.requestedBy.filter(value => value !== project._id));
-            }
-            else {
-              savedDep.indirectDep.push(project._id);
-            }
-          }
+        if (dependency.requestedBy.includes(project._id)) {
+          savedDep.directDep.push(project._id);
+          savedDep.indirectDep.push(...dependency.requestedBy.filter(value => value !== project._id));
+        }
+        else {
+          savedDep.indirectDep.push(project._id);
+        }
       });
     });
     this.dependencies = dependencies;
@@ -89,11 +85,6 @@ export class OperationalRiskComponent implements OnChanges, OnChanges {
 
   getPosition(dependency: OperationalRiskDependencies): number {
     return this.dataSource.data.indexOf(dependency) + 1;
-  }
-
-  getOutOfSupport(dependency: Dependency): boolean {
-    const dependencyDate = new Date(dependency.timestamp);
-    return dependencyDate < this.outOfSupportThreshold;
   }
 
   getMonthsFromToday(dependency: Dependency): number {
