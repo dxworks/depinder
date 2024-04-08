@@ -1,57 +1,59 @@
-<mat-toolbar>
-  <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
-    <mat-icon>menu</mat-icon>
-  </button>
-  <span style="color: black; margin-right: 4px">
+<div style="height: 100%; overflow-y: hidden">
+  <mat-toolbar>
+    <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
+      <mat-icon>menu</mat-icon>
+    </button>
+    <span style="color: black; margin-right: 4px">
     {{system?.name ?? "No name"}}
   </span>
-  <span style="flex: 1 1 auto"></span>
-  <button mat-icon-button (click)="updateSystem()">
-    <mat-icon>refresh</mat-icon>
-  </button>
-  <mat-icon fontIcon="edit" (click)="navigateToEdit()"></mat-icon>
-</mat-toolbar>
+    <span style="flex: 1 1 auto"></span>
+    <button mat-icon-button (click)="updateSystem()">
+      <mat-icon>refresh</mat-icon>
+    </button>
+    <mat-icon fontIcon="edit" (click)="navigateToEdit()"></mat-icon>
+  </mat-toolbar>
 
-<div style="padding-top: 1rem">
-  <mat-form-field class="run-date">
-    <mat-label>Run date</mat-label>
-    <select matNativeControl [(ngModel)]="selectedRunDate" (ngModelChange)="getRunData()">
-      @for (run of system?.runs; track run.date) {
-        <option [value]="run.date">{{ convertToDateString(run.date) | date:'full'}}</option>
+  <div style="padding-top: 1rem">
+    <mat-form-field class="run-date">
+      <mat-label>Run date</mat-label>
+      <select matNativeControl [(ngModel)]="selectedRunDate" (ngModelChange)="getRunData()">
+        @for (run of system?.runs; track run.date) {
+          <option [value]="run.date">{{ convertToDateString(run.date) | date:'full'}}</option>
+        }
+      </select>
+    </mat-form-field>
+  </div>
+
+  <mat-tab-group style="margin-left: 2rem; margin-right: 2rem">
+    <mat-tab label="Dashboard">
+      <app-system-dashboard [projects]="projects"></app-system-dashboard>
+    </mat-tab>
+    <mat-tab label="Projects">
+      @if (projects.length > 0) {
+        <h2>Projects in this system</h2>
+
+        <div style="padding-bottom: 2rem">
+          <app-projects-table
+            [projects]="projects"
+          ></app-projects-table>
+        </div>
       }
-    </select>
-  </mat-form-field>
+    </mat-tab>
+    <mat-tab label="Dependencies">
+      @if (dependencies.length > 0) {
+        <h2>Dependencies</h2>
+
+        <app-dependencies
+          [allDependencies]="dependencies">
+        </app-dependencies>
+      }
+    </mat-tab>
+    <mat-tab label="Licences">
+      @if (dependencies.length > 0) {
+        <app-system-licences-2
+          [dependencies]="dependencies" [systemId]="id!" [projectIds]="projectIds">
+        </app-system-licences-2>
+      }
+    </mat-tab>
+  </mat-tab-group>
 </div>
-
-<mat-tab-group style="margin-left: 2rem; margin-right: 2rem">
-  <mat-tab label="Dashboard">
-    <app-system-dashboard [projects]="projects"></app-system-dashboard>
-  </mat-tab>
-  <mat-tab label="Projects">
-    @if (projects.length > 0) {
-      <h2>Projects in this system</h2>
-
-      <div style="padding-bottom: 2rem">
-        <app-projects-table
-          [projects]="projects"
-        ></app-projects-table>
-      </div>
-    }
-  </mat-tab>
-  <mat-tab label="Dependencies">
-    @if (dependencies.length > 0) {
-      <h2>Dependencies</h2>
-
-      <app-dependencies
-        [allDependencies]="dependencies">
-      </app-dependencies>
-    }
-  </mat-tab>
-  <mat-tab label="Licences">
-    @if (dependencies.length > 0) {
-      <app-system-licences-2
-        [dependencies]="dependencies" [systemId]="id!" [projectIds]="projectIds">
-      </app-system-licences-2>
-    }
-  </mat-tab>
-</mat-tab-group>

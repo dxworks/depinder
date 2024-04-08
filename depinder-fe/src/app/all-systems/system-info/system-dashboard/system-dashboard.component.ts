@@ -5,11 +5,12 @@ import {Dependency, Project} from "@core/project";
 import {MatTableModule} from "@angular/material/table";
 import {OldDependenciesTable} from "./old-dependencies-table/old-dependencies-table";
 import {OUT_OF_SUPPORT_MONTHS, OUTDATED_MONTHS} from "@core/constants";
+import {VulnerableLibraryVersionsComponent} from "./vulnerable-library-versions/vulnerable-library-versions.component";
 
 @Component({
   selector: 'app-system-dashboard',
   standalone: true,
-  imports: [CommonModule, MatExpansionModule, MatTableModule, OldDependenciesTable],
+  imports: [CommonModule, MatExpansionModule, MatTableModule, OldDependenciesTable, VulnerableLibraryVersionsComponent],
   templateUrl: './system-dashboard.component.html',
   styleUrl: './system-dashboard.component.css'
 })

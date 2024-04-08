@@ -1,0 +1,54 @@
+@defer {
+  <table mat-table [dataSource]="tableData" multiTemplateDataRows>
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef> name </th>
+      <td mat-cell *matCellDef="let element"> {{element.name}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="version">
+      <th mat-header-cell *matHeaderCellDef> version </th>
+      <td mat-cell *matCellDef="let element"> {{element.version}} </td>
+    </ng-container>
+
+    <!--  <ng-container matColumnDef="vulnerabilities">-->
+    <!--    <th mat-header-cell *matHeaderCellDef> vulnerabilities </th>-->
+    <!--    <td mat-cell *matCellDef="let element"> {{getVulnerabilitiesPermalink(element.vulnerabilities)}} </td>-->
+    <!--  </ng-container>-->
+
+    <ng-container matColumnDef="severity">
+      <th mat-header-cell *matHeaderCellDef> severity </th>
+      <td mat-cell *matCellDef="let element"> {{getVulnerabilitySeverity(element.vulnerabilities)}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="suggestedVersion">
+      <th mat-header-cell *matHeaderCellDef> suggestedVersion </th>
+      <td mat-cell *matCellDef="let element"> {{element.suggestedVersion}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="upgradeType">
+      <th mat-header-cell *matHeaderCellDef> upgradeType </th>
+      <td mat-cell *matCellDef="let element"> {{element.upgradeType}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="expandedDetail">
+      <td mat-cell *matCellDef="let element" [attr.colspan]="tableColumns.length">
+        <div class="example-element-detail"
+             [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+          <h4>Detailed paths</h4>
+          @for (introducedThrough of element.introducedThrough; track $index) {
+            <p>{{ introducedThrough.join(' > ') }}</p>
+          }
+        </div>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="tableColumns"></tr>
+    <tr mat-row *matRowDef="let element; columns: tableColumns;"
+        class="example-element-row"
+        [class.example-expanded-row]="expandedElement === element"
+        (click)="expandedElement = expandedElement === element ? null : element">
+    </tr>
+    <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="example-detail-row"></tr>
+  </table>
+
+}
