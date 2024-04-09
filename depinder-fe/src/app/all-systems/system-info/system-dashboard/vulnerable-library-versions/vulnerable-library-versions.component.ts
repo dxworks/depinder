@@ -1,10 +1,11 @@
 import {ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import * as semver from 'semver';
+import { SemVer, gt, parse, inc, rcompare } from 'semver';
 import {Dependency, Project} from "@core/project";
 import {LibrariesService} from "../../../../common/services/libraries.service";
 import {forkJoin, map, Observable} from "rxjs";
-import {LibraryInfo} from "@core/library";
+import {LibraryInfo, LibraryVersion} from "@core/library";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {Vulnerability} from "@core/vulnerability-checker";
 import {MatButtonModule} from "@angular/material/button";
@@ -18,6 +19,9 @@ interface VulnerableLibrary {
   suggestedVersion?: string;
   upgradeType?: string;
   introducedThrough?: string[][];
+  seeAllIntroducedThrough: boolean;
+  seeAllRequestedBy: boolean;
+  requestedBy: string[];
 }
 
 @Component({
@@ -47,46 +51,101 @@ export class VulnerableLibraryVersionsComponent implements OnChanges{
 
   ngOnChanges(change: SimpleChanges) {
     this.projects = change['projects'].currentValue;
+    this.dependencies = [];
+    this.libraries = [];
+
     if (this.projects.length > 0) {
       this.getDependencies().subscribe(libraries => {
         this.libraries = Array.from(libraries.values());
-
-        let data: VulnerableLibrary[] = [];
-
-        this.dependencies.map(dependency => {
-          const library = libraries.get(dependency._id);
-          const vulnerabilities = library?.vulnerabilities?.filter(vulnerability =>
-            this.isVersionInRange(this.findDependencyVersion(library!), vulnerability.vulnerableRange!)) || [];
-          if (vulnerabilities.length > 0) {
-            let introducedThrough = this.generateIntroducedThrough(dependency);
-            introducedThrough = introducedThrough.map(path => path.reverse());
-
-            let existingData = data.find(d => (d.name === dependency?.name) && (d.version === dependency.version));
-
-            if (existingData) {
-              existingData.vulnerabilities = [...existingData.vulnerabilities, ...vulnerabilities];
-              existingData.vulnerabilities = existingData.vulnerabilities.filter((vulnerability, index, self) =>
-                  index === self.findIndex((v) => (
-                    v.permalink === vulnerability.permalink && v.severity === vulnerability.severity
-                  ))
-              );
-              existingData.introducedThrough = [...existingData.introducedThrough ?? [], ...introducedThrough];
-            } else {
-              data.push({
-                name: dependency.name || library?.name || 'Unknown',
-                version: dependency.version,
-                vulnerabilities: library?.vulnerabilities?.filter(vulnerability =>
-                  this.isVersionInRange(this.findDependencyVersion(library!), vulnerability.vulnerableRange!)) || [],
-                suggestedVersion: this.getVersionWithoutVulnerabilities(library!)?.version ?? 'No suggestion',
-                introducedThrough: introducedThrough,
-              })
-            }
-          }
-        });
-
-        this.tableData = new MatTableDataSource(data);
+        this.updateData(libraries);
       });
     }
+  }
+
+  updateData(libraries: Map<string, LibraryInfo>) {
+    const data: VulnerableLibrary[] = [];
+
+    this.dependencies.map(dependency => {
+      const library = libraries.get(dependency.name);
+      const vulnerabilities = this.getVulnerabilities(dependency, library);
+
+      if (vulnerabilities.length > 0) {
+        const introducedThrough = this.getIntroducedThrough(dependency);
+        this.updateExistingData(data, dependency, library, vulnerabilities, introducedThrough);
+      }
+    });
+
+    this.sortAndSetData(data);
+  }
+
+  getVulnerabilities(dependency: Dependency, library: LibraryInfo | undefined): Vulnerability[] {
+    return library?.vulnerabilities?.filter(vulnerability =>
+      this.isVersionInRange(dependency.version, vulnerability.vulnerableRange!)) || [];
+  }
+
+  getIntroducedThrough(dependency: Dependency): string[][] {
+    let introducedThrough = this.generateIntroducedThrough(dependency);
+    introducedThrough = introducedThrough.map(path => path.reverse());
+    return introducedThrough;
+  }
+
+  updateExistingData(data: VulnerableLibrary[], dependency: Dependency, library: LibraryInfo | undefined, vulnerabilities: Vulnerability[], introducedThrough: string[][]) {
+    const existingData = data.find(d =>
+      (d.name === dependency?.name) && (d.version === dependency.version) && (library?.name === d.name));
+
+    if (existingData) {
+      this.updateExistingDataVulnerabilities(existingData, vulnerabilities);
+      this.updateExistingDataIntroducedThrough(existingData, introducedThrough);
+      existingData.requestedBy = [...existingData.requestedBy ?? [], ...dependency.requestedBy];
+    } else {
+      this.createNewData(data, dependency, library, vulnerabilities, introducedThrough);
+    }
+  }
+
+  updateExistingDataVulnerabilities(existingData: VulnerableLibrary, vulnerabilities: Vulnerability[]) {
+    existingData.vulnerabilities = [...existingData.vulnerabilities, ...vulnerabilities];
+    existingData.vulnerabilities = existingData.vulnerabilities.filter((vulnerability, index, self) =>
+        index === self.findIndex((v) => (
+          v.permalink === vulnerability.permalink && v.severity === vulnerability.severity
+        ))
+    );
+  }
+
+  updateExistingDataIntroducedThrough(existingData: VulnerableLibrary, introducedThrough: string[][]) {
+    existingData.introducedThrough = [...existingData.introducedThrough ?? [], ...introducedThrough];
+
+    function stringifyArray(arr: any[]): string {
+      return arr.join(',');
+    }
+
+    existingData.introducedThrough = Array.from(
+      new Set(existingData.introducedThrough.map(stringifyArray))
+    ).map(item => item.split(','));
+  }
+
+  createNewData(data: VulnerableLibrary[], dependency: Dependency, library: LibraryInfo | undefined, vulnerabilities: Vulnerability[], introducedThrough: string[][]) {
+    const suggestedVersion = this.determineUpgradeVersion(library?.vulnerabilities || [], dependency.version, library?.versions || []);
+    data.push({
+      name: library?.name || 'Unknown',
+      version: dependency.version,
+      vulnerabilities: vulnerabilities,
+      suggestedVersion: suggestedVersion,
+      introducedThrough: introducedThrough,
+      seeAllIntroducedThrough: false,
+      seeAllRequestedBy: false,
+      requestedBy: dependency.requestedBy,
+      upgradeType: this.determineUpgradeType(dependency.version, suggestedVersion)
+    });
+  }
+
+  sortAndSetData(data: VulnerableLibrary[]) {
+    data.sort((a, b) => {
+      if (a.vulnerabilities.length === b.vulnerabilities.length) {
+        return a.name.localeCompare(b.name);
+      }
+      return b.vulnerabilities.length - a.vulnerabilities.length;
+    });
+    this.tableData = new MatTableDataSource(data);
   }
 
   getDependencies(): Observable<Map<string, LibraryInfo>> {
@@ -97,36 +156,135 @@ export class VulnerableLibraryVersionsComponent implements OnChanges{
       });
     });
 
+    //todo api call pentru toate librariile dintr-un proiect
     let observables = this.dependencies.filter(dep => dep.vulnerabilities).map(dependency => this.libraryService.find(dependency._id));
     return forkJoin(observables).pipe(
       map((librariesArray: LibraryInfo[]) => {
         librariesArray.forEach((lib, index) => {
-          libraries.set(this.dependencies[index]._id, lib);
+          libraries.set(lib.name, lib);
         });
         return libraries;
       })
     );
   }
 
-  getVulnerabilitySeverity(vulnerabilities: Vulnerability[]): string {
-    return vulnerabilities.map(vulnerability => vulnerability.severity).join(', ');
+  parseVulnerableRange(rangeStr: string): Array<{ operator: string; version: string }> {
+    return rangeStr.split(',').map(part => {
+      const match = part.trim().match(/(>=|<=|>|<|=)\s*(\d+\.\d+\.\d+)/);
+      if (!match) throw new Error(`Invalid version range part: ${part}`);
+      return { operator: match[1], version: match[2] };
+    });
   }
 
-  getVulnerabilitiesPermalink(vulnerabilities: Vulnerability[]): string {
-    return vulnerabilities.map(vulnerability => vulnerability.identifiers!.at(0)!.value).join(', ');
+  determineUpgradeVersion(vulnerabilities: Vulnerability[], currentVersionStr: string, versions: LibraryVersion[]): string {
+    let currentVersion = parse(currentVersionStr);
+    if (!currentVersion) throw new Error(`Invalid current version: ${currentVersionStr}`);
+
+    let upgradeVersion = currentVersion;
+    vulnerabilities.forEach(vuln => {
+      const constraints = this.parseVulnerableRange(vuln.vulnerableRange!);
+      constraints.forEach(({ operator, version: versionStr }) => {
+        let version = parse(versionStr);
+        if (!version) {
+          console.error(`Invalid vulnerable version: ${versionStr}`);
+          return;
+        }
+
+        console.log('Vulnerable version:', versionStr,
+          'Current version:', currentVersionStr,
+          'Vulnerable range:', vuln.vulnerableRange,
+          operator === '<' && rcompare(currentVersion!, version) >= 0,
+          operator === '<=' && rcompare(currentVersion!, version) > 0
+        );
+
+        if ((operator === '<' && rcompare(currentVersion!, version) >= 0) ||
+          (operator === '<=' && rcompare(currentVersion!, version) > 0)) {
+          console.log('Vulnerable version:', versionStr, 'Current version:', currentVersionStr, 'Vulnerable range:', vuln.vulnerableRange);
+          const nextVersion = inc(version, 'patch');
+          if (nextVersion && gt(parse(nextVersion)!, upgradeVersion)) {
+            upgradeVersion = parse(nextVersion) as SemVer;
+          }
+        }
+      });
+    });
+
+    if (upgradeVersion === currentVersion || !gt(upgradeVersion, currentVersion)) {
+      upgradeVersion = parse(inc(currentVersion, 'patch')) as SemVer;
+    }
+
+    for (let version of versions) {
+      if (rcompare(upgradeVersion.version, version.version) >= 0) {
+        upgradeVersion = parse(version.version)!;
+        break;
+      }
+    }
+
+    return upgradeVersion.version;
   }
 
-  findDependencyVersion(library: LibraryInfo): string {
-    return this.dependencies.find(dependency => dependency.name === library.name)?.version || '';
+  determineUpgradeType(currentVersionStr: string, newVersionStr: string): string {
+    const currentVersion = parse(currentVersionStr);
+    const newVersion = parse(newVersionStr);
+
+    if (!currentVersion || !newVersion) {
+      return 'invalid';
+    }
+
+    if (newVersion.major > currentVersion.major) {
+      return 'major';
+    } else if (newVersion.minor > currentVersion.minor) {
+      return 'minor';
+    } else if (newVersion.patch > currentVersion.patch) {
+      return 'patch';
+    } else {
+      return 'none';
+    }
+  }
+
+  generateIntroducedThrough(dependency: Dependency, path: string[] = []): string[][] {
+    const currentPath = [...path, dependency.name + '@' + dependency.version];
+
+    // Check for circular dependencies
+    if (path.includes(dependency.name + '@' + dependency.version)) {
+      return [currentPath];
+    }
+
+    let introducedThrough = [currentPath];
+
+    if (!dependency.requestedBy) {
+      return introducedThrough;
+    }
+
+    dependency.requestedBy.forEach(requester => {
+      const requestedDependency = this.dependencies?.find(dep => dep.name + '@' + dep.version === requester);
+
+      if (requestedDependency) {
+        const newPaths = this.generateIntroducedThrough(requestedDependency, currentPath);
+        introducedThrough = [...introducedThrough, ...newPaths];
+      } else {
+        introducedThrough.push([...currentPath, requester]);
+      }
+    });
+
+    if (introducedThrough.length > 1) {
+      introducedThrough = introducedThrough.slice(1);
+    }
+
+    return introducedThrough;
+  }
+
+  seeAllIntroducedThrough(element: VulnerableLibrary) {
+    element.seeAllIntroducedThrough = !element.seeAllIntroducedThrough;
+  }
+
+  seeAllRequestedBy(element: VulnerableLibrary) {
+    element.seeAllRequestedBy = !element.seeAllRequestedBy;
   }
 
   isVersionInRange(version: string, range: string): boolean {
-    // Split the condition string by commas to handle compound conditions
     const conditions = range.split(',').map((part) => part.trim());
 
-    // Check each condition in the array
     return conditions.every((condition) => {
-      // Extract the operator and the version from the condition
       const match = condition.match(/(<=|>=|<|>|=)?\s*(.*)/);
       if (!match) {
         console.error('Invalid version range condition:', condition);
@@ -135,7 +293,6 @@ export class VulnerableLibraryVersionsComponent implements OnChanges{
 
       const [, operator, versionRange] = match;
 
-      // Depending on the operator, use the appropriate semver function
       switch (operator) {
         case '<':
           return semver.lt(version, versionRange);
@@ -155,57 +312,11 @@ export class VulnerableLibraryVersionsComponent implements OnChanges{
     });
   }
 
-  generateIntroducedThrough(dependency: Dependency, path: string[] = []): string[][] {
-    const currentPath = [...path, dependency.name + '@' + dependency.version];
-    let introducedThrough = [currentPath];
-
-    dependency.requestedBy.forEach(requester => {
-      const requestedDependency = this.dependencies?.find(dep => dep.name + '@' + dep.version === requester);
-
-      if (requestedDependency) {
-        // Instead of cloning, pass the current path to the recursive call
-        const newPaths = this.generateIntroducedThrough(requestedDependency, currentPath);
-        introducedThrough = [...introducedThrough, ...newPaths];
-      } else {
-        introducedThrough.push([...currentPath, requester]);
-      }
-    });
-
-    if (introducedThrough.length > 1) {
-      introducedThrough = introducedThrough.slice(1);
-    }
-
-    return introducedThrough;
+  getVulnerabilitySeverity(vulnerabilities: Vulnerability[]): string {
+    return vulnerabilities.map(vulnerability => vulnerability.severity).join(', ');
   }
 
-  getVersionWithoutVulnerabilities(library: LibraryInfo): { version: string } | null {
-    // Get the library information for the given dependency
-    // let library = this.libraries?.find(lib => lib.name === dependency.name);
-    // if (!library) {
-    //   this.libraryService.find(dependency._id).subscribe((lib) => {
-    //     library = lib;
-    //     if (!library) {
-    //       console.error(`Library not found for dependency: ${dependency.name}`);
-    //     }
-    //   });
-    //   return null;
-    // }
-
-    // Iterate over the versions of the library in descending order
-    for (let i = library.versions.length - 1; i >= 0; i--) {
-      const version = library.versions[i];
-
-      // Check if the version has any vulnerabilities
-      const hasVulnerabilities = library.vulnerabilities!.some(vulnerability =>
-        this.isVersionInRange(version.version, vulnerability.vulnerableRange!));
-
-      // If the version does not have any vulnerabilities, return it
-      if (!hasVulnerabilities) {
-        return version;
-      }
-    }
-
-    // If no version is found without vulnerabilities, return null
-    return null;
+  getVulnerabilitiesPermalink(vulnerabilities: Vulnerability[]): string {
+    return vulnerabilities.map(vulnerability => vulnerability.identifiers!.at(0)!.value).join(', ');
   }
 }

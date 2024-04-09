@@ -1,4 +1,4 @@
-@defer {
+<!--@defer {-->
   <table mat-table [dataSource]="tableData" multiTemplateDataRows>
     <ng-container matColumnDef="name">
       <th mat-header-cell *matHeaderCellDef> name </th>
@@ -34,9 +34,38 @@
       <td mat-cell *matCellDef="let element" [attr.colspan]="tableColumns.length">
         <div class="example-element-detail"
              [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+          <h4>Requested by</h4>
+
+          @if (!element.seeAllRequestedBy) {
+            <p>{{element.requestedBy.slice(0, 5).join(', ')}}</p>
+            @if (element.requestedBy.length > 5) {
+              <p (click)="seeAllRequestedBy(element)">see {{ element.requestedBy.length - 5 }} more</p>
+            }
+          }
+          @else {
+            <p>{{element.requestedBy.join(', ')}}</p>
+            <p (click)="seeAllRequestedBy(element)">see less</p>
+          }
+
           <h4>Detailed paths</h4>
-          @for (introducedThrough of element.introducedThrough; track $index) {
-            <p>{{ introducedThrough.join(' > ') }}</p>
+          @if (element.seeAllIntroducedThrough) {
+            @for (introducedThrough of element.introducedThrough; track $index) {
+              <p>{{ introducedThrough.join(' > ') }}</p>
+            }
+            <p (click)="seeAllIntroducedThrough(element)">see less</p>
+          }
+          @else {
+            @for (introducedThrough of element.introducedThrough.slice(0, 5); track $index) {
+              <p>{{ introducedThrough.join(' > ') }}</p>
+            }
+            @if (element.introducedThrough.length > 5) {
+              <p (click)="seeAllIntroducedThrough(element)">see {{element.introducedThrough.length - 5}} more</p>
+            }
+          }
+
+          <h4>Vulnerabilities</h4>
+          @for (vulnerability of element.vulnerabilities; track $index) {
+            <p>{{ vulnerability.vulnerableRange }}</p>
           }
         </div>
       </td>
@@ -51,4 +80,4 @@
     <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="example-detail-row"></tr>
   </table>
 
-}
+<!--}-->
