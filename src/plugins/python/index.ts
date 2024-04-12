@@ -18,7 +18,7 @@ import {getPackageSemver} from '../../utils/utils'
 import {log} from '../../utils/logging'
 
 const extractor: Extractor = {
-    files: ['requirements.txt', 'setup.py', 'Pipfile', 'Pipfile.lock', 'pyproject.toml', 'poetry.lock'],
+    files: ['requirements.txt', 'setup.py', 'Pipfile', 'Pipfile.lock', 'pyproject.toml', 'poetry.lock', 'pipfile.list.txt'],
     createContexts: files => {
         const pipEnvContexts = files.filter(it => it.endsWith('Pipfile.lock')).map(it => ({
             root: path.dirname(it),
@@ -48,7 +48,13 @@ const extractor: Extractor = {
             .filter(it => it !== null)
             .map(it => it as DependencyFileContext)
 
-        return [...pipEnvContexts, ...justPipFiles].map(context => {
+        const pipListFiles = files.filter(it => it.endsWith('pipfile.list.txt')).map(it => ({
+            root: path.dirname(it),
+            manifestFile: 'pipfile.list.txt',
+        } as DependencyFileContext))
+
+
+        const pipLocks =  [...pipEnvContexts, ...justPipFiles].map(context => {
                 try {
                     if (!fs.existsSync(path.resolve(context.root, 'PipTree.json'))) {
                         execSync('pipenv install', {cwd: context.root})
@@ -66,6 +72,8 @@ const extractor: Extractor = {
                 }
             }
         )
+
+        return [...pipListFiles, ...pipLocks]
     },
 }
 
@@ -151,6 +159,29 @@ function parseLockFile(context: DependencyFileContext): DepinderProject {
                 if (dependencies[directDep]) {
                     dependencies[directDep].requestedBy.push(`${projName}@`)
                 }
+            }
+        })
+        return {
+            name: projName,
+            version: '',
+            path: context.root,
+            dependencies,
+        }
+    } else if (context.manifestFile == 'pipfile.list.txt') {
+        const deps = fs.readFileSync(path.resolve(context.root, context.manifestFile)).toString().split('\n').slice(2).map(line => {
+            const [name, version] = line.trim().split(/\s+/)
+            return { name, version }
+        })
+
+        const dependencies: { [id: string]: DepinderDependency } = {}
+        deps.forEach(({ name, version }) => {
+            const id = `${name}@${version}`
+            dependencies[id] = {
+                id,
+                name,
+                version,
+                requestedBy: [`${projName}@`],
+                semver: getPackageSemver(version),
             }
         })
         return {
