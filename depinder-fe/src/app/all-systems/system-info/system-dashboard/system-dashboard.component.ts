@@ -6,11 +6,13 @@ import {MatTableModule} from "@angular/material/table";
 import {OldDependenciesTable} from "./old-dependencies-table/old-dependencies-table";
 import {OUT_OF_SUPPORT_MONTHS, OUTDATED_MONTHS} from "@core/constants";
 import {VulnerableLibraryVersionsComponent} from "./vulnerable-library-versions/vulnerable-library-versions.component";
+import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
+import {MatProgressBarModule} from "@angular/material/progress-bar";
 
 @Component({
   selector: 'app-system-dashboard',
   standalone: true,
-  imports: [CommonModule, MatExpansionModule, MatTableModule, OldDependenciesTable, VulnerableLibraryVersionsComponent],
+  imports: [CommonModule, MatExpansionModule, MatTableModule, OldDependenciesTable, VulnerableLibraryVersionsComponent, MatProgressSpinnerModule, MatProgressBarModule],
   templateUrl: './system-dashboard.component.html',
   styleUrl: './system-dashboard.component.css'
 })

@@ -1,3 +1,15 @@
-mat-accordion * {
+.accordion-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mat-accordion {
+  margin: 16px;
+  flex: 1; /* Allows the accordion to expand to fill available space */
+  overflow: hidden; /* Prevents unnecessary scrollbars */
+}
+
+.mat-expansion-panel {
   margin: 16px;
 }

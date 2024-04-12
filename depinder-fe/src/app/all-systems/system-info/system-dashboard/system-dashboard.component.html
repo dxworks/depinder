@@ -1,37 +1,35 @@
-@defer {
-  <mat-accordion style="padding: 16px;" [multi]="false">
-    <mat-expansion-panel hideToggle>
-      <mat-expansion-panel-header style="margin: 16px">
-        <mat-panel-title>
-          Operational Risk
-        </mat-panel-title>
-        <mat-panel-description>
-          Libraries that haven't been updated in the last {{OUT_OF_SUPPORT_MONTHS}} months.
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-      <app-old-dependencies-table [projects]="projects" [filter]="getOutOfSupport"></app-old-dependencies-table>
-    </mat-expansion-panel>
-    <mat-expansion-panel hideToggle>
-      <mat-expansion-panel-header style="margin: 16px">
-        <mat-panel-title>
-          Outdated Library Versions
-        </mat-panel-title>
-        <mat-panel-description>
-          Libraries that haven't been updated in the last {{OUTDATED_MONTHS}} months.
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-      <app-old-dependencies-table [projects]="projects" [filter]="getOutDated"></app-old-dependencies-table>
-    </mat-expansion-panel>
-    <mat-expansion-panel hideToggle>
-      <mat-expansion-panel-header style="margin: 16px">
-        <mat-panel-title>
-          Vulnerable Library Versions
-        </mat-panel-title>
-        <mat-panel-description>
-          Libraries that have known vulnerabilities.
-        </mat-panel-description>
-      </mat-expansion-panel-header>
-      <app-vulnerable-library-versions [projects]="projects"></app-vulnerable-library-versions>
-    </mat-expansion-panel>
-  </mat-accordion>
-}
+<mat-accordion [multi]="false">
+  <mat-expansion-panel hideToggle>
+    <mat-expansion-panel-header style="margin: 16px">
+      <mat-panel-title>
+        Operational Risk
+      </mat-panel-title>
+      <mat-panel-description>
+        Libraries that haven't been updated in the last {{OUT_OF_SUPPORT_MONTHS}} months.
+      </mat-panel-description>
+    </mat-expansion-panel-header>
+    <app-old-dependencies-table [projects]="projects" [filter]="getOutOfSupport"></app-old-dependencies-table>
+  </mat-expansion-panel>
+  <mat-expansion-panel hideToggle>
+    <mat-expansion-panel-header style="margin: 16px">
+      <mat-panel-title>
+        Outdated Library Versions
+      </mat-panel-title>
+      <mat-panel-description>
+        Libraries that haven't been updated in the last {{OUTDATED_MONTHS}} months.
+      </mat-panel-description>
+    </mat-expansion-panel-header>
+    <app-old-dependencies-table [projects]="projects" [filter]="getOutDated"></app-old-dependencies-table>
+  </mat-expansion-panel>
+  <mat-expansion-panel hideToggle>
+    <mat-expansion-panel-header style="margin: 16px">
+      <mat-panel-title>
+        Vulnerable Library Versions
+      </mat-panel-title>
+      <mat-panel-description>
+        Libraries that have known vulnerabilities.
+      </mat-panel-description>
+    </mat-expansion-panel-header>
+    <app-vulnerable-library-versions [projects]="projects"></app-vulnerable-library-versions>
+  </mat-expansion-panel>
+</mat-accordion>

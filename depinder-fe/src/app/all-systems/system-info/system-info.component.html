@@ -1,4 +1,4 @@
-<div style="height: 100%; overflow-y: hidden">
+<div class="app-container">
   <mat-toolbar>
     <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
       <mat-icon>menu</mat-icon>
@@ -23,7 +23,6 @@
       </select>
     </mat-form-field>
   </div>
-
   <mat-tab-group style="margin-left: 2rem; margin-right: 2rem">
     <mat-tab label="Dashboard">
       <app-system-dashboard [projects]="projects"></app-system-dashboard>

@@ -23,11 +23,12 @@ import {SystemLicences2Component} from "./system-licences-2/system-licences-2.co
 import {MatToolbarModule} from "@angular/material/toolbar";
 import {ToolbarService} from "../../common/services/toolbar.service";
 import {SystemDashboardComponent} from "./system-dashboard/system-dashboard.component";
+import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 
 @Component({
   selector: 'app-system-info',
   standalone: true,
-  imports: [CommonModule, ProjectsTableComponent, DependencyRecursiveComponent, DependenciesComponent, MatFormFieldModule, MatInputModule, FormsModule, MatIconModule, MatButtonModule, MatTabsModule, LicenceLabelComponent, SystemLicences2Component, MatToolbarModule, SystemDashboardComponent],
+  imports: [CommonModule, ProjectsTableComponent, DependencyRecursiveComponent, DependenciesComponent, MatFormFieldModule, MatInputModule, FormsModule, MatIconModule, MatButtonModule, MatTabsModule, LicenceLabelComponent, SystemLicences2Component, MatToolbarModule, SystemDashboardComponent, MatProgressSpinnerModule],
   templateUrl: './system-info.component.html',
   styleUrl: './system-info.component.css'
 })

@@ -1,4 +1,4 @@
-import {ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges, ViewChild} from '@angular/core';
+import {AfterViewInit, ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges, ViewChild} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import * as semver from 'semver';
 import { SemVer, gt, parse, inc, rcompare } from 'semver';
@@ -44,13 +44,13 @@ interface VulnerableLibrary {
     ]),
   ],
 })
-export class VulnerableLibraryVersionsComponent implements OnChanges{
+export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewInit {
   @Input() projects: Project[] = [];
   dependencies: Dependency[] = [];
   libraries?: LibraryInfo[] = [];
   tableColumns: string[] = ['name', 'dependency-type', 'version', 'severity','suggestedVersion', 'upgradeType'];
-  columnsToDisplayWithExpand: string[] = [...this.tableColumns, 'expand'];
-  tableData: MatTableDataSource<VulnerableLibrary> = new MatTableDataSource<VulnerableLibrary>();
+  // columnsToDisplayWithExpand: string[] = [...this.tableColumns, 'expand'];
+  tableData!: MatTableDataSource<VulnerableLibrary>;
   expandedElement?: VulnerableLibrary;
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
@@ -68,6 +68,12 @@ export class VulnerableLibraryVersionsComponent implements OnChanges{
         this.updateData(libraries);
         this.tableData.paginator = this.paginator;
       });
+    }
+  }
+
+  ngAfterViewInit() {
+    if (this.tableData) {
+      this.tableData.paginator = this.paginator;
     }
   }
 
