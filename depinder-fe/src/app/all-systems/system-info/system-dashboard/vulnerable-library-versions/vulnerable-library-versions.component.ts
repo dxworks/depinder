@@ -27,6 +27,7 @@ interface VulnerableLibrary {
   seeAllIntroducedThrough: boolean;
   seeAllRequestedBy: boolean;
   requestedBy: string[];
+  dependencyType: string;
 }
 
 @Component({
@@ -47,7 +48,7 @@ export class VulnerableLibraryVersionsComponent implements OnChanges{
   @Input() projects: Project[] = [];
   dependencies: Dependency[] = [];
   libraries?: LibraryInfo[] = [];
-  tableColumns: string[] = ['name', 'version', 'severity','suggestedVersion', 'upgradeType'];
+  tableColumns: string[] = ['name', 'dependency-type', 'version', 'severity','suggestedVersion', 'upgradeType'];
   columnsToDisplayWithExpand: string[] = [...this.tableColumns, 'expand'];
   tableData: MatTableDataSource<VulnerableLibrary> = new MatTableDataSource<VulnerableLibrary>();
   expandedElement?: VulnerableLibrary;
@@ -142,7 +143,8 @@ export class VulnerableLibraryVersionsComponent implements OnChanges{
       seeAllIntroducedThrough: false,
       seeAllRequestedBy: false,
       requestedBy: dependency.requestedBy,
-      upgradeType: this.determineUpgradeType(dependency.version, suggestedVersion)
+      upgradeType: this.determineUpgradeType(dependency.version, suggestedVersion),
+      dependencyType: dependency.directDep ? 'Direct' : 'Transitive',
     });
   }
 
