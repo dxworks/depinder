@@ -1,4 +1,4 @@
-<!--@defer {-->
+@defer {
   <table mat-table [dataSource]="tableData" multiTemplateDataRows>
     <ng-container matColumnDef="name">
       <th mat-header-cell *matHeaderCellDef> name </th>
@@ -9,11 +9,6 @@
       <th mat-header-cell *matHeaderCellDef> version </th>
       <td mat-cell *matCellDef="let element"> {{element.version}} </td>
     </ng-container>
-
-    <!--  <ng-container matColumnDef="vulnerabilities">-->
-    <!--    <th mat-header-cell *matHeaderCellDef> vulnerabilities </th>-->
-    <!--    <td mat-cell *matCellDef="let element"> {{getVulnerabilitiesPermalink(element.vulnerabilities)}} </td>-->
-    <!--  </ng-container>-->
 
     <ng-container matColumnDef="severity">
       <th mat-header-cell *matHeaderCellDef> severity </th>
@@ -34,39 +29,54 @@
       <td mat-cell *matCellDef="let element" [attr.colspan]="tableColumns.length">
         <div class="example-element-detail"
              [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
-          <h4>Requested by</h4>
+          <h2>{{element.name}}&#64;{{element.version}}</h2>
+          <div mat-subheader>Requested by</div>
 
-          @if (!element.seeAllRequestedBy) {
-            <p>{{element.requestedBy.slice(0, 5).join(', ')}}</p>
-            @if (element.requestedBy.length > 5) {
-              <p (click)="seeAllRequestedBy(element)">see {{ element.requestedBy.length - 5 }} more</p>
+          <ul>
+            @if (!element.seeAllRequestedBy) {
+              <li>{{element.requestedBy.slice(0, 5).join(', ')}}</li>
+              @if (element.requestedBy.length > 5) {
+                <p (click)="seeAllRequestedBy(element)">see {{ element.requestedBy.length - 5 }} more</p>
+              }
             }
-          }
-          @else {
-            <p>{{element.requestedBy.join(', ')}}</p>
-            <p (click)="seeAllRequestedBy(element)">see less</p>
-          }
+            @else {
+              <li>{{element.requestedBy.join(', ')}}</li>
+              <p (click)="seeAllRequestedBy(element)">see less</p>
+            }
+          </ul>
 
-          <h4>Detailed paths</h4>
-          @if (element.seeAllIntroducedThrough) {
-            @for (introducedThrough of element.introducedThrough; track $index) {
-              <p>{{ introducedThrough.join(' > ') }}</p>
-            }
-            <p (click)="seeAllIntroducedThrough(element)">see less</p>
-          }
-          @else {
-            @for (introducedThrough of element.introducedThrough.slice(0, 5); track $index) {
-              <p>{{ introducedThrough.join(' > ') }}</p>
-            }
-            @if (element.introducedThrough.length > 5) {
-              <p (click)="seeAllIntroducedThrough(element)">see {{element.introducedThrough.length - 5}} more</p>
-            }
-          }
 
-          <h4>Vulnerabilities</h4>
-          @for (vulnerability of element.vulnerabilities; track $index) {
-            <p>{{ vulnerability.vulnerableRange }}</p>
-          }
+          <div mat-subheader>Detailed paths</div>
+
+          <ul>
+            @if (element.seeAllIntroducedThrough) {
+              @for (introducedThrough of element.introducedThrough; track $index) {
+                <li>{{ introducedThrough.join(' > ') }}</li>
+              }
+              <p (click)="seeAllIntroducedThrough(element)">see less</p>
+            }
+            @else {
+              @for (introducedThrough of element.introducedThrough.slice(0, 5); track $index) {
+                <li>{{ introducedThrough.join(' > ') }}</li>
+              }
+              @if (element.introducedThrough.length > 5) {
+                <p (click)="seeAllIntroducedThrough(element)">see {{element.introducedThrough.length - 5}} more</p>
+              }
+            }
+          </ul>
+
+          <div mat-subheader>Vulnerabilities</div>
+          <mat-list>
+            @for (vulnerability of element.vulnerabilities; track $index) {
+              <mat-list-item>
+                <mat-icon matListItemIcon matTooltip="Go to {{extractDomain(vulnerability.permalink)}}" (click)="navigateToUrl(vulnerability.permalink)">open_in_new</mat-icon>
+                <span matListItemTitle>{{ vulnerability.summary ?? vulnerability.description }}</span>
+                <span matListItemLine>Severity: {{vulnerability.severity}}</span>
+                <span matListItemLine>Vulnerability range: {{vulnerability.vulnerableRange}}</span>
+              </mat-list-item>
+            }
+          </mat-list>
+
         </div>
       </td>
     </ng-container>
@@ -80,4 +90,10 @@
     <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="example-detail-row"></tr>
   </table>
 
-<!--}-->
+  <mat-paginator [pageSizeOptions]="[5, 10, 20]"
+                 showFirstLastButtons
+                 aria-label="Select page of periodic elements">
+  </mat-paginator>
+} @loading (minimum 1s) {
+  <h1>Loading...</h1>
+}

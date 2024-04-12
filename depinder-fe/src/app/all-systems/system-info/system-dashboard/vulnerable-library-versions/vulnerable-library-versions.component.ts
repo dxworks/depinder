@@ -1,4 +1,4 @@
-import {ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges} from '@angular/core';
+import {ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges, ViewChild} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import * as semver from 'semver';
 import { SemVer, gt, parse, inc, rcompare } from 'semver';
@@ -11,6 +11,11 @@ import {Vulnerability} from "@core/vulnerability-checker";
 import {MatButtonModule} from "@angular/material/button";
 import {MatIconModule} from "@angular/material/icon";
 import {animate, state, style, transition, trigger} from "@angular/animations";
+import {MatListModule} from "@angular/material/list";
+import {MatPaginator, MatPaginatorModule} from "@angular/material/paginator";
+import {MatTooltipModule} from "@angular/material/tooltip";
+import {extractDomain, navigateToUrl} from "../../../../common/utils";
+import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 
 interface VulnerableLibrary {
   name: string;
@@ -27,7 +32,7 @@ interface VulnerableLibrary {
 @Component({
   selector: 'app-vulnerable-library-versions',
   standalone: true,
-  imports: [CommonModule, MatTableModule, MatButtonModule, MatIconModule],
+  imports: [CommonModule, MatTableModule, MatButtonModule, MatIconModule, MatListModule, MatPaginatorModule, MatTooltipModule, MatProgressSpinnerModule],
   templateUrl: './vulnerable-library-versions.component.html',
   styleUrl: './vulnerable-library-versions.component.css',
   animations: [
@@ -47,6 +52,8 @@ export class VulnerableLibraryVersionsComponent implements OnChanges{
   tableData: MatTableDataSource<VulnerableLibrary> = new MatTableDataSource<VulnerableLibrary>();
   expandedElement?: VulnerableLibrary;
 
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+
   constructor(private libraryService: LibrariesService) { }
 
   ngOnChanges(change: SimpleChanges) {
@@ -58,6 +65,7 @@ export class VulnerableLibraryVersionsComponent implements OnChanges{
       this.getDependencies().subscribe(libraries => {
         this.libraries = Array.from(libraries.values());
         this.updateData(libraries);
+        this.tableData.paginator = this.paginator;
       });
     }
   }
@@ -313,10 +321,32 @@ export class VulnerableLibraryVersionsComponent implements OnChanges{
   }
 
   getVulnerabilitySeverity(vulnerabilities: Vulnerability[]): string {
-    return vulnerabilities.map(vulnerability => vulnerability.severity).join(', ');
+    const severityValues: Map<String, number> = new Map([
+      ['CRITICAL', 0],
+      ['HIGH', 0],
+      ['MEDIUM', 0],
+      ['LOW', 0]
+    ]);
+
+    vulnerabilities.forEach(vulnerability => {
+      if (severityValues.has(vulnerability.severity)) {
+        severityValues.set(vulnerability.severity, severityValues.get(vulnerability.severity)! + 1);
+      } else {
+        severityValues.set(vulnerability.severity, 1);
+      }
+    });
+
+    let severity = '';
+
+    severityValues.forEach((value, key) => {
+      if (value > 0) {
+        severity += `${key} (${value}) `;
+      }
+    });
+
+    return severity;
   }
 
-  getVulnerabilitiesPermalink(vulnerabilities: Vulnerability[]): string {
-    return vulnerabilities.map(vulnerability => vulnerability.identifiers!.at(0)!.value).join(', ');
-  }
+  protected readonly navigateToUrl = navigateToUrl;
+  protected readonly extractDomain = extractDomain;
 }
