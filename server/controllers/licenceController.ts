@@ -78,23 +78,23 @@ export const getLicenseById = async (_req: Request, res: Response): Promise<any>
     }
 }
 
-async function licenceSuggestions(id: string) {
+async function licenceSuggestions(id?: string) {
     mongoCacheLicense.load()
     const mongoLicences = await mongoCacheLicense.getAll?.()
-    // console.log(mongoLicences)
-
     const allLicenses = mongoLicences.map((licence: any) => licence._id).filter((licence: any) => licence !== null)
-    // console.log(allLicenses)
 
-    const matches = stringSimilarity.findBestMatch(id, allLicenses)
+    if (id !== null) {
+        const matches = stringSimilarity.findBestMatch(id!, allLicenses)
+        // at least 5 similar matches with a rating of 0.3 or higher
+        return matches.ratings
+            .sort((a, b) => b.rating - a.rating)
+            .filter(match => {
+                return match.rating >= 0.3
+            })
+            .slice(0, 5)
+    }
 
-    // at least 5 similar matches with a rating of 0.3 or higher
-    return matches.ratings
-        .sort((a, b) => b.rating - a.rating)
-        .filter(match => {
-            return match.rating >= 0.3
-        })
-        .slice(0, 5);
+    return []
 }
 
 export const getLicenceSuggestions = async (_req: Request, res: Response): Promise<any> => {
