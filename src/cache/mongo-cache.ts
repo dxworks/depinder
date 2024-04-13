@@ -54,6 +54,7 @@ const DependencySchema = new Schema({
     vulnerabilities: Boolean,
     outOfSupport: Boolean,
     outdated: Boolean,
+    timestamp: Number,
 })
 
 const SystemRun = new Schema({

@@ -10,6 +10,7 @@ import {log} from '@dxworks/cli-common'
 import {parseMavenDependencyTree} from './parsers/maven'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 import {LibraryInfo} from '../../../core/library'
+import {runMavenCommandSync} from './runMaven'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pomParser = require('pom-parser')
@@ -41,6 +42,7 @@ const parser: Parser = {
 
 function parseLockFile(context: DependencyFileContext): DepinderProject {
     if(context.type === 'maven') {
+        runMavenCommandSync(context.root)
         if(!fs.existsSync(path.resolve(context.root, context.lockFile))) {
             throw new Error(`Dependency tree file not found: ${path.resolve(context.root, context.lockFile)}`)
         }

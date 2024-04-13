@@ -221,8 +221,10 @@ function extractProjectLibs(proj: DepinderProject, dep: DepinderDependency): Pro
 async function getLib(cache: Cache, plugin: Plugin, dep: DepinderDependency, options: AnalyseOptions, refreshedLibs: any[]) {
     let lib
     if (await cacheHit(cache, plugin, dep, options.refresh, refreshedLibs)) {
+        log.info(`Cache hit for ${dep.name}`)
         lib = await cache.get?.(`${plugin.name}:${dep.name}`) as LibraryInfo
     } else {
+        log.info(`Refreshing remote info for ${dep.name}`)
         lib = await plugin.registrar.retrieve(dep.name)
         if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
             // log.info(`Getting vulnerabilities for ${lib.name}`)
@@ -300,40 +302,52 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
     log.info('Project data saving in mongo db...')
 
     //todo save project info separate, stats + dependencies
-    await cacheProjects.set?.(`${project.name}@${project.version}`, {
-        name: project.name,
-        projectPath: project.path,
-        directDeps: projectInfo.directDeps,
-        indirectDeps: projectInfo.indirectDeps,
-        directOutdatedDeps: projectInfo.directOutdatedDeps,
-        directOutdatedDepsPercentage: projectInfo.directOutdatedDepsPercentage,
-        indirectOutdatedDeps: projectInfo.indirectOutdatedDeps,
-        indirectOutdatedDepsPercentage: projectInfo.indirectOutdatedDepsPercentage,
-        directVulnerableDeps: projectInfo.directVulnerableDeps,
-        indirectVulnerableDeps: projectInfo.indirectVulnerableDeps,
-        directOutOfSupport: projectInfo.directOutOfSupport,
-        indirectOutOfSupport: projectInfo.indirectOutOfSupport,
-    })
+   try {
+        await cacheProjects.load()
+        await cacheProjects.set?.(`${project.name}@${project.version}`, {
+           name: project.name,
+           projectPath: project.path,
+           directDeps: projectInfo.directDeps,
+           indirectDeps: projectInfo.indirectDeps,
+           directOutdatedDeps: projectInfo.directOutdatedDeps,
+           directOutdatedDepsPercentage: projectInfo.directOutdatedDepsPercentage,
+           indirectOutdatedDeps: projectInfo.indirectOutdatedDeps,
+           indirectOutdatedDepsPercentage: projectInfo.indirectOutdatedDepsPercentage,
+           directVulnerableDeps: projectInfo.directVulnerableDeps,
+           indirectVulnerableDeps: projectInfo.indirectVulnerableDeps,
+           directOutOfSupport: projectInfo.directOutOfSupport,
+           indirectOutOfSupport: projectInfo.indirectOutOfSupport,
+        })
+   } catch (e: any) {
+        log.error(`Error saving ${project.name}@${project.version} stats`, e)
+   }
 
     const outOfSupportDate = moment().subtract(outOfSupportThreshold, 'months').format(dateFormat)
     const outdatedDate = moment().subtract(outdatedThreshold, 'months').format(dateFormat)
 
-    await cacheProjects.set?.(`${project.name}@${project.version}`, {
-        dependencies: Object.values(project.dependencies).map(dep => {
-            const libraryInfo = dep.libraryInfo?.versions.find(version => dep.version === version.version)
-            return {
-                _id: `${plugin.name}:${dep.name}`,
-                name: dep.name,
-                version: dep.version,
-                type: dep.type,
-                directDep: !dep.requestedBy || dep.requestedBy.some(it => it.startsWith(`${project.name}@${project.version}`)),
-                requestedBy:dep.requestedBy.filter((value, index, array) => array.indexOf(value) === index),
-                vulnerabilities: (dep.libraryInfo?.vulnerabilities ?? []).length > 0,
-                outOfSupport: libraryInfo !== undefined ? new Date(libraryInfo.timestamp) < new Date(outOfSupportDate) : undefined,
-                outdated: libraryInfo !== undefined ? new Date(libraryInfo.timestamp) < new Date(outdatedDate) : undefined,
-            }
-        }),
-    })
+    try {
+        await cacheProjects.set?.(`${project.name}@${project.version}`, {
+            dependencies: Object.values(project.dependencies).map(dep => {
+                const libraryInfo = dep.libraryInfo?.versions.find(version => dep.version === version.version)
+                log.info('Library info: ', libraryInfo)
+
+                return {
+                    _id: `${plugin.name}:${dep.name}`,
+                    name: dep.name,
+                    version: dep.version,
+                    type: dep.type,
+                    directDep: !dep.requestedBy || dep.requestedBy.some(it => it.startsWith(`${project.name}@${project.version}`)),
+                    requestedBy: dep.requestedBy.filter((value, index, array) => array.indexOf(value) === index),
+                    vulnerabilities: (dep.libraryInfo?.vulnerabilities ?? []).length > 0,
+                    outOfSupport: libraryInfo !== undefined ? new Date(libraryInfo.timestamp) < new Date(outOfSupportDate) : undefined,
+                    outdated: libraryInfo !== undefined ? new Date(libraryInfo.timestamp) < new Date(outdatedDate) : undefined,
+                    timestamp: libraryInfo?.timestamp,
+                }
+            }),
+        })
+    } catch (e: any) {
+        log.error(`Error saving ${project.name}@${project.version} stats`, e)
+    }
 
     log.info('Project data saving in mongo db done!')
 
