@@ -63,3 +63,7 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
   display: inline-flex;
   padding-bottom: 12px;
 }
+
+mat-card-header {
+  margin-bottom: 8px;
+}

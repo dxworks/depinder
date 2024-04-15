@@ -12,11 +12,14 @@ import {MatTableModule} from "@angular/material/table";
 import {MatPaginatorModule} from "@angular/material/paginator";
 import {VulnerabilitiesTableComponent} from "./vulnerabilities-table/vulnerabilities-table.component";
 import {VersionsTableComponent} from "./versions-table/versions-table.component";
+import {MatCardModule} from "@angular/material/card";
+import {MatListModule} from "@angular/material/list";
+import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 
 @Component({
   selector: 'app-dependency-details-2',
   standalone: true,
-  imports: [CommonModule, MatButtonModule, MatIconModule, MatToolbarModule, MatTableModule, MatPaginatorModule, VulnerabilitiesTableComponent, VersionsTableComponent],
+  imports: [CommonModule, MatButtonModule, MatIconModule, MatToolbarModule, MatTableModule, MatPaginatorModule, VulnerabilitiesTableComponent, VersionsTableComponent, MatCardModule, MatListModule, MatProgressSpinnerModule],
   templateUrl: './dependency-details-2.component.html',
   styleUrl: './dependency-details-2.component.css'
 })
@@ -37,6 +40,30 @@ export class DependencyDetails2Component implements OnInit {
         this.dependency = dep;
       });
     });
+  }
+
+  packageUrl(): string | undefined {
+    let packageType = this.id.split(':')[0];
+    switch (packageType) {
+      case 'npm':
+        return 'https://www.npmjs.com/package/' + this.id.split(':')[1];
+      case 'maven':
+        return 'https://search.maven.org/artifact/' + this.id.split(':')[1];
+      case 'pypi':
+        return 'https://pypi.org/project/' + this.id.split(':')[1];
+      case 'rubygems':
+        return 'https://rubygems.org/gems/' + this.id.split(':')[1];
+      case 'nuget':
+        return 'https://www.nuget.org/packages/' + this.id.split(':')[1];
+      case 'composer':
+        return 'https://packagist.org/packages/' + this.id.split(':')[1];
+      case 'dotnet':
+        return 'https://www.nuget.org/packages/' + this.id.split(':')[1];
+      case 'php':
+        return 'https://packagist.org/packages/' + this.id.split(':')[1];
+      default :
+        return undefined;
+    }
   }
 
   protected readonly extractDomain = extractDomain;

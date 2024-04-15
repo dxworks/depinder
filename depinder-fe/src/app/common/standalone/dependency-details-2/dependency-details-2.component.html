@@ -1,130 +1,178 @@
-<mat-toolbar>
-  <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
-    <mat-icon>menu</mat-icon>
-  </button>
-  <span style="color: black; margin-right: 4px">
-    {{dependency?.name ?? id}}
-  </span>
-</mat-toolbar>
-
-
-@defer (when dependency === undefined) {
-  <div style="padding: 2rem">
-    <div class="card">
-      <p class="stat-name">Description</p>
-      <p>{{dependency?.description}}</p>
-
-      <div class="stats">
-        <div class="stat">
-          <div class="stat-container">
-            <div class="stat-name">Keywords</div>
-          </div>
-          <div class="stat-value">
-            @for (keyword of dependency?.keywords; track keyword) {
-              <span class="keyword">{{ keyword }}, </span>
-            }
-          </div>
-        </div>
-        <div class="stat">
-          <div class="stat-container">
-            <div class="stat-name">Licences</div>
-          </div>
-          <div class="stat-value">{{ dependency?.licenses }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <p class="stat-name" style="font-size: 18px">URLs</p>
-      <div class="stats">
-        @if (dependency?.homepageUrl !== undefined) {
-          <div class="stat">
-            <div class="stat-container">
-              <p class="stat-name">Repository URL</p>
-            </div>
-            @for (url of dependency?.homepageUrl; track url) {
-              <button mat-button style="background-color: #252B36; color: white" (click)="navigateToUrl(dependency?.homepageUrl!)">
-                <mat-icon>link</mat-icon>
-                {{ extractDomain(url) }}
-              </button>
-            }
-          </div>
-        }
-        @if (dependency?.reposUrl!.length > 0) {
-          <div class="stat">
-            <div class="stat-container">
-              <p class="stat-name">Repository URL</p>
-            </div>
-            @for (url of dependency?.reposUrl; track url) {
-              <button mat-button style="background-color: #252B36; color: white" (click)="navigateToUrl(url)">
-                <mat-icon>link</mat-icon>
-                {{ extractDomain(url) }}
-              </button>
-            }
-          </div>
-        }
-        @if (dependency?.documentationUrl!.length > 0) {
-          <div class="stat">
-            <div class="stat-container">
-              <div class="stat-name">Documentation URL</div>
-            </div>
-            @for (url of dependency?.documentationUrl; track url) {
-              <button mat-button style="background-color: #252B36; color: white" (click)="navigateToUrl(url)">
-                <mat-icon>link</mat-icon>
-                {{ extractDomain(url) }}
-              </button>
-            } @empty {
-              <li>There are no items.</li>
-            }
-          </div>
-        }
-        @if (dependency?.issuesUrl!.length > 0) {
-          <div class="stat">
-            <div class="stat-container">
-              <div class="stat-name">Issues URL</div>
-            </div>
-            @for (url of dependency?.issuesUrl; track url) {
-              <button mat-button style="background-color: #252B36; color: white" (click)="navigateToUrl(url)">
-                <mat-icon>link</mat-icon>
-                {{ extractDomain(url) }}
-              </button>
-            } @empty {
-              <li>There are no items.</li>
-            }
-          </div>
-        }
-        @if (dependency?.packageUrl!.length > 0) {
-          <div class="stat">
-            <div class="stat-container">
-              <p class="stat-name">Packages URL</p>
-            </div>
-            @for (url of dependency?.packageUrl; track url) {
-              <button mat-button style="background-color: #252B36; color: white" (click)="navigateToUrl(url)">
-                <mat-icon>link</mat-icon>
-                {{ extractDomain(url) }}
-              </button>
-            } @empty {
-              <li>There are no items.</li>
-            }
-          </div>
-        }
-      </div>
-    </div>
-
-    @if (dependency!.versions.length > 0) {
-      <div class="card">
-        <p class="stat-name" style="font-size: 18px">Versions</p>
-        <div>
-          <app-versions-table [versions]="dependency?.versions ?? []"></app-versions-table>
-        </div>
-      </div>
+<div class="app-container">
+  <mat-toolbar>
+    <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
+      <mat-icon>menu</mat-icon>
+    </button>
+    <span style="color: black; margin-right: 4px">
+      {{dependency?.name ?? id}}
+    </span>
+    <span style="flex: 1 1 auto"></span>
+    @if (packageUrl()) {
+      <button mat-icon-button (click)="navigateToUrl(packageUrl()!)">
+        <mat-icon>link</mat-icon>
+      </button>
     }
+  </mat-toolbar>
 
-    @if ((dependency!.vulnerabilities ?? []).length > 0) {
-      <div class="card">
-        <p class="stat-name" style="font-size: 18px">Vulnerabilities</p>
-        <app-vulnerabilities-table [vulnerabilities]="dependency!.vulnerabilities!"></app-vulnerabilities-table>
+  @defer (when dependency === undefined) {
+    <div style="padding: 2rem">
+      @if (dependency?.description !== undefined && dependency?.description!.length > 0) {
+        <mat-card style="margin-bottom: 16px">
+          <mat-card-header>
+            <mat-card-title>Description</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            {{dependency?.description}}
+          </mat-card-content>
+        </mat-card>
+      }
+
+      <div class="row" style="margin-bottom: 16px">
+        @if (dependency?.keywords !== undefined && dependency?.keywords!.length > 0) {
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>Keywords</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              @for (keyword of dependency?.keywords; track keyword) {
+                <span class="keyword">{{ keyword }}, </span>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+
+        @if (dependency?.licenses !== undefined && dependency?.licenses!.length > 0) {
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>Licences</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              @if (dependency!.licenses.length == 1) {
+                <h3>{{ dependency!.licenses[0] }}</h3>
+              } @else {
+                <mat-list>
+                  @for (license of dependency?.licenses; track license) {
+                    <mat-list-item>{{ license }}</mat-list-item>
+                  }
+                </mat-list>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+
+        @if (dependency?.reposUrl !== undefined && dependency?.reposUrl!.length > 0) {
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>Repository URL</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              @for (url of dependency?.reposUrl; track url) {
+                <button mat-button style="background-color: #252B36; color: white" (click)="navigateToUrl(url)">
+                  <mat-icon>link</mat-icon>
+                  {{ extractDomain(url) }}
+                </button>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+
+        @if (dependency?.homepageUrl !== undefined && dependency?.homepageUrl!.length > 0) {
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>Homepage URL</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              @for (url of dependency?.homepageUrl; track url) {
+                <button mat-button style="background-color: #252B36; color: white" (click)="navigateToUrl(url)">
+                  <mat-icon>link</mat-icon>
+                  {{ extractDomain(url) }}
+                </button>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+
+        @if (dependency?.documentationUrl !== undefined && dependency?.documentationUrl!.length > 0) {
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>Documentation URL</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              @for (url of dependency?.documentationUrl; track url) {
+                <button mat-button style="background-color: #252B36; color: white" (click)="navigateToUrl(url)">
+                  <mat-icon>link</mat-icon>
+                  {{ extractDomain(url) }}
+                </button>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+
+        @if (dependency?.issuesUrl !== undefined && dependency?.issuesUrl!.length > 0) {
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>Issues URL</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              @for (url of dependency?.issuesUrl; track url) {
+                <button mat-button style="background-color: #252B36; color: white" (click)="navigateToUrl(url)">
+                  <mat-icon>link</mat-icon>
+                  {{ extractDomain(url) }}
+                </button>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+
+        @if (dependency?.packageUrl !== undefined && dependency?.packageUrl!.length > 0) {
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>Packages URL</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              @for (url of dependency?.packageUrl; track url) {
+                <button mat-button style="background-color: #252B36; color: white" (click)="navigateToUrl(url)">
+                  <mat-icon>link</mat-icon>
+                  {{ extractDomain(url) }}
+                </button>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
       </div>
-    }
-  </div>
-}
+
+      @if (dependency!.versions.length > 0) {
+        <mat-card style="margin-bottom: 16px">
+          <mat-card-header>
+            <mat-card-title>Versions</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <app-versions-table [versions]="dependency?.versions ?? []"></app-versions-table>
+          </mat-card-content>
+        </mat-card>
+      }
+
+      @if ((dependency!.vulnerabilities ?? []).length > 0) {
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>Vulnerabilities</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <app-vulnerabilities-table [vulnerabilities]="dependency!.vulnerabilities!"></app-vulnerabilities-table>
+          </mat-card-content>
+        </mat-card>
+      }
+    </div>
+  } @loading (minimum 1s) {
+    <mat-spinner diameter="40" style="position:fixed;top:50%;left:50%"></mat-spinner>
+  } @error () {
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Error</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>Failed to load dependency information</p>
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

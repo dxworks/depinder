@@ -1,0 +1,5 @@
+.row {
+  display: flex;
+  flex-wrap: wrap; /* Allows cards to wrap onto the next line if not enough space */
+  gap: 20px; /* Spacing between cards */
+}
