@@ -90,7 +90,15 @@ function recursivelyTransformDeps(tree: DepTreeDep, result: Map<string, Depinder
             cachedVersion.requestedBy = [rootId, ...cachedVersion.requestedBy]
         } else {
             try {
-                const semver = new SemVer(dep.version ?? '', true)
+                let semver
+                try {
+                    semver = new SemVer(dep.version ?? '', true)
+                }
+                catch (e: any) {
+                    log.info(`Valid version (${dep.name}) (${dep.version})`)
+                    semver = new SemVer(dep.version?.split('@')[1] ?? '', true)
+                }
+
                 result.set(id, {
                     id,
                     version: dep.version,
@@ -99,7 +107,8 @@ function recursivelyTransformDeps(tree: DepTreeDep, result: Map<string, Depinder
                     requestedBy: [rootId],
                 } as DepinderDependency)
             } catch (e) {
-                log.warn(`Invalid version! ${e}`)
+                log.info(`Valid version (${dep.name}) (${dep.version})`)
+                log.warn(`Invalid version! (${dep.version}) ${e}`)
             }
         }
         recursivelyTransformDeps(dep, result)

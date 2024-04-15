@@ -13,6 +13,8 @@ export interface Project {
   directOutOfSupport: number,
   indirectOutOfSupport: number,
   dependencies: Dependency[],
+  manifestFile?: string,
+  lockFile?: string,
 }
 
 export interface Dependency {
@@ -25,4 +27,5 @@ export interface Dependency {
   vulnerabilities: boolean,
   outOfSupport: boolean,
   outdated: boolean,
+  timestamp: number,
 }

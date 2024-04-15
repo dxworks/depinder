@@ -34,7 +34,9 @@ export interface DepinderProject {
     path: string // the same as DependencyFileContext.root
     dependencies: {
         [dependencyId: string]: DepinderDependency
-    }
+    },
+    manifestFile?: string,
+    lockFile?: string,
 }
 
 export interface DepinderDependency {

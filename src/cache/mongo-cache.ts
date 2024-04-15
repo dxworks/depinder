@@ -72,6 +72,8 @@ const ProjectInfoSchema = new Schema({
     _id: String,
     projectPath: String,
     name: String,
+    manifestFile: String,
+    lockFile: String,
     directDeps: Number,
     indirectDeps: Number,
     directOutdatedDeps: Number,
@@ -149,6 +151,7 @@ export const mongoCacheProject: Cache = {
         return await ProjectInfoModel.findById(key).exec()
     },
     async set(key: string, value: any) {
+        console.log('set', value.lockFile, value.manifestFile)
         await ProjectInfoModel.findByIdAndUpdate(key, value, { upsert: true }).exec()
     },
     async has(key: string) {

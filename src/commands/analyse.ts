@@ -131,6 +131,14 @@ async function extractProjects(plugin: Plugin, files: string[]) {
                 continue
             }
             const proj: DepinderProject = await plugin.parser.parseDependencyTree(context)
+
+            if (context.manifestFile !== undefined) {
+                proj.manifestFile = context.manifestFile
+            }
+            if (context.lockFile !== undefined) {
+                proj.lockFile = context.lockFile
+            }
+
             log.info(`Done parsing dependency tree information for ${JSON.stringify(context)}`)
             projects.push(proj)
         } catch (e: any) {
@@ -186,6 +194,8 @@ function extractProjectStats(proj: DepinderProject): Project {
         indirectVulnerableDeps: indirectVulnerable.length,
         name: proj.name,
         projectPath: proj.path,
+        manifestFile: proj.manifestFile,
+        lockFile: proj.lockFile,
     } as Project
 }
 
@@ -305,18 +315,20 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
    try {
         await cacheProjects.load()
         await cacheProjects.set?.(`${project.name}@${project.version}`, {
-           name: project.name,
-           projectPath: project.path,
-           directDeps: projectInfo.directDeps,
-           indirectDeps: projectInfo.indirectDeps,
-           directOutdatedDeps: projectInfo.directOutdatedDeps,
-           directOutdatedDepsPercentage: projectInfo.directOutdatedDepsPercentage,
-           indirectOutdatedDeps: projectInfo.indirectOutdatedDeps,
-           indirectOutdatedDepsPercentage: projectInfo.indirectOutdatedDepsPercentage,
-           directVulnerableDeps: projectInfo.directVulnerableDeps,
-           indirectVulnerableDeps: projectInfo.indirectVulnerableDeps,
-           directOutOfSupport: projectInfo.directOutOfSupport,
-           indirectOutOfSupport: projectInfo.indirectOutOfSupport,
+            name: project.name,
+            projectPath: project.path,
+            manifestFile: project.manifestFile,
+            lockFile: project.lockFile,
+            directDeps: projectInfo.directDeps,
+            indirectDeps: projectInfo.indirectDeps,
+            directOutdatedDeps: projectInfo.directOutdatedDeps,
+            directOutdatedDepsPercentage: projectInfo.directOutdatedDepsPercentage,
+            indirectOutdatedDeps: projectInfo.indirectOutdatedDeps,
+            indirectOutdatedDepsPercentage: projectInfo.indirectOutdatedDepsPercentage,
+            directVulnerableDeps: projectInfo.directVulnerableDeps,
+            indirectVulnerableDeps: projectInfo.indirectVulnerableDeps,
+            directOutOfSupport: projectInfo.directOutOfSupport,
+            indirectOutOfSupport: projectInfo.indirectOutOfSupport,
         })
    } catch (e: any) {
         log.error(`Error saving ${project.name}@${project.version} stats`, e)
@@ -329,7 +341,6 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
         await cacheProjects.set?.(`${project.name}@${project.version}`, {
             dependencies: Object.values(project.dependencies).map(dep => {
                 const libraryInfo = dep.libraryInfo?.versions.find(version => dep.version === version.version)
-                log.info('Library info: ', libraryInfo)
 
                 return {
                     _id: `${plugin.name}:${dep.name}`,
