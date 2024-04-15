@@ -1,13 +1,47 @@
-<table mat-table [dataSource]="projects" class="mat-elevation-z8">
+<table mat-table [dataSource]="projects">
 
   <ng-container matColumnDef="name">
     <th mat-header-cell *matHeaderCellDef> Name </th>
-    <td mat-cell *matCellDef="let project"> {{project.name}} </td>
+    <td mat-cell *matCellDef="let project"> {{project.name}}</td>
+  </ng-container>
+
+  <ng-container matColumnDef="project-type">
+    <th mat-header-cell *matHeaderCellDef>  project type </th>
+    <td mat-cell *matCellDef="let project"> {{getProjectType(project) ?? 'Undefined'}} </td>
   </ng-container>
 
   <ng-container matColumnDef="projectPath">
     <th mat-header-cell *matHeaderCellDef> Project Path </th>
-    <td mat-cell *matCellDef="let project"> {{project.projectPath}} </td>
+    <td mat-cell *matCellDef="let project"> {{project.projectPath ?? 'Undefined'}} </td>
+  </ng-container>
+
+  <ng-container matColumnDef="manifest-file">
+    <th mat-header-cell *matHeaderCellDef> manifest-file </th>
+    <td mat-cell *matCellDef="let project">
+      @if (project.manifestFile) {
+        {{getFile(project.manifestFile)}}
+      }
+      @else {
+        &#10060;
+      }
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="lock-file">
+    <th mat-header-cell *matHeaderCellDef> lock-file </th>
+    <td mat-cell *matCellDef="let project">
+      @if (project.lockFile) {
+        {{getFile(project.lockFile)}}
+      }
+      @else {
+        &#10060;
+      }
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="package-manager">
+    <th mat-header-cell *matHeaderCellDef> package-manager </th>
+    <td mat-cell *matCellDef="let project"> {{determinePackageManager(project) ?? 'Undefined'}} </td>
   </ng-container>
 
   <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
