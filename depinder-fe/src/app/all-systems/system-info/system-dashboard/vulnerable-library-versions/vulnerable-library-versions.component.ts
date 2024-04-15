@@ -62,9 +62,15 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
     this.dependencies = [];
     this.libraries = [];
 
+    console.log('projects', this.projects)
     if (this.projects.length > 0) {
+      console.log('get dependencies')
       this.getDependencies().subscribe(libraries => {
+        console.log('libraries', libraries)
         this.libraries = Array.from(libraries.values());
+
+        console.log('libraries', this.libraries)
+
         this.updateData(libraries);
         this.tableData.paginator = this.paginator;
       });
@@ -82,6 +88,7 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
 
     this.dependencies.map(dependency => {
       const library = libraries.get(dependency.name);
+      console.log(dependency.name, library?.vulnerabilities?.length)
       const vulnerabilities = this.getVulnerabilities(dependency, library);
 
       if (vulnerabilities.length > 0) {
@@ -94,6 +101,7 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
   }
 
   getVulnerabilities(dependency: Dependency, library: LibraryInfo | undefined): Vulnerability[] {
+    console.info(dependency.name, library?.vulnerabilities?.length)
     return library?.vulnerabilities?.filter(vulnerability =>
       this.isVersionInRange(dependency.version, vulnerability.vulnerableRange!)) || [];
   }
@@ -168,6 +176,7 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
     let libraries = new Map<string, LibraryInfo>();
     this.projects.forEach(project => {
       project.dependencies.forEach(dependency => {
+        // console.log('dependency', dependency)
         this.dependencies.push(dependency);
       });
     });
@@ -176,8 +185,9 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
     let observables = this.dependencies.filter(dep => dep.vulnerabilities).map(dependency => this.libraryService.find(dependency._id));
     return forkJoin(observables).pipe(
       map((librariesArray: LibraryInfo[]) => {
-        librariesArray.forEach((lib, index) => {
+        librariesArray.forEach((lib, _) => {
           libraries.set(lib.name, lib);
+          console.log('lib', lib.vulnerabilities?.length)
         });
         return libraries;
       })
@@ -198,30 +208,27 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
 
     let upgradeVersion = currentVersion;
     vulnerabilities.forEach(vuln => {
-      const constraints = this.parseVulnerableRange(vuln.vulnerableRange!);
-      constraints.forEach(({ operator, version: versionStr }) => {
-        let version = parse(versionStr);
-        if (!version) {
-          console.error(`Invalid vulnerable version: ${versionStr}`);
-          return;
-        }
-
-        console.log('Vulnerable version:', versionStr,
-          'Current version:', currentVersionStr,
-          'Vulnerable range:', vuln.vulnerableRange,
-          operator === '<' && rcompare(currentVersion!, version) >= 0,
-          operator === '<=' && rcompare(currentVersion!, version) > 0
-        );
-
-        if ((operator === '<' && rcompare(currentVersion!, version) >= 0) ||
-          (operator === '<=' && rcompare(currentVersion!, version) > 0)) {
-          console.log('Vulnerable version:', versionStr, 'Current version:', currentVersionStr, 'Vulnerable range:', vuln.vulnerableRange);
-          const nextVersion = inc(version, 'patch');
-          if (nextVersion && gt(parse(nextVersion)!, upgradeVersion)) {
-            upgradeVersion = parse(nextVersion) as SemVer;
+      try {
+        const constraints = this.parseVulnerableRange(vuln.vulnerableRange!);
+        constraints.forEach(({ operator, version: versionStr }) => {
+          let version = parse(versionStr);
+          if (!version) {
+            console.warn(`Invalid vulnerable version: ${versionStr}`);
+            return;
           }
-        }
-      });
+
+          if ((operator === '<' && rcompare(currentVersion!, version) >= 0) ||
+            (operator === '<=' && rcompare(currentVersion!, version) > 0)) {
+            const nextVersion = inc(version, 'patch');
+            if (nextVersion && gt(parse(nextVersion)!, upgradeVersion)) {
+              upgradeVersion = parse(nextVersion) as SemVer;
+            }
+          }
+        });
+      }
+      catch (e) {
+        console.warn('Error determining upgrade version:', e);
+      }
     });
 
     if (upgradeVersion === currentVersion || !gt(upgradeVersion, currentVersion)) {
@@ -229,9 +236,13 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
     }
 
     for (let version of versions) {
-      if (rcompare(upgradeVersion.version, version.version) >= 0) {
-        upgradeVersion = parse(version.version)!;
-        break;
+      try {
+        if (rcompare(upgradeVersion.version, version.version) >= 0) {
+          upgradeVersion = parse(version.version)!;
+          break;
+        }
+      } catch (e) {
+        console.warn('Error comparing versions:', upgradeVersion.version, version.version, e);
       }
     }
 
@@ -303,27 +314,33 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
     return conditions.every((condition) => {
       const match = condition.match(/(<=|>=|<|>|=)?\s*(.*)/);
       if (!match) {
-        console.error('Invalid version range condition:', condition);
+        console.warn('Invalid version range condition:', condition);
         return false;
       }
 
       const [, operator, versionRange] = match;
 
-      switch (operator) {
-        case '<':
-          return semver.lt(version, versionRange);
-        case '<=':
-          return semver.lte(version, versionRange);
-        case '>':
-          return semver.gt(version, versionRange);
-        case '>=':
-          return semver.gte(version, versionRange);
-        case '=':
-        case undefined: // Handle the case where no operator is specified, assuming equality
-          return semver.eq(version, versionRange);
-        default:
-          console.error('Unsupported operator:', operator);
-          return false;
+      try {
+        switch (operator) {
+          case '<':
+            return semver.lt(version, versionRange);
+          case '<=':
+            return semver.lte(version, versionRange);
+          case '>':
+            return semver.gt(version, versionRange);
+          case '>=':
+            return semver.gte(version, versionRange);
+          case '=':
+          case undefined: // Handle the case where no operator is specified, assuming equality
+            return semver.eq(version, versionRange);
+          default:
+            console.warn('Unsupported operator:', operator);
+            return false;
+        }
+      }
+      catch (e) {
+        console.warn('Error comparing versions:', version, versionRange, e);
+        return false;
       }
     });
   }

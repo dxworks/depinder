@@ -1,5 +1,5 @@
 <table mat-table [dataSource]="tableData" multiTemplateDataRows>
-  @defer {
+<!--  @defer {-->
     <ng-container matColumnDef="name">
       <th mat-header-cell *matHeaderCellDef> name </th>
       <td mat-cell *matCellDef="let element"> {{element.name}} </td>
@@ -93,9 +93,9 @@
         (click)="expandedElement = expandedElement === element ? null : element">
     </tr>
     <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="example-detail-row"></tr>
-  } @loading (minimum 1s) {
-    <h1>Loading...</h1>
-  }
+<!--  } @loading (minimum 1s) {-->
+<!--    <h1>Loading...</h1>-->
+<!--  }-->
 </table>
 <mat-paginator [pageSizeOptions]="[5, 10, 20]"
                showFirstLastButtons

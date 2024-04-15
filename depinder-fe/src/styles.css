@@ -3,6 +3,12 @@
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 
+.app-container {
+  min-height: 100vh; /* This will make the container take at least the full height of the viewport */
+  display: flex;
+  flex-direction: column;
+}
+
 .card {
   width: 90%;
   padding: 2rem;

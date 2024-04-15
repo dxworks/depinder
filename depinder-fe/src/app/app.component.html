@@ -1,13 +1,14 @@
+<div class="app-container">
+  <mat-sidenav-container class="sidenav-container">
+    <mat-sidenav #sidenav mode="side" style="width: 250px;">
+      <mat-nav-list>
+        <a mat-list-item (click)="navigate('/systems')">Systems</a>
+        <a mat-list-item (click)="navigate('/licences')">Licences</a>
+      </mat-nav-list>
+    </mat-sidenav>
 
-<mat-sidenav-container class="sidenav-container">
-  <mat-sidenav #sidenav mode="side" style="width: 250px;">
-    <mat-nav-list>
-      <a mat-list-item (click)="navigate('/systems')">Systems</a>
-      <a mat-list-item (click)="navigate('/licences')">Licences</a>
-    </mat-nav-list>
-  </mat-sidenav>
-
-  <mat-sidenav-content>
-    <router-outlet></router-outlet>
-  </mat-sidenav-content>
-</mat-sidenav-container>
+    <mat-sidenav-content>
+      <router-outlet></router-outlet>
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+</div>
