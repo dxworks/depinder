@@ -1,6 +1,6 @@
 import {Component, OnInit} from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {ActivatedRoute, Router} from "@angular/router";
+import {ActivatedRoute} from "@angular/router";
 import {LicencesService} from "../../common/services/licences.service";
 import {MatButtonModule} from "@angular/material/button";
 import {MatIconModule} from "@angular/material/icon";
@@ -8,15 +8,15 @@ import {MatToolbarModule} from "@angular/material/toolbar";
 import {ToolbarService} from "../../common/services/toolbar.service";
 import {Licence} from "@core/licence";
 import {LibrariesService} from "../../common/services/libraries.service";
-import {Dependency} from "@core/project";
 import {DependenciesTableComponent} from "./dependencies-table/dependencies-table.component";
 import {LibraryInfo} from "@core/library";
 import {extractDomain, navigateToUrl} from "../../common/utils";
+import {MatCardModule} from "@angular/material/card";
 
 @Component({
   selector: 'app-licence-info',
   standalone: true,
-  imports: [CommonModule, MatButtonModule, MatIconModule, MatToolbarModule, DependenciesTableComponent],
+  imports: [CommonModule, MatButtonModule, MatIconModule, MatToolbarModule, DependenciesTableComponent, MatCardModule],
   templateUrl: './licence-info.component.html',
   styleUrl: './licence-info.component.css'
 })
