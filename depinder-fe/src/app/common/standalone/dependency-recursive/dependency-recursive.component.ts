@@ -7,6 +7,7 @@ import {DependencyFilter} from "../../models/dependency-filter";
 import { Dependency } from '@core/project';
 import {MatButtonModule} from "@angular/material/button";
 import {ActivatedRoute, Router} from "@angular/router";
+import {MatTreeModule} from "@angular/material/tree";
 
 @Component({
   selector: 'app-dependency-recursive',
@@ -20,7 +21,8 @@ import {ActivatedRoute, Router} from "@angular/router";
     NgClass,
     JsonPipe,
     NgStyle,
-    MatButtonModule
+    MatButtonModule,
+    MatTreeModule
   ]
 })
 export class DependencyRecursiveComponent implements OnInit {

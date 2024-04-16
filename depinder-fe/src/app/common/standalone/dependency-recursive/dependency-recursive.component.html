@@ -1,36 +1,37 @@
-<div *ngIf="true">
-  <div *ngIf="depth > 0">
-    <div class="hover-parent" (click)="showMoreToggle()">
-      <mat-icon
-        *ngIf="allDependencies.length > 0"
-        class="mat-icon-rtl-mirror">
-        {{showMore ? 'arrow_drop_down' : 'arrow_right'}}
-      </mat-icon>
-      <span
-        [ngClass]="{'highlight': isHighlighted()}">
+<div *ngIf="depth > 0">
+  <div class="hover-parent" (click)="showMoreToggle()">
+    <div>
+      <button mat-icon-button disabled="{{allDependencies.length == 0}}">
+        <mat-icon class="mat-icon-rtl-mirror">
+          @if (allDependencies.length > 0) {
+            {{ showMore ? 'expand_more' : 'chevron_right' }}
+          }
+        </mat-icon>
+      </button>
+      <span [ngClass]="{'highlight': isHighlighted()}">
         {{dependency?.name}} at {{dependency?.version}}
       </span>
       <button mat-button class="hover-button" (click)="navigateToDependency()">See details</button>
     </div>
+
   </div>
-
-  @for(dependency of allDependencies; track $index) {
-    @if (showMore && (containsFilters($index) || ((this.filter | json) === '{}'))) {
-      <div [ngStyle]="getPadding()">
-        @defer (on viewport){
-          <app-dependency-recursive
-          [depth]="depth + 1"
-          [allDependencies]="dependency.children"
-          [filter]="filter"
-          [showMore]="containsFilters($index)"
-          [dependency]="dependency.data"
-          (childEvent)="receiveInfo($event)">
-        </app-dependency-recursive>
-        } @placeholder () {
-          <p>Loading...</p>
-        }
-      </div>
-    }
-  }
-
 </div>
+
+@for(dependency of allDependencies; track $index) {
+  @if (showMore && (containsFilters($index) || ((this.filter | json) === '{}'))) {
+    <div [ngStyle]="getPadding()">
+      @defer (on viewport){
+        <app-dependency-recursive
+        [depth]="depth + 1"
+        [allDependencies]="dependency.children"
+        [filter]="filter"
+        [showMore]="containsFilters($index)"
+        [dependency]="dependency.data"
+        (childEvent)="receiveInfo($event)">
+      </app-dependency-recursive>
+      } @placeholder () {
+        <p>Loading...</p>
+      }
+    </div>
+  }
+}
