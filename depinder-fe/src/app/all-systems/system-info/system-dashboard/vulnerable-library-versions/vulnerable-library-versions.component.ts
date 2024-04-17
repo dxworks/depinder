@@ -1,10 +1,8 @@
-import {AfterViewInit, ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges, ViewChild} from '@angular/core';
+import {AfterViewInit, Component, Input, OnChanges, SimpleChanges, ViewChild} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import * as semver from 'semver';
 import { SemVer, gt, parse, inc, rcompare } from 'semver';
 import {Dependency, Project} from "@core/project";
-import {LibrariesService} from "../../../../common/services/libraries.service";
-import {forkJoin, map, Observable} from "rxjs";
 import {LibraryInfo, LibraryVersion} from "@core/library";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
 import {Vulnerability} from "@core/vulnerability-checker";
@@ -46,34 +44,28 @@ interface VulnerableLibrary {
 })
 export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewInit {
   @Input() projects: Project[] = [];
-  dependencies: Dependency[] = [];
-  libraries?: LibraryInfo[] = [];
+  @Input() libraries?: Map<string, LibraryInfo>;
+  @Input() dependencies: Dependency[] = [];
+
   tableColumns: string[] = ['name', 'dependency-type', 'version', 'severity','suggestedVersion', 'upgradeType'];
-  // columnsToDisplayWithExpand: string[] = [...this.tableColumns, 'expand'];
-  tableData!: MatTableDataSource<VulnerableLibrary>;
+  tableData?: MatTableDataSource<VulnerableLibrary>;
   expandedElement?: VulnerableLibrary;
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
 
-  constructor(private libraryService: LibrariesService) { }
+  constructor() { }
 
   ngOnChanges(change: SimpleChanges) {
     this.projects = change['projects'].currentValue;
-    this.dependencies = [];
-    this.libraries = [];
+    if (change['libraries'].currentValue !== undefined) {
+      this.libraries = change['libraries'].currentValue;
+    }
+    if (change['dependencies'].currentValue !== undefined) {
+      this.dependencies = change['dependencies'].currentValue;
+    }
 
-    console.log('projects', this.projects)
-    if (this.projects.length > 0) {
-      console.log('get dependencies')
-      this.getDependencies().subscribe(libraries => {
-        console.log('libraries', libraries)
-        this.libraries = Array.from(libraries.values());
-
-        console.log('libraries', this.libraries)
-
-        this.updateData(libraries);
-        this.tableData.paginator = this.paginator;
-      });
+    if (this.projects.length > 0 && this.libraries !== undefined && this.libraries.size > 0) {
+      this.updateData(this.libraries);
     }
   }
 
@@ -84,11 +76,11 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
   }
 
   updateData(libraries: Map<string, LibraryInfo>) {
+    this.tableData = new MatTableDataSource<VulnerableLibrary>();
     const data: VulnerableLibrary[] = [];
 
     this.dependencies.map(dependency => {
       const library = libraries.get(dependency.name);
-      console.log(dependency.name, library?.vulnerabilities?.length)
       const vulnerabilities = this.getVulnerabilities(dependency, library);
 
       if (vulnerabilities.length > 0) {
@@ -98,10 +90,10 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
     });
 
     this.sortAndSetData(data);
+    this.tableData.paginator = this.paginator;
   }
 
   getVulnerabilities(dependency: Dependency, library: LibraryInfo | undefined): Vulnerability[] {
-    console.info(dependency.name, library?.vulnerabilities?.length)
     return library?.vulnerabilities?.filter(vulnerability =>
       this.isVersionInRange(dependency.version, vulnerability.vulnerableRange!)) || [];
   }
@@ -170,28 +162,6 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
       return b.vulnerabilities.length - a.vulnerabilities.length;
     });
     this.tableData = new MatTableDataSource(data);
-  }
-
-  getDependencies(): Observable<Map<string, LibraryInfo>> {
-    let libraries = new Map<string, LibraryInfo>();
-    this.projects.forEach(project => {
-      project.dependencies.forEach(dependency => {
-        // console.log('dependency', dependency)
-        this.dependencies.push(dependency);
-      });
-    });
-
-    //todo api call pentru toate librariile dintr-un proiect
-    let observables = this.dependencies.filter(dep => dep.vulnerabilities).map(dependency => this.libraryService.find(dependency._id));
-    return forkJoin(observables).pipe(
-      map((librariesArray: LibraryInfo[]) => {
-        librariesArray.forEach((lib, _) => {
-          libraries.set(lib.name, lib);
-          console.log('lib', lib.vulnerabilities?.length)
-        });
-        return libraries;
-      })
-    );
   }
 
   parseVulnerableRange(rangeStr: string): Array<{ operator: string; version: string }> {

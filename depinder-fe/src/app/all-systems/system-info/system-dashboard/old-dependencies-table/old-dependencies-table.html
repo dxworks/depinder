@@ -1,23 +1,17 @@
-<table mat-table [dataSource]="dataSource">
-
-  <ng-container matColumnDef="position">
-    <th mat-header-cell *matHeaderCellDef> No. </th>
-    <td mat-cell *matCellDef="let element">{{getPosition(element)}}</td>
-  </ng-container>
-
+<table mat-table matSort [dataSource]="dataSource" multiTemplateDataRows>
   <ng-container matColumnDef="name">
-    <th mat-header-cell *matHeaderCellDef> Name </th>
-    <td mat-cell *matCellDef="let element"> {{element.dependency.name}} {{element.dependency.version}} </td>
+    <th mat-header-cell *matHeaderCellDef mat-sort-header="name"> Name </th>
+    <td mat-cell *matCellDef="let element"> {{element.name}} </td>
   </ng-container>
 
-  <ng-container matColumnDef="timestamp">
-    <th mat-header-cell *matHeaderCellDef> Last updated </th>
-    <td mat-cell *matCellDef="let element"> {{dateToString(element.dependency.timestamp)}} </td>
+  <ng-container matColumnDef="lastUpdated">
+    <th mat-header-cell *matHeaderCellDef mat-sort-header="lastUpdated"> Last updated </th>
+    <td mat-cell *matCellDef="let element"> {{dateToString(element.lastUpdated)}} </td>
   </ng-container>
 
   <ng-container matColumnDef="months-from-today">
     <th mat-header-cell *matHeaderCellDef> Months from today </th>
-    <td mat-cell *matCellDef="let element"> {{getMonthsFromToday(element.dependency)}} </td>
+    <td mat-cell *matCellDef="let element"> {{getMonthsFromToday(element.lastUpdated)}} </td>
   </ng-container>
 
   <ng-container matColumnDef="projects-affected">
@@ -41,12 +35,20 @@
     </td>
   </ng-container>
 
+  <ng-container matColumnDef="expandedDetail">
+    <td mat-cell *matCellDef="let element" [attr.colspan]="displayedColumns.length">
+      <div [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+        <app-old-dep-details [dependency]="element"></app-old-dep-details>
+      </div>
+    </td>
+  </ng-container>
+
   <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-
-  <tr class="mat-row" *matNoDataRow>
-    <td class="mat-cell" colspan="4">No data matching the filter</td>
+  <tr mat-row *matRowDef="let element; columns: displayedColumns;"
+      class="example-element-row"
+      [class.example-expanded-row]="expandedElement === element"
+      (click)="expandedElement = expandedElement === element ? null : element">
   </tr>
+  <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="example-detail-row"></tr>
 </table>
-
 <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" aria-label="Select page"></mat-paginator>
