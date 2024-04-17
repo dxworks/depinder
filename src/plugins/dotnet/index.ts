@@ -17,9 +17,10 @@ import {getPackageSemver} from '../../utils/utils'
 import {log} from '@dxworks/cli-common'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 import {LibraryInfo} from '../../../core/library'
+import {extractorFiles} from '../../../core/constants'
 
 const extractor: Extractor = {
-    files: ['*.csproj', '*.fsproj', '*.vbproj'],
+    files: extractorFiles.get('dotnet') ?? [],
     createContexts: (files: string[]) =>
         files.map(it => ({
             root: path.dirname(it),

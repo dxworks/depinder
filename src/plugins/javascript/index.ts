@@ -17,9 +17,10 @@ import {npm} from '../../utils/npm'
 import fs from 'fs'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 import {LibraryInfo} from '../../../core/library'
+import {extractorFiles} from '../../../core/constants'
 
 const extractor: Extractor = {
-    files: ['package.json', 'package-lock.json', 'yarn.lock'],
+    files: extractorFiles.get('javascript') ?? [],
     createContexts: files => {
         const lockFileContexts = files.filter(it => it.endsWith('package-lock.json') || it.endsWith('yarn.lock')).map(it => ({
             root: path.dirname(it),

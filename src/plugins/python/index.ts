@@ -18,11 +18,12 @@ import * as toml from 'toml'
 import {getPackageSemver} from '../../utils/utils'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 import {LibraryInfo} from '../../../core/library'
+import {extractorFiles} from '../../../core/constants'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 
 const extractor: Extractor = {
-    files: ['requirements.txt', 'setup.py', 'Pipfile', 'Pipfile.lock', 'pyproject.toml', 'poetry.lock'],
+    files: extractorFiles.get('python') ?? [],
     createContexts: files => {
         const pipEnvContexts = files.filter(it => it.endsWith('Pipfile.lock')).map(it => ({
             root: path.dirname(it),

@@ -11,12 +11,13 @@ import {parseMavenDependencyTree} from './parsers/maven'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 import {LibraryInfo} from '../../../core/library'
 import {runMavenCommandSync} from './runMaven'
+import {extractorFiles} from '../../../core/constants'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pomParser = require('pom-parser')
 
 const extractor: Extractor = {
-    files: ['pom.xml', 'build.gradle', 'build.gradle.kts'],
+    files: extractorFiles.get('java') ?? [],
     createContexts: files => {
 
         const pomContexts = files.filter(it => it.endsWith('pom.xml')).map(it => ({

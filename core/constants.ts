@@ -33,5 +33,13 @@ export const fileToPackageManager: Map<string, string> = new Map<string, string>
         ['poetry.lock', 'Poetry'],
         ['Gemfile', 'Bundler'],
         ['*.gemspec', 'RubyGems'],
-        ['Gemfile.lock', 'Bundler']
+        ['Gemfile.lock', 'Bundler'],
 ])
+
+export enum Severity {
+    CRITICAL = 'CRITICAL',
+    HIGH = 'HIGH',
+    MEDIUM = 'MEDIUM',
+    LOW = 'LOW',
+    NONE = 'NONE'
+}

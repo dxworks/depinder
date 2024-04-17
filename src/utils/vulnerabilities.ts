@@ -1,6 +1,7 @@
 import {graphql} from '@octokit/graphql'
 import axios from 'axios'
 import {Vulnerability} from '../../core/vulnerability-checker'
+import {Severity} from '../../core/constants'
 
 export async function getVulnerabilitiesFromGithub(ecosystem: string, packageName: string): Promise<Vulnerability[]> {
     const authGraphql = graphql.defaults({
@@ -92,15 +93,15 @@ export async function getVulnerabilitiesFromSonatype(purls: string[]): Promise<{
 
 function mapSeverity(cvssScore: any) {
     if(cvssScore < 1)
-        return 'NONE'
+        return Severity.NONE
     if(cvssScore < 4)
-        return 'LOW'
+        return Severity.LOW
     if(cvssScore < 7)
-        return 'MEDIUM'
+        return Severity.MEDIUM
     if(cvssScore < 9)
-        return 'HIGH'
+        return Severity.HIGH
     if(cvssScore <=10)
-        return 'CRITICAL'
+        return Severity.CRITICAL
 
-    return 'NONE'
+    return Severity.NONE
 }

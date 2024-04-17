@@ -14,9 +14,10 @@ import fetch from 'node-fetch'
 import {Plugin} from '../../extension-points/plugin'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 import {LibraryInfo} from '../../../core/library'
+import {extractorFiles} from '../../../core/constants'
 
 const extractor: Extractor = {
-    files: ['Gemfile', '*.gemspec', 'Gemfile.lock'],
+    files: extractorFiles.get('ruby') ?? [],
     createContexts: files =>
         files.filter(it => it.endsWith('Gemfile.lock')).map(it => ({
             root: path.dirname(it),

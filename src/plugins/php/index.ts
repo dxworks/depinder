@@ -14,9 +14,10 @@ import {getPackageDetails, IPackagistPackageDetails} from './php-interfaces'
 import {getPackageSemver} from '../../utils/utils'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 import {LibraryInfo} from '../../../core/library'
+import {extractorFiles} from '../../../core/constants'
 
 const extractor: Extractor = {
-    files: ['composer.json', 'composer.lock'],
+    files: extractorFiles.get('php') ?? [],
     createContexts: files => {
         return files.filter(it => it.endsWith('composer.lock')).map(it => ({
             root: path.dirname(it),
