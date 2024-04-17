@@ -12,6 +12,7 @@ import {
 import {JsonPipe} from "@angular/common";
 import {DependencyDetailsComponent} from "./dependency-details/dependency-details.component";
 import {MatDialog, MatDialogRef} from "@angular/material/dialog";
+import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 
 @Component({
   standalone: true,
@@ -21,7 +22,8 @@ import {MatDialog, MatDialogRef} from "@angular/material/dialog";
     DependencyFilterComponent,
     DependencyRecursiveComponent,
     JsonPipe,
-    DependencyDetailsComponent
+    DependencyDetailsComponent,
+    MatProgressSpinnerModule
   ],
   styleUrl: './dependencies.component.css'
 })

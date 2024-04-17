@@ -1,92 +1,95 @@
-<mat-toolbar>
-  <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
-    <mat-icon>menu</mat-icon>
-  </button>
-  <span style="color: black; margin-right: 4px">
+<div class="app-container">
+  <mat-toolbar>
+    <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
+      <mat-icon>menu</mat-icon>
+    </button>
+    <span style="color: black; margin-right: 4px">
     {{licence?.name}}
   </span>
-</mat-toolbar>
+  </mat-toolbar>
 
-<div style="margin: 2rem">
-  @if (licenceDetails !== undefined) {
-    <mat-card>
-      <mat-card-header>
-        <mat-card-title>Licence Text</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <p [innerHTML]="licenceDetails.licenseTextHtml"></p>
-      </mat-card-content>
-    </mat-card>
-
-    <div class="row">
+  <div style="margin: 2rem">
+    @if (licenceDetails !== undefined) {
       <mat-card>
         <mat-card-header>
-          <mat-card-title>
-            Deprecated
-            @if (licenceDetails.isDeprecatedLicenseId) {
-              <span style="color: red; font-weight: bold">&#10004;</span>
-            } @else {
-              <span style="color: green; font-weight: bold">&#10006;</span>
-            }
-          </mat-card-title>
+          <mat-card-title>Licence Text</mat-card-title>
         </mat-card-header>
-        <mat-card-content></mat-card-content>
-      </mat-card>
-      <mat-card>
-        <mat-card-header>
-          <mat-card-title>
-            OSI approved
-            @if (licenceDetails.isOsiApproved) {
-              <span style="color: green; font-weight: bold">&#10004;</span>
-            } @else {
-              <span style="color: red; font-weight: bold">&#10006;</span>
-            }
-          </mat-card-title>
-        </mat-card-header>
-        <mat-card-content></mat-card-content>
-      </mat-card>
-      <mat-card>
-        <mat-card-header>
-          <mat-card-title>
-            Custom
-            @if (licence?.custom) {
-              <span style="color: black; font-weight: bold">&#10004;</span>
-            } @else {
-              <span style="color: black; font-weight: bold">&#10006;</span>
-            }
-          </mat-card-title>
-        </mat-card-header>
-        <mat-card-content></mat-card-content>
-      </mat-card>
-    </div>
-
-    <mat-card>
-      <mat-card-header>
-        <mat-card-title>See also</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        @for (url of licenceDetails.seeAlso; track url) {
-          <button mat-button style="background-color: #252B36; color: white; margin-right: 8px" (click)="navigateToUrl(url)">
-            <mat-icon>link</mat-icon>
-            {{ extractDomain(url) }}
-          </button>
-        } @empty {
-          <li>There are no items.</li>
-        }
-      </mat-card-content>
-    </mat-card>
-
-    @if (dependencies.length > 0) {
-      <mat-card>
-        <mat-card-header>
-          <mat-card-title>
-            Dependencies using this licence
-          </mat-card-title>
-        </mat-card-header>
-        <mat-card-content style="margin-top: 16px">
-          <app-dependencies-table [dependencies]="dependencies"></app-dependencies-table>
+        <mat-card-content>
+          <p [innerHTML]="licenceDetails.licenseTextHtml"></p>
         </mat-card-content>
       </mat-card>
+
+      <div class="row">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>
+              Deprecated
+              @if (licenceDetails.isDeprecatedLicenseId) {
+                <span style="color: red; font-weight: bold">&#10004;</span>
+              } @else {
+                <span style="color: green; font-weight: bold">&#10006;</span>
+              }
+            </mat-card-title>
+          </mat-card-header>
+          <mat-card-content></mat-card-content>
+        </mat-card>
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>
+              OSI approved
+              @if (licenceDetails.isOsiApproved) {
+                <span style="color: green; font-weight: bold">&#10004;</span>
+              } @else {
+                <span style="color: red; font-weight: bold">&#10006;</span>
+              }
+            </mat-card-title>
+          </mat-card-header>
+          <mat-card-content></mat-card-content>
+        </mat-card>
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>
+              Custom
+              @if (licence?.custom) {
+                <span style="color: black; font-weight: bold">&#10004;</span>
+              } @else {
+                <span style="color: black; font-weight: bold">&#10006;</span>
+              }
+            </mat-card-title>
+          </mat-card-header>
+          <mat-card-content></mat-card-content>
+        </mat-card>
+      </div>
+
+      <mat-card>
+        <mat-card-header>
+          <mat-card-title>See also</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          @for (url of licenceDetails.seeAlso; track url) {
+            <button mat-button style="background-color: #252B36; color: white; margin-right: 8px" (click)="navigateToUrl(url)">
+              <mat-icon>link</mat-icon>
+              {{ extractDomain(url) }}
+            </button>
+          } @empty {
+            <li>There are no items.</li>
+          }
+        </mat-card-content>
+      </mat-card>
+
+      @if (dependencies.length > 0) {
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>
+              Dependencies using this licence
+            </mat-card-title>
+          </mat-card-header>
+          <mat-card-content style="margin-top: 16px">
+            <app-dependencies-table [dependencies]="dependencies"></app-dependencies-table>
+          </mat-card-content>
+        </mat-card>
+      }
     }
-  }
+  </div>
+
 </div>

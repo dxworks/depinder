@@ -1,74 +1,74 @@
-<mat-toolbar>
-  <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
-    <mat-icon>menu</mat-icon>
-  </button>
-  <span style="color: black; margin-right: 4px">
+<div class="app-container">
+  <mat-toolbar>
+    <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
+      <mat-icon>menu</mat-icon>
+    </button>
+    <span style="color: black; margin-right: 4px">
     Licence
-  </span>
-  <span [ngStyle]="{'color': 'grey'}">
+    </span>
+    <span [ngStyle]="{'color': 'grey'}">
     ({{dataSource.data.length}})
-  </span>
-</mat-toolbar>
+    </span>
+  </mat-toolbar>
 
-<div style="padding: 2rem">
-  <div class="mat-elevation-z8" style="width: 100%; display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
-    <div style="display: flex; align-items: center;">
-      <mat-form-field subscriptSizing="dynamic" appearance="fill">
-        <mat-label>
-          <mat-icon>search</mat-icon>Search
-        </mat-label>
-        <input matInput (keyup)="applyFilter($event)" #input>
-      </mat-form-field>
+  <div style="padding: 2rem">
+    <div class="mat-elevation-z8" style="width: 100%; display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center;">
+        <mat-form-field subscriptSizing="dynamic" appearance="fill">
+          <mat-label>
+            <mat-icon>search</mat-icon>Search
+          </mat-label>
+          <input matInput (keyup)="applyFilter($event)" #input>
+        </mat-form-field>
 
-      <h3 style="margin-left: 20px; margin-bottom: 0">
-        {{dataSource.filteredData.length}}
-      </h3>
+        <h3 style="margin-left: 20px; margin-bottom: 0">
+          {{dataSource.filteredData.length}}
+        </h3>
 
-      <h3 style="color: grey; margin-left: 4px; margin-bottom: 0">
-        licences
-      </h3>
-    </div>
+        <h3 style="color: grey; margin-left: 4px; margin-bottom: 0">
+          licences
+        </h3>
+      </div>
       <button mat-button (click)="newLicence()">
         <mat-icon>add</mat-icon> Add new licence
       </button>
-  </div>
+    </div>
 
-  <table mat-table matSort [dataSource]="dataSource" class="mat-elevation-z8">
-    <ng-container matColumnDef="_id">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header> ID </th>
-      <td mat-cell *matCellDef="let element"> {{element._id}} </td>
-    </ng-container>
+    <table mat-table matSort [dataSource]="dataSource" class="mat-elevation-z8">
+      <ng-container matColumnDef="_id">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> ID </th>
+        <td mat-cell *matCellDef="let element"> {{element._id}} </td>
+      </ng-container>
 
-    <ng-container matColumnDef="name">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
-      <td mat-cell *matCellDef="let element"> {{element.name}} </td>
-    </ng-container>
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
+        <td mat-cell *matCellDef="let element"> {{element.name}} </td>
+      </ng-container>
 
-    <ng-container matColumnDef="isDeprecatedLicenseId">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header> Deprecated </th>
-      <td mat-cell *matCellDef="let element"> {{element.isDeprecatedLicenseId ? 'Yes' : 'No'}} </td>
-    </ng-container>
+      <ng-container matColumnDef="isDeprecatedLicenseId">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Deprecated </th>
+        <td mat-cell *matCellDef="let element"> {{element.isDeprecatedLicenseId ? 'Yes' : 'No'}} </td>
+      </ng-container>
 
-    <ng-container matColumnDef="isOsiApproved">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header> OSI Approved </th>
-      <td mat-cell *matCellDef="let element"> {{element.isOsiApproved ? 'Yes' : 'No'}} </td>
-    </ng-container>
+      <ng-container matColumnDef="isOsiApproved">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> OSI Approved </th>
+        <td mat-cell *matCellDef="let element"> {{element.isOsiApproved ? 'Yes' : 'No'}} </td>
+      </ng-container>
 
-    <ng-container matColumnDef="other_ids">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header> Other IDs </th>
-      <td mat-cell *matCellDef="let element"> {{element.other_ids.join(', ')}} </td>
-    </ng-container>
+      <ng-container matColumnDef="other_ids">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Other IDs </th>
+        <td mat-cell *matCellDef="let element"> {{element.other_ids.join(', ')}} </td>
+      </ng-container>
 
-    <ng-container matColumnDef="custom">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header> Is custom </th>
-      <td mat-cell *matCellDef="let element"> {{element.custom ? 'Yes' : 'No'}} </td>
-    </ng-container>
+      <ng-container matColumnDef="custom">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header> Is custom </th>
+        <td mat-cell *matCellDef="let element"> {{element.custom ? 'Yes' : 'No'}} </td>
+      </ng-container>
 
-    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr mat-row *matRowDef="let row; columns: displayedColumns;" (click)="navigateToLicence(row._id)"></tr>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" (click)="navigateToLicence(row._id)"></tr>
     </table>
 
-  <mat-paginator [pageSizeOptions]="[10, 20, 50]"
-                   aria-label="Select page of periodic elements">
-  </mat-paginator>
+    <mat-paginator [pageSizeOptions]="[10, 20, 50]" aria-label="Select page of periodic elements"></mat-paginator>
+  </div>
 </div>

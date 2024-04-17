@@ -18,7 +18,6 @@ export interface TableElement {
   isCustom?: boolean;
   licenceInfo?: any,
   suggestedLicences?: SuggestedLicence[] | null;
-  // symbol: string;
 }
 
 @Component({

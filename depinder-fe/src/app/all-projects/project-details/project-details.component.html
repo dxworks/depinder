@@ -1,10 +1,22 @@
-<ng-container *ngIf="project">
-  <div style="display: flex; flex-direction: column">
-    <h1 style="text-align: center;">{{project.name}}</h1>
-    <h3 style="text-align: center;">{{project.projectPath}}</h3>
-  </div>
+<div class="app-container">
+  <mat-toolbar>
+    <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
+      <mat-icon>menu</mat-icon>
+    </button>
+    <span style="color: black; margin-right: 4px">
+    {{ project.name ?? projectId}}
+  </span>
+  </mat-toolbar>
 
-  <app-dependencies
-    [allDependencies]="project.dependencies"
-  ></app-dependencies>
-</ng-container>
+
+  <div style="padding: 2rem">
+    @defer {
+      <ng-container *ngIf="project">
+        <h3>{{project.projectPath}}</h3>
+        <app-dependencies
+          [allDependencies]="project.dependencies"
+        ></app-dependencies>
+      </ng-container>
+    }
+  </div>
+</div>

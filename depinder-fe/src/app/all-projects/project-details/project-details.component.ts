@@ -2,6 +2,7 @@ import {Component, OnInit} from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { ProjectsService } from "../../common/services/projects.service";
 import {Dependency, Project } from '@core/project';
+import {ToolbarService} from "../../common/services/toolbar.service";
 
 @Component({
   selector: 'app-project-details',
@@ -14,7 +15,7 @@ export class ProjectDetailsComponent implements OnInit {
   dependencies: Dependency[] = [];
   value? : string;
 
-  constructor(private projectsService: ProjectsService, private route: ActivatedRoute) {
+  constructor(private projectsService: ProjectsService, private route: ActivatedRoute, protected toolbarService: ToolbarService) {
   }
 
   ngOnInit(): void {
