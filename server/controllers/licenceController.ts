@@ -40,64 +40,6 @@ export const newLicense = async (_req: Request, res: Response): Promise<any> => 
     }
 }
 
-export const addAll = async (_req: Request, res: Response): Promise<any> => {
-    mongoCacheLicense.load()
-
-    for (const license of _req.body.licenses) {
-        let githubData = undefined
-
-        try {
-            let existingData = await mongoCacheLicense.get?.(license.licenseId)
-            if (await mongoCacheLicense.has?.(license.licenseId)) {
-                console.log(`License ${license.licenseId} already exists`)
-            }
-
-            try {
-                const response = await axios.get(`https://api.github.com/licenses/${license.licenseId.toLowerCase()}`, {
-                    headers: {
-                        'Authorization': `token ${process.env.GH_TOKEN}`,
-                        'X-GitHub-Api-Version': '2022-11-28'
-                    }
-                });
-
-                if (response.status !== 200) {
-                    console.error(`Error ${license.licenseId}: ${response.status}`)
-                    continue
-                }
-                else {
-                    let permissions = response.data['permissions'] as string[]
-                    let conditions = response.data['conditions'] as string[]
-                    let limitations = response.data['limitations'] as string[]
-
-                    githubData = {
-                        permissions: permissions,
-                        conditions: conditions,
-                        limitations: limitations
-                    }
-
-                    console.log(`License ${license.licenseId} added with GitHub data ${JSON.stringify(githubData)} `)
-                }
-
-                mongoCacheLicense.set?.(license.licenseId, {
-                    ...license,
-                    custom: existingData.custom ?? false,
-                    _id: license.licenseId,
-                    other_ids: existingData.other_ids ?? [],
-                    ...githubData
-                })
-            }
-            catch (e) {
-                console.error(`Error: ${e}`)
-            }
-        }
-        catch (e) {
-            console.error(`Error: ${e}`)
-        }
-    }
-
-    res.status(200).json({ message: 'All licenses added' })
-}
-
 export const getLicenseById = async (_req: Request, res: Response): Promise<any> => {
     try {
         const id = _req.params.id
@@ -245,7 +187,6 @@ export const patchLicense = async (_req: Request, res: Response): Promise<any> =
 }
 
 const convertBody = (_req: Request) => {
-    const id = _req.body._id
     const reference = _req.body.reference
     const isDeprecatedLicenseId = _req.body.isDeprecatedLicenseId
     const detailsUrl = _req.body.detailsUrl
@@ -266,5 +207,73 @@ const convertBody = (_req: Request) => {
         isOsiApproved: isOsiApproved,
         other_ids: otherIds,
         custom: custom,
+    }
+}
+
+const axiosInstance = axios.create({
+    baseURL: 'https://api.github.com',
+    headers: {
+        'Authorization': `token ${process.env.GH_TOKEN}`,
+        'X-GitHub-Api-Version': '2022-11-28'
+    }
+});
+
+export const updateFromSpdx = async (_req: Request, res: Response): Promise<Response> => {
+    try {
+        mongoCacheLicense.load();
+
+        const spdxContent = await fetchSpdxContent();
+        const licenses = JSON.parse(Buffer.from(spdxContent, 'base64').toString());
+
+        await updateLicenses(licenses['licenses']);
+
+        return res.status(200).json({ message: 'All licenses updated successfully' });
+    } catch (error) {
+        console.error('Failed to update licenses:', error);
+        return res.status(500).json({ message: 'Failed to update licenses', error: error });
+    }
+};
+
+async function fetchSpdxContent(): Promise<string> {
+    const response = await axiosInstance.get('/repos/spdx/license-list-data/contents/json/licenses.json');
+    return response.data.content;
+}
+
+async function updateLicenses(licenses: any[]): Promise<void> {
+    for (const license of licenses) {
+        const existingData = await mongoCacheLicense.get?.(license.licenseId);
+        if (await mongoCacheLicense.has?.(license.licenseId)) {
+            console.log(`License ${license.licenseId} already exists.`);
+        } else {
+            const githubData = await fetchGithubLicenseData(license.licenseId);
+            if (githubData) {
+                mongoCacheLicense.set?.(license.licenseId, {
+                    ...license,
+                    ...githubData,
+                    custom: existingData !== null && existingData?.custom,
+                    _id: license.licenseId,
+                    other_ids: existingData !== null && existingData?.other_ids ? existingData.other_ids : []
+                });
+                console.log(`License ${license.licenseId} updated with GitHub data.`);
+            }
+        }
+    }
+}
+
+async function fetchGithubLicenseData(licenseId: string): Promise<any> {
+    try {
+        const response = await axios.get(`https://api.github.com/licenses/${licenseId.toLowerCase()}`);
+
+        if (response.status === 200) {
+            return {
+                permissions: response.data.permissions,
+                conditions: response.data.conditions,
+                limitations: response.data.limitations
+            };
+        } else {
+            console.error(`Error fetching ${licenseId}: ${response.status}`);
+        }
+    } catch (error) {
+        console.error(`Error fetching GitHub data for ${licenseId}:`, error);
     }
 }
