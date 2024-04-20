@@ -32,56 +32,8 @@
 
     <ng-container matColumnDef="expandedDetail">
       <td mat-cell *matCellDef="let element" [attr.colspan]="tableColumns.length">
-        <div class="example-element-detail"
-             [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
-          <h2>{{element.name}}&#64;{{element.version}}</h2>
-          <div mat-subheader>Requested by</div>
-
-          <ul>
-            @if (!element.seeAllRequestedBy) {
-              <li>{{element.requestedBy.slice(0, 5).join(', ')}}</li>
-              @if (element.requestedBy.length > 5) {
-                <p (click)="seeAllRequestedBy(element)">see {{ element.requestedBy.length - 5 }} more</p>
-              }
-            }
-            @else {
-              <li>{{element.requestedBy.join(', ')}}</li>
-              <p (click)="seeAllRequestedBy(element)">see less</p>
-            }
-          </ul>
-
-
-          <div mat-subheader>Detailed paths</div>
-
-          <ul>
-            @if (element.seeAllIntroducedThrough) {
-              @for (introducedThrough of element.introducedThrough; track $index) {
-                <li>{{ introducedThrough.join(' > ') }}</li>
-              }
-              <p (click)="seeAllIntroducedThrough(element)">see less</p>
-            }
-            @else {
-              @for (introducedThrough of element.introducedThrough.slice(0, 5); track $index) {
-                <li>{{ introducedThrough.join(' > ') }}</li>
-              }
-              @if (element.introducedThrough.length > 5) {
-                <p (click)="seeAllIntroducedThrough(element)">see {{element.introducedThrough.length - 5}} more</p>
-              }
-            }
-          </ul>
-
-          <div mat-subheader>Vulnerabilities</div>
-          <mat-list>
-            @for (vulnerability of element.vulnerabilities; track $index) {
-              <mat-list-item>
-                <mat-icon matListItemIcon matTooltip="Go to {{extractDomain(vulnerability.permalink)}}" (click)="navigateToUrl(vulnerability.permalink)">open_in_new</mat-icon>
-                <span matListItemTitle>{{ vulnerability.summary ?? vulnerability.description }}</span>
-                <span matListItemLine>Severity: {{vulnerability.severity}}</span>
-                <span matListItemLine>Vulnerability range: {{vulnerability.vulnerableRange}}</span>
-              </mat-list-item>
-            }
-          </mat-list>
-
+        <div class="example-element-detail" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+          <app-vulnerable-library-details [element]="element"></app-vulnerable-library-details>
         </div>
       </td>
     </ng-container>
@@ -98,5 +50,4 @@
                  showFirstLastButtons
                  aria-label="Select page of periodic elements">
   </mat-paginator>
-
 }

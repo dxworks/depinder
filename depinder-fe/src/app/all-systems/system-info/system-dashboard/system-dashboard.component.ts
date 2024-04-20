@@ -79,7 +79,7 @@ export class SystemDashboardComponent implements OnChanges {
     let libraries = new Map<string, LibraryInfo>();
 
     let observables = this.dependencies.map(dependency => this.libraryService.find(dependency._id).pipe(
-      delay(3)
+      delay(1)
     ));
 
     return from(observables).pipe(

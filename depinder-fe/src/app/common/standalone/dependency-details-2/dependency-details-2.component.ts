@@ -61,6 +61,8 @@ export class DependencyDetails2Component implements OnInit {
         return 'https://www.nuget.org/packages/' + this.id.split(':')[1];
       case 'php':
         return 'https://packagist.org/packages/' + this.id.split(':')[1];
+      case 'java':
+        return 'https://central.sonatype.com/artifact/' + this.id.split(':')[1] + '/' + this.id.split(':')[2];
       default :
         return undefined;
     }

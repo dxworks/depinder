@@ -1,0 +1,102 @@
+<div class="flex-container">
+  <div class="first-column">
+    <div>
+      <h2>{{element.name}}&#64;{{element.version}}</h2>
+      <div mat-subheader>Requested by projects:</div>
+
+      <ul>
+        <li>{{element.requestedByProjects.join(', ')}}</li>
+      </ul>
+
+<!--      <ul>-->
+<!--        @if (!element.seeAllRequestedBy) {-->
+<!--          <li>{{element.requestedBy.slice(0, 5).join(', ')}}</li>-->
+<!--          @if (element.requestedBy.length > 5) {-->
+<!--            <p (click)="seeAllRequestedBy(element)">see {{ element.requestedBy.length - 5 }} more</p>-->
+<!--          }-->
+<!--        }-->
+<!--        @else {-->
+<!--          <li>{{element.requestedBy.join(', ')}}</li>-->
+<!--          <p (click)="seeAllRequestedBy(element)">see less</p>-->
+<!--        }-->
+<!--      </ul>-->
+
+      <div mat-subheader>Detailed paths</div>
+
+      <ul>
+        @if (element.seeAllIntroducedThrough) {
+          @for (introducedThrough of element.introducedThrough; track $index) {
+            <li>{{ introducedThrough.join(' > ') }}</li>
+          }
+          <p (click)="seeAllIntroducedThrough(element)">see less</p>
+        }
+        @else {
+          @for (introducedThrough of element.introducedThrough!.slice(0, 5); track $index) {
+            <li>{{ introducedThrough.join(' > ') }}</li>
+          }
+          @if (element.introducedThrough!.length > 5) {
+            <p (click)="seeAllIntroducedThrough(element)">see {{element.introducedThrough!.length - 5}} more</p>
+          }
+        }
+      </ul>
+
+      <div mat-subheader>Vulnerabilities</div>
+      <mat-list>
+        @for (vulnerability of element.vulnerabilities; track $index) {
+          <mat-list-item>
+            <mat-icon matListItemIcon matTooltip="Go to {{extractDomain(vulnerability.permalink)}}" (click)="navigateToUrl(vulnerability.permalink)">open_in_new</mat-icon>
+            <span matListItemTitle>{{vulnerability.summary ?? vulnerability.description}}</span>
+            <span matListItemLine>Severity: {{vulnerability.severity}}</span>
+            <span matListItemLine>{{vulnerability.vulnerableRange}}</span>
+          </mat-list-item>
+        }
+      </mat-list>
+    </div>
+  </div>
+  @if (element.patchVersion !== undefined || element.minorVersion !== undefined) {
+    <div class="second-column">
+      <mat-card>
+        <mat-card-title>Best Update Version: {{element.suggestedVersion}}</mat-card-title>
+        <mat-card-content></mat-card-content>
+      </mat-card>
+
+      @if (element.patchVersion !== undefined) {
+        <mat-card>
+          <mat-card-title>Patch Update Version: {{element.patchVersion}}</mat-card-title>
+          <mat-card-content>
+            <mat-list>
+              @for (vulnerability of getVulnerabilities(element.patchVersion); track $index) {
+                <mat-list-item>
+                  <mat-icon matListItemIcon matTooltip="Go to {{extractDomain(vulnerability.permalink)}}" (click)="navigateToUrl(vulnerability.permalink)">open_in_new</mat-icon>
+                  <span matListItemTitle>{{ vulnerability.summary ?? vulnerability.description }}
+                    <p matListItemLine>Severity: {{vulnerability.severity}}</p>
+                  </span>
+                  <span matListItemMeta>{{vulnerability.vulnerableRange}}</span>
+                </mat-list-item>
+              }
+            </mat-list>
+          </mat-card-content>
+        </mat-card>
+      }
+
+      @if (element.minorVersion !== undefined) {
+        <mat-card>
+          <mat-card-title>Minor Update Version: {{element.minorVersion}}</mat-card-title>
+          <mat-card-content>
+            <mat-list>
+              @for (vulnerability of getVulnerabilities(element.minorVersion); track $index) {
+                <mat-list-item>
+                  <mat-icon matListItemIcon matTooltip="Go to {{extractDomain(vulnerability.permalink)}}" (click)="navigateToUrl(vulnerability.permalink)">open_in_new</mat-icon>
+                  <span matListItemTitle>{{ vulnerability.summary ?? vulnerability.description }}
+                    <p matListItemLine>Severity: {{vulnerability.severity}}</p>
+                  </span>
+                  <span matListItemMeta>{{vulnerability.vulnerableRange}}</span>
+                </mat-list-item>
+              }
+            </mat-list>
+          </mat-card-content>
+        </mat-card>
+      }
+    </div>
+  }
+</div>

@@ -1,7 +1,7 @@
 import {AfterViewInit, Component, Input, OnChanges, SimpleChanges, ViewChild} from '@angular/core';
-import { CommonModule } from '@angular/common';
+import {CommonModule} from '@angular/common';
 import * as semver from 'semver';
-import { SemVer, gt, parse, inc, rcompare } from 'semver';
+import {parse} from 'semver';
 import {Dependency, Project} from "@core/project";
 import {LibraryInfo, LibraryVersion} from "@core/library";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
@@ -12,26 +12,36 @@ import {animate, state, style, transition, trigger} from "@angular/animations";
 import {MatListModule} from "@angular/material/list";
 import {MatPaginator, MatPaginatorModule} from "@angular/material/paginator";
 import {MatTooltipModule} from "@angular/material/tooltip";
-import {extractDomain, navigateToUrl} from "../../../../common/utils";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
+import {MatGridListModule} from "@angular/material/grid-list";
+import {MatCardModule} from "@angular/material/card";
+import {VulnerableLibraryDetailsComponent} from "./vulnerable-library-details/vulnerable-library-details.component";
+import {Severity} from "@core/constants";
 
-interface VulnerableLibrary {
+export interface VulnerableLibrary {
   name: string;
+  library: LibraryInfo;
   version: string;
+  allVulnerabilities: Vulnerability[];
   vulnerabilities: Vulnerability[];
-  suggestedVersion?: string;
   upgradeType?: string;
   introducedThrough?: string[][];
   seeAllIntroducedThrough: boolean;
   seeAllRequestedBy: boolean;
   requestedBy: string[];
+  requestedByProjects: string[];
   dependencyType: string;
+
+  suggestedVersion?: string;
+  patchVersion?: string;
+  minorVersion?: string;
+  majorVersion?: string;
 }
 
 @Component({
   selector: 'app-vulnerable-library-versions',
   standalone: true,
-  imports: [CommonModule, MatTableModule, MatButtonModule, MatIconModule, MatListModule, MatPaginatorModule, MatTooltipModule, MatProgressSpinnerModule],
+  imports: [CommonModule, MatTableModule, MatButtonModule, MatIconModule, MatListModule, MatPaginatorModule, MatTooltipModule, MatProgressSpinnerModule, MatGridListModule, MatCardModule, VulnerableLibraryDetailsComponent],
   templateUrl: './vulnerable-library-versions.component.html',
   styleUrl: './vulnerable-library-versions.component.css',
   animations: [
@@ -140,18 +150,37 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
 
   createNewData(data: VulnerableLibrary[], dependency: Dependency, library: LibraryInfo | undefined, vulnerabilities: Vulnerability[], introducedThrough: string[][]) {
     const suggestedVersion = this.determineUpgradeVersion(library?.vulnerabilities || [], dependency.version, library?.versions || []);
-    data.push({
+
+    library!.versions = library?.versions.sort((a, b) => semver.compare(a.version, b.version)) ?? [];
+
+    const patchVersion = this.determinePatchUpgradeVersion(library?.vulnerabilities ?? [], dependency.version, library?.versions || []);
+    const minorVersion = this.determineMinorUpgradeVersion(library?.vulnerabilities ?? [], dependency.version, library?.versions || []);
+    const requestedByProjects = Array.from(new Set<string>(introducedThrough.map(path => path[0])));
+    console.log('dependency', dependency.name, 'requestedByProjects', requestedByProjects);
+
+    const vulnerableLibrary: VulnerableLibrary = {
       name: library?.name || 'Unknown',
+      library: library!,
       version: dependency.version,
       vulnerabilities: vulnerabilities,
-      suggestedVersion: suggestedVersion,
+      allVulnerabilities: library?.vulnerabilities || [],
       introducedThrough: introducedThrough,
+      requestedByProjects: requestedByProjects,
       seeAllIntroducedThrough: false,
       seeAllRequestedBy: false,
       requestedBy: dependency.requestedBy,
       upgradeType: this.determineUpgradeType(dependency.version, suggestedVersion),
       dependencyType: dependency.directDep ? 'Direct' : 'Transitive',
-    });
+      suggestedVersion: suggestedVersion,
+      patchVersion: patchVersion ? (semver.gte(patchVersion, suggestedVersion) ? undefined : patchVersion) : undefined,
+      minorVersion: minorVersion ? (semver.gte(minorVersion, suggestedVersion) ? undefined : minorVersion) : undefined
+    };
+
+    data.push(vulnerableLibrary);
+
+    if (vulnerableLibrary.minorVersion !== undefined || vulnerableLibrary.patchVersion !== undefined) {
+      console.log('dependency', dependency.name, 'minorVersion', minorVersion, 'patchVersion', patchVersion, 'suggestedVersion', suggestedVersion);
+    }
   }
 
   sortAndSetData(data: VulnerableLibrary[]) {
@@ -164,59 +193,96 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
     this.tableData = new MatTableDataSource(data);
   }
 
-  parseVulnerableRange(rangeStr: string): Array<{ operator: string; version: string }> {
-    return rangeStr.split(',').map(part => {
-      const match = part.trim().match(/(>=|<=|>|<|=)\s*(\d+\.\d+\.\d+)/);
-      if (!match) throw new Error(`Invalid version range part: ${part}`);
-      return { operator: match[1], version: match[2] };
-    });
-  }
-
   determineUpgradeVersion(vulnerabilities: Vulnerability[], currentVersionStr: string, versions: LibraryVersion[]): string {
     let currentVersion = parse(currentVersionStr);
     if (!currentVersion) throw new Error(`Invalid current version: ${currentVersionStr}`);
 
     let upgradeVersion = currentVersion;
-    vulnerabilities.forEach(vuln => {
-      try {
-        const constraints = this.parseVulnerableRange(vuln.vulnerableRange!);
-        constraints.forEach(({ operator, version: versionStr }) => {
-          let version = parse(versionStr);
-          if (!version) {
-            console.warn(`Invalid vulnerable version: ${versionStr}`);
-            return;
-          }
 
-          if ((operator === '<' && rcompare(currentVersion!, version) >= 0) ||
-            (operator === '<=' && rcompare(currentVersion!, version) > 0)) {
-            const nextVersion = inc(version, 'patch');
-            if (nextVersion && gt(parse(nextVersion)!, upgradeVersion)) {
-              upgradeVersion = parse(nextVersion) as SemVer;
-            }
-          }
-        });
-      }
-      catch (e) {
-        console.warn('Error determining upgrade version:', e);
-      }
+    let checkedVersions=  versions.filter(libVer => {
+      return semver.gt(libVer.version!, currentVersion!, false);
     });
 
-    if (upgradeVersion === currentVersion || !gt(upgradeVersion, currentVersion)) {
-      upgradeVersion = parse(inc(currentVersion, 'patch')) as SemVer;
-    }
+    for (let version of checkedVersions.sort((a, b) => semver.compare(a.version!, b.version))) {
+      let vulnerabilities1 = vulnerabilities.filter(vulnerability =>
+        semver.satisfies(version.version, vulnerability.vulnerableRange!));
 
-    for (let version of versions) {
-      try {
-        if (rcompare(upgradeVersion.version, version.version) >= 0) {
-          upgradeVersion = parse(version.version)!;
-          break;
-        }
-      } catch (e) {
-        console.warn('Error comparing versions:', upgradeVersion.version, version.version, e);
+      if (vulnerabilities1.length === 0) {
+        upgradeVersion = parse(version.version)!;
+        break;
       }
     }
 
     return upgradeVersion.version;
+  }
+
+  determinePatchUpgradeVersion(vulnerabilities: Vulnerability[], currentVersionStr: string, versions: LibraryVersion[]): string | undefined {
+    let currentVersion = parse(currentVersionStr);
+    if (!currentVersion) throw new Error(`Invalid current version: ${currentVersionStr}`);
+
+    let currentVersionVulnerabilities = vulnerabilities.filter(vulnerability => this.isVersionInRange(currentVersionStr, vulnerability.vulnerableRange!));
+    let upgradeVersion = currentVersion;
+
+    let checkedVersions=  versions.filter(libVer => {
+      return semver.gt(libVer.version!, currentVersion!) &&
+        semver.patch(libVer.version!) > semver.patch(currentVersion!) &&
+        semver.minor(libVer.version!) === semver.minor(currentVersion!) &&
+        semver.major(libVer.version!) === semver.major(currentVersion!);
+    }).sort((a, b) => semver.compare(a.version!, b.version));
+
+    for (let version of checkedVersions.sort((a, b) => semver.compare(a.version!, b.version))) {
+      let vulnerabilities1 = vulnerabilities.filter(vulnerability =>
+        semver.satisfies(version.version, vulnerability.vulnerableRange!));
+
+      if (this.compareVulnerabilities(currentVersionVulnerabilities, vulnerabilities1)) {
+        upgradeVersion = parse(version.version)!;
+        break;
+      }
+    }
+
+    if (currentVersion === upgradeVersion) return undefined;
+    return upgradeVersion.version;
+  }
+
+  determineMinorUpgradeVersion(vulnerabilities: Vulnerability[], currentVersionStr: string, versions: LibraryVersion[]): string | undefined {
+    let currentVersion = parse(currentVersionStr);
+    if (!currentVersion) throw new Error(`Invalid current version: ${currentVersionStr}`);
+
+    let currentVersionVulnerabilities = vulnerabilities.filter(vulnerability => this.isVersionInRange(currentVersionStr, vulnerability.vulnerableRange!));
+    let upgradeVersion = currentVersion;
+
+    let checkedVersions=  versions.filter(libVer => {
+      return semver.gt(libVer.version!, currentVersion!) &&
+        semver.minor(libVer.version!) > semver.minor(currentVersion!) &&
+        semver.major(libVer.version!) === semver.major(currentVersion!);
+    }).sort((a, b) => semver.compare(a.version!, b.version));
+
+    for (let version of checkedVersions.sort((a, b) => semver.compare(a.version!, b.version))) {
+      let vulnerabilities1 = vulnerabilities.filter(vulnerability =>
+        semver.satisfies(version.version, vulnerability.vulnerableRange!));
+
+      if (this.compareVulnerabilities(currentVersionVulnerabilities, vulnerabilities1)) {
+        upgradeVersion = parse(version.version)!;
+        break;
+      }
+    }
+
+    if (currentVersion === upgradeVersion) return undefined;
+    return upgradeVersion.version;
+  }
+
+  compareVulnerabilities(a: Vulnerability[], b: Vulnerability[]): boolean {
+    for (let severity of Object.values(Severity)) {
+      const aCount = a.filter(v => v.severity === severity).length;
+      const bCount = b.filter(v => v.severity === severity).length;
+      if (aCount < bCount) {
+        return false;
+      }
+      if (aCount > bCount) {
+        return true;
+      }
+    }
+    return false;
   }
 
   determineUpgradeType(currentVersionStr: string, newVersionStr: string): string {
@@ -270,49 +336,44 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
     return introducedThrough;
   }
 
-  seeAllIntroducedThrough(element: VulnerableLibrary) {
-    element.seeAllIntroducedThrough = !element.seeAllIntroducedThrough;
-  }
-
-  seeAllRequestedBy(element: VulnerableLibrary) {
-    element.seeAllRequestedBy = !element.seeAllRequestedBy;
-  }
-
   isVersionInRange(version: string, range: string): boolean {
-    const conditions = range.split(',').map((part) => part.trim());
-
-    return conditions.every((condition) => {
-      const match = condition.match(/(<=|>=|<|>|=)?\s*(.*)/);
-      if (!match) {
-        console.warn('Invalid version range condition:', condition);
-        return false;
-      }
-
-      const [, operator, versionRange] = match;
-
-      try {
-        switch (operator) {
-          case '<':
-            return semver.lt(version, versionRange);
-          case '<=':
-            return semver.lte(version, versionRange);
-          case '>':
-            return semver.gt(version, versionRange);
-          case '>=':
-            return semver.gte(version, versionRange);
-          case '=':
-          case undefined: // Handle the case where no operator is specified, assuming equality
-            return semver.eq(version, versionRange);
-          default:
-            console.warn('Unsupported operator:', operator);
-            return false;
-        }
-      }
-      catch (e) {
-        console.warn('Error comparing versions:', version, versionRange, e);
-        return false;
-      }
-    });
+    return semver.satisfies(version, range);
+    // const conditions = range.split(',').map((part) => part.trim());
+    //
+    // return conditions.every((condition) => {
+    //   const match = condition.match(/(<=|>=|<|>|=)?\s*(.*)/);
+    //   if (!match) {
+    //     console.warn('Invalid version range condition:', condition);
+    //     return false;
+    //   }
+    //
+    //   const [, operator, versionRange] = match;
+    //
+    //   semver.outside(version, versionRange, '<');
+    //
+    //   try {
+    //     switch (operator) {
+    //       case '<':
+    //         return semver.lt(version, versionRange);
+    //       case '<=':
+    //         return semver.lte(version, versionRange);
+    //       case '>':
+    //         return semver.gt(version, versionRange);
+    //       case '>=':
+    //         return semver.gte(version, versionRange);
+    //       case '=':
+    //       case undefined: // Handle the case where no operator is specified, assuming equality
+    //         return semver.eq(version, versionRange);
+    //       default:
+    //         console.warn('Unsupported operator:', operator);
+    //         return false;
+    //     }
+    //   }
+    //   catch (e) {
+    //     console.warn('Error comparing versions:', version, versionRange, e);
+    //     return false;
+    //   }
+    // });
   }
 
   getVulnerabilitySeverity(vulnerabilities: Vulnerability[]): string {
@@ -341,7 +402,4 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
 
     return severity;
   }
-
-  protected readonly navigateToUrl = navigateToUrl;
-  protected readonly extractDomain = extractDomain;
 }

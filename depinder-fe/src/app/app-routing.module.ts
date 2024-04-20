@@ -26,7 +26,7 @@ const routes: Routes = [
   { path: 'licences/edit', component: AddLicenceComponent, data: {editMode: true}},
   { path: 'licences/:id', component: LicenceInfoComponent},
   { path: 'licences', component: LicencesComponent},
-  { path: '**', component: AllProjectsComponent }
+  { path: '**', redirectTo: 'systems'}
   // { path: '**', component: AppComponent }
 ];
 

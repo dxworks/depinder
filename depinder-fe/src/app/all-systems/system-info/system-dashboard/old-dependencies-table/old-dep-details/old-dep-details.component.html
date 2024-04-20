@@ -1,0 +1,46 @@
+<div>
+  <h3>Projects using this library</h3>
+  <ul>
+    @for (dep of dependency.projects; track $index) {
+      <li>{{dep.projectId}} using version{{dep.dependencyVersions.size > 1 ? 's' : ''}} {{getVersions(dep.dependencyVersions)}}</li>
+    }
+  </ul>
+
+  @if (dependency.directDep.length > 0) {
+    <h3>Direct Deps</h3>
+    <ul>
+      @if (!showAllDirectDependencies) {
+        @for (directDep of dependency.directDep.slice(0,4); track $index) {
+          <li>{{directDep.projectId}} using version{{directDep.dependencyVersions.size > 1 ? 's' : ''}} {{getVersions(directDep.dependencyVersions)}}</li>
+        }
+        @if (dependency.directDep.length > 4) {
+          <p (click)="showAllDirectDependencies = true">Show more</p>
+        }
+      } @else {
+        @for (directDep of dependency.directDep; track $index) {
+          <li>{{directDep.projectId}} using version{{directDep.dependencyVersions.size > 1 ? 's' : ''}} {{getVersions(directDep.dependencyVersions)}}</li>
+        }
+        <p (click)="showAllDirectDependencies = false">Show less</p>
+      }
+    </ul>
+  }
+
+  @if (dependency.indirectDep.length > 0) {
+    <h3>Indirect Deps</h3>
+    <ul>
+      @if (!showAllIndirectDependencies) {
+        @for (indirectDep of dependency.indirectDep.slice(0,5); track $index) {
+          <li>{{indirectDep.projectId}} using version{{indirectDep.dependencyVersions.size > 1 ? 's' : ''}} {{getVersions(indirectDep.dependencyVersions)}}</li>
+        }
+        @if (dependency.indirectDep.length > 5) {
+          <p (click)="showAllIndirectDependencies = true">Show more</p>
+        }
+      } @else {
+        @for (indirectDep of dependency.indirectDep; track $index) {
+          <li>{{indirectDep.projectId}} using version{{indirectDep.dependencyVersions.size > 1 ? 's' : ''}} {{getVersions(indirectDep.dependencyVersions)}}</li>
+        }
+        <p (click)="showAllIndirectDependencies = false">Show less</p>
+      }
+    </ul>
+  }
+</div>
