@@ -45,6 +45,10 @@ export class LicencesService {
     return this.http.get(url, { observe: 'response' });
   }
 
+  refreshAll() {
+    return this.http.post(`${this.getUrl()}/update`, { observe: 'response' });
+  }
+
   getUrl() {
     return `${BASE_URL}/${this.model}`;
   }

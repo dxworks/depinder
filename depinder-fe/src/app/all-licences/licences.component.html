@@ -3,12 +3,12 @@
     <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
       <mat-icon>menu</mat-icon>
     </button>
-    <span style="color: black; margin-right: 4px">
-    Licence
-    </span>
-    <span [ngStyle]="{'color': 'grey'}">
-    ({{dataSource.data.length}})
-    </span>
+    <span style="color: black; margin-right: 4px">Licence</span>
+    <span [ngStyle]="{'color': 'grey'}">({{dataSource.data.length}})</span>
+    <span style="flex: 1 1 auto"></span>
+    <button mat-icon-button (click)="refreshLicenses()">
+      <mat-icon>{{refreshIcon}}</mat-icon>
+    </button>
   </mat-toolbar>
 
   <div style="padding: 2rem">

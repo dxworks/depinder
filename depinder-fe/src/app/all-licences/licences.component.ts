@@ -12,6 +12,8 @@ import {MatInputModule} from "@angular/material/input";
 import {ToolbarService} from "../common/services/toolbar.service";
 import {MatToolbarModule} from "@angular/material/toolbar";
 import {MatSort, MatSortModule} from "@angular/material/sort";
+import {MatSnackBar} from "@angular/material/snack-bar";
+import {delay} from "rxjs";
 
 @Component({
   selector: 'app-all-licences',
@@ -27,13 +29,17 @@ export class LicencesComponent implements OnInit {
   dataSource: MatTableDataSource<Licence> = new MatTableDataSource<Licence>();
   displayedColumns: string[] = ['_id', 'name', 'isDeprecatedLicenseId', 'isOsiApproved', 'custom', 'other_ids'];
 
+  refreshIcon = 'refresh';
+
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
   constructor(private licenceService: LicencesService,
               private router: Router,
               protected toolbarService: ToolbarService,
-              private cdRef: ChangeDetectorRef) { }
+              private snackBar: MatSnackBar,
+              private changeDetectorRefs: ChangeDetectorRef)
+  { }
 
   ngOnInit() {
     if (this.licences) {
@@ -41,14 +47,22 @@ export class LicencesComponent implements OnInit {
       this.toolbarService.changeTitle(`Licences (${this.licences$.length})`);
       this.dataSource = new MatTableDataSource<Licence>(this.licences$);
     }
-    else this.licenceService.all().subscribe(
+    else {
+      this.getLicences();
+    }
+  }
+
+  getLicences() {
+    this.licenceService.all().subscribe(
       (res: any) => {
-        this.licences$ = res.body as Licence[];
+        this.licences$ = (res.body as Licence[]).sort((a, b) => a._id.localeCompare(b._id));
         this.toolbarService.changeTitle(`Licences (${this.licences$.length})`);
 
         this.dataSource = new MatTableDataSource<Licence>(this.licences$);
         this.dataSource.paginator = this.paginator;
         this.dataSource.sort = this.sort;
+
+        this.changeDetectorRefs.detectChanges();
       }
     )
   }
@@ -68,5 +82,21 @@ export class LicencesComponent implements OnInit {
     if (this.dataSource.paginator) {
       this.dataSource.paginator.firstPage();
     }
+  }
+
+  refreshLicenses(): void {
+    this.refreshIcon = 'sync';
+
+    this.licenceService.refreshAll().subscribe({
+      next: (res: any) => {
+        this.refreshIcon = 'done';
+        setTimeout(() => this.refreshIcon = 'refresh', 5000);
+        this.getLicences();
+      },
+      error: (error: any) => {
+        this.snackBar.open(`Error: ${error.message}`, 'Close', { duration: 5000 });
+        this.refreshIcon = 'refresh';
+      }
+    });
   }
 }
