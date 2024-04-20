@@ -97,7 +97,9 @@ const LicenseSchema = new Schema({
     seeAlso: [String],
     isOsiApproved: Boolean,
     other_ids: [String],
-    custom: Boolean,
+    permissions: [String],
+    conditions: [String],
+    limitations: [String],
 })
 
 export const LibraryInfoModel: Model<LibraryInfo> = mongoose.model<LibraryInfo>('LibraryInfo', LibraryInfoSchema)

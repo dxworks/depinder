@@ -8,6 +8,10 @@ export interface Licence {
     isOsiApproved?: boolean,
     other_ids?: string[],
     custom?: boolean,
+
+    permissions?: string[],
+    conditions?: string[],
+    limitations?: string[],
 }
 
 export interface SuggestedLicence {

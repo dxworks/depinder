@@ -7,3 +7,27 @@
 mat-card {
   margin: 8px;
 }
+
+.licence-rules {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 20px; /* Adds space between cards */
+
+  mat-card {
+    flex: 1 1 300px; /* Grow to fill space, don’t shrink, base width of 300px */
+    min-width: 300px; /* Minimum width of each card */
+    max-width: 100%; /* Optional: to ensure it does not grow beyond the screen width */
+  }
+
+  @media (max-width: 600px) { /* Adjust this breakpoint as needed */
+    .card-container {
+      flex-direction: column;
+    }
+
+    mat-card {
+      min-width: auto; /* Cards can shrink to fit smaller screens */
+      width: 100%; /* Take full width on small screens */
+    }
+  }
+}

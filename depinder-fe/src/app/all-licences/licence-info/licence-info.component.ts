@@ -12,11 +12,14 @@ import {DependenciesTableComponent} from "./dependencies-table/dependencies-tabl
 import {LibraryInfo} from "@core/library";
 import {extractDomain, navigateToUrl} from "../../common/utils";
 import {MatCardModule} from "@angular/material/card";
+import {LicenceRulesService} from "../../common/services/licence-rules.service";
+import {MatListModule} from "@angular/material/list";
+import {MatTooltipModule} from "@angular/material/tooltip";
 
 @Component({
   selector: 'app-licence-info',
   standalone: true,
-  imports: [CommonModule, MatButtonModule, MatIconModule, MatToolbarModule, DependenciesTableComponent, MatCardModule],
+  imports: [CommonModule, MatButtonModule, MatIconModule, MatToolbarModule, DependenciesTableComponent, MatCardModule, MatListModule, MatTooltipModule],
   templateUrl: './licence-info.component.html',
   styleUrl: './licence-info.component.css'
 })
@@ -29,7 +32,8 @@ export class LicenceInfoComponent implements OnInit{
   constructor(private route: ActivatedRoute,
               private licenceService: LicencesService,
               protected toolbarService: ToolbarService,
-              private libraryService: LibrariesService) { }
+              private libraryService: LibrariesService,
+              protected licenceRulesService: LicenceRulesService) { }
 
   ngOnInit(): void {
     this.route.params.subscribe(params => {

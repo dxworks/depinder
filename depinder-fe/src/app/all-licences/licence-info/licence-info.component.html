@@ -31,7 +31,6 @@
               }
             </mat-card-title>
           </mat-card-header>
-          <mat-card-content></mat-card-content>
         </mat-card>
         <mat-card>
           <mat-card-header>
@@ -59,23 +58,88 @@
           </mat-card-header>
           <mat-card-content></mat-card-content>
         </mat-card>
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>
+              See also
+              @for (url of licenceDetails.seeAlso; track url) {
+                <button mat-button style="color: #252B36; margin-right: 8px" (click)="navigateToUrl(url)">
+                  <mat-icon>link</mat-icon>
+                  {{ extractDomain(url) }}
+                </button>
+              } @empty {
+                <li>There are no items.</li>
+              }
+            </mat-card-title>
+          </mat-card-header>
+        </mat-card>
       </div>
 
-      <mat-card>
-        <mat-card-header>
-          <mat-card-title>See also</mat-card-title>
-        </mat-card-header>
-        <mat-card-content>
-          @for (url of licenceDetails.seeAlso; track url) {
-            <button mat-button style="background-color: #252B36; color: white; margin-right: 8px" (click)="navigateToUrl(url)">
-              <mat-icon>link</mat-icon>
-              {{ extractDomain(url) }}
-            </button>
-          } @empty {
-            <li>There are no items.</li>
-          }
-        </mat-card-content>
-      </mat-card>
+      <div class="licence-rules">
+        <mat-card style="flex: 1">
+          <mat-card-header>
+            <mat-card-title>Permissions</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <mat-list>
+              @for (condition of licence?.permissions ?? []; track condition) {
+                @if (licenceRulesService.getPermissionRuleById(condition); as rule) {
+                  <mat-list-item>
+                    <mat-icon matListItemIcon>verified</mat-icon>
+                    <div style="width: min-content" matListItemTitle matTooltip="{{rule.description}}" matTooltipPosition="right">{{ rule.label }}</div>
+                  </mat-list-item>
+                }
+              } @empty {
+                <mat-list-item>
+                  <h4 matListItemLine>There are no items.</h4>
+                </mat-list-item>
+              }
+            </mat-list>
+          </mat-card-content>
+        </mat-card>
+        <mat-card style="flex: 1">
+          <mat-card-header>
+            <mat-card-title>Conditions</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <mat-list>
+              @for (condition of licence?.conditions ?? []; track condition) {
+                @if (licenceRulesService.getConditionRuleById(condition); as rule) {
+                  <mat-list-item>
+                    <mat-icon matListItemIcon>warning</mat-icon>
+                    <div matListItemTitle style="width: min-content" matTooltip="{{rule.description}}" matTooltipPosition="right">{{ rule.label }}</div>
+                  </mat-list-item>
+                }
+              } @empty {
+                <mat-list-item>
+                  <h4 matListItemLine>There are no items.</h4>
+                </mat-list-item>
+              }
+            </mat-list>
+          </mat-card-content>
+        </mat-card>
+        <mat-card style="flex: 1">
+          <mat-card-header>
+            <mat-card-title>Limitations</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <mat-list>
+              @for (condition of licence?.limitations ?? []; track condition) {
+                @if (licenceRulesService.getLimitationRuleById(condition); as rule) {
+                  <mat-list-item>
+                    <mat-icon matListItemIcon>block</mat-icon>
+                    <div matListItemTitle style="width: min-content" matTooltip="{{rule.description}}" matTooltipPosition="right">{{ rule.label }}</div>
+                  </mat-list-item>
+                }
+              } @empty {
+                <mat-list-item>
+                  <h4 matListItemLine>There are no items.</h4>
+                </mat-list-item>
+              }
+            </mat-list>
+          </mat-card-content>
+        </mat-card>
+      </div>
 
       @if (dependencies.length > 0) {
         <mat-card>

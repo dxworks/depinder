@@ -1,6 +1,7 @@
 import {Request, Response} from 'express'
 import {mongoCacheLibrary, mongoCacheLicense, mongoCacheProject} from '../../src/cache/mongo-cache'
 import stringSimilarity from 'string-similarity'
+import axios from 'axios';
 
 export const all = async (_req: Request, res: Response): Promise<any> => {
     try {
@@ -43,18 +44,51 @@ export const addAll = async (_req: Request, res: Response): Promise<any> => {
     mongoCacheLicense.load()
 
     for (const license of _req.body.licenses) {
+        let githubData = undefined
+
         try {
+            let existingData = await mongoCacheLicense.get?.(license.licenseId)
             if (await mongoCacheLicense.has?.(license.licenseId)) {
-                // res.status(400).json({ message: 'License already exists' })
-                console.log('License already exists')
-                return
+                console.log(`License ${license.licenseId} already exists`)
             }
 
-            mongoCacheLicense.set?.(license.licenseId, {
-                ...license,
-                custom: false,
-                _id: license.licenseId,
-            })
+            try {
+                const response = await axios.get(`https://api.github.com/licenses/${license.licenseId.toLowerCase()}`, {
+                    headers: {
+                        'Authorization': `token ${process.env.GH_TOKEN}`,
+                        'X-GitHub-Api-Version': '2022-11-28'
+                    }
+                });
+
+                if (response.status !== 200) {
+                    console.error(`Error ${license.licenseId}: ${response.status}`)
+                    continue
+                }
+                else {
+                    let permissions = response.data['permissions'] as string[]
+                    let conditions = response.data['conditions'] as string[]
+                    let limitations = response.data['limitations'] as string[]
+
+                    githubData = {
+                        permissions: permissions,
+                        conditions: conditions,
+                        limitations: limitations
+                    }
+
+                    console.log(`License ${license.licenseId} added with GitHub data ${JSON.stringify(githubData)} `)
+                }
+
+                mongoCacheLicense.set?.(license.licenseId, {
+                    ...license,
+                    custom: existingData.custom ?? false,
+                    _id: license.licenseId,
+                    other_ids: existingData.other_ids ?? [],
+                    ...githubData
+                })
+            }
+            catch (e) {
+                console.error(`Error: ${e}`)
+            }
         }
         catch (e) {
             console.error(`Error: ${e}`)

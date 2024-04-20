@@ -132,6 +132,11 @@ async function extractProjects(plugin: Plugin, files: string[]) {
             }
             const proj: DepinderProject = await plugin.parser.parseDependencyTree(context)
 
+            if (proj.name === undefined) {
+                log.warn(`Project name is undefined for ${JSON.stringify(context)}`)
+                proj.name = proj.path
+                continue
+            }
             if (context.manifestFile !== undefined) {
                 proj.manifestFile = context.manifestFile
             }
@@ -180,6 +185,9 @@ function extractProjectStats(proj: DepinderProject): Project {
 
     const directOutOfSupport = directDeps.filter(dep => dep.now_latest > outOfSupportThreshold)
     const indirectOutOfSupport = indirectDeps.filter(dep => dep.now_latest > outOfSupportThreshold)
+
+    console.log('manifestFile', proj.manifestFile, proj.manifestFile !== undefined)
+    console.log('lockFile', proj.lockFile, proj.lockFile !== undefined)
 
     return {
         directDeps: directDeps.length,
@@ -237,9 +245,10 @@ async function getLib(cache: Cache, plugin: Plugin, dep: DepinderDependency, opt
         log.info(`Refreshing remote info for ${dep.name}`)
         lib = await plugin.registrar.retrieve(dep.name)
         if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
-            // log.info(`Getting vulnerabilities for ${lib.name}`)
             lib.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, lib.name)
         }
+
+        await cache.load()
         await cache.set?.(`${plugin.name}:${dep.name}`, lib)
         if (options.refresh) refreshedLibs.push(dep.name)
     }
@@ -260,7 +269,6 @@ async function processProjects(projects: DepinderProject[], plugin: Plugin, cach
 
     const projectsBar = multiProgressBar.create(projects.length, 0, {name: 'Projects', state: 'Analysing'})
 
-
     for (const project of projects) {
         newProjectIds.push(await processSingleProject(project, plugin, cache, refreshedLibs, options, cacheProjects))
         projectsBar.increment()
@@ -268,7 +276,10 @@ async function processProjects(projects: DepinderProject[], plugin: Plugin, cach
 
     projectsBar.stop()
 
+    await cacheProjects.load()
     await cacheProjects.write()
+
+    await cache.load()
     await cache.write()
 
     return newProjectIds
@@ -315,7 +326,7 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
    try {
         await cacheProjects.load()
         await cacheProjects.set?.(`${project.name}@${project.version}`, {
-            name: project.name,
+            name: project.name ?? project.path,
             projectPath: project.path,
             manifestFile: project.manifestFile,
             lockFile: project.lockFile,
@@ -334,6 +345,7 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
         log.error(`Error saving ${project.name}@${project.version} stats`, e)
    }
 
+    //todo change dates
     const outOfSupportDate = moment().subtract(outOfSupportThreshold, 'months').format(dateFormat)
     const outdatedDate = moment().subtract(outdatedThreshold, 'months').format(dateFormat)
 
