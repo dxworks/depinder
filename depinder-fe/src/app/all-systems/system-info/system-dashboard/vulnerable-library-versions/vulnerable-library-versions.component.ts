@@ -123,7 +123,12 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
       this.updateExistingDataIntroducedThrough(existingData, introducedThrough);
       existingData.requestedBy = [...existingData.requestedBy ?? [], ...dependency.requestedBy];
     } else {
-      this.createNewData(data, dependency, library, vulnerabilities, introducedThrough);
+      try {
+        this.createNewData(data, dependency, library, vulnerabilities, introducedThrough);
+      }
+      catch (e) {
+        console.warn('Error creating new data:', e);
+      }
     }
   }
 
@@ -200,7 +205,13 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
     let upgradeVersion = currentVersion;
 
     let checkedVersions=  versions.filter(libVer => {
-      return semver.gt(libVer.version!, currentVersion!, false);
+      try {
+        return semver.gt(libVer.version!, currentVersion!, false);
+      }
+      catch (e) {
+        console.warn('Error comparing versions:', currentVersion, libVer.version, e);
+        return false;
+      }
     });
 
     for (let version of checkedVersions.sort((a, b) => semver.compare(a.version!, b.version))) {
