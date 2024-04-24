@@ -25,7 +25,7 @@
   </div>
   <mat-tab-group style="margin-left: 2rem; margin-right: 2rem">
     <mat-tab label="Dashboard">
-      <app-system-dashboard [projects]="projects"></app-system-dashboard>
+      <app-system-dashboard [projects]="projects" [licences]="licences"></app-system-dashboard>
     </mat-tab>
     <mat-tab label="Projects">
       @if (projects.length > 0) {

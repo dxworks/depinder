@@ -11,16 +11,20 @@ import {MatProgressBarModule} from "@angular/material/progress-bar";
 import {concatMap, delay, finalize, from, map, Observable} from "rxjs";
 import {LibraryInfo, LibraryVersion} from "@core/library";
 import {LibrariesService} from "../../../common/services/libraries.service";
+import {LicencingIssuesComponent} from "./licencing-issues/licencing-issues.component";
+import {Licence} from "@core/licence";
 
 @Component({
   selector: 'app-system-dashboard',
   standalone: true,
-  imports: [CommonModule, MatExpansionModule, MatTableModule, OldDependenciesTable, VulnerableLibraryVersionsComponent, MatProgressSpinnerModule, MatProgressBarModule],
+  imports: [CommonModule, MatExpansionModule, MatTableModule, OldDependenciesTable, VulnerableLibraryVersionsComponent, MatProgressSpinnerModule, MatProgressBarModule, LicencingIssuesComponent],
   templateUrl: './system-dashboard.component.html',
   styleUrl: './system-dashboard.component.css'
 })
 export class SystemDashboardComponent implements OnChanges {
   @Input() projects: Project[] = [];
+  @Input() licences: Licence[] = [];
+
   dependencies: Dependency[] = [];
   libraries?: Map<string, LibraryInfo> = new Map<string, LibraryInfo>();
   loaded = false;

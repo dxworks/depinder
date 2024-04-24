@@ -17,13 +17,15 @@ import {convertToDateString} from "../../common/utils";
 import {MatIconModule} from "@angular/material/icon";
 import {MatButtonModule} from "@angular/material/button";
 import {MatTabsModule} from "@angular/material/tabs";
-import {catchError, forkJoin, of, switchMap, tap} from "rxjs";
+import {catchError, forkJoin, from, mergeMap, of, switchMap, tap, toArray} from "rxjs";
 import {LicenceLabelComponent} from "../../common/standalone/licence-label/licence-label.component";
 import {SystemLicences2Component} from "./system-licences-2/system-licences-2.component";
 import {MatToolbarModule} from "@angular/material/toolbar";
 import {ToolbarService} from "../../common/services/toolbar.service";
 import {SystemDashboardComponent} from "./system-dashboard/system-dashboard.component";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
+import {LicencesService} from "../../common/services/licences.service";
+import {Licence} from "@core/licence";
 
 @Component({
   selector: 'app-system-info',
@@ -35,6 +37,7 @@ import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 export class SystemInfoComponent implements OnInit {
   projects: Project[] = [];
   dependencies: Dependency[] = [];
+  licences: any[] = [];
   system?: System;
   id?: string;
   selectedRun?: SystemRun;
@@ -44,7 +47,8 @@ export class SystemInfoComponent implements OnInit {
               private systemService: SystemsService,
               private route: ActivatedRoute,
               protected toolbarService: ToolbarService,
-              private router: Router,) { }
+              private router: Router,
+              private licenceService: LicencesService) { }
 
   ngOnInit() {
     this.route.params.pipe(
@@ -68,11 +72,20 @@ export class SystemInfoComponent implements OnInit {
     this.selectedRun = this.getRunByDate(date);
     this.projects = [];
     this.dependencies = [];
+    this.licences = [];
 
-    return forkJoin(this.selectedRun.projects.map(projectId => this.projectsService.find(projectId))).pipe(
+    return forkJoin(
+      this.selectedRun.projects.map(projectId =>
+        forkJoin({
+          project: this.projectsService.find(projectId),
+          licences: this.licenceService.getByProjectId(projectId)
+        })
+      )
+    ).pipe(
       tap(results => {
-        this.projects = results;
-        this.dependencies = results.flatMap(project => project.dependencies);
+        this.projects = results.map(result => result.project);
+        this.dependencies = results.flatMap(result => result.project.dependencies);
+        this.licences = results.flatMap(result => result.licences.body as Licence[]);
       }),
       catchError(error => {
         console.error('Error fetching projects data', error);
@@ -108,12 +121,9 @@ export class SystemInfoComponent implements OnInit {
   }
 
   updateSystem() {
-    console.log(this.system);
-    console.log(this.id);
     this.systemService.updateSystem(this.id!, undefined, undefined, undefined, true).subscribe(
       {
         next: () => {
-          //refresh page
           window.location.reload();
         }
       }

@@ -1,0 +1,116 @@
+<p>licencing-issues works!</p>
+<!--@for (licence of licences; track $index) {-->
+<!--  <p>{{licence | json}}</p>-->
+<!--}-->
+
+@if (dataSource) {
+
+  <table mat-table [dataSource]="dataSource" multiTemplateDataRows>
+    <ng-container matColumnDef="licenceID">
+      <th mat-header-cell *matHeaderCellDef> Name </th>
+      <td mat-cell *matCellDef="let element"> {{element.licenceID}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="projects">
+      <th mat-header-cell *matHeaderCellDef> Projects </th>
+      <td mat-cell *matCellDef="let element"> {{element.projects.length}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="libraries">
+      <th mat-header-cell *matHeaderCellDef> libraries </th>
+      <td mat-cell *matCellDef="let element"> {{element.libraries.length}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="permissions">
+      <th mat-header-cell *matHeaderCellDef> permissions </th>
+      <td mat-cell *matCellDef="let element">
+        <ul>
+          @for (permission of element.permissions; track $index) {
+            <li>{{permission}}</li>
+          }
+        </ul>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="conditions">
+      <th mat-header-cell *matHeaderCellDef> conditions </th>
+      <td mat-cell *matCellDef="let element">
+        <ul>
+          @for (condition of element.conditions; track $index) {
+            <li>{{condition}}</li>
+          }
+        </ul>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="limitations">
+      <th mat-header-cell *matHeaderCellDef> limitations </th>
+      <td mat-cell *matCellDef="let element">
+        <ul>
+          @for (limitation of element.limitations; track limitation) {
+            <li>{{limitation}}</li>
+          }
+        </ul>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="issues">
+      <th mat-header-cell *matHeaderCellDef> issues </th>
+      <td mat-cell *matCellDef="let element">
+        <ul>
+          @if (isCopyleft(element)) {
+            <li>Copyleft</li>
+          }
+        </ul>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="expandedDetail">
+      <td mat-cell *matCellDef="let element" [attr.colspan]="columns.length">
+        <div [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+          <h3>Projects using this licence</h3>
+          <ul>
+            @for (library of element.libraries; track $index) {
+              <li>{{library.projectId}}</li>
+              <ul>
+                <li>direct deps: {{ library.directLibraries.length }}
+                  <span (click)="library.seeAllDirectLibraries = !library.seeAllDirectLibraries">(see {{library.seeAllDirectLibraries ? 'less' : 'all' }})</span>
+                </li>
+                <div style="padding-left: 16px">
+                  @if (library.seeAllDirectLibraries) {
+                    <ul>
+                      @for (directLibrary of library.directLibraries; track $index) {
+                        <li>{{directLibrary._id}}</li>
+                      }
+                    </ul>
+                  }
+                </div>
+                <li>indirect deps {{library.indirectLibraries.length}}
+                  <span (click)="library.seeAllIndirectLibraries = !library.seeAllIndirectLibraries">(see {{library.seeAllIndirectLibraries ? 'less' : 'all' }})</span>
+                </li>
+                <div style="padding-left: 16px">
+                  @if (library.seeAllIndirectLibraries) {
+                    <ul>
+                      @for (indirectLibrary of library.indirectLibraries; track $index) {
+                        <li>{{indirectLibrary._id}}</li>
+                      }
+                    </ul>
+                  }
+                </div>
+              </ul>
+            }
+          </ul>
+
+        </div>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="columns"></tr>
+    <tr mat-row *matRowDef="let element; columns: columns;"
+        class="example-element-row"
+        [class.example-expanded-row]="expandedElement === element"
+        (click)="expandedElement = expandedElement === element ? null : element">
+    </tr>
+    <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="example-detail-row"></tr>
+  </table>
+}

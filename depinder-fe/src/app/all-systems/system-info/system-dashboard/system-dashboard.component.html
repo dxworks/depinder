@@ -33,6 +33,17 @@
       </mat-expansion-panel-header>
       <app-vulnerable-library-versions [projects]="projects" [libraries]="libraries" [dependencies]="dependencies"></app-vulnerable-library-versions>
     </mat-expansion-panel>
+    <mat-expansion-panel hideToggle>
+      <mat-expansion-panel-header style="margin: 16px">
+        <mat-panel-title>
+         Licencing Issues
+        </mat-panel-title>
+        <mat-panel-description>
+          Display projects using libraries with potential licensing issues.
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+      <app-licencing-issues [projects]="projects" [libraries]="libraries" [dependencies]="dependencies" [licences]="licences"></app-licencing-issues>
+    </mat-expansion-panel>
   </mat-accordion>
 } @else {
   <div style="position:fixed;top:50%;left:50%">
