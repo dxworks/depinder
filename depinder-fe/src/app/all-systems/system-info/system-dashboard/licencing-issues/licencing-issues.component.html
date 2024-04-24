@@ -1,10 +1,4 @@
-<p>licencing-issues works!</p>
-<!--@for (licence of licences; track $index) {-->
-<!--  <p>{{licence | json}}</p>-->
-<!--}-->
-
 @if (dataSource) {
-
   <table mat-table [dataSource]="dataSource" multiTemplateDataRows>
     <ng-container matColumnDef="licenceID">
       <th mat-header-cell *matHeaderCellDef> Name </th>
