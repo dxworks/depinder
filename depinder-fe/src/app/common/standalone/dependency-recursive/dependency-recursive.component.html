@@ -9,7 +9,7 @@
         </mat-icon>
       </button>
       <span [ngClass]="{'highlight': isHighlighted()}">
-        {{dependency?.name}} at {{dependency?.version}}
+        {{dependency?.name}}&commat;{{dependency?.version}}
       </span>
       <button mat-button class="hover-button" (click)="navigateToDependency()">See details</button>
     </div>

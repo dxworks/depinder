@@ -33,7 +33,7 @@ export class DependencyRecursiveComponent implements OnInit {
   //todo change name
   @Input() allDependencies: TreeNode[] = [];
 
-  @Input() showMore: boolean = false;
+  @Input() showMore: boolean = true;
 
   @Output() childEvent = new EventEmitter<Dependency>();
 
@@ -79,7 +79,8 @@ export class DependencyRecursiveComponent implements OnInit {
   }
 
   isHighlighted(): boolean {
-    const nameMatch = (this.filter.searchField === undefined || this.filter.searchField.trim().length > 0) && (this.dependency?.name.includes(this.filter.searchField ?? '') ?? false);
+    const name = this.dependency?.name + '@' + this.dependency?.version;
+    const nameMatch = (this.filter.searchField === undefined || this.filter.searchField.trim().length > 0) && (name.includes(this.filter.searchField ?? '') ?? false);
 
     //todo check why comparisons don't work with boolean
     const vulnerabilitiesMatch = this.filter.filterByVulnerabilities === undefined || `${this.dependency?.vulnerabilities}` === `${this.filter.filterByVulnerabilities}`;

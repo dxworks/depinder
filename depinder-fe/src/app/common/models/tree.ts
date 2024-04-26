@@ -14,7 +14,7 @@ export class TreeNode {
   }
 
   contains(name?: string, vulnerabilities?: boolean, outOfSupport?: boolean, outdated?: boolean): boolean {
-    const nameMatch = name === undefined || this.data.name.includes(name);
+    const nameMatch = name === undefined || (this.data.name + '@' + this.data.version).includes(name);
 
     //todo check why comparisons don't work with boolean
     const vulnerabilitiesMatch = vulnerabilities === undefined || `${this.data.vulnerabilities}` === `${vulnerabilities}`;

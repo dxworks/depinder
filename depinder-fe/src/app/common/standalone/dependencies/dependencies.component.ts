@@ -38,7 +38,6 @@ export class DependenciesComponent implements OnInit, OnChanges {
     filterByOutdated: undefined,
     filterByOutOfSupport: undefined,
   };
-  maxDepth: number = 10;
   dialogRef?: MatDialogRef<DependencyDetailsComponent, any>;
 
   constructor(private projectsService: ProjectsService,
@@ -59,7 +58,7 @@ export class DependenciesComponent implements OnInit, OnChanges {
   fetchProject() {
     this.treeNodes = [];
     // Convert the array into a Map, using _id as the key
-    const uniqueDependenciesMap = new Map(this.allDependencies.map(dep => [dep._id, dep]));
+    const uniqueDependenciesMap = new Map(this.allDependencies.map(dep => [`${dep._id}@${dep.version}`, dep]));
 
     // Convert the Map back into an array
     this.allDependencies = Array.from(uniqueDependenciesMap.values());
@@ -71,34 +70,35 @@ export class DependenciesComponent implements OnInit, OnChanges {
 
         let testTreeNode = new TreeNode(dependency);
 
-        let testTreeNode2 = this.createTreeNode(
-          testTreeNode,
-          testDependencies,
-          0
-        );
+        let testTreeNode2 = this.createTreeNode(testTreeNode, testDependencies, new Set<string>());
 
         this.treeNodes.push(testTreeNode2);
       }
     }
   }
 
-  createTreeNode(currentDependency: TreeNode, dependencies: Dependency[], depth: number): TreeNode {
-    if (depth < this.maxDepth) {
-      for (let dependency of dependencies) {
-
-        let currentTreeNode: TreeNode = new TreeNode(dependency);
-
-        let dependencies2 = this.projectsService.getDependenciesByRequestedBy(this.allDependencies, dependency.name + '@' + dependency.version);
-
-        // Recursive call
-        this.createTreeNode(currentTreeNode, dependencies2, depth + 1);
-
-        if(depth == 20)
-          console.log(dependency._id + ' ' + depth)
-
-        // Adding child to the current node
-        currentDependency.addChild(currentTreeNode);
+  createTreeNode(currentDependency: TreeNode, dependencies: Dependency[], path: Set<string>): TreeNode {
+    for (let dependency of dependencies) {
+      // Check if the dependency is already in the path from root to current node
+      if (path.has(dependency._id)) {
+        continue;
       }
+
+      // Add the dependency to the path
+      path.add(dependency._id);
+
+      let currentTreeNode: TreeNode = new TreeNode(dependency);
+
+      let dependencies2 = this.projectsService.getDependenciesByRequestedBy(this.allDependencies, dependency.name + '@' + dependency.version);
+
+      // Recursive call with the updated path
+      this.createTreeNode(currentTreeNode, dependencies2, new Set(path));
+
+      // Adding child to the current node
+      currentDependency.addChild(currentTreeNode);
+
+      // Remove the dependency from the path after processing
+      path.delete(dependency._id);
     }
 
     return currentDependency;
