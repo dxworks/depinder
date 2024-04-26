@@ -22,7 +22,11 @@ export const newLicense = async (_req: Request, res: Response): Promise<any> => 
             return
         }
 
-        if (await mongoCacheLicense.has?.(_req.body._id)) {
+        const _id = _req.body._id.replace(/\s/g, '-')
+
+        _req.body._id = _id
+
+        if (await mongoCacheLicense.has?.(_id)) {
             res.status(400).json({ message: 'License already exists' })
             return
         }

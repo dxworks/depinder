@@ -50,7 +50,7 @@ export class AddLicenceComponent implements OnInit {
       reference: [''],
       isDeprecatedLicenseId: [false],
       detailsUrl: [''],
-      name: [''],
+      name: [this.id],
       _id: [this.id ?? '', [Validators.required]],
       seeAlso: this.fb.array([]),
       isOsiApproved: [false],
