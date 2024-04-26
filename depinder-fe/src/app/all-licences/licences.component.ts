@@ -78,9 +78,52 @@ export class LicencesComponent implements OnInit {
     this.router.navigate([`licences/${id}`])
   }
 
+  calculateRelevance(licence: Licence, filterValue: string): number {
+    let score = 0;
+    const normalizedFilter = filterValue.trim().toLowerCase();
+
+    // Score by 'name'
+    if (licence.name!.toLowerCase().includes(normalizedFilter)) {
+      score += (1000 - licence.name!.toLowerCase().indexOf(normalizedFilter)) * 3; // Higher weight for 'name'
+    }
+
+    // Score by 'id'
+    if (licence._id.toLowerCase().includes(normalizedFilter)) {
+      score += (1000 - licence._id.toLowerCase().indexOf(normalizedFilter)) * 2; // Medium weight for 'id'
+    }
+
+    // Score by 'other_ids'
+    if (licence.other_ids) {
+      licence.other_ids.forEach(id => {
+        if (id.toLowerCase().includes(normalizedFilter)) {
+          score += 1000 - id.toLowerCase().indexOf(normalizedFilter); // Lower weight for 'other_ids'
+        }
+      });
+    }
+
+    return score;
+  }
+
   applyFilter(event: Event) {
     const filterValue = (event.target as HTMLInputElement).value;
     this.dataSource.filter = filterValue.trim().toLowerCase();
+    const threshold = 500; // Define a suitable threshold based on your scoring system
+
+    if (filterValue) {
+      const filteredAndSortedLicences = this.licences$
+        .map(licence => ({ licence, score: this.calculateRelevance(licence, filterValue) }))
+        .filter(item => item.score >= threshold) // Only include items above the threshold
+        .sort((a, b) => b.score - a.score)
+        .map(item => item.licence);
+
+      this.dataSource = new MatTableDataSource<Licence>(filteredAndSortedLicences);
+      this.dataSource.paginator = this.paginator;
+      this.dataSource.sort = this.sort;
+    } else {
+      this.dataSource = new MatTableDataSource<Licence>(this.licences$);
+      this.dataSource.paginator = this.paginator;
+      this.dataSource.sort = this.sort;
+    }
 
     if (this.dataSource.paginator) {
       this.dataSource.paginator.firstPage();
