@@ -70,7 +70,7 @@ export class SystemLicences2Component implements OnInit {
                     name: licence.name ?? licence._id,
                     libraries: new Set(licence.libraries),
                     isChecked: false,
-                    isCustom: licence.custom,
+                    isCustom: licence.isCustom,
                     licenceInfo: licence,
                     suggestedLicences: licence.suggestedLicences
                   } as TableElement);

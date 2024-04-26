@@ -1,7 +1,7 @@
 import {Request, Response} from 'express'
 import {mongoCacheLibrary, mongoCacheLicense, mongoCacheProject} from '../../src/cache/mongo-cache'
 import stringSimilarity from 'string-similarity'
-import axios from 'axios';
+import axios from 'axios'
 
 export const all = async (_req: Request, res: Response): Promise<any> => {
     try {
@@ -58,15 +58,18 @@ async function licenceSuggestions(id?: string) {
     mongoCacheLicense.load()
     const mongoLicences = await mongoCacheLicense.getAll?.()
     const allLicenses = mongoLicences.map((licence: any) => licence._id).filter((licence: any) => licence !== null)
-
+    mongoLicences.map((licence: any) => licence.name).filter((licence: any) => licence !== null)
     if (id !== null) {
-        const matches = stringSimilarity.findBestMatch(id!, allLicenses)
+        const matchesWithId = stringSimilarity.findBestMatch(id!, allLicenses)
+        const matchesWithName = stringSimilarity.findBestMatch(id!, allLicenses)
+
         // at least 5 similar matches with a rating of 0.3 or higher
-        return matches.ratings
+        return matchesWithId.ratings.concat(matchesWithName.ratings)
             .sort((a, b) => b.rating - a.rating)
             .filter(match => {
                 return match.rating >= 0.3
             })
+            .filter((match, index, self) => self.findIndex(m => m.target === match.target) === index)
             .slice(0, 5)
     }
 
@@ -91,7 +94,7 @@ export const addAlias = async (_req: Request, res: Response): Promise<any> => {
         const id = _req.body.id
         const alias = _req.body.alias
 
-        console.log(id, alias)
+        // console.log(id, alias)
 
         mongoCacheLicense.load()
         const value = await mongoCacheLicense.get?.(id)
@@ -101,7 +104,7 @@ export const addAlias = async (_req: Request, res: Response): Promise<any> => {
             mongoCacheLicense.set?.(id, value)
         }
 
-        console.log(value)
+        // console.log(value)
 
         res.status(200).json(value)
     } catch (err) {
@@ -136,19 +139,21 @@ export const getLicenceByProjectId = async (_req: Request, res: Response): Promi
                     } else {
                         mongoCacheLicense.load()
                         const licenceData = await mongoCacheLicense.get?.(license) ?? await mongoCacheLicense.findByField?.('other_ids', license)
-                        // ?? await mongoCacheLicense.findByField?.('other_ids', id)
 
                         licenses.set(license, {
                             _id: licenceData?._id ?? license,
-                            custom: licenceData?.custom,
-                            detailsUrl: licenceData?.detailsUrl,
                             name: licenceData?.name ?? license,
+                            isCustom: licenceData?.isCustom,
+                            detailsUrl: licenceData?.detailsUrl,
                             isDeprecatedLicenseId: licenceData?.isDeprecatedLicenseId,
                             isOsiApproved: licenceData?.isOsiApproved,
                             other_ids: licenceData?.other_ids,
                             reference: licenceData?.reference,
                             referenceNumber: licenceData?.referenceNumber,
                             seeAlso: licenceData?.seeAlso,
+                            permissions: licenceData?.permissions,
+                            conditions: licenceData?.conditions,
+                            limitations: licenceData?.limitations,
                             libraries: [dep],
                             suggestedLicences: licenceData == null ? await licenceSuggestions(license) : [],
                         })
@@ -156,6 +161,8 @@ export const getLicenceByProjectId = async (_req: Request, res: Response): Promi
                 }
             }
         }
+
+        // console.log(licenses.values())
 
         res.status(200).json(Array.from(licenses.values()))
     }
@@ -173,7 +180,7 @@ export const patchLicense = async (_req: Request, res: Response): Promise<any> =
         mongoCacheLicense.load()
         const value = await mongoCacheLicense.get?.(id)
 
-        console.log(body)
+        // console.log(body)
 
         if (value) {
             mongoCacheLicense.set?.(_req.body._id, body)
@@ -195,7 +202,7 @@ const convertBody = (_req: Request) => {
     const seeAlso = _req.body.seeAlso
     const isOsiApproved = _req.body.isOsiApproved
     const otherIds = _req.body.other_ids
-    const custom = _req.body.custom ?? false
+    const isCustom = _req.body.isCustom ?? false
 
     return {
         reference: reference,
@@ -206,7 +213,7 @@ const convertBody = (_req: Request) => {
         seeAlso: seeAlso,
         isOsiApproved: isOsiApproved,
         other_ids: otherIds,
-        custom: custom,
+        isCustom: isCustom,
     }
 }
 
@@ -214,66 +221,75 @@ const axiosInstance = axios.create({
     baseURL: 'https://api.github.com',
     headers: {
         'Authorization': `token ${process.env.GH_TOKEN}`,
-        'X-GitHub-Api-Version': '2022-11-28'
-    }
-});
+        'X-GitHub-Api-Version': '2022-11-28',
+    },
+})
 
 export const updateFromSpdx = async (_req: Request, res: Response): Promise<Response> => {
     try {
-        mongoCacheLicense.load();
+        mongoCacheLicense.load()
 
-        const spdxContent = await fetchSpdxContent();
-        const licenses = JSON.parse(Buffer.from(spdxContent, 'base64').toString());
+        const spdxContent = await fetchSpdxContent()
+        const licenses = JSON.parse(Buffer.from(spdxContent, 'base64').toString())
 
-        await updateLicenses(licenses['licenses']);
+        await updateLicenses(licenses['licenses'])
 
-        return res.status(200).json({ message: 'All licenses updated successfully' });
+        return res.status(200).json({ message: 'All licenses updated successfully' })
     } catch (error) {
-        console.error('Failed to update licenses:', error);
-        return res.status(500).json({ message: 'Failed to update licenses', error: error });
+        console.error('Failed to update licenses:', error)
+        return res.status(500).json({ message: 'Failed to update licenses', error: error })
     }
-};
+}
 
 async function fetchSpdxContent(): Promise<string> {
-    const response = await axiosInstance.get('/repos/spdx/license-list-data/contents/json/licenses.json');
-    return response.data.content;
+    const response = await axiosInstance.get('/repos/spdx/license-list-data/contents/json/licenses.json')
+    return response.data.content
 }
 
 async function updateLicenses(licenses: any[]): Promise<void> {
     for (const license of licenses) {
-        const existingData = await mongoCacheLicense.get?.(license.licenseId);
+        let githubData = undefined
+        const existingData = await mongoCacheLicense.get?.(license.licenseId)
         if (await mongoCacheLicense.has?.(license.licenseId)) {
-            console.log(`License ${license.licenseId} already exists.`);
-        } else {
-            const githubData = await fetchGithubLicenseData(license.licenseId);
-            if (githubData) {
-                mongoCacheLicense.set?.(license.licenseId, {
-                    ...license,
-                    ...githubData,
-                    custom: existingData !== null && existingData?.custom,
-                    _id: license.licenseId,
-                    other_ids: existingData !== null && existingData?.other_ids ? existingData.other_ids : []
-                });
-                console.log(`License ${license.licenseId} updated with GitHub data.`);
+            console.log(`License ${license.licenseId} already exists.`)
+            // } else {
+            try {
+                githubData = await fetchGithubLicenseData(license.licenseId)
+            } catch (error: any) {
+                if (error.response.code === 429) {
+                    return error
+                }
+                console.error(`Error fetching GitHub data for ${license.licenseId}:`, error)
             }
+            // }
+
+            const isCustom = existingData ? (existingData?.isCustom ?? false) : false
+            await mongoCacheLicense.set?.(license.licenseId, {
+                ...license,
+                ...githubData,
+                isCustom: isCustom,
+                _id: license.licenseId,
+                other_ids: existingData !== null && existingData?.other_ids ? existingData.other_ids : [license.name],
+            })
+
         }
     }
-}
 
-async function fetchGithubLicenseData(licenseId: string): Promise<any> {
-    try {
-        const response = await axios.get(`https://api.github.com/licenses/${licenseId.toLowerCase()}`);
+    async function fetchGithubLicenseData(licenseId: string): Promise<any> {
+        try {
+            const response = await axiosInstance.get(`licenses/${licenseId.toLowerCase()}`)
 
-        if (response.status === 200) {
-            return {
-                permissions: response.data.permissions,
-                conditions: response.data.conditions,
-                limitations: response.data.limitations
-            };
-        } else {
-            console.error(`Error fetching ${licenseId}: ${response.status}`);
+            if (response.status === 200) {
+                return {
+                    permissions: response.data.permissions,
+                    conditions: response.data.conditions,
+                    limitations: response.data.limitations,
+                }
+            } else {
+                console.error(`Error fetching ${licenseId}: ${response.status}`)
+            }
+        } catch (error) {
+            console.error(`Error fetching GitHub data for ${licenseId}:`, error)
         }
-    } catch (error) {
-        console.error(`Error fetching GitHub data for ${licenseId}:`, error);
     }
 }

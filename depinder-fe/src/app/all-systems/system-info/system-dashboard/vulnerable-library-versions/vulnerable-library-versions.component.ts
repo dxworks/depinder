@@ -161,7 +161,6 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
     const patchVersion = this.determinePatchUpgradeVersion(library?.vulnerabilities ?? [], dependency.version, library?.versions || []);
     const minorVersion = this.determineMinorUpgradeVersion(library?.vulnerabilities ?? [], dependency.version, library?.versions || []);
     const requestedByProjects = Array.from(new Set<string>(introducedThrough.map(path => path[0])));
-    console.log('dependency', dependency.name, 'requestedByProjects', requestedByProjects);
 
     const vulnerableLibrary: VulnerableLibrary = {
       name: library?.name || 'Unknown',
@@ -182,10 +181,6 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
     };
 
     data.push(vulnerableLibrary);
-
-    if (vulnerableLibrary.minorVersion !== undefined || vulnerableLibrary.patchVersion !== undefined) {
-      console.log('dependency', dependency.name, 'minorVersion', minorVersion, 'patchVersion', patchVersion, 'suggestedVersion', suggestedVersion);
-    }
   }
 
   sortAndSetData(data: VulnerableLibrary[]) {

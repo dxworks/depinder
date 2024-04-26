@@ -54,7 +54,7 @@ export class AddLicenceComponent implements OnInit {
       _id: [this.id ?? '', [Validators.required]],
       seeAlso: this.fb.array([]),
       isOsiApproved: [false],
-      custom: [false],
+      isCustom: [false],
     });
 
     if (this.id && this.editMode) {
@@ -65,7 +65,7 @@ export class AddLicenceComponent implements OnInit {
           this.licenseForm.patchValue(
             {
               _id: existingInfo!._id,
-              custom: existingInfo!.custom,
+              isCustom: existingInfo!.isCustom,
               detailsUrl: existingInfo!.detailsUrl,
               isDeprecatedLicenseId: existingInfo!.isDeprecatedLicenseId,
               isOsiApproved: existingInfo!.isOsiApproved,

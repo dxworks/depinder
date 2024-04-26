@@ -113,7 +113,11 @@ export class LicencingIssuesComponent implements OnInit {
         }
       })
 
-    this.data = this.data.filter(licence => this.isCopyleft(licence));
+    this.data = this.data.filter((licence, index, self) =>
+        index === self.findIndex((t) => (
+          t.licenceID === licence.licenceID
+        )) && this.isCopyleft(licence)
+    );
 
     this.dataSource = new MatTableDataSource<LicenceIssue>(this.data);
   }

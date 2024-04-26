@@ -7,7 +7,7 @@ export interface Licence {
     seeAlso?: string[],
     isOsiApproved?: boolean,
     other_ids?: string[],
-    custom?: boolean,
+    isCustom?: boolean,
 
     permissions?: string[],
     conditions?: string[],

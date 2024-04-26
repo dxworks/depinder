@@ -27,7 +27,7 @@ export class LicencesComponent implements OnInit {
 
   licences$: Licence[] = [];
   dataSource: MatTableDataSource<Licence> = new MatTableDataSource<Licence>();
-  displayedColumns: string[] = ['_id', 'name', 'isDeprecatedLicenseId', 'isOsiApproved', 'custom', 'other_ids'];
+  displayedColumns: string[] = ['_id', 'name', 'isDeprecatedLicenseId', 'isOsiApproved', 'isCustom', 'other_ids'];
 
   refreshIcon = 'refresh';
 
@@ -56,6 +56,9 @@ export class LicencesComponent implements OnInit {
     this.licenceService.all().subscribe(
       (res: any) => {
         this.licences$ = (res.body as Licence[]).sort((a, b) => a._id.localeCompare(b._id));
+        this.licences$.forEach(licence => {
+          licence.other_ids = licence.other_ids?.slice(1)
+        });
         this.toolbarService.changeTitle(`Licences (${this.licences$.length})`);
 
         this.dataSource = new MatTableDataSource<Licence>(this.licences$);

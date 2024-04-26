@@ -3,6 +3,7 @@ import mongoose, { Model, Schema } from 'mongoose'
 import {Project} from '../../core/project'
 import {LibraryInfo} from '../../core/library'
 import {System} from '../../core/system'
+import {Licence} from '../../core/licence'
 
 const LibraryVersionSchema = new Schema({
     version: String,
@@ -100,6 +101,7 @@ const LicenseSchema = new Schema({
     permissions: [String],
     conditions: [String],
     limitations: [String],
+    isCustom: Boolean,
 })
 
 export const LibraryInfoModel: Model<LibraryInfo> = mongoose.model<LibraryInfo>('LibraryInfo', LibraryInfoSchema)
@@ -108,7 +110,7 @@ export const ProjectInfoModel: Model<Project> = mongoose.model<Project>('Project
 
 export const SystemInfoModel: Model<System> = mongoose.model<System>('SystemInfo', SystemSchema)
 
-export const LicenceModel: Model<LibraryInfo> = mongoose.model<LibraryInfo>('LicenceInfo', LicenseSchema)
+export const LicenceModel: Model<Licence> = mongoose.model<Licence>('LicenceInfo', LicenseSchema)
 
 const MONGO_USER = process.env.MONGO_USER ?? 'root'
 const MONGO_PASSWORD = process.env.MONGO_PASSWORD ?? 'secret'
