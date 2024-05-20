@@ -9,6 +9,7 @@ import fs from 'fs'
 import {depinderTempFolder} from '../../utils/utils'
 import {parseMavenDependencyTree} from './parsers/maven'
 import {log} from '../../utils/logging'
+import {parseGradleContext} from './parsers/gradle'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pomParser = require('pom-parser')
@@ -26,7 +27,7 @@ const extractor: Extractor = {
         const gradleContexts = files.filter(it => it.endsWith('build.gradle') || it.endsWith('build.gradle.kts')).map(it => ({
             root: path.dirname(it),
             manifestFile: path.basename(it),
-            lockFile: 'gradle.json',
+            lockFile: 'deptree.txt',
             type: 'gradle',
         }) as DependencyFileContext)
 
@@ -50,7 +51,10 @@ function parseLockFile(context: DependencyFileContext): DepinderProject {
         return depinderProject
     }
     else if(context.type === 'gradle') {
-        throw new Error(`Unsupported context type: ${context.type}. Gradle is not supported yet!`)
+        if(!fs.existsSync(path.resolve(context.root, context.lockFile))) {
+            throw new Error(`Dependency tree file not found: ${path.resolve(context.root, context.lockFile)}`)
+        }
+        return parseGradleContext(context)
     }
 
     throw new Error(`Unsupported context type: ${context.type}`)
