@@ -6,12 +6,13 @@ import fetch from 'node-fetch'
 import {Plugin} from '../../extension-points/plugin'
 import fs from 'fs'
 import {depinderTempFolder} from '../../utils/utils'
-import {log} from '@dxworks/cli-common'
 import {parseMavenDependencyTree} from './parsers/maven'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 import {LibraryInfo} from '../../../core/library'
 import {runMavenCommandSync} from './runMaven'
 import {extractorFiles} from '../../../core/constants'
+import {log} from '../../utils/logging'
+import {parseGradleContext} from './parsers/gradle'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pomParser = require('pom-parser')
@@ -29,7 +30,7 @@ const extractor: Extractor = {
         const gradleContexts = files.filter(it => it.endsWith('build.gradle') || it.endsWith('build.gradle.kts')).map(it => ({
             root: path.dirname(it),
             manifestFile: path.basename(it),
-            lockFile: 'gradle.json',
+            lockFile: 'deptree.txt',
             type: 'gradle',
         }) as DependencyFileContext)
 
@@ -54,23 +55,11 @@ function parseLockFile(context: DependencyFileContext): DepinderProject {
         return depinderProject
     }
     else if(context.type === 'gradle') {
-        throw new Error(`Unsupported context type: ${context.type}. Gradle is not supported yet!`)
+        if(!fs.existsSync(path.resolve(context.root, context.lockFile))) {
+            throw new Error(`Dependency tree file not found: ${path.resolve(context.root, context.lockFile)}`)
+        }
+        return parseGradleContext(context)
     }
-    // if (context.type === 'maven-with-dep-tree') {
-    //     return JSON.parse(fs.readFileSync(path.resolve(context.root, context.lockFile)).toString()) as DepinderProject
-    // }
-    //
-    // if (context.type === 'gradle') {
-    //     if (fs.existsSync(path.resolve(context.root, context.lockFile))) {
-    //         const proj = JSON.parse(fs.readFileSync(path.resolve(context.root, context.lockFile)).toString()) as DepinderProject
-    //         return {
-    //             ...proj,
-    //             dependencies: Object.entries(proj.dependencies).filter(([, value]) =>
-    //                 value.requestedBy.includes(`${proj.name}@${proj.version}`)
-    //             ).reduce((acc, [key, value]) => ({...acc, [key]: value}), {}),
-    //         }
-    //     }
-    // }
 
     throw new Error(`Unsupported context type: ${context.type}`)
 }
@@ -162,7 +151,7 @@ const javaRegistrar = new MavenCentralRegistrar(new LibrariesIORegistrar('maven'
 
 export const java: Plugin = {
     name: 'java',
-    aliases: ['maven', 'gradle'],
+    aliases: ['maven', 'gradle', 'jvm'],
     extractor,
     parser,
     registrar: javaRegistrar,

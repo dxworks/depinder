@@ -1,5 +1,4 @@
 import {Command} from 'commander'
-import {log} from '@dxworks/cli-common'
 import chalk from 'chalk'
 import {getMongoDockerContainerStatus} from './cache'
 import {LibraryInfoModel, mongoCacheLibrary} from '../cache/mongo-cache'
@@ -8,6 +7,7 @@ import {getPluginsFromNames} from '../plugins'
 import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
 import {Presets, SingleBar} from 'cli-progress'
 import {Plugin} from '../extension-points/plugin'
+import {log} from '../utils/logging'
 
 export const updateCommand = new Command()
     .name('update')
