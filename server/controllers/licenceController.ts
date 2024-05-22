@@ -23,8 +23,11 @@ export const newLicense = async (_req: Request, res: Response): Promise<any> => 
         }
 
         const _id = _req.body._id.replace(/\s/g, '-')
-
         _req.body._id = _id
+
+        if (_id !== _req.body._id) {
+            _req.body.other_ids.push(_id)
+        }
 
         if (await mongoCacheLicense.has?.(_id)) {
             res.status(400).json({ message: 'License already exists' })
@@ -34,6 +37,7 @@ export const newLicense = async (_req: Request, res: Response): Promise<any> => 
         const body = convertBody(_req)
 
         mongoCacheLicense.load()
+
 
         mongoCacheLicense.set?.(_req.body._id, body)
 
@@ -62,18 +66,25 @@ async function licenceSuggestions(id?: string) {
     mongoCacheLicense.load()
     const mongoLicences = await mongoCacheLicense.getAll?.()
     const allLicenses = mongoLicences.map((licence: any) => licence._id).filter((licence: any) => licence !== null)
-    mongoLicences.map((licence: any) => licence.name).filter((licence: any) => licence !== null)
+    const allLicenseNames = mongoLicences.map((licence: any) => licence.name).filter((licence: any) => licence !== null)
+
     if (id !== null) {
-        const matchesWithId = stringSimilarity.findBestMatch(id!, allLicenses)
-        const matchesWithName = stringSimilarity.findBestMatch(id!, allLicenses)
+        const matchesWithId = allLicenses.map((licenseId: string) => ({
+            target: licenseId,
+            rating: stringSimilarity.compareTwoStrings(id!, licenseId)
+        }));
+        const matchesWithName = allLicenseNames.map((licenseName : any) => ({
+            target: licenseName,
+            rating: stringSimilarity.compareTwoStrings(id!, licenseName)
+        }));
 
         // at least 5 similar matches with a rating of 0.3 or higher
-        return matchesWithId.ratings.concat(matchesWithName.ratings)
-            .sort((a, b) => b.rating - a.rating)
-            .filter(match => {
+        return matchesWithId.concat(matchesWithName)
+            .sort((a: { rating: number }, b: { rating: number }) => b.rating - a.rating)
+            .filter((match: { rating: number }) => {
                 return match.rating >= 0.3
             })
-            .filter((match, index, self) => self.findIndex(m => m.target === match.target) === index)
+            .filter((match: { target: any }, index: any, self: any[]) => self.findIndex(m => m.target === match.target) === index)
             .slice(0, 5)
     }
 
@@ -265,7 +276,7 @@ async function updateLicenses(licenses: any[]): Promise<void> {
                 }
                 console.error(`Error fetching GitHub data for ${license.licenseId}:`, error)
             }
-            // }
+            }
 
             const isCustom = existingData ? (existingData?.isCustom ?? false) : false
             await mongoCacheLicense.set?.(license.licenseId, {
@@ -276,7 +287,7 @@ async function updateLicenses(licenses: any[]): Promise<void> {
                 other_ids: existingData !== null && existingData?.other_ids ? existingData.other_ids : [license.name],
             })
 
-        }
+        // }
     }
 
     async function fetchGithubLicenseData(licenseId: string): Promise<any> {
