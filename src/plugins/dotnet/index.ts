@@ -14,10 +14,10 @@ import {runNuGetInspectorProgrammatically} from '@dxworks/nuget-inspector'
 import fs from 'fs'
 import path from 'path'
 import {getPackageSemver} from '../../utils/utils'
-import {log} from '@dxworks/cli-common'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 import {LibraryInfo} from '../../../core/library'
 import {extractorFiles} from '../../../core/constants'
+import {log} from '../../utils/logging'
 
 const extractor: Extractor = {
     files: extractorFiles.get('dotnet') ?? [],

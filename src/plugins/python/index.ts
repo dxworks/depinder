@@ -5,17 +5,16 @@ import {
     Extractor,
     Parser,
 } from '../../extension-points/extract'
-// @ts-ignore
 import path from 'path'
 import {AbstractRegistrar, LibrariesIORegistrar, Registrar} from '../../extension-points/registrar'
 import fetch from 'node-fetch'
 import {Plugin} from '../../extension-points/plugin'
 import fs from 'fs'
 import moment from 'moment'
-import {log} from '@dxworks/cli-common'
 import {execSync} from 'child_process'
 import * as toml from 'toml'
 import {getPackageSemver} from '../../utils/utils'
+import {log} from '../../utils/logging'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 import {LibraryInfo} from '../../../core/library'
 import {extractorFiles} from '../../../core/constants'
@@ -53,7 +52,13 @@ const extractor: Extractor = {
             .filter(it => it !== null)
             .map(it => it as DependencyFileContext)
 
-        return [...pipEnvContexts, ...justPipFiles].map(context => {
+        const pipListFiles = files.filter(it => it.endsWith('pipfile.list.txt')).map(it => ({
+            root: path.dirname(it),
+            manifestFile: 'pipfile.list.txt',
+        } as DependencyFileContext))
+
+
+        const pipLocks =  [...pipEnvContexts, ...justPipFiles].map(context => {
                 try {
                     if (!fs.existsSync(path.resolve(context.root, 'PipTree.json'))) {
                         execSync('pipenv install', {cwd: context.root})
@@ -71,6 +76,8 @@ const extractor: Extractor = {
                 }
             }
         )
+
+        return [...pipListFiles, ...pipLocks]
     },
 }
 
@@ -156,6 +163,29 @@ function parseLockFile(context: DependencyFileContext): DepinderProject {
                 if (dependencies[directDep]) {
                     dependencies[directDep].requestedBy.push(`${projName}@`)
                 }
+            }
+        })
+        return {
+            name: projName,
+            version: '',
+            path: context.root,
+            dependencies,
+        }
+    } else if (context.manifestFile == 'pipfile.list.txt') {
+        const deps = fs.readFileSync(path.resolve(context.root, context.manifestFile)).toString().split('\n').slice(2).map(line => {
+            const [name, version] = line.trim().split(/\s+/)
+            return { name, version }
+        })
+
+        const dependencies: { [id: string]: DepinderDependency } = {}
+        deps.forEach(({ name, version }) => {
+            const id = `${name}@${version}`
+            dependencies[id] = {
+                id,
+                name,
+                version,
+                requestedBy: [`${projName}@`],
+                semver: getPackageSemver(version),
             }
         })
         return {

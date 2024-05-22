@@ -1,20 +1,18 @@
-import {DepinderDependency, DepinderProject} from './extract'
+import {DepinderDependency} from './extract'
+import {LibraryInfo} from './registrar'
 
 export interface CodeFinder {
-    findFiles(project: DepinderProject, allFiles: string[]): Promise<string[]> // filters the files that are related to this project
+    getDeclaredEntities?: (library: DepinderDependency) => Promise<string[]> // returns the list of entities that are declared in the library (e.g. classes, functions, packages, namespaces etc.)
 
-    extractUsages?(project: DepinderProject): Promise<LibraryUsage[]> // extracts the usages of the dependencies in the project from the files
-
-    languages: string[] // the languages that this code finder supports
-
-    getDeclaredEntities?(library: DepinderDependency): Promise<string[]> // returns the list of entities that are declared in the library (e.g. classes, functions, packages, namespaces etc.)
-
-    checkUsage(library: DepinderDependency, importedEntity: string): Promise<boolean> // checks if the library is used in the file
+    matchImportToLibrary?: (importStatement: ImportStatement) => LibraryInfo | null // tries to match an import statement to a library
 }
 
-export interface LibraryUsage {
-    file: string,
-    importedEntity: string,
-    used: boolean,
-    language: string,
+export interface ImportStatement {
+    file: string
+    importedEntity: string
+    modifiers: string[]
+    language: string
+    used?: boolean
+    library?: string
+    fullImport: string
 }

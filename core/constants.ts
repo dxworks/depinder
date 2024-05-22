@@ -7,7 +7,7 @@ export const extractorFiles: Map<string, string[]> = new Map<string, string[]>(
         ['dotnet', ['*.csproj', '*.fsproj', '*.vbproj']],
         ['javascript', ['package.json', 'package-lock.json', 'yarn.lock']],
         ['php', ['composer.json', 'composer.lock']],
-        ['python', ['requirements.txt', 'setup.py', 'Pipfile', 'Pipfile.lock', 'pyproject.toml', 'poetry.lock']],
+        ['python', ['requirements.txt', 'setup.py', 'Pipfile', 'Pipfile.lock', 'pyproject.toml', 'poetry.lock', 'pipfile.list.txt']],
         ['ruby', ['Gemfile', '*.gemspec', 'Gemfile.lock']],
     ]
 )

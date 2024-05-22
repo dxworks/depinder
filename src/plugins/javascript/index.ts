@@ -9,15 +9,15 @@ import {buildDepTreeFromFiles} from 'snyk-nodejs-lockfile-parser'
 import path from 'path'
 import {SemVer} from 'semver'
 import {DepTreeDep} from 'snyk-nodejs-lockfile-parser/dist/parsers'
-import {log} from '@dxworks/cli-common'
-import {Registrar} from '../../extension-points/registrar'
 import {json} from 'npm-registry-fetch'
 import {Plugin} from '../../extension-points/plugin'
+import {Registrar} from '../../extension-points/registrar'
 import {npm} from '../../utils/npm'
 import fs from 'fs'
 import {VulnerabilityChecker} from '../../../core/vulnerability-checker'
 import {LibraryInfo} from '../../../core/library'
 import {extractorFiles} from '../../../core/constants'
+import {log} from '../../utils/logging'
 
 const extractor: Extractor = {
     files: extractorFiles.get('javascript') ?? [],
