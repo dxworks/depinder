@@ -1,5 +1,5 @@
 import {DepinderDependency} from './extract'
-import {LibraryInfo} from './registrar'
+import {LibraryInfo} from '../../core/library'
 
 export interface CodeFinder {
     getDeclaredEntities?: (library: DepinderDependency) => Promise<string[]> // returns the list of entities that are declared in the library (e.g. classes, functions, packages, namespaces etc.)

@@ -65,17 +65,19 @@ export const getLicenseById = async (_req: Request, res: Response): Promise<any>
 async function licenceSuggestions(id?: string) {
     mongoCacheLicense.load()
     const mongoLicences = await mongoCacheLicense.getAll?.()
-    const allLicenses = mongoLicences.map((licence: any) => licence._id).filter((licence: any) => licence !== null)
-    const allLicenseNames = mongoLicences.map((licence: any) => licence.name).filter((licence: any) => licence !== null)
+    // const allLicenses = mongoLicences.map((licence: any) => licence._id).filter((licence: any) => licence !== null)
+    // const allLicenseNames = mongoLicences.map((licence: any) => licence.name).filter((licence: any) => licence !== null)
+
+    const allLicenses = mongoLicences.filter((licence: any) => licence !== null)
 
     if (id !== null) {
-        const matchesWithId = allLicenses.map((licenseId: string) => ({
-            target: licenseId,
-            rating: stringSimilarity.compareTwoStrings(id!, licenseId)
+        const matchesWithId = allLicenses.map((license: any) => ({
+            target: license._id,
+            rating: stringSimilarity.compareTwoStrings(id!, license._id)
         }));
-        const matchesWithName = allLicenseNames.map((licenseName : any) => ({
-            target: licenseName,
-            rating: stringSimilarity.compareTwoStrings(id!, licenseName)
+        const matchesWithName = allLicenses.map((license: any) => ({
+            target: license._id,
+            rating: stringSimilarity.compareTwoStrings(id!, license.name)
         }));
 
         // at least 5 similar matches with a rating of 0.3 or higher
@@ -117,6 +119,10 @@ export const addAlias = async (_req: Request, res: Response): Promise<any> => {
         if (value) {
             value.other_ids.push(alias)
             mongoCacheLicense.set?.(id, value)
+        }
+        else {
+            res.status(404).json({message: 'License not found'})
+            return
         }
 
         // console.log(value)
@@ -286,8 +292,6 @@ async function updateLicenses(licenses: any[]): Promise<void> {
                 _id: license.licenseId,
                 other_ids: existingData !== null && existingData?.other_ids ? existingData.other_ids : [license.name],
             })
-
-        // }
     }
 
     async function fetchGithubLicenseData(licenseId: string): Promise<any> {
