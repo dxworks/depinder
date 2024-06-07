@@ -74,7 +74,7 @@
                   @if (library.seeAllDirectLibraries) {
                     <ul>
                       @for (directLibrary of library.directLibraries; track $index) {
-                        <li>{{directLibrary._id}}</li>
+                        <li>{{directLibrary._id}}&#64;{{directLibrary.version}}</li>
                       }
                     </ul>
                   }
@@ -86,7 +86,7 @@
                   @if (library.seeAllIndirectLibraries) {
                     <ul>
                       @for (indirectLibrary of library.indirectLibraries; track $index) {
-                        <li>{{indirectLibrary._id}}</li>
+                        <li>{{indirectLibrary._id}}&#64;{{indirectLibrary.version}}</li>
                       }
                     </ul>
                   }

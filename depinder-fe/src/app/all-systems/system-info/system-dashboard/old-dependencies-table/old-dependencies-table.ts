@@ -72,10 +72,10 @@ export class OldDependenciesTable implements OnChanges, OnChanges, AfterViewInit
     }
 
     if (this.projects !== undefined && this.libraries !== undefined) {
-      this.getDependencies();
+      this.filterDependencies();
 
       if (this.dependencies.size > 0) {
-        this.dataSource = new MatTableDataSource(Array.from(this.dependencies.values()));
+        this.dataSource = new MatTableDataSource(Array.from(this.dependencies.values()).sort((a, b) => a.lastUpdated - b.lastUpdated));
       }
     }
   }
@@ -85,7 +85,7 @@ export class OldDependenciesTable implements OnChanges, OnChanges, AfterViewInit
     this.dataSource.sort = this.sort;
   }
 
-  getDependencies() {
+  filterDependencies() {
     let dependencies = new Map<string, OperationalRiskDependencies>();
     this.projects!.forEach(project => {
       project.dependencies.filter(dependency => {
@@ -108,11 +108,9 @@ export class OldDependenciesTable implements OnChanges, OnChanges, AfterViewInit
         let savedDep = dependencies.get(dependency._id)!;
 
         let projectDependency = savedDep.projects.findIndex(value => {
-          if (value.projectId !== project._id) {
-            console.log(value.projectId, project._id);
-          }
           return value.projectId === project._id;
         });
+
         if (projectDependency != -1) {
           savedDep.projects[projectDependency].dependencyVersions.add(dependency.version)
         }

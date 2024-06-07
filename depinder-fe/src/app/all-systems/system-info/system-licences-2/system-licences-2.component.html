@@ -1,4 +1,4 @@
-@if (this.licences.length > 0) {
+@if (this.tableElements.length > 0) {
   <h1>Existing licences</h1>
 
   <app-existing-licence [data]="existingLicences()"></app-existing-licence>
@@ -8,5 +8,7 @@
   <app-other-licences [data]="otherLicences()" (refreshParent)="refreshLicence($event)"></app-other-licences>
 
 } @else {
-  <h1>Loading...</h1>
+  <div style="position:fixed;top:50%;left:50%">
+    <mat-spinner></mat-spinner>
+  </div>
 }

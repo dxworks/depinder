@@ -1,9 +1,9 @@
 <div *ngIf="depth > 0">
   <div class="hover-parent" (click)="showMoreToggle()">
     <div>
-      <button mat-icon-button disabled="{{allDependencies.length == 0}}">
+      <button mat-icon-button disabled="{{children.length == 0}}">
         <mat-icon class="mat-icon-rtl-mirror">
-          @if (allDependencies.length > 0) {
+          @if (children.length > 0) {
             {{ showMore ? 'expand_more' : 'chevron_right' }}
           }
         </mat-icon>
@@ -17,13 +17,13 @@
   </div>
 </div>
 
-@for(dependency of allDependencies; track $index) {
+@for(dependency of children; track $index) {
   @if (showMore && (containsFilters($index) || ((this.filter | json) === '{}'))) {
     <div [ngStyle]="getPadding()">
       @defer (on viewport){
         <app-dependency-recursive
         [depth]="depth + 1"
-        [allDependencies]="dependency.children"
+        [children]="dependency.children"
         [filter]="filter"
         [showMore]="containsFilters($index)"
         [dependency]="dependency.data"

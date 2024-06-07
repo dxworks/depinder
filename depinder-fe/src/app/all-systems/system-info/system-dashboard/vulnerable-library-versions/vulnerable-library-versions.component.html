@@ -1,53 +1,55 @@
 @if (tableData !== undefined) {
-  <table mat-table [dataSource]="tableData" multiTemplateDataRows style="width: 80%">
-    <ng-container matColumnDef="name">
-      <th mat-header-cell *matHeaderCellDef> name </th>
-      <td mat-cell *matCellDef="let element"> {{element.name}} </td>
-    </ng-container>
+  <div table-responsive>
+    <table mat-table [dataSource]="tableData" multiTemplateDataRows style="">
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef> name </th>
+        <td mat-cell *matCellDef="let element"> {{element.name}} </td>
+      </ng-container>
 
-    <ng-container matColumnDef="dependency-type">
-      <th mat-header-cell *matHeaderCellDef> type </th>
-      <td mat-cell *matCellDef="let element"> {{element.dependencyType}} </td>
-    </ng-container>
+      <ng-container matColumnDef="dependency-type">
+        <th mat-header-cell *matHeaderCellDef> type </th>
+        <td mat-cell *matCellDef="let element"> {{element.dependencyType}} </td>
+      </ng-container>
 
-    <ng-container matColumnDef="version">
-      <th mat-header-cell *matHeaderCellDef> version </th>
-      <td mat-cell *matCellDef="let element"> {{element.version}} </td>
-    </ng-container>
+      <ng-container matColumnDef="version">
+        <th mat-header-cell *matHeaderCellDef> version </th>
+        <td mat-cell *matCellDef="let element"> {{element.version}} </td>
+      </ng-container>
 
-    <ng-container matColumnDef="severity">
-      <th mat-header-cell *matHeaderCellDef> severity </th>
-      <td mat-cell *matCellDef="let element"> {{getVulnerabilitySeverity(element.vulnerabilities)}} </td>
-    </ng-container>
+      <ng-container matColumnDef="severity">
+        <th mat-header-cell *matHeaderCellDef> severity </th>
+        <td mat-cell *matCellDef="let element"> {{getVulnerabilitySeverity(element.vulnerabilities)}} </td>
+      </ng-container>
 
-    <ng-container matColumnDef="suggestedVersion">
-      <th mat-header-cell *matHeaderCellDef> suggestedVersion </th>
-      <td mat-cell *matCellDef="let element"> {{element.suggestedVersion}} </td>
-    </ng-container>
+      <ng-container matColumnDef="suggestedVersion">
+        <th mat-header-cell *matHeaderCellDef> suggestedVersion </th>
+        <td mat-cell *matCellDef="let element"> {{element.suggestedVersion}} </td>
+      </ng-container>
 
-    <ng-container matColumnDef="upgradeType">
-      <th mat-header-cell *matHeaderCellDef> upgradeType </th>
-      <td mat-cell *matCellDef="let element"> {{element.upgradeType}} </td>
-    </ng-container>
+      <ng-container matColumnDef="upgradeType">
+        <th mat-header-cell *matHeaderCellDef> upgradeType </th>
+        <td mat-cell *matCellDef="let element"> {{element.upgradeType}} </td>
+      </ng-container>
 
-    <ng-container matColumnDef="expandedDetail">
-      <td mat-cell *matCellDef="let element" [attr.colspan]="tableColumns.length">
-        <div class="example-element-detail" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
-          <app-vulnerable-library-details [element]="element"></app-vulnerable-library-details>
-        </div>
-      </td>
-    </ng-container>
+      <ng-container matColumnDef="expandedDetail">
+        <td mat-cell *matCellDef="let element" [attr.colspan]="tableColumns.length">
+          <div class="example-element-detail" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+            <app-vulnerable-library-details [element]="element"></app-vulnerable-library-details>
+          </div>
+        </td>
+      </ng-container>
 
-    <tr mat-header-row *matHeaderRowDef="tableColumns"></tr>
-    <tr mat-row *matRowDef="let element; columns: tableColumns;"
-        class="example-element-row"
-        [class.example-expanded-row]="expandedElement === element"
-        (click)="expandedElement = expandedElement === element ? null : element">
-    </tr>
-    <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="example-detail-row"></tr>
-  </table>
-  <mat-paginator [pageSizeOptions]="[5, 10, 20]"
-                 showFirstLastButtons
-                 aria-label="Select page of periodic elements">
-  </mat-paginator>
+      <tr mat-header-row *matHeaderRowDef="tableColumns"></tr>
+      <tr mat-row *matRowDef="let element; columns: tableColumns;"
+          class="example-element-row"
+          [class.example-expanded-row]="expandedElement === element"
+          (click)="expandedElement = expandedElement === element ? null : element">
+      </tr>
+      <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="example-detail-row"></tr>
+    </table>
+    <mat-paginator [pageSizeOptions]="[5, 10, 20]"
+                   showFirstLastButtons
+                   aria-label="Select page of periodic elements">
+    </mat-paginator>
+  </div>
 }

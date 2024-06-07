@@ -36,7 +36,13 @@
     "test": "jest --passWithNoTests",
     "test:dev": "jest --watch",
     "start-fe": "cd ./depinder-fe && ng serve",
-    "start-be": "node ./server/src/server.js"
+    "start-be": "node ./server/src/server.js",
+    "start-docker": "docker-compose -f src/assets/depinder.docker-compose.yml up",
+    "start-all": "npm run start-fe & npm run start-be & npm run start-docker",
+    "stop-fe": "kill-port 4200",
+    "stop-be": "kill-port 3000",
+    "stop-docker": "docker-compose -f src/assets/depinder.docker-compose.yml down",
+    "stop-all": "npm run stop-fe & npm run stop-be & npm run stop-docker"
   },
   "dependencies": {
     "@dxworks/nuget-inspector": "^1.2.0",

@@ -10,6 +10,7 @@ import {from, mergeMap, toArray} from "rxjs";
 import {OtherLicencesComponent} from "./other-licences/other-licences.component";
 import {SuggestedLicence} from "@core/licence";
 import {ExistingLicenceComponent} from "./existing-licence/existing-licence.component";
+import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 
 export interface TableElement {
   name: string;
@@ -23,7 +24,7 @@ export interface TableElement {
 @Component({
   selector: 'app-system-licences-2',
   standalone: true,
-  imports: [CommonModule, LicenceLabelComponent, MatTableModule, MatButtonModule, MatCheckboxModule, OtherLicencesComponent, ExistingLicenceComponent],
+  imports: [CommonModule, LicenceLabelComponent, MatTableModule, MatButtonModule, MatCheckboxModule, OtherLicencesComponent, ExistingLicenceComponent, MatProgressSpinnerModule],
   templateUrl: './system-licences-2.component.html',
   styleUrl: './system-licences-2.component.css'
 })
@@ -31,7 +32,7 @@ export class SystemLicences2Component implements OnInit {
   @Input() dependencies!: Dependency[];
   @Input() projectIds!: string[];
   @Input() systemId!: string;
-  licences: TableElement[] = [];
+  tableElements: TableElement[] = [];
   licenceData: any[] = [];
 
   constructor(
@@ -54,18 +55,18 @@ export class SystemLicences2Component implements OnInit {
 
             for (let projectLicences of this.licenceData) {
               for (const licence of projectLicences) {
-                const existingEntryIndex = this.licences.findIndex((element) => element.name === (licence.name ?? licence._id));
+                const existingEntryIndex = this.tableElements.findIndex((element) => element.name === (licence.name ?? licence._id));
 
                 if (existingEntryIndex !== -1) {
-                  const existingLibraries = this.licences[existingEntryIndex].libraries;
+                  const existingLibraries = this.tableElements[existingEntryIndex].libraries;
                   const newLibraries = licence.libraries;
 
-                  this.licences[existingEntryIndex] = {
-                    ...this.licences[existingEntryIndex],
+                  this.tableElements[existingEntryIndex] = {
+                    ...this.tableElements[existingEntryIndex],
                     libraries: new Set([...(existingLibraries ?? []), ...(newLibraries ?? [])])
                   }
                 } else {
-                  this.licences.push({
+                  this.tableElements.push({
                     // index: licence.index,
                     name: licence.name ?? licence._id,
                     libraries: new Set(licence.libraries),
@@ -85,15 +86,15 @@ export class SystemLicences2Component implements OnInit {
 
   refreshLicence(ids: Array<string>) {
     this.licenceData = [];
-    this.licences = [];
+    this.tableElements = [];
     this.loadLicences();
   }
 
   otherLicences() {
-    return this.licences.filter(d => d.isCustom === undefined);
+    return this.tableElements.filter(d => d.isCustom === undefined);
   }
 
   existingLicences() {
-    return this.licences.filter(d => d.isCustom !== undefined);
+    return this.tableElements.filter(d => d.isCustom !== undefined);
   }
 }

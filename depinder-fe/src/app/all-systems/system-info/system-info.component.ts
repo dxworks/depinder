@@ -26,11 +26,12 @@ import {SystemDashboardComponent} from "./system-dashboard/system-dashboard.comp
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {LicencesService} from "../../common/services/licences.service";
 import {Licence} from "@core/licence";
+import {MatListModule} from "@angular/material/list";
 
 @Component({
   selector: 'app-system-info',
   standalone: true,
-  imports: [CommonModule, ProjectsTableComponent, DependencyRecursiveComponent, DependenciesComponent, MatFormFieldModule, MatInputModule, FormsModule, MatIconModule, MatButtonModule, MatTabsModule, LicenceLabelComponent, SystemLicences2Component, MatToolbarModule, SystemDashboardComponent, MatProgressSpinnerModule],
+  imports: [CommonModule, ProjectsTableComponent, DependencyRecursiveComponent, DependenciesComponent, MatFormFieldModule, MatInputModule, FormsModule, MatIconModule, MatButtonModule, MatTabsModule, LicenceLabelComponent, SystemLicences2Component, MatToolbarModule, SystemDashboardComponent, MatProgressSpinnerModule, MatListModule],
   templateUrl: './system-info.component.html',
   styleUrl: './system-info.component.css'
 })
@@ -51,16 +52,22 @@ export class SystemInfoComponent implements OnInit {
               private licenceService: LicencesService) { }
 
   ngOnInit() {
+    // Subscribe to route parameters
     this.route.params.pipe(
+      // Store the system's ID from the route parameters
       tap(params => this.id = params['id']),
+      // Fetch the system's details if the system's ID is available
       switchMap(params => this.id ? this.systemService.find(this.id) : of(null)),
+      // Store the fetched system and select the date of the latest run if any runs are available
       tap(system => {
         this.system = system ?? undefined;
         if (this.system && this.system.runs.length > 0) {
           this.selectedRunDate = this.getLatestRunDate();
         }
       }),
+      // Fetch the run data if a run date is selected
       switchMap(() => this.selectedRunDate ? this.getRunDataObservable(this.selectedRunDate) : of(null)),
+      // Handle any errors that occur during the fetching process
       catchError(error => {
         console.error('Error fetching data', error);
         return of(null); // Handle the error or return a default value
@@ -132,6 +139,14 @@ export class SystemInfoComponent implements OnInit {
 
   get projectIds() {
     return this.projects.map(project => project._id);
+  }
+
+  get directDependencies() {
+    return this.dependencies.filter(dependency => dependency.directDep);
+  }
+
+  get transitiveDependencies() {
+    return this.dependencies.filter(dependency => !dependency.directDep);
   }
 
   navigateToEdit() {

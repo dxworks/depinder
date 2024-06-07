@@ -57,13 +57,16 @@ export class LibrariesIORegistrar extends AbstractRegistrar {
                     timestamp: moment(it.published_at).valueOf(),
                     latest: it.number === libIoData.latest_release_number,
                     licenses: [],
+                    // vulnerabilities: it.
                 }
             }),
-            description: libIoData?.description ?? '',
+            description: libIoData.description,
             licenses: libIoData.licenses ? [libIoData.licenses] : [],
             homepageUrl: libIoData?.homepage ?? '',
             keywords: libIoData?.keywords ?? [],
             reposUrl: libIoData?.repository_url ? [libIoData.repository_url] : [],
+            downloads: libIoData.downloads,
+            //todo add platform
         }
     }
 }

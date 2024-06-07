@@ -31,111 +31,76 @@ export class DependenciesComponent implements OnInit, OnChanges {
   @Input() allDependencies: Dependency[] = [];
   treeNodes: TreeNode[] = [];
   selectedDependency?: Dependency;
-  selectedLibrary?: LibraryInfo;
+  // selectedLibrary?: LibraryInfo;
   filter: DependencyFilter = {
     searchField: undefined,
     filterByVulnerabilities: undefined,
     filterByOutdated: undefined,
     filterByOutOfSupport: undefined,
   };
-  dialogRef?: MatDialogRef<DependencyDetailsComponent, any>;
 
-  constructor(private projectsService: ProjectsService,
-              private librariesService: LibrariesService,
-              public dialog: MatDialog) {
-    this.openDialog = this.openDialog.bind(this);
-  }
+  constructor(private projectsService: ProjectsService) {}
+
   ngOnInit(): void {
-    this.fetchProject();
+    this.buildDirectDependencyNodes();
   }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes["allDependencies"]) {
-      this.fetchProject();
+      this.buildDirectDependencyNodes();
     }
   }
 
-  fetchProject() {
+  buildDirectDependencyNodes() {
     this.treeNodes = [];
     // Convert the array into a Map, using _id as the key
-    const uniqueDependenciesMap = new Map(this.allDependencies.map(dep => [`${dep._id}@${dep.version}`, dep]));
+    const uniqueDependenciesMap = new Map(this.allDependencies.map(dependency => [`${dependency._id}@${dependency.version}`, dependency]));
 
     // Convert the Map back into an array
     this.allDependencies = Array.from(uniqueDependenciesMap.values());
     for (let dependency of this.allDependencies) {
       if (dependency.directDep) {
-        let testDependencies = this.projectsService.getDependenciesByRequestedBy(
+        let directDependencies = this.projectsService.getDependenciesByRequestedBy(
           this.allDependencies,
           `${dependency.name}@${dependency.version}`);
 
-        let testTreeNode = new TreeNode(dependency);
+        let rootTreeNode = new TreeNode(dependency);
 
-        let testTreeNode2 = this.createTreeNode(testTreeNode, testDependencies, new Set<string>());
+        let treeNode = this.createTreeNode(rootTreeNode, directDependencies, new Set<string>());
 
-        this.treeNodes.push(testTreeNode2);
+        this.treeNodes.push(treeNode);
       }
     }
   }
 
-  createTreeNode(currentDependency: TreeNode, dependencies: Dependency[], path: Set<string>): TreeNode {
+  createTreeNode(currentNode: TreeNode, dependencies: Dependency[], dependencyPath: Set<string>): TreeNode {
     for (let dependency of dependencies) {
       // Check if the dependency is already in the path from root to current node
-      if (path.has(dependency._id)) {
+      if (dependencyPath.has(dependency._id)) {
         continue;
       }
 
       // Add the dependency to the path
-      path.add(dependency._id);
+      dependencyPath.add(dependency._id);
 
-      let currentTreeNode: TreeNode = new TreeNode(dependency);
+      let newTreeNode: TreeNode = new TreeNode(dependency);
 
-      let dependencies2 = this.projectsService.getDependenciesByRequestedBy(this.allDependencies, dependency.name + '@' + dependency.version);
+      let childDependencies = this.projectsService.getDependenciesByRequestedBy(this.allDependencies, dependency.name + '@' + dependency.version);
 
       // Recursive call with the updated path
-      this.createTreeNode(currentTreeNode, dependencies2, new Set(path));
+      this.createTreeNode(newTreeNode, childDependencies, new Set(dependencyPath));
 
       // Adding child to the current node
-      currentDependency.addChild(currentTreeNode);
+      currentNode.addChild(newTreeNode);
 
       // Remove the dependency from the path after processing
-      path.delete(dependency._id);
+      dependencyPath.delete(dependency._id);
     }
 
-    return currentDependency;
+    return currentNode;
   }
 
-  receiveInfo($event: any) {
-    this.selectedDependency = $event;
-
-    if (this.selectedDependency !== undefined) {
-      this.librariesService.find(this.selectedDependency?._id).subscribe({
-          next: (libraryInfo: LibraryInfo) => {
-            this.selectedLibrary = libraryInfo;
-            this.openDialog();
-          },
-          error: (err: any) => {
-            console.error(err);
-          }
-        }
-      );
-    }
-  }
   receiveFilter($event: DependencyFilter) {
     this.filter = $event;
-  }
-
-  openDialog(): void {
-    this.dialogRef = this.dialog.open(DependencyDetailsComponent, {
-      width: '80vw',
-      height: '60vh',
-      data: {
-        selectedDependency: this.selectedDependency,
-        libraryInfo: this.selectedLibrary,
-      }
-    });
-
-    this.dialogRef.afterClosed().subscribe(() => {
-      this.selectedDependency = undefined;
-    });
   }
 }

@@ -8,7 +8,7 @@ import {OUT_OF_SUPPORT_MONTHS, OUTDATED_MONTHS} from "@core/constants";
 import {VulnerableLibraryVersionsComponent} from "./vulnerable-library-versions/vulnerable-library-versions.component";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {MatProgressBarModule} from "@angular/material/progress-bar";
-import {concatMap, delay, finalize, from, map, Observable} from "rxjs";
+import {bufferCount, concatMap, delay, finalize, forkJoin, from, map, Observable} from "rxjs";
 import {LibraryInfo, LibraryVersion} from "@core/library";
 import {LibrariesService} from "../../../common/services/libraries.service";
 import {LicencingIssuesComponent} from "./licencing-issues/licencing-issues.component";
@@ -43,9 +43,7 @@ export class SystemDashboardComponent implements OnChanges {
       this.projects = changes['projects'].currentValue;
 
       this.projects.forEach(project => {
-        project.dependencies.forEach(dependency => {
-          this.dependencies.push(dependency);
-        });
+        this.dependencies.push(...project.dependencies);
       });
 
       this.totalDependencies = this.dependencies.length;
@@ -81,22 +79,30 @@ export class SystemDashboardComponent implements OnChanges {
 
   getDependencies(): Observable<Map<string, LibraryInfo>> {
     let libraries = new Map<string, LibraryInfo>();
-
-    let observables = this.dependencies.map(dependency => this.libraryService.find(dependency._id).pipe(
-      delay(1)
-    ));
+    let observables = this.dependencies.map(dependency => this.libraryService.find(dependency._id));
 
     return from(observables).pipe(
-      concatMap(request => request),
-      map((lib: LibraryInfo) => {
-        try {
-          libraries.set(lib.name, lib);
-        }
-        catch (e: any) {
-          console.warn('Error adding library to map', e)
-        }
-        this.totalLoaded++;
+      // Group the observables into batches of 20
+      bufferCount(20),
+      // Use the concatMap operator to handle these batches one by one
+      concatMap(batch => forkJoin(batch)),
+      // Use the map operator to process each fetched library
+      map((libs: LibraryInfo[]) => {
+        libs.forEach(lib => {
+          try {
+            // Add the library to the map with its name as the key
+            libraries.set(lib.name, lib);
+          }
+          catch (e: any) {
+            // Log a warning if there's an error adding the library to the map
+            console.warn('Error adding library to map', e)
+          }
+          // Increment the totalLoaded variable each time a library is successfully fetched
+          this.totalLoaded++;
+          // delay(1);
+        });
 
+        // Return the updated libraries map
         return libraries;
       })
     );

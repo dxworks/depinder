@@ -297,23 +297,30 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
     })
     let depsWithInfo = 0
 
-    for (const dep of filteredDependencies) {
-        try {
-            dep.libraryInfo = await getLib(
-                cache,
-                plugin,
-                dep,
-                options,
-                refreshedLibs
-            )
-        } catch (e: any) {
-            log.warn(`Exception getting remote info for ${dep.name}`)
-            log.error(e)
-        }
-        depProgressBar.increment()
-        depsWithInfo++
-        log.info(`Got remote information on ${dep.name} (${depsWithInfo}/${filteredDependencies.length})`)
+    console.time('Execution Time');
+
+    const batchSize = 10;
+    for (let i = 0; i < filteredDependencies.length; i += batchSize) {
+        const batch = filteredDependencies.slice(i, i + batchSize);
+        const promises = batch.map(dep =>
+            getLib(cache, plugin, dep, options, refreshedLibs)
+                .then(libraryInfo => {
+                    dep.libraryInfo = libraryInfo;
+                    log.info(`Got remote information on ${dep.name} (${i + batch.indexOf(dep) + 1}/${filteredDependencies.length})`);
+                })
+                .catch(e => {
+                    log.warn(`Exception getting remote info for ${dep.name}`);
+                    log.error(e);
+                })
+                .finally(() => {
+                    depsWithInfo++;
+                    log.info(`Got remote information on ${dep.name} (${depsWithInfo}/${filteredDependencies.length})`)
+                    depProgressBar.increment();
+                })
+        );
+        await Promise.all(promises);
     }
+    console.timeEnd('Execution Time');
 
     depProgressBar.stop()
 
@@ -414,8 +421,6 @@ export async function analyseFilesToCache(folders: string[], options: AnalyseOpt
     }
 
     console.log('Projects in the system:', allProjects.length)
-
-    // await processSystem(allProjects, useCache)
 
     log.info('Done')
 

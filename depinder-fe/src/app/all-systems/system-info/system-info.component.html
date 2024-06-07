@@ -25,11 +25,17 @@
   </div>
   <mat-tab-group style="margin-left: 2rem; margin-right: 2rem">
     <mat-tab label="Dashboard">
-      <app-system-dashboard [projects]="projects" [licences]="licences"></app-system-dashboard>
+      @if (projects.length > 0 && licences.length > 0) {
+        <app-system-dashboard [projects]="projects" [licences]="licences"></app-system-dashboard>
+      } @else {
+        <div style="position:fixed;top:50%;left:50%">
+          <mat-spinner></mat-spinner>
+        </div>
+      }
     </mat-tab>
     <mat-tab label="Projects">
       @if (projects.length > 0) {
-        <h2>Projects in this system</h2>
+        <h2>{{projects.length}} project{{projects.length == 1 ? '' : 's'}} in this system:</h2>
 
         <div style="padding-bottom: 2rem">
           <app-projects-table
@@ -37,14 +43,27 @@
           ></app-projects-table>
         </div>
       }
+      @else {
+        <div style="position:fixed;top:50%;left:50%">
+          <mat-spinner></mat-spinner>
+        </div>
+      }
     </mat-tab>
     <mat-tab label="Dependencies">
       @if (dependencies.length > 0) {
         <h2>Dependencies</h2>
+        <p style="color: grey;">
+          Direct dependencies: {{directDependencies.length}} | Transitive dependencies: {{transitiveDependencies.length}}
+        </p>
 
         <app-dependencies
           [allDependencies]="dependencies">
         </app-dependencies>
+      }
+      @else {
+        <div style="position:fixed;top:50%;left:50%">
+          <mat-spinner></mat-spinner>
+        </div>
       }
     </mat-tab>
     <mat-tab label="Licences">
@@ -52,6 +71,11 @@
         <app-system-licences-2
           [dependencies]="dependencies" [systemId]="id!" [projectIds]="projectIds">
         </app-system-licences-2>
+      }
+      @else {
+        <div style="position:fixed;top:50%;left:50%">
+          <mat-spinner></mat-spinner>
+        </div>
       }
     </mat-tab>
   </mat-tab-group>

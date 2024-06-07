@@ -34,11 +34,3 @@ export class TreeNode {
     return false;
   }
 }
-
-export class Tree<T> {
-  root: TreeNode | null;
-
-  constructor() {
-    this.root = null;
-  }
-}

@@ -23,5 +23,6 @@ app.use('/licence', licenceRoutes)
 
 app.listen(PORT, () => {
     console.log(process.env.LIBRARIES_IO_API_KEY)
+    console.log(process.env.GH_TOKEN)
     console.log(`Server is running on port ${PORT}`)
 })

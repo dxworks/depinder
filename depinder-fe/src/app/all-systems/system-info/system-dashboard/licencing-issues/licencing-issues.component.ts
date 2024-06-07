@@ -2,10 +2,7 @@ import {Component, Input, OnInit} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {Dependency, Project} from "@core/project";
 import {LibraryInfo} from "@core/library";
-import {Licence} from "@core/licence";
 import {MatTableDataSource, MatTableModule} from "@angular/material/table";
-import {OperationalRiskDependencies} from "../old-dependencies-table/old-dependencies-table";
-import {LicenceRulesService} from "../../../../common/services/licence-rules.service";
 import {animate, state, style, transition, trigger} from "@angular/animations";
 import {OldDepDetailsComponent} from "../old-dependencies-table/old-dep-details/old-dep-details.component";
 import {MatListModule} from "@angular/material/list";
@@ -49,10 +46,9 @@ export class LicencingIssuesComponent implements OnInit {
   @Input() dependencies: Dependency[] = [];
   @Input() licences: any[] = [];
 
-  constructor(private licenceRules: LicenceRulesService) { }
+  constructor() { }
 
   columns = ['licenceID', 'projects', 'libraries', 'conditions', 'limitations', 'permissions', 'issues'];
-  // columns = ['licenceID', 'projects', 'libraries', 'issues'];
   data: LicenceIssue[] = [];
   dataSource!: MatTableDataSource<LicenceIssue>;
   projectIDs: string[] = [];
@@ -61,46 +57,28 @@ export class LicencingIssuesComponent implements OnInit {
   ngOnInit() {
     this.projectIDs = this.projects.map(project => project._id);
 
-    this.data = this.licences
-      .filter(licence => (licence.permissions ?? []).length > 0 && (licence.conditions ?? []).length > 0 && (licence.limitations ?? []).length > 0)
+    this.data = (this.licences ?? [])
+      .filter(licence => this.hasDetailedInformation(licence))
       .map(licence => {
         let licenceLibraries: LibraryDisplay[] = [];  // Declare inside the map function
 
         this.projects.forEach(project => {
-          project.dependencies.forEach(dependency => {
-            let library = this.libraries?.get(dependency.name);
-            if (library !== undefined && library.licenses.some(libLicence => libLicence === licence._id)) {
+          for (let lib of licence.libraries) {
+            if (project.dependencies.find(dep => dep.name === lib.name)) {
               let libraryDisplay = licenceLibraries.find(libraryDisplay => libraryDisplay.projectId === project._id);
-
               if (libraryDisplay) {
-                if (dependency.directDep) {
-                  libraryDisplay.directLibraries?.push(library);
-                }
-                else {
-                  libraryDisplay.indirectLibraries.push(library);
-                }
+                lib.directDep ? libraryDisplay.directLibraries?.push(lib) : libraryDisplay.indirectLibraries.push(lib);
               } else {
-                if (dependency.directDep) {
-                  licenceLibraries.push({
-                    projectId: project._id,
-                    directLibraries: [library],
-                    indirectLibraries: [],
-                    seeAllDirectLibraries: false,
-                    seeAllIndirectLibraries: false
-                  });
-                }
-                else {
-                  licenceLibraries.push({
-                    projectId: project._id,
-                    directLibraries: [],
-                    indirectLibraries: [library],
-                    seeAllDirectLibraries: false,
-                    seeAllIndirectLibraries: false
-                  });
-                }
+                licenceLibraries.push({
+                  projectId: project._id,
+                  directLibraries: lib.directDep ? [lib] : [],
+                  indirectLibraries: !lib.directDep ? [lib] : [],
+                  seeAllDirectLibraries: false,
+                  seeAllIndirectLibraries: false
+                });
               }
             }
-          });
+          }
         });
 
         return {
@@ -113,10 +91,32 @@ export class LicencingIssuesComponent implements OnInit {
         }
       })
 
+    this.data = Object.values(this.data.reduce((acc: any, cur) => {
+      if (!acc[cur.licenceID]) {
+        acc[cur.licenceID] = cur;
+      } else {
+        acc[cur.licenceID] = {
+          ...acc[cur.licenceID],
+          projects: [...(acc[cur.licenceID].projects || []), ...(cur.projects || [])].filter((project, index, self) =>
+              index === self.findIndex((t) => (
+                t.projectId === project.projectId
+              ))
+          ),
+          libraries: [...(acc[cur.licenceID].libraries || []), ...(cur.libraries || [])].filter((library, index, self) =>
+              index === self.findIndex((t) => (
+                t.licenceID === library.licenceID
+              ))
+          ),
+          permissions: cur.permissions,
+          conditions: cur.conditions,
+          limitations: cur.limitations,
+        };
+      }
+      return acc;
+    }, {}));
+
     this.data = this.data.filter((licence, index, self) =>
-        index === self.findIndex((t) => (
-          t.licenceID === licence.licenceID
-        )) && this.isCopyleft(licence)
+      this.isCopyleft(licence)
     );
 
     this.dataSource = new MatTableDataSource<LicenceIssue>(this.data);
@@ -128,5 +128,7 @@ export class LicencingIssuesComponent implements OnInit {
       licence.conditions?.includes('document-changes')) ?? false;
   }
 
-  protected readonly Array = Array;
+  hasDetailedInformation(licence: any) {
+    return (licence?.permissions ?? []).length > 0 && (licence?.conditions ?? []).length > 0 && (licence?.limitations ?? []).length > 0;
+  }
 }

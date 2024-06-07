@@ -5,9 +5,9 @@
         (filterEmitter)="receiveFilter($event)"
       ></app-dependency-filter>
 
-      <app-dependency-recursive [allDependencies]="treeNodes"
+      <app-dependency-recursive [children]="treeNodes"
                                 [showMore]="true"
-                                (childEvent)="receiveInfo($event)"
+
                                 [filter]="filter">
       </app-dependency-recursive>
     } @loading (minimum 1s) {

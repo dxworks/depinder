@@ -12,6 +12,7 @@ export const getAllLibraries = async (_req: Request, res: Response): Promise<any
         res.status(500).send('Internal Server Error')
     }
 }
+
 export const getLibraryById = async (_req: Request, res: Response): Promise<any> => {
     try {
         const id = _req.body.id

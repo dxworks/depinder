@@ -31,7 +31,7 @@ export class DependencyRecursiveComponent implements OnInit {
   @Input() dependency?: Dependency;
 
   //todo change name
-  @Input() allDependencies: TreeNode[] = [];
+  @Input() children: TreeNode[] = [];
 
   @Input() showMore: boolean = true;
 
@@ -45,7 +45,7 @@ export class DependencyRecursiveComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.allDependencies.sort((a, b) => a.data.name.localeCompare(b.data.name));
+    this.children.sort((a, b) => a.data.name.localeCompare(b.data.name));
   }
 
   containsFilters(index: number): boolean {
@@ -67,7 +67,7 @@ export class DependencyRecursiveComponent implements OnInit {
     if (isSearchFieldEmpty && isFilterByVulnerabilitiesUndefined && isFilterByOutOfSupportUndefined && isFilterByOutdatedUndefined)
       return false;
 
-    return this.allDependencies[index].contains(searchFieldTrimmed, this.filter.filterByVulnerabilities, this.filter.filterByOutOfSupport, this.filter.filterByOutdated);
+    return this.children[index].contains(searchFieldTrimmed, this.filter.filterByVulnerabilities, this.filter.filterByOutOfSupport, this.filter.filterByOutdated);
   }
 
   toggle() {

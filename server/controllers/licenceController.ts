@@ -62,32 +62,51 @@ export const getLicenseById = async (_req: Request, res: Response): Promise<any>
     }
 }
 
+function filterWords(str: string, unwantedWords: string[]): string {
+    const words = str.split(' ')
+    const filteredWords = words.filter(word => !unwantedWords.includes(word.toLowerCase()))
+    return filteredWords.join(' ')
+}
+
 async function licenceSuggestions(id?: string) {
     mongoCacheLicense.load()
-    const mongoLicences = await mongoCacheLicense.getAll?.()
-    // const allLicenses = mongoLicences.map((licence: any) => licence._id).filter((licence: any) => licence !== null)
-    // const allLicenseNames = mongoLicences.map((licence: any) => licence.name).filter((licence: any) => licence !== null)
 
-    const allLicenses = mongoLicences.filter((licence: any) => licence !== null)
+    if (id === undefined) {
+        return []
+    }
 
-    if (id !== null) {
-        const matchesWithId = allLicenses.map((license: any) => ({
-            target: license._id,
-            rating: stringSimilarity.compareTwoStrings(id!, license._id)
-        }));
-        const matchesWithName = allLicenses.map((license: any) => ({
-            target: license._id,
-            rating: stringSimilarity.compareTwoStrings(id!, license.name)
-        }));
+    try {
+        const filteredID = filterWords(id, ['license', 'the']);
 
-        // at least 5 similar matches with a rating of 0.3 or higher
-        return matchesWithId.concat(matchesWithName)
-            .sort((a: { rating: number }, b: { rating: number }) => b.rating - a.rating)
-            .filter((match: { rating: number }) => {
-                return match.rating >= 0.3
-            })
-            .filter((match: { target: any }, index: any, self: any[]) => self.findIndex(m => m.target === match.target) === index)
-            .slice(0, 5)
+        const mongoLicences = await mongoCacheLicense.getAll?.()
+        // const allLicenses = mongoLicences.map((licence: any) => licence._id).filter((licence: any) => licence !== null)
+        // const allLicenseNames = mongoLicences.map((licence: any) => licence.name).filter((licence: any) => licence !== null)
+
+        const allLicenses = mongoLicences.filter((licence: any) => licence !== null)
+
+        if (id !== null) {
+            const matchesWithId = allLicenses.map((license: any) => ({
+                target: license._id,
+                rating: stringSimilarity.compareTwoStrings(id!, license._id)
+            }));
+            const matchesWithName = allLicenses.map((license: any) => ({
+                target: license._id,
+                rating: stringSimilarity.compareTwoStrings(id!, license.name)
+            }));
+
+            // at least 5 similar matches with a rating of 0.3 or higher
+            return matchesWithId.concat(matchesWithName)
+                .sort((a: { rating: number }, b: { rating: number }) => b.rating - a.rating)
+                .filter((match: { rating: number }) => {
+                    return match.rating >= 0.3
+                })
+                .filter((match: { target: any }, index: any, self: any[]) => self.findIndex(m => m.target === match.target) === index)
+                .slice(0, 5)
+        }
+    }
+    catch (error) {
+        console.error(error)
+        return []
     }
 
     return []
@@ -154,7 +173,7 @@ export const getLicenceByProjectId = async (_req: Request, res: Response): Promi
         for (const dep of dependencies) {
             const library = await mongoCacheLibrary.get?.(dep.id)
             if (library) {
-                for (const license of library.licenses) {
+                for (const license of library.licenses ?? []) {
                     if (licenses.has(license)) {
                         licenses.get(license).libraries.push(dep)
                     } else {

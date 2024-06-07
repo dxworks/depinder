@@ -344,42 +344,6 @@ export class VulnerableLibraryVersionsComponent implements OnChanges, AfterViewI
 
   isVersionInRange(version: string, range: string): boolean {
     return semver.satisfies(version, range);
-    // const conditions = range.split(',').map((part) => part.trim());
-    //
-    // return conditions.every((condition) => {
-    //   const match = condition.match(/(<=|>=|<|>|=)?\s*(.*)/);
-    //   if (!match) {
-    //     console.warn('Invalid version range condition:', condition);
-    //     return false;
-    //   }
-    //
-    //   const [, operator, versionRange] = match;
-    //
-    //   semver.outside(version, versionRange, '<');
-    //
-    //   try {
-    //     switch (operator) {
-    //       case '<':
-    //         return semver.lt(version, versionRange);
-    //       case '<=':
-    //         return semver.lte(version, versionRange);
-    //       case '>':
-    //         return semver.gt(version, versionRange);
-    //       case '>=':
-    //         return semver.gte(version, versionRange);
-    //       case '=':
-    //       case undefined: // Handle the case where no operator is specified, assuming equality
-    //         return semver.eq(version, versionRange);
-    //       default:
-    //         console.warn('Unsupported operator:', operator);
-    //         return false;
-    //     }
-    //   }
-    //   catch (e) {
-    //     console.warn('Error comparing versions:', version, versionRange, e);
-    //     return false;
-    //   }
-    // });
   }
 
   getVulnerabilitySeverity(vulnerabilities: Vulnerability[]): string {
