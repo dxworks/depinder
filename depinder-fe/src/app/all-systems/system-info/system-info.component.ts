@@ -52,22 +52,16 @@ export class SystemInfoComponent implements OnInit {
               private licenceService: LicencesService) { }
 
   ngOnInit() {
-    // Subscribe to route parameters
     this.route.params.pipe(
-      // Store the system's ID from the route parameters
       tap(params => this.id = params['id']),
-      // Fetch the system's details if the system's ID is available
       switchMap(params => this.id ? this.systemService.find(this.id) : of(null)),
-      // Store the fetched system and select the date of the latest run if any runs are available
       tap(system => {
         this.system = system ?? undefined;
         if (this.system && this.system.runs.length > 0) {
           this.selectedRunDate = this.getLatestRunDate();
         }
       }),
-      // Fetch the run data if a run date is selected
       switchMap(() => this.selectedRunDate ? this.getRunDataObservable(this.selectedRunDate) : of(null)),
-      // Handle any errors that occur during the fetching process
       catchError(error => {
         console.error('Error fetching data', error);
         return of(null); // Handle the error or return a default value
@@ -84,15 +78,25 @@ export class SystemInfoComponent implements OnInit {
     return forkJoin(
       this.selectedRun.projects.map(projectId =>
         forkJoin({
-          project: this.projectsService.find(projectId),
-          licences: this.licenceService.getByProjectId(projectId)
+          project: this.projectsService.find(projectId).pipe(
+            catchError(error => {
+              console.warn('Error fetching project data', error);
+              return of(null); // Return a default value
+            })
+          ),
+          licences: this.licenceService.getByProjectId(projectId).pipe(
+            catchError(error => {
+              console.warn('Error fetching licences data', error);
+              return of(null); // Return a default value
+            })
+          )
         })
       )
     ).pipe(
       tap(results => {
-        this.projects = results.map(result => result.project);
-        this.dependencies = results.flatMap(result => result.project.dependencies);
-        this.licences = results.flatMap(result => result.licences.body as Licence[]);
+        this.projects = results.map(result => result.project).filter(project => project !== null) as Project[];
+        this.dependencies = results.flatMap(result => result.project ? result.project.dependencies : []);
+        this.licences = results.flatMap(result => result.licences ? result.licences.body as Licence[] : []);
       }),
       catchError(error => {
         console.error('Error fetching projects data', error);
@@ -110,9 +114,14 @@ export class SystemInfoComponent implements OnInit {
 
     forkJoin(projectObservables).subscribe(results => {
       results.forEach((project: Project) => {
-        console.log(project._id);
-        this.projects = [project, ...this.projects];
-        this.dependencies = [...project.dependencies, ...this.dependencies];
+        try {
+          console.log(project._id);
+          this.projects = [project, ...this.projects];
+          this.dependencies = [...project.dependencies, ...this.dependencies];
+        }
+        catch (e) {
+          console.error('Error fetching projects data', e);
+        }
       });
     });
   }
