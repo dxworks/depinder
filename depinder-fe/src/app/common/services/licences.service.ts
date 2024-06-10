@@ -15,6 +15,10 @@ export class LicencesService {
     return this.http.get(`${this.getUrl()}/all`, { observe: 'response' });
   }
 
+  baseInfo() {
+    return this.http.get(`${this.getUrl()}/base-info`, { observe: 'response' });
+  }
+
   getById(id: string) {
     return this.http.get(`${this.getUrl()}/${id}`, { observe: 'response' });
   }

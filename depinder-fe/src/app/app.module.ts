@@ -36,6 +36,7 @@ import {MatSidenavModule} from "@angular/material/sidenav";
 import {MatListModule} from "@angular/material/list";
 import {MatMenuModule} from "@angular/material/menu";
 import {MatLineModule} from "@angular/material/core";
+import { FlexLayoutModule } from "@angular/flex-layout";
 
 @NgModule({
   declarations: [
@@ -45,6 +46,7 @@ import {MatLineModule} from "@angular/material/core";
     LibraryDetailsComponent,
   ],
   imports: [
+    FlexLayoutModule,
     BrowserModule,
     BrowserAnimationsModule,
     HttpClientModule,

@@ -49,12 +49,33 @@
     </td>
   </ng-container>
 
-  <ng-container matColumnDef="actions">
-    <th mat-header-cell *matHeaderCellDef> Actions </th>
+  <ng-container matColumnDef="all-existing-licenses">
+    <th mat-header-cell *matHeaderCellDef> Other licenses </th>
     <td mat-cell *matCellDef="let element">
-      <button mat-icon-button (click)="navigateToSave(element.name)">
-        <mat-icon>save</mat-icon>
-      </button>
+      <div fxLayout="row" fxLayoutGap="10px" fxLayoutAlign="center center">
+        <mat-form-field>
+          <mat-label>Other License</mat-label>
+          <mat-select (selectionChange)="setSelectedLicense(element.name, $event.value)">
+            @for (l of licenses; track l._id) {
+              <mat-option value="{{l._id}}">{{l.name}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button mat-icon-button (click)="addAlias(element.name, selectedLicense.get(element.name))">
+          <mat-icon>save</mat-icon>
+        </button>
+      </div>
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="new-license">
+    <th mat-header-cell *matHeaderCellDef> New license </th>
+    <td mat-cell *matCellDef="let element">
+      <div>
+        <button mat-icon-button (click)="navigateToSave(element.name)">
+          <mat-icon>add</mat-icon>
+        </button>
+      </div>
     </td>
   </ng-container>
 
