@@ -72,7 +72,16 @@ export class CreateSystemComponent {
     if (this.form.valid) {
       const systemData = this.getSystemData();
       this.systemsService.createSystem(systemData).subscribe(
-        res => console.log(res),
+        res => {
+          console.log(res);
+          this.systemsService.updateSystem(systemData._id, undefined, undefined, undefined, true).subscribe(
+            {
+              next: () => {
+                window.location.reload();
+              }
+            }
+          )
+        },
         err => console.log(err)
       );
     } else {
