@@ -3,6 +3,25 @@ import {mongoCacheLibrary, mongoCacheLicense, mongoCacheProject} from '../../src
 import stringSimilarity from 'string-similarity'
 import axios from 'axios'
 
+export const baseInfo = async (_req: Request, res: Response): Promise<any> => {
+    try {
+        mongoCacheLicense.load()
+        const value = await mongoCacheLicense.getAll?.()
+
+        const simplifiedValue = value.map((license: { _id: any; name: any }) => ({
+            _id: license._id,
+            name: license.name,
+        }))
+
+        console.log(simplifiedValue)
+
+        res.status(200).json(simplifiedValue)
+    } catch (err) {
+        console.error(`Error: ${err}`)
+        res.status(500).send('Internal Server Error')
+    }
+}
+
 export const all = async (_req: Request, res: Response): Promise<any> => {
     try {
         mongoCacheLicense.load()
