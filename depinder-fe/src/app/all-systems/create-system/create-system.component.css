@@ -1,0 +1,27 @@
+.field-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.example-full-width {
+  flex: 1;
+}
+
+.field-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.input-with-button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.spinner-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}

@@ -18,6 +18,11 @@ import { alphaNumericUnderscoreValidator } from '../../common/validators';
 import {MatIconModule} from "@angular/material/icon";
 import {MatToolbarModule} from "@angular/material/toolbar";
 import {ToolbarService} from "../../common/services/toolbar.service";
+import {MatCardModule} from "@angular/material/card";
+import {MatProgressBarModule} from "@angular/material/progress-bar";
+import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
+import { Location } from '@angular/common';
+
 
 export class MyErrorStateMatcher implements ErrorStateMatcher {
   isErrorState(control: FormControl | null, form: FormGroupDirective | NgForm | null): boolean {
@@ -29,7 +34,7 @@ export class MyErrorStateMatcher implements ErrorStateMatcher {
 @Component({
   selector: 'app-create-system',
   standalone: true,
-    imports: [CommonModule, MatFormFieldModule, ReactiveFormsModule, MatInputModule, MatButtonModule, MatIconModule, MatToolbarModule],
+  imports: [CommonModule, MatFormFieldModule, ReactiveFormsModule, MatInputModule, MatButtonModule, MatIconModule, MatToolbarModule, MatCardModule, MatProgressBarModule, MatProgressSpinnerModule],
   templateUrl: './create-system.component.html',
   styleUrl: './create-system.component.css'
 })
@@ -37,9 +42,11 @@ export class MyErrorStateMatcher implements ErrorStateMatcher {
 export class CreateSystemComponent {
   form!: FormGroup;
   matcher = new MyErrorStateMatcher();
+  isSubmitting = false;
 
   constructor(private fb: FormBuilder,
               private systemsService: SystemsService,
+              private location: Location,
               protected toolbarService: ToolbarService,) {
     this.initializeForm();
   }
@@ -70,19 +77,23 @@ export class CreateSystemComponent {
 
   onSubmit(): void {
     if (this.form.valid) {
+      this.isSubmitting = true;
       const systemData = this.getSystemData();
       this.systemsService.createSystem(systemData).subscribe(
         res => {
-          console.log(res);
+          this.isSubmitting = false;
           this.systemsService.updateSystem(systemData._id, undefined, undefined, undefined, true).subscribe(
             {
               next: () => {
-                window.location.reload();
+                this.location.back();
               }
             }
           )
         },
-        err => console.log(err)
+        err => {
+          this.isSubmitting = false;
+          alert('There is another system with the same ID. Please choose a different ID.')
+        }
       );
     } else {
       alert('Form is invalid')

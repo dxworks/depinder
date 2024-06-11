@@ -2,45 +2,62 @@
   <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
     <mat-icon>menu</mat-icon>
   </button>
-  <span style="color: black; margin-right: 4px">
-    Create a New System
-  </span>
+  <span>Create a New System</span>
 </mat-toolbar>
 
-<div style="margin: 2rem;">
-  <form class="example-form" [formGroup]="form" (ngSubmit)="onSubmit()">
-    <mat-form-field class="example-full-width">
-      <mat-label>ID</mat-label>
-      <input type="text" matInput formControlName="id" [errorStateMatcher]="matcher">
-      @if (form.get('id')?.hasError('invalidAlphaNumericUnderscore') && form.get('id')?.hasError('required')) {
-        <mat-error>The ID can contain letters, numbers, and underscores</mat-error>
-      }
-      @if (form.get('id')?.hasError('required')) {
-        <mat-error>ID is <strong>required</strong></mat-error>
-      }
-    </mat-form-field>
+@if (isSubmitting) {
+  <div class="spinner-container">
+    <mat-spinner></mat-spinner>
+  </div>
+} @else {
+  <div style="margin: 2rem;">
+    <form class="example-form" [formGroup]="form" (ngSubmit)="onSubmit()">
+      <mat-card>
+        <mat-card-header>
+          <mat-card-title>System Details</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="field-row">
+            <mat-form-field class="example-full-width">
+              <mat-label>ID</mat-label>
+              <input matInput placeholder="Enter ID" formControlName="id" [errorStateMatcher]="matcher">
+              <mat-error *ngIf="form.get('id')?.hasError('invalidAlphaNumericUnderscore')">
+                Only letters, numbers, and underscores
+              </mat-error>
+              <mat-error *ngIf="form.get('id')?.hasError('required')">
+                ID is <strong>required</strong>
+              </mat-error>
+            </mat-form-field>
 
-    <mat-form-field class="example-full-width">
-      <mat-label>Name</mat-label>
-      <input type="text" matInput formControlName="name" [errorStateMatcher]="matcher">
-      @if (form.get('name')?.hasError('required')) {
-        <mat-error>Name is <strong>required</strong></mat-error>
-      }
-    </mat-form-field>
+            <mat-form-field class="example-full-width">
+              <mat-label>Name</mat-label>
+              <input matInput placeholder="Enter Name" formControlName="name" [errorStateMatcher]="matcher">
+              <mat-error *ngIf="form.get('name')?.hasError('required')">
+                Name is <strong>required</strong>
+              </mat-error>
+            </mat-form-field>
+          </div>
 
-    <div formArrayName="filePaths">
-      @for (control of filePaths.controls; track $index) {
-        <mat-form-field [formGroupName]="$index">
-          <mat-label>File Path {{ $index + 1 }}</mat-label>
-          <input matInput formControlName="path">
-        </mat-form-field>
-        @if (filePaths.length > 1) {
-          <button mat-button type="button" (click)="removeFilePath($index)">Remove</button>
-        }
-      }
-    </div>
+          <h3 style="margin-top: 1rem">Add the file paths</h3>
 
-    <button mat-raised-button type="button" (click)="addFilePath()">Add File Path</button>
-    <button mat-raised-button type="submit">Create System</button>
-  </form>
-</div>
+          <div formArrayName="filePaths">
+            <div *ngFor="let control of filePaths.controls; let i = index" [formGroupName]="i">
+              <mat-form-field class="field-row">
+                <mat-label>File Path {{ i + 1 }}</mat-label>
+                <div class="input-with-button">
+                  <input matInput placeholder="Enter File Path" formControlName="path">
+                  <button mat-button type="button" *ngIf="filePaths.length > 1" (click)="removeFilePath(i)">Remove</button>
+                </div>
+              </mat-form-field>
+            </div>
+          </div>
+
+          <button mat-raised-button color="primary" type="button" (click)="addFilePath()">Add File Path</button>
+        </mat-card-content>
+        <mat-card-actions>
+          <button mat-raised-button color="accent" type="submit">Create System</button>
+        </mat-card-actions>
+      </mat-card>
+    </form>
+  </div>
+}

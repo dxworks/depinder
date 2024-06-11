@@ -38,6 +38,13 @@ export const createSystem = async (_req: Request, res: Response): Promise<any> =
         const name = _req.body.name
         const projectPaths = _req.body.projectPaths
 
+        await mongoCacheSystem.load()
+
+        // Check if the ID already exists in the database
+        if (await mongoCacheSystem.has?.(id)) {
+            return res.status(400).json({ error: 'ID already exists in the database' })
+        }
+
         //todo check analyse options
         const projectIds = await analyseFilesToCache(
             projectPaths,
@@ -45,12 +52,10 @@ export const createSystem = async (_req: Request, res: Response): Promise<any> =
                 plugins: [],
                 // not used in analyse, only in saveAnalysisToCsv
                 results: 'results',
-                refresh: false,
+                refresh: true,
             },
             true
         )
-
-        await mongoCacheSystem.load()
 
         mongoCacheSystem.set?.(id, {
             name: name,
