@@ -92,6 +92,16 @@ depinder analyse <paths-to-analysed-project-folders> ... -r <path-to-results-fol
 This command gets as an argument multiple fully qualified folder paths and will automatically run all plugins that are available for the project's used languages 
 and export the results in the specified `results` folder.
 
+### Start everything
+```shell
+npm run start-all
+```
+
+### Docker
+```shell
+npm run start-docker
+```
+
 ### Backend
 ```shell
 npm run start-be
