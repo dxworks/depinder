@@ -5,6 +5,12 @@
 
 .first-column {
   flex: 2;
+  word-wrap: break-word;
+}
+
+.first-column li {
+  word-break: break-all;
+  white-space: pre-wrap;
 }
 
 .second-column {

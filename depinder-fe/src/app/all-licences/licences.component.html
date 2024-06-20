@@ -3,7 +3,7 @@
     <button mat-icon-button (click)="toolbarService.sidebar?.toggle()">
       <mat-icon>menu</mat-icon>
     </button>
-    <span style="color: black; margin-right: 4px">Licence</span>
+    <span style="color: black; margin-right: 4px">Licenses</span>
     <span [ngStyle]="{'color': 'grey'}">({{dataSource.data.length}})</span>
     <span style="flex: 1 1 auto"></span>
     <button mat-icon-button (click)="refreshLicenses()">
@@ -26,11 +26,11 @@
         </h3>
 
         <h3 style="color: grey; margin-left: 4px; margin-bottom: 0">
-          licences
+          licenses
         </h3>
       </div>
       <button mat-button (click)="newLicence()">
-        <mat-icon>add</mat-icon> Add new licence
+        <mat-icon>add</mat-icon> Add new license
       </button>
     </div>
 

@@ -32,9 +32,9 @@ export const getLibrariesWithLicense = async (_req: Request, res: Response): Pro
         const license = _req.body.licenceId
 
         mongoCacheLibrary.load()
-        const value = await mongoCacheLibrary.getAll!()
+        const value = await mongoCacheLibrary.getAll?.()
 
-        const filtered = value.filter((it: any) => it.licenses.includes(license))
+        const filtered = value.filter((it: any) => (it.licenses ?? []).includes(license))
         res.status(200).json(filtered)
     } catch (err) {
         console.error(`Error: ${err}`)
