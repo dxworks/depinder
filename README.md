@@ -1,128 +1,74 @@
-# Dxworks depinder
+# Depinder - Dependency analysis for software projects
 
-This project was generated using the `dxworks-template-node-ts` repository template.
+The repository is found at: https://github.com/dxworks/depinder/tree/systems
 
-## Installation
+Depinder offers comprehensive dependency analysis, identifying direct and transitive depen- dencies to provide a detailed understanding of the software’s dependency graph. It integrates security analysis by leveraging databases such as the GitHub Advisory Database and the Common Vulnerability Scoring System (CVSS) to detect and prioritize vulnerabilities. Additionally, the tool ensures license compliance by identifying and managing the licenses associated with each dependency, thus prevent- ing potential legal issues.
 
-Use `npm` to install
 
-```shell
-npm i -g @dxworks/depinder
+## Environment Variables
+
+Depinder relies on GitHub and Libraries.io to get information about packages and known security vulnerabilities. In order to call these downstream services, you need to add two environment variables with the corresponding tokens:
+
+- `GH_TOKEN` should contain a GitHub token with the read:packages scope.
+- `LIBRARIES_IO_API_KEY` should contain the Libraries.io API Key.
+
+## Run Locally
+
+Clone the project
+
+```bash
+  git clone -b systems --single-branch https://github.com/dxworks/depinder
 ```
 
-or, to use it from `dxw cli`:
+Go to the project directory
 
-```shell
-dxw plugin i @dxworks/depinder
+```bash
+  cd depinder
 ```
 
-To check if the installation was successful, run:
+Install dependencies
 
-```shell
-depinder --version
+```bash
+  npm install && cd depinder-fe && npm install && cd .. && cd server && npm install && tsc && cd .. && npm install
 ```
 
-## Configuration
-`Depinder` relies on `GitHub` and `Libraries.io` to get information about packages and known security vulnerabilities. In order to call these downstream services, you need to add two environment variables with the corresponding tokens:
-- `GH_TOKEN` should contain a `GitHub` token with the `read:packages` scope.
-- `LIBRARIES_IO_API_KEY` should contain the `Libraries.io` API Key.
+Start everything (Angular frontend, Express backend, Docker container):
 
-## Preprocess data
-If you want to run `Depinder` on a project that has not been processed by `Depminer` before, 
-you need to run the following command to generate the folder structure:
-
-```shell
-dxw depminer construct <path-to-dx-dependencies-folder> <path-to-exported-folder>
+```bash
+  npm run start-all
 ```
 
-After doing this, some package managers will require some more post-processing, in order to generate the `dependency tree` or the `lock file`.
+If you would rather run each component separately:
 
-### Maven
-To generate the `dependency tree` for a maven project, run the following command in each project (or root project in case they contain modules):
-
-```shell
-mvn dependency:tree -DoutputFile=deptree.txt
+```bash
+  npm run start-fe
 ```
-This command should create a `deptree.txt` file next to each `pom.xml` file.
-This file will be processed by MavenMiner to generate the a `pom.json` file, that corresponds to the expectations that the `Depinder` Java plugin has.
-
-
-### Gradle
-To generate the `dependency tree` for a gradle project, run the following command in each project (or root project in case they contain modules):
-
-```shell
-gradle dependencies --configuration compileClasspath > deptree.txt
-```
-This command should create a `deptree.txt` file next to each `build.gradle` file.
-This file will be processed by GradleMiner to generate the a `gradle.json` file, that corresponds to the expectations that the `Depinder` Java plugin has.
-
-## Usage
-The following commands can be used either as standalone, or with the `dxw` prefix ahead.
-
-### Cache command
-
-To check if the MongoDB cache is running:
-```shell
-depinder cache
+```bash
+  npm run start-be
 ```
 
-To initalise the Redis cache:
-```shell
-depinder cache init
+```bash
+  npm run start-docker
 ```
 
-To start the MongoDB cache:
-```shell
-depinder cache start
+
+## Analysing systems
+
+For projects using Maven or Gradle, an additional command needs to be run to generate dependency tree files:
+
+This should be run in the folder of a Maven project:
+```bash
+  mvn dependency:tree -DoutputFile=deptree.txt
 ```
 
-To stop the MongoDB cache:
-```shell
-depinder cache stop
+This should be run in the folder of a Gradle project:
+```bash
+  gradle dependencies --configuration compileClasspath > deptree.txt
 ```
-
-To see what is available in the cache, please visit the [Mongo Express Dashboard](http://localhost:8002/).
-
-### Analyse
-To analyse a project, run the following command:
-
-```shell
-depinder analyse <paths-to-analysed-project-folders> ... -r <path-to-results-folder>
-```
-This command gets as an argument multiple fully qualified folder paths and will automatically run all plugins that are available for the project's used languages 
-and export the results in the specified `results` folder.
-
-### Start everything
-```shell
-npm run start-all
-```
-
-### Docker
-```shell
-npm run start-docker
-```
-
-### Backend
-```shell
-npm run start-be
-```
-
-### Frontend
-```shell
-npm run start-fe
-```
-Backend needs to be running for the frontend to work as expected.
-
 ## Acknowledgements
 
 Packagist api calls were inspired by [packagist-api-client](https://www.npmjs.com/package/packagist-api-client).
 Depinder also uses some libraries from `Snyk.io` to parse dependency files.
-
-## Contributing
-
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
-
-Please make sure to update tests as appropriate.
 
 ## License
 
