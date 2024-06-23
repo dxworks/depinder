@@ -57,6 +57,8 @@ export const createSystem = async (_req: Request, res: Response): Promise<any> =
             true
         )
 
+        await mongoCacheSystem.load()
+
         mongoCacheSystem.set?.(id, {
             name: name,
             runs: [
