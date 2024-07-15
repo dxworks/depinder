@@ -32,6 +32,7 @@ export interface AnalyseOptions {
     plugins?: string[]
     results: string
     refresh: boolean
+    onlyCache: boolean
 }
 
 interface DependencyInfo extends DepinderDependency {
@@ -65,6 +66,7 @@ export const analyseCommand = new Command()
     // .argument('[depext-files...]', 'A list of files to parse for dependency information')
     .option('--results, -r', 'The results folder', 'results')
     .option('--refresh', 'Refresh the cache', false)
+    .option('--only-cache', 'Only use the cache', false)
     .option('--plugins, -p [plugins...]', 'A list of plugins')
     .action((folders: string[], options: AnalyseOptions) => {
         // Call analyseFilesToCache and handle the result, but do not return anything.
@@ -114,9 +116,11 @@ function chooseSystemsCacheOption(): Cache {
 }
 
 function extractLicenses(dep: DepinderDependency) {
-    return dep.libraryInfo?.licenses?.map(it => {
-        return it.substring(0, 100)
-    })
+    return dep.libraryInfo?.licenses
+        ?.filter(it => it !== null && it !== undefined)
+        .map(it => {
+            return it.substring(0, 100)
+        })
 }
 
 async function extractProjects(plugin: Plugin, files: string[]) {
@@ -236,13 +240,12 @@ function extractProjectLibs(proj: DepinderProject, dep: DepinderDependency): Pro
 }
 
 async function getLib(cache: Cache, plugin: Plugin, dep: DepinderDependency, options: AnalyseOptions, refreshedLibs: any[]) {
-    let lib
     if (await cacheHit(cache, plugin, dep, options.refresh, refreshedLibs)) {
         log.info(`Cache hit for ${dep.name}`)
-        lib = await cache.get?.(`${plugin.name}:${dep.name}`) as LibraryInfo
-    } else {
+        return await cache.get?.(`${plugin.name}:${dep.name}`) as LibraryInfo
+    } else if (!options.onlyCache) {
         log.info(`Refreshing remote info for ${dep.name}`)
-        lib = await plugin.registrar.retrieve(dep.name)
+        const lib = await plugin.registrar.retrieve(dep.name)
         if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
             lib.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, lib.name)
         }
@@ -250,9 +253,10 @@ async function getLib(cache: Cache, plugin: Plugin, dep: DepinderDependency, opt
         await cache.load()
         await cache.set?.(`${plugin.name}:${dep.name}`, lib)
         if (options.refresh) refreshedLibs.push(dep.name)
+        return lib
     }
 
-    return lib
+    throw new Error(`No cache hit for ${dep.name} and only cache option is set`)
 }
 
 async function cacheHit(cache: Cache, plugin: Plugin, dep: DepinderDependency, refresh: boolean, refreshedLibs: any[]) {
@@ -314,7 +318,7 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
                 })
                 .finally(() => {
                     depsWithInfo++;
-                    log.info(`Got remote information on ${dep.name} (${depsWithInfo}/${filteredDependencies.length})`)
+                    log.info(`Finished getting remote information on ${dep.name} (${depsWithInfo}/${filteredDependencies.length})`)
                     depProgressBar.increment();
                 })
         );
@@ -329,7 +333,7 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
     log.info('Project data saving in mongo db...')
 
     //todo save project info separate, stats + dependencies
-   try {
+    try {
         await cacheProjects.load()
         await cacheProjects.set?.(`${project.name}@${project.version}`, {
             name: project.name ?? project.path,
@@ -347,9 +351,9 @@ async function processSingleProject(project: DepinderProject, plugin: any, cache
             directOutOfSupport: projectInfo.directOutOfSupport,
             indirectOutOfSupport: projectInfo.indirectOutOfSupport,
         })
-   } catch (e: any) {
+    } catch (e: any) {
         log.error(`Error saving ${project.name}@${project.version} stats`, e)
-   }
+    }
 
     //todo change dates
     const outOfSupportDate = moment().subtract(outOfSupportThreshold, 'months').format(dateFormat)
@@ -493,10 +497,14 @@ export async function saveToCsv(folders: string[], options: AnalyseOptions, useC
 
         const allLicenses = _.groupBy(allLibsInfo, (lib: LibraryInfo) => {
             const license: string | undefined = lib.versions.flatMap(it => it.licenses).find(() => true)
-            if (!license)
+            if (!license || license.length === 0)
                 return 'unknown'
             if (!licenseIds.includes(license))
-                return spdxCorrect(license || 'unknown') || 'unknown'
+                try {
+                    return spdxCorrect(license) || 'unknown'
+                } catch (e: any) {
+                    return 'unknown'
+                }
             return license
         })
 
@@ -508,9 +516,9 @@ export async function saveToCsv(folders: string[], options: AnalyseOptions, useC
         fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-libs.csv`), header + projects.flatMap(proj =>
             Object.values(proj.dependencies).map(dep => {
 
-                 const data = extractProjectLibs(proj, dep)
+                const data = extractProjectLibs(proj, dep)
 
-                return `${data.path},${data.name},${data.name},${data.version},${data.latestVersion},${data.usedVersionReleaseDate},${data.latestVersionReleaseDate},${data.latestUsed},${data.nowUsed},${data.nowLatest},"${data.vulnerabilities}",${data.vulnerabilityDetails},${data.directDependency},"${data.type}","${data.licenses}"`
+                return `${data.path},${data.name},${data.name},${data.version},${data.latestVersion},${data.usedVersionReleaseDate},${data.latestVersionReleaseDate},${data.latestUsed},${data.nowUsed},${data.nowLatest},${data.vulnerabilities},"${data.vulnerabilityDetails}",${data.directDependency},"${data.type}","${data.licenses}"`
             })).join('\n'))
 
         const cacheProjects = useCache ? chooseProjectsCacheOption() : noCache

@@ -1,9 +1,7 @@
 import fetch from 'node-fetch'
 import moment from 'moment/moment'
 import {delay} from '../utils/utils'
-import {Vulnerability} from '../../core/vulnerability-checker'
-import {LibraryInfo, LibraryVersion} from '../../core/library'
-import {log} from '@dxworks/cli-common'
+import {LibraryInfo} from '../../core/library'
 
 export interface Registrar {
     retrieve: RegistryRetriever

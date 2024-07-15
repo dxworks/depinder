@@ -26,6 +26,7 @@ const extractor: Extractor = {
             root: path.dirname(it),
             lockFile: path.basename(it),
             manifestFile: 'package.json',
+
         } as DependencyFileContext))
 
         const packageJsonWithLockInParent = files.filter(it => it.endsWith('package.json'))

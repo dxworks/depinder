@@ -36,6 +36,7 @@ const extractor: Extractor = {
 
         return [...pomContexts, ...gradleContexts]
     },
+    filter: file => !file.includes('build/'),
 }
 
 const parser: Parser = {
@@ -44,7 +45,7 @@ const parser: Parser = {
 
 function parseLockFile(context: DependencyFileContext): DepinderProject {
     if(context.type === 'maven') {
-        runMavenCommandSync(context.root)
+        // runMavenCommandSync(context.root)
         if(!fs.existsSync(path.resolve(context.root, context.lockFile))) {
             throw new Error(`Dependency tree file not found: ${path.resolve(context.root, context.lockFile)}`)
         }
