@@ -3,6 +3,7 @@ import {_package} from './utils/utils'
 import {analyseCommand} from './commands/analyse'
 import {cacheCommand} from './commands/cache'
 import {updateCommand} from './commands/update'
+import {historyCommand} from './commands/history/history'
 
 export const mainCommand = new Command()
     .name('depinder')
@@ -11,4 +12,5 @@ export const mainCommand = new Command()
     .addCommand(analyseCommand)
     .addCommand(updateCommand)
     .addCommand(cacheCommand)
+    .addCommand(historyCommand)
 
