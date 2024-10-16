@@ -5,6 +5,7 @@ import {AnalyseOptions} from '../analyse'
 import {getPluginsFromNames} from '../../plugins'
 import {DepinderProject} from "../../extension-points/extract"
 import {Plugin} from "../../extension-points/plugin"
+import minimatch from "minimatch";
 
 export const historyCommand = new Command()
     .name('history')
@@ -39,6 +40,13 @@ async function processCommitForPlugins(commit: any, folder: string, selectedPlug
     console.log('Commit:', JSON.stringify(commit, null, 2));
     const changes = await getChangedFiles(commit, folder);
     console.log("Changes: ", changes);
+
+    for (const plugin of selectedPlugins) {
+        const filteredFiles = changes
+            .filter(file => plugin.extractor.filter ? plugin.extractor.filter(file) : true)
+            .filter(file => plugin.extractor.files.some(pattern => minimatch(file, pattern, {matchBase: true})));
+        console.log("Filtered Files: " + filteredFiles);
+    }
 }
 
 async function getChangedFiles(commit: any, folder: string): Promise<string[]> {
