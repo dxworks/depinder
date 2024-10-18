@@ -1,4 +1,4 @@
-import { Command } from 'commander'
+import {Command} from 'commander'
 import git from 'isomorphic-git'
 import fs from 'fs'
 import {AnalyseOptions} from '../analyse'
@@ -6,6 +6,7 @@ import {getPluginsFromNames} from '../../plugins'
 import {DepinderProject} from "../../extension-points/extract"
 import {Plugin} from "../../extension-points/plugin"
 import minimatch from "minimatch";
+import {log} from "../../utils/logging"
 
 export const historyCommand = new Command()
     .name('history')
@@ -46,6 +47,21 @@ async function processCommitForPlugins(commit: any, folder: string, selectedPlug
             .filter(file => plugin.extractor.filter ? plugin.extractor.filter(file) : true)
             .filter(file => plugin.extractor.files.some(pattern => minimatch(file, pattern, {matchBase: true})));
         console.log("Filtered Files: " + filteredFiles);
+
+        if (filteredFiles.length > 0) {
+            // Create DepinderProjects
+            const projects: DepinderProject[] = await extractProjects(plugin, filteredFiles, commit, folder);
+
+            for (const project of projects) {
+              console.log("projects: " + projects.length)
+              console.log(`Plugin ${plugin.name} analyzing project ${project.name}@${project.version}`)
+                if (project.dependencies) {
+                    console.log(`Dependencies for project in commit ${commit.oid}:`, project.dependencies);
+                } else {
+                    console.log(`No dependencies found for project in commit ${commit.oid}`);
+                }
+            }
+        }
     }
 }
 
@@ -87,7 +103,6 @@ async function getChangedFiles(commit: any, folder: string): Promise<string[]> {
 
 // Function to fetch commits from a Git repository
 async function getCommits(folder: string): Promise<any[]> {
-    console.log("folder: " + folder);
     try {
         return await git.log({
             fs,
@@ -97,4 +112,71 @@ async function getCommits(folder: string): Promise<any[]> {
         console.error(`Failed to get commits for ${folder}:`, error);
         return [];
     }
+}
+
+async function extractProjects(plugin: Plugin, files: string[], commit: any, folder: string): Promise<DepinderProject[]> {
+    const projects: DepinderProject[] = [];
+
+    for (const context of plugin.extractor.createContexts(files)) {
+        log.info(`Parsing dependency tree information for context: ${JSON.stringify(context)}`);
+
+        const manifestFile = context.manifestFile || '';
+        let manifestContent: any;
+        log.info(manifestFile);
+
+        if (manifestFile) {
+            try {
+                // Read the manifest file from the specific commit
+                const manifestBuffer = await git.readBlob({
+                    fs,
+                    dir: folder,
+                    oid: commit.oid,
+                    filepath: manifestFile
+                });
+
+                // Convert the Uint8Array buffer to a UTF-8 string
+                const rawContent = new TextDecoder("utf-8").decode(manifestBuffer.blob);
+
+                // Log the raw content for debugging purposes
+                log.info(`Raw content of ${manifestFile} from commit ${commit.oid}:\n${rawContent}`);
+
+                // Try to parse the content as JSON directly
+                manifestContent = JSON.parse(rawContent);
+            } catch (error) {
+                // If JSON parsing fails or if the file cannot be read, log the error
+                if (error instanceof SyntaxError) {
+                    log.error(`Manifest file ${manifestFile} in commit ${commit.oid} is not valid JSON: ${error.message}`);
+                } else {
+                    log.error(`Failed to read or parse ${manifestFile} from commit ${commit.oid}:`, error);
+                }
+                continue; // Skip this context if we can't read or parse the manifest file
+            }
+        } else {
+            log.warn(`No manifest file defined in context for plugin ${plugin.name}`);
+            continue;
+        }
+
+        // Now that we have the manifest content, extract the project name and version
+        const projectName = manifestContent.name || `Unnamed Project (commit: ${commit.oid})`;
+        const projectVersion = manifestContent.version || '0.0.0';
+
+        try {
+            if (!plugin.parser) {
+                log.warn(`Plugin ${plugin.name} does not have a parser, skipping...`);
+                continue;
+            }
+
+            // Parse dependencies from the context
+            const proj: DepinderProject = await plugin.parser.parseDependencyTree(context);
+            proj.name = projectName;
+            proj.version = projectVersion;
+
+            log.info(`Successfully parsed dependency tree for ${projectName}@${projectVersion}`);
+            projects.push(proj);
+        } catch (error: any) {
+            log.error(`Error while parsing dependency tree for project in commit ${commit.oid}:`, error);
+        }
+    }
+
+    return projects;
 }
