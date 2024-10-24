@@ -24,7 +24,8 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
         console.log('No folders provided to analyze.');
         return;
     }
-    const projectMap: Map<string, { commit: string, projects: DepinderProject[] }[]> = new Map();
+
+    const commitProjectsMap: Map<string, { commit: any, projects: DepinderProject[] }[]> = new Map();
 
     for (const folder of folders) {
         const commits = await getCommits(folder);
@@ -33,9 +34,11 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
             continue;
         }
         for (const commit of commits) {
-            await processCommitForPlugins(commit, folder, selectedPlugins, projectMap);
+            await processCommitForPlugins(commit, folder, selectedPlugins, commitProjectsMap);
         }
     }
+
+    console.log(commitProjectsMap);
 }
 
 // Function to fetch commits from a Git repository
@@ -52,7 +55,11 @@ async function getCommits(folder: string): Promise<any[]> {
 }
 
 // Function to process each commit and update the map by plugin
-async function processCommitForPlugins(commit: any, folder: string, selectedPlugins: Plugin[], projectMap: Map<string, { commit: string, projects: DepinderProject[] }[]>
+async function processCommitForPlugins(
+    commit: any,
+    folder: string,
+    selectedPlugins: Plugin[],
+    commitProjectsMap: Map<string, { commit: any, projects: DepinderProject[] }[]>
 ) {
     const changes = await getChangedFiles(commit, folder);
     await ensureDirectoryExists(depinderTempFolder);
@@ -71,9 +78,8 @@ async function processCommitForPlugins(commit: any, folder: string, selectedPlug
             }
         }
 
-        console.log('Filtered Files: ' + filteredFiles);
-
         if (filteredFiles.length > 0) {
+            console.log('Filtered Files: ' + filteredFiles);
             const tempFilePaths: string[] = [];
             for (const file of filteredFiles) {
                 const tempFilePath = path.join(depinderTempFolder, `${commit.oid}-${path.basename(file)}`);
@@ -100,6 +106,11 @@ async function processCommitForPlugins(commit: any, folder: string, selectedPlug
             });
 
             await cleanupTempFiles(tempFilePaths);
+
+            if (!commitProjectsMap.has(plugin.name)) {
+                commitProjectsMap.set(plugin.name, []);
+            }
+            commitProjectsMap.get(plugin.name)!.push({ commit, projects });
         }
     }
 }
