@@ -1,12 +1,14 @@
 import {Command} from 'commander'
 import git from 'isomorphic-git'
-import fs from 'fs'
 import {AnalyseOptions} from '../analyse'
 import {getPluginsFromNames} from '../../plugins'
 import {DepinderProject} from "../../extension-points/extract"
 import {Plugin} from "../../extension-points/plugin"
 import minimatch from "minimatch";
 import {log} from "../../utils/logging"
+import path from "path"
+import {depinderTempFolder} from "../../utils/utils"
+import {promises as fs} from 'fs'
 
 export const historyCommand = new Command()
     .name('history')
@@ -36,31 +38,68 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
     }
 }
 
+// Function to fetch commits from a Git repository
+async function getCommits(folder: string): Promise<any[]> {
+    try {
+        return await git.log({
+            fs,
+            dir: folder,
+        });
+    } catch (error) {
+        console.error(`Failed to get commits for ${folder}:`, error);
+        return [];
+    }
+}
+
 // Function to process each commit and update the map by plugin
-async function processCommitForPlugins(commit: any, folder: string, selectedPlugins: Plugin[], projectMap: Map<string, { commit: string, projects: DepinderProject[] }[]>) {
-    console.log('Commit:', JSON.stringify(commit, null, 2));
+async function processCommitForPlugins(commit: any, folder: string, selectedPlugins: Plugin[], projectMap: Map<string, { commit: string, projects: DepinderProject[] }[]>
+) {
     const changes = await getChangedFiles(commit, folder);
-    console.log("Changes: ", changes);
+    await ensureDirectoryExists(depinderTempFolder);
 
     for (const plugin of selectedPlugins) {
-        const filteredFiles = changes
-            .filter(file => plugin.extractor.filter ? plugin.extractor.filter(file) : true)
-            .filter(file => plugin.extractor.files.some(pattern => minimatch(file, pattern, {matchBase: true})));
-        console.log("Filtered Files: " + filteredFiles);
+        let filteredFiles = changes
+            .filter((file) => (plugin.extractor.filter ? plugin.extractor.filter(file) : true))
+            .filter((file) => plugin.extractor.files.some((pattern) => minimatch(file, pattern, { matchBase: true })));
+
+        if (filteredFiles.includes('package.json') || filteredFiles.includes('package-lock.json') || filteredFiles.includes('manifest.json')) {
+            if (!filteredFiles.includes('package.json')) {
+                filteredFiles.push('package.json');
+            }
+            if (!filteredFiles.includes('package-lock.json')) {
+                filteredFiles.push('package-lock.json');
+            }
+        }
+
+        console.log('Filtered Files: ' + filteredFiles);
 
         if (filteredFiles.length > 0) {
-            // Create DepinderProjects
-            const projects: DepinderProject[] = await extractProjects(plugin, filteredFiles, commit, folder);
+            const tempFilePaths: string[] = [];
+            for (const file of filteredFiles) {
+                const tempFilePath = path.join(depinderTempFolder, `${commit.oid}-${path.basename(file)}`);
+                try {
+                    const fileContent = await git.readBlob({
+                        fs,
+                        dir: folder,
+                        oid: commit.oid,
+                        filepath: file,
+                    });
 
-            for (const project of projects) {
-              console.log("projects: " + projects.length)
-              console.log(`Plugin ${plugin.name} analyzing project ${project.name}@${project.version}`)
-                if (project.dependencies) {
-                    console.log(`Dependencies for project in commit ${commit.oid}:`, project.dependencies);
-                } else {
-                    console.log(`No dependencies found for project in commit ${commit.oid}`);
+                    await fs.writeFile(tempFilePath, fileContent.blob);
+                    tempFilePaths.push(tempFilePath);
+                } catch (error) {
+                    console.error(`Failed to create temp file for ${file} at commit ${commit.oid}:`, error);
                 }
             }
+
+            const projects: DepinderProject[] = await extractProjects(plugin, tempFilePaths);
+
+            projects.forEach(project => {
+                const dependencyIds = Object.keys(project.dependencies);
+                console.log(`Project: ${project.name}, Dependencies: ${dependencyIds}`);
+            });
+
+            await cleanupTempFiles(tempFilePaths);
         }
     }
 }
@@ -101,82 +140,44 @@ async function getChangedFiles(commit: any, folder: string): Promise<string[]> {
     return changedFiles;
 }
 
-// Function to fetch commits from a Git repository
-async function getCommits(folder: string): Promise<any[]> {
+async function extractProjects(plugin: Plugin, files: string[]) {
+    const projects = [] as DepinderProject[]
+
+    for (const context of plugin.extractor.createContexts(files)) {
+        log.info(`Parsing dependency tree information for ${JSON.stringify(context)}`)
+        try {
+            if (!plugin.parser) {
+                log.info(`Plugin ${plugin.name} does not have a parser!`)
+                continue
+            }
+            const proj: DepinderProject = await plugin.parser.parseDependencyTree(context)
+            log.info(`Done parsing dependency tree information for ${JSON.stringify(context)}`)
+            projects.push(proj)
+        } catch (e: any) {
+            log.warn(`Exception parsing dependency tree information for ${JSON.stringify(context)}`)
+            log.error(e)
+        }
+    }
+    return projects
+}
+
+
+// Function to ensure the directory exists
+async function ensureDirectoryExists(directoryPath: string) {
     try {
-        return await git.log({
-            fs,
-            dir: folder,
-        });
+        await fs.mkdir(directoryPath, { recursive: true });
     } catch (error) {
-        console.error(`Failed to get commits for ${folder}:`, error);
-        return [];
+        console.error(`Failed to create directory: ${directoryPath}`, error);
     }
 }
 
-async function extractProjects(plugin: Plugin, files: string[], commit: any, folder: string): Promise<DepinderProject[]> {
-    const projects: DepinderProject[] = [];
 
-    for (const context of plugin.extractor.createContexts(files)) {
-        log.info(`Parsing dependency tree information for context: ${JSON.stringify(context)}`);
-
-        const manifestFile = context.manifestFile || '';
-        let manifestContent: any;
-        log.info(manifestFile);
-
-        if (manifestFile) {
-            try {
-                // Read the manifest file from the specific commit
-                const manifestBuffer = await git.readBlob({
-                    fs,
-                    dir: folder,
-                    oid: commit.oid,
-                    filepath: manifestFile
-                });
-
-                // Convert the Uint8Array buffer to a UTF-8 string
-                const rawContent = new TextDecoder("utf-8").decode(manifestBuffer.blob);
-
-                // Log the raw content for debugging purposes
-                log.info(`Raw content of ${manifestFile} from commit ${commit.oid}:\n${rawContent}`);
-
-                // Try to parse the content as JSON directly
-                manifestContent = JSON.parse(rawContent);
-            } catch (error) {
-                // If JSON parsing fails or if the file cannot be read, log the error
-                if (error instanceof SyntaxError) {
-                    log.error(`Manifest file ${manifestFile} in commit ${commit.oid} is not valid JSON: ${error.message}`);
-                } else {
-                    log.error(`Failed to read or parse ${manifestFile} from commit ${commit.oid}:`, error);
-                }
-                continue; // Skip this context if we can't read or parse the manifest file
-            }
-        } else {
-            log.warn(`No manifest file defined in context for plugin ${plugin.name}`);
-            continue;
-        }
-
-        // Now that we have the manifest content, extract the project name and version
-        const projectName = manifestContent.name || `Unnamed Project (commit: ${commit.oid})`;
-        const projectVersion = manifestContent.version || '0.0.0';
-
+// Function to clean up temp files after processing
+async function cleanupTempFiles(tempFilePaths: string[]) {
+    for (const filePath of tempFilePaths) {
         try {
-            if (!plugin.parser) {
-                log.warn(`Plugin ${plugin.name} does not have a parser, skipping...`);
-                continue;
-            }
-
-            // Parse dependencies from the context
-            const proj: DepinderProject = await plugin.parser.parseDependencyTree(context);
-            proj.name = projectName;
-            proj.version = projectVersion;
-
-            log.info(`Successfully parsed dependency tree for ${projectName}@${projectVersion}`);
-            projects.push(proj);
-        } catch (error: any) {
-            log.error(`Error while parsing dependency tree for project in commit ${commit.oid}:`, error);
+            await fs.unlink(filePath);
+        } catch (error) {
         }
     }
-
-    return projects;
 }

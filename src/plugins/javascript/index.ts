@@ -23,7 +23,7 @@ const extractor: Extractor = {
         const lockFileContexts = files.filter(it => it.endsWith('package-lock.json') || it.endsWith('yarn.lock')).map(it => ({
             root: path.dirname(it),
             lockFile: path.basename(it),
-            manifestFile: 'package.json',
+            manifestFile: files.find(manifest => path.dirname(manifest) === path.dirname(it) && manifest.endsWith('package.json')),
         } as DependencyFileContext))
 
         const packageJsonWithLockInParent = files.filter(it => it.endsWith('package.json'))
@@ -116,7 +116,7 @@ function transformDeps(tree: DepTreeDep, root: string): Map<string, DepinderDepe
 async function parseLockFile({root, manifestFile, lockFile}: DependencyFileContext): Promise<DepinderProject> {
     // const lockFileVersion = getLockfileVersionFromFile(lockFile)
     // log.info(`parsing ${path.resolve(root, lockFile)}`)
-    const result = await buildDepTreeFromFiles(root, manifestFile ?? 'package.json', lockFile ?? '', true);
+    const result = await buildDepTreeFromFiles(root, manifestFile ?? 'package.json', lockFile ?? '', true, false);
 
     const manifestJSON = JSON.parse(fs.readFileSync(path.resolve(root, manifestFile ?? 'package.json'), 'utf8'))
     return {
