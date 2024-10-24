@@ -62,7 +62,7 @@ async function processCommitForPlugins(commit: any, folder: string, selectedPlug
             .filter((file) => (plugin.extractor.filter ? plugin.extractor.filter(file) : true))
             .filter((file) => plugin.extractor.files.some((pattern) => minimatch(file, pattern, { matchBase: true })));
 
-        if (filteredFiles.includes('package.json') || filteredFiles.includes('package-lock.json') || filteredFiles.includes('manifest.json')) {
+        if (filteredFiles.includes('package.json') || filteredFiles.includes('package-lock.json')) {
             if (!filteredFiles.includes('package.json')) {
                 filteredFiles.push('package.json');
             }

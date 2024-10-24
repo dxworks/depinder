@@ -18,13 +18,16 @@ import fs from 'fs'
 import {log} from '../../utils/logging'
 
 const extractor: Extractor = {
-    files: ['package.json', 'package-lock.json', 'yarn.lock'],
-    createContexts: files => {
-        const lockFileContexts = files.filter(it => it.endsWith('package-lock.json') || it.endsWith('yarn.lock')).map(it => ({
-            root: path.dirname(it),
-            lockFile: path.basename(it),
-            manifestFile: files.find(manifest => path.dirname(manifest) === path.dirname(it) && manifest.endsWith('package.json')),
-        } as DependencyFileContext))
+  files: ['package.json', 'package-lock.json', 'yarn.lock'],
+  createContexts: files => {
+    const lockFileContexts = files.filter(it => it.endsWith('package-lock.json') || it.endsWith('yarn.lock')).map(it => {
+      const manifest = files.find(manifest => path.dirname(manifest) === path.dirname(it) && manifest.endsWith('package.json'));
+      return {
+        root: path.dirname(it),
+        lockFile: path.basename(it),
+        manifestFile: manifest ? path.basename(manifest) : 'package.json',  // Use the basename if found, else default to 'package.json'
+      } as DependencyFileContext;
+    });
 
         const packageJsonWithLockInParent = files.filter(it => it.endsWith('package.json'))
             .filter(packageFile => !lockFileContexts.some(it => it.root == path.dirname(packageFile)))
