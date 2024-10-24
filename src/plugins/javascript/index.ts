@@ -116,7 +116,7 @@ function transformDeps(tree: DepTreeDep, root: string): Map<string, DepinderDepe
 async function parseLockFile({root, manifestFile, lockFile}: DependencyFileContext): Promise<DepinderProject> {
     // const lockFileVersion = getLockfileVersionFromFile(lockFile)
     // log.info(`parsing ${path.resolve(root, lockFile)}`)
-    const result = await buildDepTreeFromFiles(root, manifestFile ?? 'package.json', lockFile ?? '', true, false)
+    const result = await buildDepTreeFromFiles(root, manifestFile ?? 'package.json', lockFile ?? '', true);
 
     const manifestJSON = JSON.parse(fs.readFileSync(path.resolve(root, manifestFile ?? 'package.json'), 'utf8'))
     return {
