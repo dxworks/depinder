@@ -46,6 +46,7 @@
     "cross-env": "^7.0.3",
     "csv": "^6.0.4",
     "dotenv": "^16.0.3",
+    "isomorphic-git": "^1.27.1",
     "lodash": "^4.17.21",
     "minimatch": "^6.1.6",
     "moment": "^2.29.1",
