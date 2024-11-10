@@ -38,8 +38,38 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
         }
     }
 
-    console.log(commitProjectsMap);
+   await compareDependenciesBetweenCommits(commitProjectsMap);
 }
+
+// Function to compare dependencies across commits
+async function compareDependenciesBetweenCommits(
+    commitProjectsMap: Map<string, { commit: any, projects: DepinderProject[] }[]>
+) {
+    for (const [pluginName, entries] of commitProjectsMap.entries()) {
+        const reversedEntries = [...entries].reverse();
+
+        for (let i = 1; i < reversedEntries.length; i++) {
+            const currentEntry = reversedEntries[i - 1];
+            const nextEntry = reversedEntries[i];
+
+            const currentDeps = getDependencyMap(currentEntry.projects[0]);
+            const nextDeps = getDependencyMap(nextEntry.projects[0]);
+
+            console.log("current: ", currentEntry.commit.oid);
+            console.log("next: ", nextEntry.commit.oid);
+        }
+    }
+}
+
+function getDependencyMap(project: DepinderProject | undefined): Record<string, string> {
+    if (!project) return {};
+    return Object.values(project.dependencies).reduce((map, dep) => {
+        const [name, version] = dep.id.split('@');
+        map[name] = version;
+        return map;
+    }, {} as Record<string, string>);
+}
+
 
 // Function to fetch commits from a Git repository
 async function getCommits(folder: string): Promise<any[]> {
@@ -79,7 +109,6 @@ async function processCommitForPlugins(
         }
 
         if (filteredFiles.length > 0) {
-            console.log('Filtered Files: ' + filteredFiles);
             const tempFilePaths: string[] = [];
             for (const file of filteredFiles) {
                 const tempFilePath = path.join(depinderTempFolder, `${commit.oid}-${path.basename(file)}`);
@@ -101,7 +130,7 @@ async function processCommitForPlugins(
             const projects: DepinderProject[] = await extractProjects(plugin, tempFilePaths);
 
             projects.forEach(project => {
-                const dependencyIds = Object.keys(project.dependencies);
+                const dependencyIds = Object.values(project.dependencies).map(dep => dep.id).join(', ');
                 console.log(`Project: ${project.name}, Dependencies: ${dependencyIds}`);
             });
 
