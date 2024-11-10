@@ -57,6 +57,18 @@ async function compareDependenciesBetweenCommits(
 
             console.log("current: ", currentEntry.commit.oid);
             console.log("next: ", nextEntry.commit.oid);
+
+            const changes = identifyDependencyChanges(currentDeps, nextDeps);
+
+            if (changes.added.length > 0) {
+                console.log(`Commit ${nextEntry.commit.oid} - Dependencies added:`, changes.added);
+            }
+            if (changes.removed.length > 0) {
+                console.log(`Commit ${nextEntry.commit.oid} - Dependencies removed:`, changes.removed);
+            }
+            if (changes.modified.length > 0) {
+                console.log(`Commit ${nextEntry.commit.oid} - Dependencies modified:`, changes.modified);
+            }
         }
     }
 }
@@ -70,6 +82,31 @@ function getDependencyMap(project: DepinderProject | undefined): Record<string, 
     }, {} as Record<string, string>);
 }
 
+// Function to identify added, removed, and modified dependencies between two maps
+function identifyDependencyChanges(
+    currentDeps: Record<string, string>,
+    nextDeps: Record<string, string>
+) {
+    const added: string[] = [];
+    const removed: string[] = [];
+    const modified: { dependency: string, from: string, to: string }[] = [];
+
+    for (const dep in currentDeps) {
+        if (!nextDeps[dep]) {
+            removed.push(`${dep}@${currentDeps[dep]}`);
+        } else if (currentDeps[dep] !== nextDeps[dep]) {
+            modified.push({ dependency: dep, from: currentDeps[dep], to: nextDeps[dep] });
+        }
+    }
+
+    for (const dep in nextDeps) {
+        if (!currentDeps[dep]) {
+            added.push(`${dep}@${nextDeps[dep]}`);
+        }
+    }
+
+    return { added, removed, modified };
+}
 
 // Function to fetch commits from a Git repository
 async function getCommits(folder: string): Promise<any[]> {
