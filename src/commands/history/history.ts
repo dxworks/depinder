@@ -21,7 +21,7 @@ export const historyCommand = new Command()
 export async function analyseHistory(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
   const selectedPlugins = getPluginsFromNames(options.plugins);
   if (folders.length === 0) {
-    console.log('No folders provided to analyze.');
+    log.info('No folders provided to analyze.');
     return;
   }
 
@@ -30,7 +30,7 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
   for (const folder of folders) {
     const commits = await getCommits(folder);
     if (commits.length === 0) {
-      console.log(`No commits found for ${folder}`);
+      log.info(`No commits found for ${folder}`);
       continue;
     }
     for (const commit of commits) {
@@ -63,17 +63,6 @@ async function compareDependenciesBetweenCommits(
       const currentDeps = getDependencyMap(currentEntry.projects[0]);
       const nextDeps = getDependencyMap(nextEntry.projects[0]);
       const changes = identifyDependencyChanges(currentDeps, nextDeps);
-
-      if (changes.added.length > 0) {
-        console.log(`Commit ${nextEntry.commit.oid} - Dependencies added:`, changes.added);
-      }
-      if (changes.removed.length > 0) {
-        console.log(`Commit ${nextEntry.commit.oid} - Dependencies removed:`, changes.removed);
-      }
-      if (changes.modified.length > 0) {
-        console.log(`Commit ${nextEntry.commit.oid} - Dependencies modified:`, changes.modified);
-      }
-
       const commitDate = new Date(nextEntry.commit.commit.committer.timestamp * 1000).toISOString();
       await processDependencyChanges(dependencyHistory, changes, nextEntry.commit.oid, commitDate);
     }
