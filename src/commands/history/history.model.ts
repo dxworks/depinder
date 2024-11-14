@@ -1,6 +1,5 @@
 interface DependencyHistory {
   [dependencyName: string]: {
-    dependency: string;
     history: StatusEntry[];
   };
 }
@@ -9,6 +8,7 @@ interface StatusEntry {
   commitOid: string;
   date: string;
   action: "DELETED" | "ADDED" | "MODIFIED";
-  fromVersion?: string;
-  toVersion?: string;
+  version?: string;        // For ADDED or DELETED actions
+  fromVersion?: string;    // Only for MODIFIED action
+  toVersion?: string;      // Only for MODIFIED action
 }
