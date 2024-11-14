@@ -34,7 +34,9 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
             continue;
         }
         for (const commit of commits) {
-            await processCommitForPlugins(commit, folder, selectedPlugins, commitProjectsMap);
+            if(commit.commit.parent.length < 2) { // Skip merge commits
+              await processCommitForPlugins(commit, folder, selectedPlugins, commitProjectsMap);
+            }
         }
     }
 
