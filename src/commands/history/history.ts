@@ -40,12 +40,19 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
         }
     }
 
-   await compareDependenciesBetweenCommits(commitProjectsMap);
+    const dependencyHistory: DependencyHistory = {};
+    await compareDependenciesBetweenCommits(commitProjectsMap, dependencyHistory);
+    console.log('Dependency history:');
+    for (const [depName, depHistory] of Object.entries(dependencyHistory)) {
+      console.log(`Dependency: ${depName}`);
+      console.log(JSON.stringify(depHistory.history, null, 2));
+    }
 }
 
 // Function to compare dependencies across commits
 async function compareDependenciesBetweenCommits(
-    commitProjectsMap: Map<string, { commit: any, projects: DepinderProject[] }[]>
+    commitProjectsMap: Map<string, { commit: any, projects: DepinderProject[] }[]>,
+    dependencyHistory: DependencyHistory
 ) {
     for (const [pluginName, entries] of commitProjectsMap.entries()) {
         const reversedEntries = [...entries].reverse();
@@ -53,13 +60,8 @@ async function compareDependenciesBetweenCommits(
         for (let i = 1; i < reversedEntries.length; i++) {
             const currentEntry = reversedEntries[i - 1];
             const nextEntry = reversedEntries[i];
-
             const currentDeps = getDependencyMap(currentEntry.projects[0]);
             const nextDeps = getDependencyMap(nextEntry.projects[0]);
-
-            console.log("current: ", currentEntry.commit.oid);
-            console.log("next: ", nextEntry.commit.oid);
-
             const changes = identifyDependencyChanges(currentDeps, nextDeps);
 
             if (changes.added.length > 0) {
@@ -71,8 +73,67 @@ async function compareDependenciesBetweenCommits(
             if (changes.modified.length > 0) {
                 console.log(`Commit ${nextEntry.commit.oid} - Dependencies modified:`, changes.modified);
             }
+
+          const commitDate =  new Date(nextEntry.commit.commit.committer.timestamp * 1000).toISOString();
+          await processDependencyChanges(dependencyHistory, changes, nextEntry.commit.oid, commitDate);
         }
     }
+}
+
+async function processDependencyChanges(
+  dependencyHistory: DependencyHistory,
+  changes: { added: string[]; removed: string[]; modified: { dependency: string; from: string; to: string }[] },
+  commitOid: string,
+  commitDate: string,
+) {
+  // Process added dependencies
+  for (const added of changes.added) {
+    const [depName, version] = added.split('@');
+    if (!dependencyHistory[depName]) {
+      dependencyHistory[depName] = {
+        history: []
+      };
+    }
+    dependencyHistory[depName].history.push({
+      commitOid,
+      date: commitDate,
+      action: "ADDED",
+      version
+    });
+  }
+
+  // Process removed dependencies
+  for (const removed of changes.removed) {
+    const [depName, version] = removed.split('@');
+    if (!dependencyHistory[depName]) {
+      dependencyHistory[depName] = {
+        history: []
+      };
+    }
+    dependencyHistory[depName].history.push({
+      commitOid,
+      date: commitDate,
+      action: "DELETED",
+      version
+    });
+  }
+
+  // Process modified dependencies
+  for (const modified of changes.modified) {
+    const { dependency: depName, from, to } = modified;
+    if (!dependencyHistory[depName]) {
+      dependencyHistory[depName] = {
+        history: []
+      };
+    }
+    dependencyHistory[depName].history.push({
+      commitOid,
+      date: commitDate,
+      action: "MODIFIED",
+      fromVersion: from,
+      toVersion: to
+    });
+  }
 }
 
 function getDependencyMap(project: DepinderProject | undefined): Record<string, string> {
@@ -109,6 +170,8 @@ function identifyDependencyChanges(
 
     return { added, removed, modified };
 }
+
+
 
 // Function to fetch commits from a Git repository
 async function getCommits(folder: string): Promise<any[]> {
