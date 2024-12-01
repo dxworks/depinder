@@ -28,11 +28,13 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
       log.info(`No commits found for ${folder}`);
       continue;
     }
-    for (const commit of commits) {
-      if (commit.commit.parent.length < 2) { // Skip merge commits
-        await processCommitForPlugins(commit, folder, selectedPlugins, commitProjectsMap);
-      }
+    const sortedCommits = sortCommitsInOrder(commits);
+    const testCommits = sortedCommits.slice(0, 20); // Take only the first 20 commits for testing
+    for (const commit of testCommits) {
+      console.log("Commit: " + JSON.stringify(commit));
+      await processCommitForPlugins(commit, folder, selectedPlugins, commitProjectsMap);
     }
+
   }
 
   const dependencyHistory: DependencyHistory = {};
@@ -42,6 +44,40 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
     console.log(`Dependency: ${depName}`);
     console.log(JSON.stringify(depHistory.history, null, 2));
   }
+}
+
+function sortCommitsInOrder(commits: any[]): any[] {
+  const commitMap = new Map<string, any>();
+  const childrenMap = new Map<string, any[]>();
+  let rootCommit: any = null;
+
+  commits.forEach(commit => {
+    commitMap.set(commit.oid, commit);
+    if (commit.commit.parent.length === 0) {
+      rootCommit = commit; // Identify root commit
+    } else {
+      commit.commit.parent.forEach((parentOid: string) => {
+        if (!childrenMap.has(parentOid)) {
+          childrenMap.set(parentOid, []);
+        }
+        childrenMap.get(parentOid)!.push(commit);
+      });
+    }
+  });
+
+  const sortedCommits: any[] = [];
+  function traverseCommit(commit: any) {
+    sortedCommits.push(commit);
+    if (childrenMap.has(commit.oid)) {
+      childrenMap.get(commit.oid)!.forEach(childCommit => traverseCommit(childCommit));
+    }
+  }
+
+  if (rootCommit) {
+    traverseCommit(rootCommit);
+  }
+
+  return sortedCommits;
 }
 
 // Function to compare dependencies across commits
