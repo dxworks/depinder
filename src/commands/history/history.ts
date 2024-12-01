@@ -82,20 +82,31 @@ function sortCommitsInOrder(commits: any[]): any[] {
 
 // Function to compare dependencies across commits
 async function compareDependenciesBetweenCommits(
-  commitProjectsMap: Map<string, { commit: any, projects: DepinderProject[] }[]>,
+  commitProjectsMap: Map<string, { commit: any; projects: DepinderProject[] | "error" }[]>,
   dependencyHistory: DependencyHistory
 ) {
   for (const [pluginName, entries] of commitProjectsMap.entries()) {
-    const reversedEntries = [...entries].reverse();
+    const reversedEntries = [...entries].reverse(); // Reverse to process in chronological order
 
-    for (let i = 1; i < reversedEntries.length; i++) {
-      const currentEntry = reversedEntries[i - 1];
-      const nextEntry = reversedEntries[i];
-      const currentDeps = getDependencyMap(currentEntry.projects[0]);
-      const nextDeps = getDependencyMap(nextEntry.projects[0]);
-      const changes = identifyDependencyChanges(currentDeps, nextDeps);
-      const commitDate = new Date(nextEntry.commit.commit.committer.timestamp * 1000).toISOString();
-      await processDependencyChanges(dependencyHistory, changes, nextEntry.commit.oid, commitDate);
+    let lastValidEntry: { commit: any; projects: DepinderProject[] } | null = null;
+
+    for (const entry of reversedEntries) {
+      if (entry.projects === "error") {
+        console.log(
+          `Skipping entry for plugin ${pluginName} at commit ${entry.commit.oid} due to errors.`
+        );
+        continue;
+      }
+
+      if (lastValidEntry) {
+        const currentDeps = getDependencyMap(lastValidEntry.projects[0]);
+        const nextDeps = getDependencyMap(entry.projects[0]);
+        const changes = identifyDependencyChanges(currentDeps, nextDeps);
+        const commitDate = new Date(entry.commit.commit.committer.timestamp * 1000).toISOString();
+        await processDependencyChanges(dependencyHistory, changes, entry.commit.oid, commitDate);
+      }
+
+      lastValidEntry = entry as { commit: any; projects: DepinderProject[] };
     }
   }
 }

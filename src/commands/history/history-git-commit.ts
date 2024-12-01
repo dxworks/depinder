@@ -25,7 +25,7 @@ export async function processCommitForPlugins(
   commit: any,
   folder: string,
   selectedPlugins: Plugin[],
-  commitProjectsMap: Map<string, { commit: any, projects: DepinderProject[] }[]>
+  commitProjectsMap: Map<string, { commit: any, projects: DepinderProject[] | string}[]>
 ) {
   const changes = await getChangedFiles(commit, folder);
   await ensureDirectoryExists(depinderTempFolder);
@@ -46,6 +46,8 @@ export async function processCommitForPlugins(
 
     if (filteredFiles.length > 0) {
       const tempFilePaths: string[] = [];
+      let allFilesExist = true;
+
       for (const file of filteredFiles) {
         const tempFilePath = path.join(depinderTempFolder, `${commit.oid}-${path.basename(file)}`);
         try {
@@ -59,8 +61,23 @@ export async function processCommitForPlugins(
           await fs.writeFile(tempFilePath, fileContent.blob);
           tempFilePaths.push(tempFilePath);
         } catch (error) {
-          console.error(`Failed to create temp file for ${file} at commit ${commit.oid}:`, error);
+          console.error(`Failed to read file ${file} at commit ${commit.oid}:`, error);
+          allFilesExist = false;
         }
+      }
+
+      if (!allFilesExist) {
+        console.log(`Skipping plugin ${plugin.name} for commit ${commit.oid} due to missing files.`);
+        if (!commitProjectsMap.has(plugin.name)) {
+          commitProjectsMap.set(plugin.name, []);
+        }
+        commitProjectsMap.get(plugin.name)!.push({
+          commit,
+          projects: "error",
+        });
+
+        await cleanupTempFiles(tempFilePaths);
+        continue;
       }
 
       const projects: DepinderProject[] = await extractProjects(plugin, tempFilePaths);
