@@ -2,8 +2,8 @@ import {Command} from 'commander'
 import {AnalyseOptions} from '../analyse'
 import {getPluginsFromNames} from '../../plugins'
 import {DepinderProject} from "../../extension-points/extract"
-import {log} from "../../utils/logging"
-import {getCommits, processCommitForPlugins} from "./history-git-commit"
+import {log} from '../../utils/logging'
+import {getCommits, processCommitForPlugins} from './history-git-commit'
 
 export const historyCommand = new Command()
   .name('history')
@@ -29,12 +29,11 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
       continue;
     }
     const sortedCommits = sortCommitsInOrder(commits);
-    const testCommits = sortedCommits.slice(0, 20); // Take only the first 20 commits for testing
+    const testCommits = sortedCommits.slice(0, 20); // take only the first 20 commits for testing
     for (const commit of testCommits) {
-      console.log("Commit: " + JSON.stringify(commit));
+      console.log("Commit: " + commit.oid + " Parent: " + commit.commit.parent);
       await processCommitForPlugins(commit, folder, selectedPlugins, commitProjectsMap);
     }
-
   }
 
   const dependencyHistory: DependencyHistory = {};
@@ -46,37 +45,45 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
   }
 }
 
+// sort git commits => based on Kahn's Algorithm for Topological Sorting
 function sortCommitsInOrder(commits: any[]): any[] {
   const commitMap = new Map<string, any>();
+  const indegreeMap = new Map<string, number>();
   const childrenMap = new Map<string, any[]>();
-  let rootCommit: any = null;
-
   commits.forEach(commit => {
     commitMap.set(commit.oid, commit);
-    if (commit.commit.parent.length === 0) {
-      rootCommit = commit; // Identify root commit
-    } else {
-      commit.commit.parent.forEach((parentOid: string) => {
-        if (!childrenMap.has(parentOid)) {
-          childrenMap.set(parentOid, []);
-        }
-        childrenMap.get(parentOid)!.push(commit);
-      });
+    if (!indegreeMap.has(commit.oid)) {
+      indegreeMap.set(commit.oid, 0);
     }
+    commit.commit.parent.forEach((parentOid: string) => {
+      if (!childrenMap.has(parentOid)) {
+        childrenMap.set(parentOid, []);
+      }
+      childrenMap.get(parentOid)!.push(commit);
+      indegreeMap.set(commit.oid, (indegreeMap.get(commit.oid) || 0) + 1);
+    });
   });
-
+  const rootCommits = commits.filter(commit => commit.commit.parent.length === 0);
   const sortedCommits: any[] = [];
-  function traverseCommit(commit: any) {
-    sortedCommits.push(commit);
-    if (childrenMap.has(commit.oid)) {
-      childrenMap.get(commit.oid)!.forEach(childCommit => traverseCommit(childCommit));
+  const queue: any[] = [...rootCommits];
+
+  while (queue.length > 0) {
+    const currentCommit = queue.shift();
+    sortedCommits.push(currentCommit);
+    if (childrenMap.has(currentCommit.oid)) {
+      for (const child of childrenMap.get(currentCommit.oid)!) {
+        const childIndegree = (indegreeMap.get(child.oid) || 0) - 1;
+        indegreeMap.set(child.oid, childIndegree);
+        if (childIndegree === 0) {
+          queue.push(child);
+        }
+      }
     }
   }
-
-  if (rootCommit) {
-    traverseCommit(rootCommit);
+  const remainingCommits = commits.filter(commit => indegreeMap.get(commit.oid) !== 0);
+  if (remainingCommits.length > 0) {
+    console.warn('Detected a cycle in the commit graph, which cannot be fully sorted.');
   }
-
   return sortedCommits;
 }
 
@@ -86,11 +93,12 @@ async function compareDependenciesBetweenCommits(
   dependencyHistory: DependencyHistory
 ) {
   for (const [pluginName, entries] of commitProjectsMap.entries()) {
-    const reversedEntries = [...entries].reverse(); // Reverse to process in chronological order
-
+    entries.forEach(entry => {
+      console.log("Commit OID:", entry.commit.oid);
+    });
     let lastValidEntry: { commit: any; projects: DepinderProject[] } | null = null;
 
-    for (const entry of reversedEntries) {
+    for (const entry of entries) {
       if (entry.projects === "error") {
         console.log(
           `Skipping entry for plugin ${pluginName} at commit ${entry.commit.oid} due to errors.`
