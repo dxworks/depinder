@@ -35,12 +35,14 @@ export async function processCommitForPlugins(
       .filter((file) => (plugin.extractor.filter ? plugin.extractor.filter(file) : true))
       .filter((file) => plugin.extractor.files.some((pattern) => minimatch(file, pattern, {matchBase: true})));
 
-    if (filteredFiles.includes('package.json') || filteredFiles.includes('package-lock.json')) {
-      if (!filteredFiles.includes('package.json')) {
-        filteredFiles.push('package.json');
-      }
-      if (!filteredFiles.includes('package-lock.json')) {
-        filteredFiles.push('package-lock.json');
+    if(plugin.name === 'npm') {
+      if (filteredFiles.includes('package.json') || filteredFiles.includes('package-lock.json')) {
+        if (!filteredFiles.includes('package.json')) {
+          filteredFiles.push('package.json');
+        }
+        if (!filteredFiles.includes('package-lock.json')) {
+          filteredFiles.push('package-lock.json');
+        }
       }
     }
 
@@ -81,11 +83,9 @@ export async function processCommitForPlugins(
       }
 
       const projects: DepinderProject[] = await extractProjects(plugin, tempFilePaths);
-      projects.forEach(project => {
-        const dependencyIds = Object.values(project.dependencies).map(dep => dep.id).join(', ');
-        // const requestedBy = Object.values(project.dependencies).map(dep => dep.requestedBy.join(', ')).join(', ');
+      projects.forEach((project) => {
+        const dependencyIds = Object.values(project.dependencies).map((dep) => dep.id).join(', ');
         console.log(`Project: ${project.name}, Dependencies: ${dependencyIds}`);
-        // console.log(`Requested By: ${requestedBy}`);
       });
 
       await cleanupTempFiles(tempFilePaths);
@@ -154,7 +154,6 @@ async function extractProjects(plugin: Plugin, files: string[]) {
   return projects
 }
 
-
 // Function to ensure the directory exists
 async function ensureDirectoryExists(directoryPath: string) {
   try {
@@ -163,7 +162,6 @@ async function ensureDirectoryExists(directoryPath: string) {
     console.error(`Failed to create directory: ${directoryPath}`, error);
   }
 }
-
 
 // Function to clean up temp files after processing
 async function cleanupTempFiles(tempFilePaths: string[]) {
