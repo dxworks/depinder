@@ -6,6 +6,7 @@ import {log} from "../../utils/logging"
 import path from "path"
 import {depinderTempFolder} from "../../utils/utils"
 import {promises as fs} from 'fs'
+import {processJavaPlugin} from './java-plugin';
 
 // Function to fetch commits from a Git repository
 export async function getCommits(folder: string): Promise<any[]> {
@@ -25,7 +26,7 @@ export async function processCommitForPlugins(
   commit: any,
   folder: string,
   selectedPlugins: Plugin[],
-  commitProjectsMap: Map<string, { commit: any, projects: DepinderProject[] | string}[]>
+  commitProjectsMap: Map<string, { commit: any; projects: DepinderProject[] | string }[]>
 ) {
   const changes = await getChangedFiles(commit, folder);
   await ensureDirectoryExists(depinderTempFolder);
@@ -35,7 +36,7 @@ export async function processCommitForPlugins(
       .filter((file) => (plugin.extractor.filter ? plugin.extractor.filter(file) : true))
       .filter((file) => plugin.extractor.files.some((pattern) => minimatch(file, pattern, {matchBase: true})));
 
-    if(plugin.name === 'npm') {
+    if (plugin.name === 'npm' && filteredFiles.length > 0) {
       if (filteredFiles.includes('package.json') || filteredFiles.includes('package-lock.json')) {
         if (!filteredFiles.includes('package.json')) {
           filteredFiles.push('package.json');
@@ -44,9 +45,6 @@ export async function processCommitForPlugins(
           filteredFiles.push('package-lock.json');
         }
       }
-    }
-
-    if (filteredFiles.length > 0) {
       const tempFilePaths: string[] = [];
       let allFilesExist = true;
 
@@ -59,7 +57,6 @@ export async function processCommitForPlugins(
             oid: commit.oid,
             filepath: file,
           });
-
           await fs.writeFile(tempFilePath, fileContent.blob);
           tempFilePaths.push(tempFilePath);
         } catch (error) {
@@ -75,7 +72,7 @@ export async function processCommitForPlugins(
         }
         commitProjectsMap.get(plugin.name)!.push({
           commit,
-          projects: "error",
+          projects: 'error',
         });
 
         await cleanupTempFiles(tempFilePaths);
@@ -84,12 +81,44 @@ export async function processCommitForPlugins(
 
       const projects: DepinderProject[] = await extractProjects(plugin, tempFilePaths);
       projects.forEach((project) => {
-        const dependencyIds = Object.values(project.dependencies).map((dep) => dep.id).join(', ');
+        const dependencyIds = Object.values(project.dependencies)
+          .map((dep) => dep.id)
+          .join(', ');
         console.log(`Project: ${project.name}, Dependencies: ${dependencyIds}`);
       });
 
       await cleanupTempFiles(tempFilePaths);
 
+      if (!commitProjectsMap.has(plugin.name)) {
+        commitProjectsMap.set(plugin.name, []);
+      }
+      commitProjectsMap.get(plugin.name)!.push({ commit, projects });
+    }
+
+    if (plugin.name === 'java' && filteredFiles.length > 0) {
+      let tempFilePaths: string[] = [];
+      let projects: DepinderProject[] | string = [];
+
+      try {
+        tempFilePaths = await processJavaPlugin(commit, folder, filteredFiles);
+        console.log('Temp Java file paths:', tempFilePaths);
+        if (!tempFilePaths || tempFilePaths.length === 0) {
+          throw new Error('No temp files returned from processJavaPlugin.');
+        }
+        const parsedProjects = await extractProjects(plugin, tempFilePaths);
+        parsedProjects.forEach((project) => {
+          const dependencyIds = Object.values(project.dependencies)
+            .map((dep) => dep.id)
+            .join(', ');
+          console.log(`Project: ${project.name}, Dependencies: ${dependencyIds}`);
+        });
+        projects = parsedProjects;
+      } catch (error) {
+        console.error(`Error processing Java plugin for commit ${commit.oid}:`, error);
+        projects = 'error';
+      } finally {
+        await cleanupTempFiles(tempFilePaths);
+      }
       if (!commitProjectsMap.has(plugin.name)) {
         commitProjectsMap.set(plugin.name, []);
       }

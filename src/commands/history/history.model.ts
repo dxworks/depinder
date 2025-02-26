@@ -11,4 +11,11 @@ interface StatusEntry {
   version?: string;        // For ADDED or DELETED actions
   fromVersion?: string;    // Only for MODIFIED action
   toVersion?: string;      // Only for MODIFIED action
+  // depinderDependencyName: string;
 }
+
+// interface CommitDependencyHistory {
+//   [commitOid: string]: {
+//     history: StatusEntry[];
+//   };
+// }

@@ -19,6 +19,7 @@ const extractor: Extractor = {
 
         const pomContexts = files.filter(it => it.endsWith('pom.xml')).map(it => ({
             root: path.dirname(it),
+            manifestFile: 'pom.xml',
             lockFile: 'deptree.txt',
             type: 'maven',
         } as DependencyFileContext))
