@@ -6,7 +6,7 @@ import {log} from "../../utils/logging"
 import path from "path"
 import {depinderTempFolder} from "../../utils/utils"
 import {promises as fs} from 'fs'
-import {processJavaPlugin} from './java-plugin';
+import {processJavaPlugin} from './java-plugin'
 
 // Function to fetch commits from a Git repository
 export async function getCommits(folder: string): Promise<any[]> {
@@ -31,99 +31,79 @@ export async function processCommitForPlugins(
   const changes = await getChangedFiles(commit, folder);
   await ensureDirectoryExists(depinderTempFolder);
 
+  const tempFilePathsMap = new Map<string, string[]>(); // Store temp files per plugin
+
   for (const plugin of selectedPlugins) {
     let filteredFiles = changes
       .filter((file) => (plugin.extractor.filter ? plugin.extractor.filter(file) : true))
-      .filter((file) => plugin.extractor.files.some((pattern) => minimatch(file, pattern, {matchBase: true})));
+      .filter((file) => plugin.extractor.files.some((pattern) => minimatch(file, pattern, { matchBase: true })));
 
-    if (plugin.name === 'npm' && filteredFiles.length > 0) {
-      if (filteredFiles.includes('package.json') || filteredFiles.includes('package-lock.json')) {
-        if (!filteredFiles.includes('package.json')) {
-          filteredFiles.push('package.json');
-        }
-        if (!filteredFiles.includes('package-lock.json')) {
-          filteredFiles.push('package-lock.json');
-        }
-      }
-      const tempFilePaths: string[] = [];
-      let allFilesExist = true;
-
-      for (const file of filteredFiles) {
-        const tempFilePath = path.join(depinderTempFolder, `${commit.oid}-${path.basename(file)}`);
-        try {
-          const fileContent = await git.readBlob({
-            fs,
-            dir: folder,
-            oid: commit.oid,
-            filepath: file,
-          });
-          await fs.writeFile(tempFilePath, fileContent.blob);
-          tempFilePaths.push(tempFilePath);
-        } catch (error) {
-          console.error(`Failed to read file ${file} at commit ${commit.oid}:`, error);
-          allFilesExist = false;
-        }
-      }
-
-      if (!allFilesExist) {
-        console.log(`Skipping plugin ${plugin.name} for commit ${commit.oid} due to missing files.`);
-        if (!commitProjectsMap.has(plugin.name)) {
-          commitProjectsMap.set(plugin.name, []);
-        }
-        commitProjectsMap.get(plugin.name)!.push({
-          commit,
-          projects: 'error',
-        });
-
-        await cleanupTempFiles(tempFilePaths);
-        continue;
-      }
-
-      const projects: DepinderProject[] = await extractProjects(plugin, tempFilePaths);
-      projects.forEach((project) => {
-        const dependencyIds = Object.values(project.dependencies)
-          .map((dep) => dep.id)
-          .join(', ');
-        console.log(`Project: ${project.name}, Dependencies: ${dependencyIds}`);
-      });
-
-      await cleanupTempFiles(tempFilePaths);
-
-      if (!commitProjectsMap.has(plugin.name)) {
-        commitProjectsMap.set(plugin.name, []);
-      }
-      commitProjectsMap.get(plugin.name)!.push({ commit, projects });
-    }
-
-    if (plugin.name === 'java' && filteredFiles.length > 0) {
+    if (filteredFiles.length > 0) {
       let tempFilePaths: string[] = [];
-      let projects: DepinderProject[] | string = [];
 
       try {
-        tempFilePaths = await processJavaPlugin(commit, folder, filteredFiles);
-        console.log('Temp Java file paths:', tempFilePaths);
-        if (!tempFilePaths || tempFilePaths.length === 0) {
-          throw new Error('No temp files returned from processJavaPlugin.');
+        if (plugin.name === 'npm') {
+          if (filteredFiles.includes('package.json') || filteredFiles.includes('package-lock.json')) {
+            if (!filteredFiles.includes('package.json')) {
+              filteredFiles.push('package.json');
+            }
+            if (!filteredFiles.includes('package-lock.json')) {
+              filteredFiles.push('package-lock.json');
+            }
+          }
+
+          for (const file of filteredFiles) {
+            const tempFilePath = path.join(depinderTempFolder, `${commit.oid}-${path.basename(file)}`);
+            try {
+              const fileContent = await git.readBlob({
+                fs,
+                dir: folder,
+                oid: commit.oid,
+                filepath: file,
+              });
+              await fs.writeFile(tempFilePath, fileContent.blob);
+              tempFilePaths.push(tempFilePath);
+            } catch (error) {
+              console.error(`Failed to read file ${file} at commit ${commit.oid}:`, error);
+            }
+          }
+        } else if (plugin.name === 'java') {
+          tempFilePaths = await processJavaPlugin(commit, folder, filteredFiles);
+          if (!tempFilePaths || tempFilePaths.length === 0) {
+            throw new Error('No temp files returned from processJavaPlugin.');
+          }
         }
-        const parsedProjects = await extractProjects(plugin, tempFilePaths);
-        parsedProjects.forEach((project) => {
-          const dependencyIds = Object.values(project.dependencies)
-            .map((dep) => dep.id)
-            .join(', ');
-          console.log(`Project: ${project.name}, Dependencies: ${dependencyIds}`);
-        });
-        projects = parsedProjects;
+
+        // Store temp file paths for later extraction
+        tempFilePathsMap.set(plugin.name, tempFilePaths);
       } catch (error) {
-        console.error(`Error processing Java plugin for commit ${commit.oid}:`, error);
-        projects = 'error';
-      } finally {
-        await cleanupTempFiles(tempFilePaths);
+        console.error(`Error processing plugin ${plugin.name} for commit ${commit.oid}:`, error);
+        tempFilePathsMap.set(plugin.name, ['error']);
       }
-      if (!commitProjectsMap.has(plugin.name)) {
-        commitProjectsMap.set(plugin.name, []);
-      }
-      commitProjectsMap.get(plugin.name)!.push({commit, projects});
     }
+  }
+
+  // Now, extract projects for all plugins after handling temp files
+  for (const [pluginName, tempFilePaths] of tempFilePathsMap.entries()) {
+    let projects: DepinderProject[] | string = [];
+
+    if (tempFilePaths[0] !== 'error' && tempFilePaths.length > 0) {
+      try {
+        console.log(`Extracting projects for plugin ${pluginName}...`);
+        projects = await extractProjects(selectedPlugins.find((p) => p.name === pluginName)!, tempFilePaths);
+      } catch (error) {
+        console.error(`Error extracting projects for ${pluginName}:`, error);
+        projects = 'error';
+      }
+    }
+
+    if (!commitProjectsMap.has(pluginName)) {
+      commitProjectsMap.set(pluginName, []);
+    }
+    commitProjectsMap.get(pluginName)!.push({ commit, projects });
+
+    // Cleanup temp files after extraction
+    await cleanupTempFiles(tempFilePaths);
   }
 }
 
@@ -131,13 +111,19 @@ export async function processCommitForPlugins(
 async function getChangedFiles(commit: any, folder: string): Promise<string[]> {
   const changedFiles: string[] = [];
   const currentCommitOid = commit.oid;
-  const parentCommitOid = commit.commit.parent[0];
+  const parentCommitOids = commit.commit.parent;
 
   try {
-    const diff = await git.walk({
+    if (parentCommitOids.length === 0) {
+      return await git.listFiles({fs, dir: folder, ref: currentCommitOid});
+    }
+
+    const parentCommitOid = parentCommitOids[0];
+
+    await git.walk({
       fs,
       dir: folder,
-      trees: [git.TREE({ref: currentCommitOid}), git.TREE({ref: parentCommitOid})],
+      trees: [git.TREE({ ref: currentCommitOid }), git.TREE({ ref: parentCommitOid })],
       map: async function (filepath, [head, base]) {
         if (!head && base) {
           // File was deleted
@@ -153,7 +139,7 @@ async function getChangedFiles(commit: any, folder: string): Promise<string[]> {
             changedFiles.push(filepath);
           }
         }
-      }
+      },
     });
   } catch (error) {
     console.error(`Error getting changed files for commit ${currentCommitOid}:`, error);
