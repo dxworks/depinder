@@ -23,7 +23,7 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
     return;
   }
 
-  const commitProjectsMap: Map<string, { commit: any, projects: DepinderProject[] }[]> = new Map();
+  const commitProjectsMap: Map<string, { commit: any; projects: DepinderProject[] | "error" }[]> = new Map();
 
   for (const folder of folders) {
     const commits = await getCommits(folder);
@@ -34,7 +34,6 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
     const sortedCommits = sortCommitsInOrder(commits);
     const testCommits = sortedCommits.slice(0, 20); // take only the first 20 commits for testing
     for (const commit of testCommits) {
-      console.log("Commit: " + commit.oid + " Parent: " + commit.commit.parent);
       await processCommitForPlugins(commit, folder, selectedPlugins, commitProjectsMap);
     }
   }
@@ -42,38 +41,18 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
   const pluginDependencyHistory = await compareDependenciesBetweenCommits(commitProjectsMap);
 
   for (const [pluginName, dependencyHistory] of pluginDependencyHistory.entries()) {
-    console.log(`Processing dependency history for plugin: ${pluginName}`);
     await processDependencyHistory(pluginName, dependencyHistory);
     await processCommitDependencyHistory(pluginName, dependencyHistory);
   }
-
 }
 
 async function processDependencyHistory(pluginName: string, dependencyHistory: DependencyHistory): Promise<void> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const homeDir = os.homedir();
   const outputPath = path.join(homeDir, 'OutputReportsOfHistory');
-
-  try {
-    await fs.mkdir(outputPath, { recursive: true });
-  } catch (error) {
-    console.error(`Failed to create directory at ${outputPath}:`, error);
-    return;
-  }
-
+  await fs.mkdir(outputPath, { recursive: true });
   const depHistoryFile = path.join(outputPath, `dependency-history-${pluginName}-${timestamp}.json`);
-
-  try {
-    await fs.writeFile(
-      depHistoryFile,
-      JSON.stringify(dependencyHistory, null, 2),
-      'utf8'
-    );
-    console.log(`Dependency history saved to ${depHistoryFile}`);
-  } catch (error) {
-    console.error('Error saving Dependency History JSON file:', error);
-    console.error('This might be due to permissions. Try running the script with elevated privileges or saving to a different directory.');
-  }
+  await fs.writeFile(depHistoryFile, JSON.stringify(dependencyHistory, null, 2), 'utf8');
 }
 
 async function processCommitDependencyHistory(pluginName: string, dependencyHistory: DependencyHistory): Promise<void> {
@@ -81,30 +60,11 @@ async function processCommitDependencyHistory(pluginName: string, dependencyHist
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const homeDir = os.homedir();
   const outputPath = path.join(homeDir, 'OutputReportsOfHistory');
-
-  try {
-    await fs.mkdir(outputPath, { recursive: true });
-  } catch (error) {
-    console.error(`Failed to create directory at ${outputPath}:`, error);
-    return;
-  }
-
+  await fs.mkdir(outputPath, { recursive: true });
   const commitDepHistoryFile = path.join(outputPath, `commit-dependency-history-${pluginName}-${timestamp}.json`);
-
-  try {
-    await fs.writeFile(
-      commitDepHistoryFile,
-      JSON.stringify(commitDepHistory, null, 2),
-      'utf8'
-    );
-    console.log(`Commit dependency history for plugin ${pluginName} saved to ${commitDepHistoryFile}`);
-  } catch (error) {
-    console.error(`Error saving Commit Dependency History JSON file for plugin ${pluginName}:`, error);
-    console.error('This might be due to permissions. Try running the script with elevated privileges or saving to a different directory.');
-  }
+  await fs.writeFile(commitDepHistoryFile, JSON.stringify(commitDepHistory, null, 2), 'utf8');
 }
 
-// sort git commits => based on Kahn's Algorithm for Topological Sorting
 function sortCommitsInOrder(commits: any[]): any[] {
   const commitMap = new Map<string, any>();
   const indegreeMap = new Map<string, number>();
@@ -139,62 +99,48 @@ function sortCommitsInOrder(commits: any[]): any[] {
       }
     }
   }
-  const remainingCommits = commits.filter(commit => indegreeMap.get(commit.oid) !== 0);
-  if (remainingCommits.length > 0) {
-    console.warn('Detected a cycle in the commit graph, which cannot be fully sorted.');
-  }
   return sortedCommits;
 }
 
-// Function to compare dependencies across commits
 async function compareDependenciesBetweenCommits(
   commitProjectsMap: Map<string, { commit: any; projects: DepinderProject[] | "error" }[]>
 ): Promise<Map<string, DependencyHistory>> {
   const pluginDependencyHistory = new Map<string, DependencyHistory>();
-
   for (const [pluginName, entries] of commitProjectsMap.entries()) {
-    console.log(`Processing plugin: ${pluginName}`);
-    // Initialize an empty dependency history for the plugin.
     const pluginHistory: DependencyHistory = {};
-    let lastValidEntry: { commit: any; projects: DepinderProject[] } | null = null;
+    const lastValidProjects: Map<string, DepinderProject> = new Map();
 
     for (const entry of entries) {
-      console.log("Commit OID:", entry.commit.oid);
-
-      if (entry.projects === "error") {
-        console.log(
-          `Skipping entry for plugin ${pluginName} at commit ${entry.commit.oid} due to errors.`
-        );
-        continue;
-      }
-
-      const currentDeps = getDependencyMap(entry.projects[0]);
+      if (entry.projects === 'error') continue;
       const commitDate = new Date(entry.commit.commit.committer.timestamp * 1000).toISOString();
 
-      if (!lastValidEntry) {
-        for (const [depName, version] of Object.entries(currentDeps)) {
-          if (!pluginHistory[depName]) {
-            pluginHistory[depName] = { history: [] };
+      for (const project of entry.projects) {
+        const projectKey = project.name;
+        const currentDeps = getDependencyMap(project);
+        const previousProject = lastValidProjects.get(projectKey);
+
+        if (!previousProject) {
+          for (const [depName, version] of Object.entries(currentDeps)) {
+            if (!pluginHistory[depName]) pluginHistory[depName] = { history: [] };
+            pluginHistory[depName].history.push({
+              commitOid: entry.commit.oid,
+              date: commitDate,
+              action: 'ADDED',
+              version,
+              project: projectKey
+            });
           }
-          pluginHistory[depName].history.push({
-            commitOid: entry.commit.oid,
-            date: commitDate,
-            action: "ADDED",
-            version: version,
-          });
+        } else {
+          const previousDeps = getDependencyMap(previousProject);
+          const changes = identifyDependencyChanges(previousDeps, currentDeps);
+          await processDependencyChanges(pluginHistory, changes, entry.commit.oid, commitDate, projectKey);
         }
-      } else {
-        const previousDeps = getDependencyMap(lastValidEntry.projects[0]);
-        const changes = identifyDependencyChanges(previousDeps, currentDeps);
-        await processDependencyChanges(pluginHistory, changes, entry.commit.oid, commitDate);
+
+        lastValidProjects.set(projectKey, project);
       }
-
-      lastValidEntry = entry as { commit: any; projects: DepinderProject[] };
     }
-
     pluginDependencyHistory.set(pluginName, pluginHistory);
   }
-
   return pluginDependencyHistory;
 }
 
@@ -203,53 +149,41 @@ async function processDependencyChanges(
   changes: { added: string[]; removed: string[]; modified: { dependency: string; from: string; to: string }[] },
   commitOid: string,
   commitDate: string,
+  project: string
 ) {
-  // Process added dependencies
   for (const added of changes.added) {
     const [depName, version] = added.split('@');
-    if (!dependencyHistory[depName]) {
-      dependencyHistory[depName] = {
-        history: []
-      };
-    }
+    if (!dependencyHistory[depName]) dependencyHistory[depName] = { history: [] };
     dependencyHistory[depName].history.push({
       commitOid,
       date: commitDate,
-      action: "ADDED",
-      version
+      action: 'ADDED',
+      version,
+      project
     });
   }
 
-  // Process removed dependencies
   for (const removed of changes.removed) {
     const [depName, version] = removed.split('@');
-    if (!dependencyHistory[depName]) {
-      dependencyHistory[depName] = {
-        history: []
-      };
-    }
+    if (!dependencyHistory[depName]) dependencyHistory[depName] = { history: [] };
     dependencyHistory[depName].history.push({
       commitOid,
       date: commitDate,
-      action: "DELETED",
-      version
+      action: 'DELETED',
+      version,
+      project
     });
   }
 
-  // Process modified dependencies
-  for (const modified of changes.modified) {
-    const {dependency: depName, from, to} = modified;
-    if (!dependencyHistory[depName]) {
-      dependencyHistory[depName] = {
-        history: []
-      };
-    }
-    dependencyHistory[depName].history.push({
+  for (const { dependency, from, to } of changes.modified) {
+    if (!dependencyHistory[dependency]) dependencyHistory[dependency] = { history: [] };
+    dependencyHistory[dependency].history.push({
       commitOid,
       date: commitDate,
-      action: "MODIFIED",
+      action: 'MODIFIED',
       fromVersion: from,
-      toVersion: to
+      toVersion: to,
+      project
     });
   }
 }
@@ -263,20 +197,19 @@ function getDependencyMap(project: DepinderProject | undefined): Record<string, 
   }, {} as Record<string, string>);
 }
 
-// Function to identify added, removed, and modified dependencies between two maps
 function identifyDependencyChanges(
   currentDeps: Record<string, string>,
   nextDeps: Record<string, string>
 ) {
   const added: string[] = [];
   const removed: string[] = [];
-  const modified: { dependency: string, from: string, to: string }[] = [];
+  const modified: { dependency: string; from: string; to: string }[] = [];
 
   for (const dep in currentDeps) {
     if (!nextDeps[dep]) {
       removed.push(`${dep}@${currentDeps[dep]}`);
     } else if (currentDeps[dep] !== nextDeps[dep]) {
-      modified.push({dependency: dep, from: currentDeps[dep], to: nextDeps[dep]});
+      modified.push({ dependency: dep, from: currentDeps[dep], to: nextDeps[dep] });
     }
   }
 
@@ -286,14 +219,14 @@ function identifyDependencyChanges(
     }
   }
 
-  return {added, removed, modified};
+  return { added, removed, modified };
 }
 
 function createCommitDependencyHistory(dependencyHistory: DependencyHistory): CommitDependencyHistory {
   const commitDependencyHistory: CommitDependencyHistory = {};
   for (const [depName, depData] of Object.entries(dependencyHistory)) {
     for (const statusEntry of depData.history) {
-      const { commitOid } = statusEntry;
+      const { commitOid, project } = statusEntry;
       if (!commitDependencyHistory[commitOid!]) {
         commitDependencyHistory[commitOid!] = { history: [] };
       }
@@ -301,6 +234,7 @@ function createCommitDependencyHistory(dependencyHistory: DependencyHistory): Co
         ...statusEntry,
         commitOid: undefined,
         depinderDependencyName: depName,
+        project
       });
     }
   }

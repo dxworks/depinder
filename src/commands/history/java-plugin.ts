@@ -14,8 +14,6 @@ export async function processJavaPlugin(
   filteredFiles: string[]
 ): Promise<string[]> {
   let result: string[] = [];
-  const tempFiles: string[] = [];
-  let deptreePath: string | undefined = undefined;
 
   try {
     console.log(`Processing Java plugin for commit ${commit.oid} in folder "${folder}"`);
@@ -27,69 +25,55 @@ export async function processJavaPlugin(
     });
     console.log('Checkout successful.');
 
-    let pomFile: string | null = null;
-    for (const filePath of filteredFiles) {
-      if (filePath.endsWith('pom.xml')) {
-        pomFile = path.join(folder, filePath);
-        console.log(`Found pom.xml at: ${pomFile}`);
-        break;
-      }
-    }
+    for (const relativeFilePath of filteredFiles) {
+      if (!relativeFilePath.endsWith('pom.xml')) continue;
 
-    if (!pomFile) {
-      console.error(`No pom.xml found in filteredFiles for commit ${commit.oid}.`);
-      return [];
-    }
+      const pomFile = path.join(folder, relativeFilePath);
+      console.log(`Found pom.xml at: ${pomFile}`);
 
-    const tempPomXmlPath = path.join(depinderTempFolder, "pom.xml");
-    try {
+      const projectName = path.basename(path.dirname(pomFile));
+      const projectTempFolder = path.join(depinderTempFolder, projectName);
+      await fs.mkdir(projectTempFolder, { recursive: true });
+      console.log(`Created/verified temp folder for project "${projectName}": ${projectTempFolder}`);
+
+      const tempPomXmlPath = path.join(projectTempFolder, "pom.xml");
       await fs.copyFile(pomFile, tempPomXmlPath);
       console.log(`Copied pom.xml to temp: ${tempPomXmlPath}`);
-      tempFiles.push(tempPomXmlPath);
-    } catch (copyError) {
-      console.error(`Failed to copy pom.xml:`, copyError);
-      return [];
-    }
+      result.push(tempPomXmlPath);
 
-    const pomDir = path.dirname(pomFile);
-    console.log(`Running Maven command in directory: ${pomDir}`);
+      const pomDir = path.dirname(pomFile);
+      console.log(`Running Maven command in directory: ${pomDir}`);
+      const mavenCommand = 'mvn dependency:tree -DoutputFile=deptree.txt';
+      const { stdout, stderr } = await execPromise(mavenCommand, { cwd: pomDir });
+      console.log('Maven command output:', stdout);
+      if (stderr) {
+        console.log('Maven command errors:', stderr);
+      }
 
-    const mavenCommand = 'mvn dependency:tree -DoutputFile=deptree.txt';
-    console.log(`Running Maven command: ${mavenCommand}`);
-    const { stdout, stderr } = await execPromise(mavenCommand, { cwd: pomDir });
-    console.log('Maven command output:', stdout);
-    if (stderr) {
-      console.log('Maven command errors:', stderr);
-    }
+      const deptreePath = path.join(pomDir, 'deptree.txt');
+      console.log(`Verifying existence of deptree file at "${deptreePath}"...`);
+      await fs.access(deptreePath);
+      console.log('deptree.txt found.');
 
-    deptreePath = path.join(pomDir, 'deptree.txt');
-    console.log(`Verifying existence of deptree file at "${deptreePath}"...`);
-    await fs.access(deptreePath);
-    console.log('deptree.txt found.');
+      const tempDepTreePath = path.join(projectTempFolder, "deptree.txt");
+      await fs.copyFile(deptreePath, tempDepTreePath);
+      console.log(`Copied deptree.txt to temp: ${tempDepTreePath}`);
+      result.push(tempDepTreePath);
 
-    const tempDepTreePath = path.join(depinderTempFolder, "deptree.txt");
-    console.log(`Copying deptree.txt to temporary file at "${tempDepTreePath}"...`);
-    await fs.copyFile(deptreePath, tempDepTreePath);
-    console.log('deptree.txt file copied successfully.');
-    tempFiles.push(tempDepTreePath);
-
-    result = tempFiles;
-    console.log('Process complete. Returning files:', result);
-  } catch (error) {
-    console.error(`Failed to process Java plugin for commit ${commit.oid}:`, error);
-    return [];
-  } finally {
-    if (deptreePath) {
       try {
         await fs.unlink(deptreePath);
-        console.log(`Successfully deleted deptree.txt at "${deptreePath}".`);
+        console.log(`Deleted original deptree.txt at "${deptreePath}".`);
       } catch (deleteError: any) {
         if (deleteError.code !== 'ENOENT') {
           console.error(`Error deleting deptree.txt at "${deptreePath}":`, deleteError);
         }
       }
     }
-  }
 
-  return result;
+    console.log('Process complete. Returning files:', result);
+    return result;
+  } catch (error) {
+    console.error(`Failed to process Java plugin for commit ${commit.oid}:`, error);
+    return [];
+  }
 }
