@@ -64,7 +64,8 @@
     "spdx-license-ids": "^3.0.10",
     "tmp": "^0.2.1",
     "toml": "^3.0.0",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "xml2js": "^0.6.2"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.9.2",
@@ -80,6 +81,7 @@
     "@types/string-template": "^1.0.2",
     "@types/tmp": "^0.2.3",
     "@types/ws": "^8.5.4",
+    "@types/xml2js": "^0.4.14",
     "@typescript-eslint/eslint-plugin": "^4.32.0",
     "@typescript-eslint/parser": "^4.32.0",
     "copyfiles": "^2.4.1",
