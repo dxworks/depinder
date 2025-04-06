@@ -169,7 +169,7 @@ function matchImportToLibrary (importStatement: ImportStatement, depinderDepende
  * known depinder dependencies.
  */
 function fallbackResolveImport(importPath: string, depinderDependencies: Record<string, DepinderDependency>): DepinderDependency | null {
-    const installedLibs = new Set(Object.keys(depinderDependencies));
+    const installedLibs = new Set(Object.keys(depinderDependencies))
 
     const parts = importPath.split('/')
     const candidates = []
@@ -187,7 +187,7 @@ function fallbackResolveImport(importPath: string, depinderDependencies: Record<
     // Match longest valid package
     for (const candidate of candidates.sort((a, b) => b.length - a.length)) {
         if (installedLibs.has(candidate)) {
-            return depinderDependencies[candidate];
+            return depinderDependencies[candidate]
         }
     }
 

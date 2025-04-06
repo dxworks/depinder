@@ -4,7 +4,7 @@ import {analyseCommand} from './commands/analyse'
 import {cacheCommand} from './commands/cache'
 import {updateCommand} from './commands/update'
 import {extractFrameworkVersionsCommand} from './commands/extractFrameworkVersion'
-import {inspectCommand} from './commands/inspect';
+import {inspectCommand} from './commands/inspect'
 
 export const mainCommand = new Command()
     .name('depinder')
