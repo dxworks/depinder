@@ -1,10 +1,8 @@
 import {DepinderDependency} from './extract'
-import {LibraryInfo} from './registrar'
 
 export interface CodeFinder {
-    getDeclaredEntities?: (library: DepinderDependency) => Promise<string[]> // returns the list of entities that are declared in the library (e.g. classes, functions, packages, namespaces etc.)
-
-    matchImportToLibrary?: (importStatement: ImportStatement) => LibraryInfo | null // tries to match an import statement to a library
+    matchImportToLibrary: (importStatement: ImportStatement, depinderDependencies: Record<string, DepinderDependency>) => DepinderDependency | null // tries to match an import statement to a library
+    getDependencyKey: (depinderDependency: DepinderDependency) => string // returns the key that is used to identify a dependency
 }
 
 export interface ImportStatement {
@@ -12,7 +10,7 @@ export interface ImportStatement {
     importedEntity: string
     modifiers: string[]
     language: string
-    used?: boolean
-    library?: string
+    // used?: boolean -> not implemented yet in the script for getting the imports
+    library: string
     fullImport: string
 }

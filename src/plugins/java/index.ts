@@ -1,4 +1,10 @@
-import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
+import {
+    DependencyFileContext,
+    DepinderDependency,
+    DepinderProject,
+    Extractor,
+    Parser,
+} from '../../extension-points/extract'
 // @ts-ignore
 import path from 'path'
 import {AbstractRegistrar, LibrariesIORegistrar, LibraryInfo} from '../../extension-points/registrar'
@@ -9,6 +15,7 @@ import fs from 'fs'
 import {depinderTempFolder} from '../../utils/utils'
 import {parseMavenDependencyTree} from './parsers/maven'
 import {log} from '../../utils/logging'
+import {CodeFinder, ImportStatement} from '../../extension-points/code-impact'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pomParser = require('pom-parser')
@@ -156,6 +163,36 @@ export class MavenCentralRegistrar extends AbstractRegistrar {
 
 const javaRegistrar = new MavenCentralRegistrar(new LibrariesIORegistrar('maven'))
 
+/*
+  I don't think we actually need this. Keep it here for now to see exactly which ones are not based on a jdeps match
+ */
+function removeLibraryVersion(libraryName: string): string {
+    const parts = libraryName.split('-')
+    if (parts.length > 1) {
+        parts.pop()
+        return parts.join('-')
+    }
+    return libraryName
+}
+
+function matchImportToLibrary (
+    importStatement: ImportStatement,
+    depinderDependencies: Record<string, DepinderDependency>
+): DepinderDependency | null  {
+    const libraryName = removeLibraryVersion(importStatement.library)
+    return depinderDependencies[libraryName] ?? null
+}
+
+function getDependencyKey(depinderDependency: DepinderDependency): string {
+    const parts = depinderDependency.name.split(':')
+    return parts[1] // artifactId
+}
+
+const codeFinder: CodeFinder = {
+    matchImportToLibrary,
+    getDependencyKey,
+}
+
 export const java: Plugin = {
     name: 'java',
     aliases: ['maven', 'gradle'],
@@ -163,5 +200,6 @@ export const java: Plugin = {
     parser,
     registrar: javaRegistrar,
     checker,
+    codeFinder,
 }
 

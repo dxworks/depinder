@@ -16,6 +16,7 @@ import {Plugin} from '../../extension-points/plugin'
 import {npm} from '../../utils/npm'
 import fs from 'fs'
 import {log} from '../../utils/logging'
+import {CodeFinder, ImportStatement} from '../../extension-points/code-impact'
 
 const extractor: Extractor = {
     files: ['package.json', 'package-lock.json', 'yarn.lock'],
@@ -157,12 +158,59 @@ const checker: VulnerabilityChecker = {
     getPURL: (lib, ver) => `pkg:npm/${lib.replace('@', '%40')}@${ver}`,
 }
 
+function matchImportToLibrary (importStatement: ImportStatement, depinderDependencies: Record<string, DepinderDependency>): DepinderDependency | null  {
+    const libraryName = importStatement.library
+    return depinderDependencies[libraryName] ?? fallbackResolveImport(importStatement.library, depinderDependencies)
+}
+
+/**
+ * Handles import sub-paths (e.g., 'swr/immutable', 'lodash/fp') by trying to
+ * resolve them to their root package (e.g., 'swr', 'lodash') from the list of
+ * known depinder dependencies.
+ */
+function fallbackResolveImport(importPath: string, depinderDependencies: Record<string, DepinderDependency>): DepinderDependency | null {
+    const installedLibs = new Set(Object.keys(depinderDependencies));
+
+    const parts = importPath.split('/')
+    const candidates = []
+
+    // Scoped packages (@scope/package)
+    if (importPath.startsWith('@') && parts.length >= 2) {
+        candidates.push(`${parts[0]}/${parts[1]}`)
+    }
+
+    // All shorter prefixes (e.g. lodash/fp → lodash)
+    for (let i = 1; i <= parts.length; i++) {
+        candidates.push(parts.slice(0, i).join('/'))
+    }
+
+    // Match longest valid package
+    for (const candidate of candidates.sort((a, b) => b.length - a.length)) {
+        if (installedLibs.has(candidate)) {
+            return depinderDependencies[candidate];
+        }
+    }
+
+    return null // no match
+}
+
+
+function getDependencyKey(depinderDependency: DepinderDependency): string {
+    return depinderDependency.name
+}
+
+const codeFinder: CodeFinder = {
+    matchImportToLibrary,
+    getDependencyKey,
+}
+
 export const javascript: Plugin = {
     name: 'npm',
-    aliases: ['js', 'javascript', 'node', 'nodejs', 'yarn'],
+    aliases: ['js', 'javascript', 'javascript (jsx)', 'ts', 'typescript', 'typescript (tsx)', 'node', 'nodejs', 'yarn'],
     extractor,
     parser,
     registrar,
     checker,
+    codeFinder,
 }
 

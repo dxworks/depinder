@@ -109,8 +109,12 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
 
     const selectedPlugins = getPluginsFromNames(options.plugins)
 
+    const depinderDependencies: Record<string, Record<string, DepinderDependency>> = {}
+
     for (const plugin of selectedPlugins) {
         log.info(`Plugin ${plugin.name} starting`)
+
+        depinderDependencies[plugin.name] = {}
 
         const cache: Cache = useCache ? chooseCacheOption() : noCache
         await cache.load()
@@ -177,6 +181,15 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
             }
             depProgressBar.stop()
             projectsBar.increment()
+
+            if (plugin.codeFinder){
+                for (const  dependency of Object.values(project.dependencies)) {
+                    const key = plugin.codeFinder?.getDependencyKey(dependency)
+                    depinderDependencies[plugin.name][key] = dependency
+                }
+            } else {
+                console.warn(`Plugin '${plugin.name}' does not support CodeFinder yet.`)
+            }
         }
         projectsBar.stop()
 
@@ -241,6 +254,17 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
 
             return `${proj.path},${proj.name},${directDeps.length},${indirectDeps.length},${directOutdated.length},${directOutDatedPercent},${indirectOutdated.length},${indirectOutDatedPercent},${directVulnerable.length},${indirectVulnerable.length},${directOutOfSupport.length},${indirectOutOfSupport.length}`
         }).join('\n'))
+    }
+
+    // the depinderDependencies should not be empty in order to be relevant for code finder
+    const shouldSaveDepinderOutput = Object.values(depinderDependencies).some(
+        (pluginDeps) => Object.keys(pluginDeps).length > 0
+    )
+    if (shouldSaveDepinderOutput){
+        fs.writeFileSync(
+            path.resolve(process.cwd(), resultFolder, 'depinder-projects.json'),
+            JSON.stringify(depinderDependencies, null, 2)
+        )
     }
 
     log.info(`Results are written to ${path.resolve(process.cwd(), resultFolder)}`)
