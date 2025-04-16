@@ -1,12 +1,27 @@
 import {Command} from 'commander'
 import {AnalyseOptions} from '../analyse'
 import {getPluginsFromNames} from '../../plugins'
-import {DepinderProject} from "../../extension-points/extract"
+import { DepinderProject, Extractor, Parser } from "../../extension-points/extract"
 import {log} from '../../utils/logging'
 import {getCommits, processCommitForPlugins} from './history-git-commit'
 import {promises as fs} from 'fs'
 import path from 'path'
 import * as os from "os"
+import {LibraryInfo, Registrar} from "../../extension-points/registrar"
+import {VulnerabilityChecker} from "../../extension-points/vulnerability-checker"
+import {CodeFinder} from "../../extension-points/code-impact"
+import {getVulnerabilitiesFromGithub} from "../../utils/vulnerabilities"
+
+export interface Plugin {
+  name: string // the name of the technology (could be language name or package manager name)
+  aliases?: string[] // potential aliases to use from CLI
+  extractor: Extractor // defines which files to search for
+  parser?: Parser // defines how to parse the files specified by the extractor and returns a tree with all dependencies
+  registrar: Registrar // gets information about libraries from package manager apis
+  checker?: VulnerabilityChecker // checks for vulnerabilities for the found dependencies
+
+  codeFinder?: CodeFinder // finds the references in code for a all dependencies of a project
+}
 
 export const historyCommand = new Command()
   .name('history')
@@ -17,7 +32,7 @@ export const historyCommand = new Command()
   .action(analyseHistory);
 
 export async function analyseHistory(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
-  const selectedPlugins = getPluginsFromNames(options.plugins);
+  const selectedPlugins: Plugin[] = getPluginsFromNames(options.plugins);
   if (folders.length === 0) {
     log.info('No folders provided to analyze.');
     return;
@@ -44,6 +59,54 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
     await processDependencyHistory(pluginName, dependencyHistory);
     await processCommitDependencyHistory(pluginName, dependencyHistory);
   }
+
+  await saveLibrariesToJson(selectedPlugins, pluginDependencyHistory);
+}
+
+async function saveLibrariesToJson(
+  selectedPlugins: Plugin[],
+  pluginDependencyHistory: Map<string, DependencyHistory>
+) {
+  const idsToUpdate = new Set<string>();
+  for (const [pluginName, depHistory] of pluginDependencyHistory.entries()) {
+    for (const depName of Object.keys(depHistory)) {
+      idsToUpdate.add(`${pluginName}:${depName}`);
+    }
+  }
+  const idsArray = Array.from(idsToUpdate).slice(0, 10);
+  const libraryInfoMap: Record<string, { plugin: string; info: LibraryInfo }> = {};
+
+  for (const plugin of selectedPlugins) {
+    const libsToUpdate = idsArray.filter(id => id.startsWith(`${plugin.name}:`));
+
+    for (const id of libsToUpdate) {
+      const libraryName = id.substring(plugin.name.length + 1);
+      try {
+        const lib = await plugin.registrar.retrieve(libraryName);
+        if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
+          try {
+            lib.vulnerabilities = await getVulnerabilitiesFromGithub(
+              plugin.checker.githubSecurityAdvisoryEcosystem,
+              lib.name
+            );
+          } catch {}
+        }
+        libraryInfoMap[id] = {
+          plugin: plugin.name,
+          info: lib
+        };
+
+      } catch {}
+    }
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const homeDir = os.homedir();
+  const outputPath = path.join(homeDir, 'OutputReportsOfHistory');
+  await fs.mkdir(outputPath, { recursive: true });
+
+  const filePath = path.join(outputPath, `library-info-${timestamp}.json`);
+  await fs.writeFile(filePath, JSON.stringify(libraryInfoMap, null, 2), 'utf8');
 }
 
 async function processDependencyHistory(pluginName: string, dependencyHistory: DependencyHistory): Promise<void> {
