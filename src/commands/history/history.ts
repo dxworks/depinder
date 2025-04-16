@@ -73,7 +73,7 @@ async function saveLibrariesToJson(
       idsToUpdate.add(`${pluginName}:${depName}`);
     }
   }
-  const idsArray = Array.from(idsToUpdate).slice(0, 10);
+  const idsArray = Array.from(idsToUpdate);
   const libraryInfoMap: Record<string, { plugin: string; info: LibraryInfo }> = {};
 
   for (const plugin of selectedPlugins) {
