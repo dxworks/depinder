@@ -73,7 +73,7 @@ async function saveLibrariesToJson(
       idsToUpdate.add(`${pluginName}:${depName}`);
     }
   }
-  const idsArray = Array.from(idsToUpdate);
+  const idsArray = Array.from(idsToUpdate).slice(0,5);
   const libraryInfoMap: Record<string, { plugin: string; info: LibraryInfo }> = {};
 
   for (const plugin of selectedPlugins) {
@@ -179,18 +179,20 @@ async function compareDependenciesBetweenCommits(
 
       for (const project of entry.projects) {
         const projectKey = project.name;
-        const currentDeps = getDependencyMap(project);
+        const currentDeps = getDependencyMap(project); // includes version + type
         const previousProject = lastValidProjects.get(projectKey);
 
         if (!previousProject) {
-          for (const [depName, version] of Object.entries(currentDeps)) {
+          // Initial commit for this project, all are ADDED
+          for (const [depName, { version, type }] of Object.entries(currentDeps)) {
             if (!pluginHistory[depName]) pluginHistory[depName] = { history: [] };
             pluginHistory[depName].history.push({
               commitOid: entry.commit.oid,
               date: commitDate,
               action: 'ADDED',
               version,
-              project: projectKey
+              project: projectKey,
+              type
             });
           }
         } else {
@@ -209,36 +211,40 @@ async function compareDependenciesBetweenCommits(
 
 async function processDependencyChanges(
   dependencyHistory: DependencyHistory,
-  changes: { added: string[]; removed: string[]; modified: { dependency: string; from: string; to: string }[] },
+  changes: {
+    added: [string, { version: string, type: "direct" | "transitive" }][];
+    removed: [string, { version: string, type: "direct" | "transitive" }][];
+    modified: { dependency: string; from: string; to: string; type: "direct" | "transitive" }[];
+  },
   commitOid: string,
   commitDate: string,
   project: string
 ) {
-  for (const added of changes.added) {
-    const [depName, version] = added.split('@');
+  for (const [depName, { version, type }] of changes.added) {
     if (!dependencyHistory[depName]) dependencyHistory[depName] = { history: [] };
     dependencyHistory[depName].history.push({
       commitOid,
       date: commitDate,
       action: 'ADDED',
       version,
-      project
+      project,
+      type
     });
   }
 
-  for (const removed of changes.removed) {
-    const [depName, version] = removed.split('@');
+  for (const [depName, { version, type }] of changes.removed) {
     if (!dependencyHistory[depName]) dependencyHistory[depName] = { history: [] };
     dependencyHistory[depName].history.push({
       commitOid,
       date: commitDate,
       action: 'DELETED',
       version,
-      project
+      project,
+      type
     });
   }
 
-  for (const { dependency, from, to } of changes.modified) {
+  for (const { dependency, from, to, type } of changes.modified) {
     if (!dependencyHistory[dependency]) dependencyHistory[dependency] = { history: [] };
     dependencyHistory[dependency].history.push({
       commitOid,
@@ -246,39 +252,49 @@ async function processDependencyChanges(
       action: 'MODIFIED',
       fromVersion: from,
       toVersion: to,
-      project
+      project,
+      type
     });
   }
 }
 
-function getDependencyMap(project: DepinderProject | undefined): Record<string, string> {
+function getDependencyMap(project: DepinderProject | undefined): Record<string, { version: string, type: "direct" | "transitive" }> {
   if (!project) return {};
   return Object.values(project.dependencies).reduce((map, dep) => {
-    const [name, version] = dep.id.split('@');
-    map[name] = version;
+    const [name] = dep.id.split('@');
+    const isDirect = dep.requestedBy.length === 1 && dep.requestedBy[0] === 'root';
+    map[name] = {
+      version: dep.version,
+      type: isDirect ? 'direct' : 'transitive'
+    };
     return map;
-  }, {} as Record<string, string>);
+  }, {} as Record<string, { version: string, type: "direct" | "transitive" }>);
 }
 
 function identifyDependencyChanges(
-  currentDeps: Record<string, string>,
-  nextDeps: Record<string, string>
+  currentDeps: Record<string, { version: string, type: "direct" | "transitive" }>,
+  nextDeps: Record<string, { version: string, type: "direct" | "transitive" }>
 ) {
-  const added: string[] = [];
-  const removed: string[] = [];
-  const modified: { dependency: string; from: string; to: string }[] = [];
+  const added: [string, { version: string, type: "direct" | "transitive" }][] = [];
+  const removed: [string, { version: string, type: "direct" | "transitive" }][] = [];
+  const modified: { dependency: string; from: string; to: string; type: "direct" | "transitive" }[] = [];
 
   for (const dep in currentDeps) {
     if (!nextDeps[dep]) {
-      removed.push(`${dep}@${currentDeps[dep]}`);
-    } else if (currentDeps[dep] !== nextDeps[dep]) {
-      modified.push({ dependency: dep, from: currentDeps[dep], to: nextDeps[dep] });
+      removed.push([dep, currentDeps[dep]]);
+    } else if (currentDeps[dep].version !== nextDeps[dep].version) {
+      modified.push({
+        dependency: dep,
+        from: currentDeps[dep].version,
+        to: nextDeps[dep].version,
+        type: nextDeps[dep].type
+      });
     }
   }
 
   for (const dep in nextDeps) {
     if (!currentDeps[dep]) {
-      added.push(`${dep}@${nextDeps[dep]}`);
+      added.push([dep, nextDeps[dep]]);
     }
   }
 

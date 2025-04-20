@@ -13,6 +13,7 @@ interface StatusEntry {
   fromVersion?: string;    // Only for MODIFIED action
   toVersion?: string;      // Only for MODIFIED action
   project?: string;          // Project the dependency belongs to
+  type?: "direct" | "transitive";
 }
 
 interface CommitDependencyHistory {
