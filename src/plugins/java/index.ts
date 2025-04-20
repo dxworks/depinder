@@ -163,28 +163,15 @@ export class MavenCentralRegistrar extends AbstractRegistrar {
 
 const javaRegistrar = new MavenCentralRegistrar(new LibrariesIORegistrar('maven'))
 
-/*
-  I don't think we actually need this. Keep it here for now to see exactly which ones are not based on a jdeps match
- */
-function removeLibraryVersion(libraryName: string): string {
-    const parts = libraryName.split('-')
-    if (parts.length > 1) {
-        parts.pop()
-        return parts.join('-')
-    }
-    return libraryName
-}
-
 function matchImportToLibrary (
     importStatement: ImportStatement,
     depinderDependencies: Record<string, DepinderDependency>
 ): DepinderDependency | null  {
-    const libraryName = removeLibraryVersion(importStatement.library)
-    return depinderDependencies[libraryName] ?? null
+    return depinderDependencies[importStatement.library]
 }
 
 function getDependencyKey(depinderDependency: DepinderDependency): string {
-    const parts = depinderDependency.name.split(':')
+    const parts = depinderDependency.id.split(':')
     return parts[1] // artifactId
 }
 
