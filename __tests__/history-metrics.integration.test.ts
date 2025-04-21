@@ -1,9 +1,9 @@
 import { runMetrics } from "../src/commands/history-metrics/metrics-command";
 
-describe('test growth-pattern metric and chart generation', () => {
-  it('should generate the growth-pattern metric and corresponding chart', async () => {
+describe('test metric and chart generation', () => {
+  it('should generate the metric and corresponding chart', async () => {
     await runMetrics('/Users/avram/OutputReportsOfHistory', {
-      results: 'results-growth-pattern',
+      results: 'results-charts',
       metric: 'growth-pattern',
       chart: true,
       chartType: ['line', 'bar', 'stacked', 'stacked-area'],
