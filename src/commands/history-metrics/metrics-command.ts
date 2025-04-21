@@ -1,7 +1,8 @@
-import fs from 'fs';
-import path from 'path';
-import { AdditionRemovalMetric } from "./metrics";
-import { Command } from "commander";
+import fs from 'fs'
+import path from 'path'
+import {GrowthPatternMetric } from "./metrics-generator"
+import {Command} from "commander"
+import {generateGrowthPatternChartData, generateHtmlChart} from "./chart-generator"
 
 export const runMetricsCommand = new Command()
   .name('metrics')
@@ -11,16 +12,14 @@ export const runMetricsCommand = new Command()
   .option('--metric <metricType>', 'Metric type to calculate', 'addition-removal')
   .option('--chart', 'Generate chart visualization', false)
   .option('--chartType <chartType>', 'Chart type (bar | line | stacked)', 'bar')
-  .option('--title <title>', 'Optional chart title')
   .option('--inputFiles <inputFiles...>', 'List of input files to use (without .json)')
   .action(runMetrics);
 
-interface MetricOptions {
+export interface MetricOptions {
   results: string;
   metric: string;
   chart: boolean;
-  chartType: 'bar' | 'line' | 'stacked';
-  title?: string;
+  chartType: ('line' | 'bar' | 'stacked' | 'stacked-area')[];
   inputFiles: string[];
 }
 
@@ -49,7 +48,6 @@ export async function runMetrics(folder: string, options: MetricOptions): Promis
     const filePath = path.join(folder, fileName);
     const fileContents = fs.readFileSync(filePath, 'utf-8');
     const data: CommitDependencyHistory = JSON.parse(fileContents);
-
     const results = metricProcessor(data);
 
     const resultsFolder = path.join(path.dirname(filePath), options.results);
@@ -58,7 +56,12 @@ export async function runMetrics(folder: string, options: MetricOptions): Promis
     fs.writeFileSync(outputFile, JSON.stringify(results, null, 2));
 
     if (options.chart) {
-      await generateHtmlChart(outputFile, results, options);
+      const chartConfigs = getChartDataForMetric(options.metric, results, options);
+      if (chartConfigs && chartConfigs.length > 0) {
+        await generateHtmlChart(outputFile, chartConfigs);
+      } else {
+        console.warn(`⚠️  No chart generator defined for metric '${options.metric}'. Skipping chart.`);
+      }
     }
 
     console.log(`✅ Metric calculated for ${filePath} and chart generated (if requested).`);
@@ -67,8 +70,8 @@ export async function runMetrics(folder: string, options: MetricOptions): Promis
 
 function getMetricProcessor(metricType: string): ((data: CommitDependencyHistory) => any) | undefined {
   switch (metricType) {
-    case 'addition-removal':
-      return AdditionRemovalMetric;
+    case 'growth-pattern':
+      return GrowthPatternMetric;
     default:
       return undefined;
   }
@@ -76,50 +79,22 @@ function getMetricProcessor(metricType: string): ((data: CommitDependencyHistory
 
 function getRequiredInputFilesForMetric(metricType: string): string[] {
   switch (metricType) {
-    case 'addition-removal':
-      return ['commit-dependency-history-java'];
+    case 'growth-pattern':
+      return ['commit-dependency-history'];
     default:
       return [];
   }
 }
 
-async function generateHtmlChart(outputFile: string, results: any[], options: MetricOptions) {
-  const chartFile = outputFile.replace('.json', '.html');
-  const traceAdded = {
-    x: results.map((r: any) => r.date),
-    y: results.map((r: any) => r.added.direct + r.added.transitive),
-    name: 'Added',
-    type: options.chartType
-  };
-  const traceRemoved = {
-    x: results.map((r: any) => r.date),
-    y: results.map((r: any) => r.removed.direct + r.removed.transitive),
-    name: 'Removed',
-    type: options.chartType
-  };
-  const dataTraces = [traceAdded, traceRemoved];
-  const layout = {
-    title: options.title || 'Dependency Changes Over Time',
-    barmode: options.chartType === 'stacked' ? 'stack' : undefined
-  };
-  const html = `
-    <html>
-    <head>
-      <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    </head>
-    <body>
-      <div id="chart"></div>
-      <script>
-        const data = ${JSON.stringify(dataTraces)};
-        const layout = ${JSON.stringify(layout)};
-        Plotly.newPlot('chart', data, layout);
-      </script>
-    </body>
-    </html>`;
-
-  fs.writeFileSync(chartFile, html);
-  if (process.env.NODE_ENV !== 'test') {
-    const open = (await import('open')).default;
-    await open(chartFile);
+function getChartDataForMetric(
+  metricType: string,
+  results: any[],
+  options: MetricOptions
+): { data: any[]; layout: any }[] | null {
+  switch (metricType) {
+    case 'growth-pattern':
+      return generateGrowthPatternChartData(results, options);
+    default:
+      return null;
   }
 }

@@ -1,16 +1,17 @@
 import { runMetrics } from "../src/commands/history-metrics/metrics-command";
 
-describe('test general metric and chart generation', () => {
-  it('should generate the metric and corresponding chart', async () => {
+describe('test growth-pattern metric and chart generation', () => {
+  it('should generate the growth-pattern metric and corresponding chart', async () => {
     await runMetrics('/Users/avram/OutputReportsOfHistory', {
-      results: 'results-addition-removal',
-      metric: 'addition-removal',
+      results: 'results-growth-pattern',
+      metric: 'growth-pattern',
       chart: true,
-      chartType: 'stacked',
-      title: '📦 Additions & Removals Over Time',
-      inputFiles: ['dependency-history-java-2025-04-20T21-17-13-671Z',
-        'commit-dependency-history-java-2025-04-20T21-17-13-675Z',
-        'library-info-2025-04-20T21-17-21-745Z']
+      chartType: ['line', 'bar', 'stacked', 'stacked-area'],
+      inputFiles: [
+        'dependency-history-java-2025-04-21T19-40-53-470Z',
+        'commit-dependency-history-java-2025-04-21T19-40-53-473Z',
+        'library-info-2025-04-21T19-41-01-669Z'
+      ]
     });
 
     console.log('✅ Done generating metric + chart.');
