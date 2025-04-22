@@ -11,7 +11,8 @@ describe('test metric and chart generation', () => {
         'dependency-history-java-2025-04-21T19-40-53-470Z',
         'commit-dependency-history-java-2025-04-21T19-40-53-473Z',
         'library-info-2025-04-21T19-41-01-669Z'
-      ]
+      ],
+      plugin: 'java'
     });
 
     console.log('✅ Done generating metric + chart.');

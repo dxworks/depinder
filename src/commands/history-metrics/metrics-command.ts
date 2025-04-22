@@ -13,6 +13,7 @@ export const runMetricsCommand = new Command()
   .option('--chart', 'Generate chart visualization', false)
   .option('--chartType <chartType>', 'Chart type (bar | line | stacked)', 'bar')
   .option('--inputFiles <inputFiles...>', 'List of input files to use (without .json)')
+  .option('--plugin <plugin>', 'Plugin name to resolve input file prefixes')
   .action(runMetrics);
 
 export interface MetricOptions {
@@ -21,6 +22,7 @@ export interface MetricOptions {
   chart: boolean;
   chartType: ('line' | 'bar' | 'stacked' | 'stacked-area')[];
   inputFiles: string[];
+  plugin: string;
 }
 
 export async function runMetrics(folder: string, options: MetricOptions): Promise<void> {
@@ -30,26 +32,26 @@ export async function runMetrics(folder: string, options: MetricOptions): Promis
     return;
   }
 
-  if (options.inputFiles.length === 0) {
-    console.error('❌ No valid input files provided.');
+  if (!options.inputFiles || options.inputFiles.length === 0) {
+    console.error('❌ No input files provided.');
     return;
   }
 
-  const requiredFiles = getRequiredInputFilesForMetric(options.metric);
+  const basePrefixes = getRequiredInputFilesForMetric(options.metric);
+  const requiredPrefixes = getFilePrefixesForPlugin(basePrefixes, options.plugin);
+  const validInputFiles = filterValidInputFiles(options.inputFiles, requiredPrefixes);
 
-  for (const relativePath of options.inputFiles) {
+  if (validInputFiles.length === 0) {
+    console.warn(`⚠️  No input files matched the required pattern for metric '${options.metric}'`);
+    return;
+  }
+
+  for (const relativePath of validInputFiles) {
     const fileName = relativePath.endsWith('.json') ? relativePath : `${relativePath}.json`;
-    const fileBase = path.basename(fileName);
-    if (!requiredFiles.some(prefix => fileBase.startsWith(prefix))) {
-      console.log(`ℹ️  Skipping file '${fileBase}' — not required for metric '${options.metric}'.`);
-      continue;
-    }
-
     const filePath = path.join(folder, fileName);
     const fileContents = fs.readFileSync(filePath, 'utf-8');
     const data: CommitDependencyHistory = JSON.parse(fileContents);
     const results = metricProcessor(data);
-
     const resultsFolder = path.join(path.dirname(filePath), options.results);
     fs.mkdirSync(resultsFolder, { recursive: true });
     const outputFile = path.join(resultsFolder, `${path.parse(filePath).name}-${options.metric}-metric.json`);
@@ -57,7 +59,7 @@ export async function runMetrics(folder: string, options: MetricOptions): Promis
 
     if (options.chart) {
       const chartConfigs = getChartDataForMetric(options.metric, results, options);
-      if (chartConfigs && chartConfigs.length > 0) {
+      if (chartConfigs?.length) {
         await generateHtmlChart(outputFile, chartConfigs);
       } else {
         console.warn(`⚠️  No chart generator defined for metric '${options.metric}'. Skipping chart.`);
@@ -66,6 +68,16 @@ export async function runMetrics(folder: string, options: MetricOptions): Promis
 
     console.log(`✅ Metric calculated for ${filePath} and chart generated (if requested).`);
   }
+}
+
+function getFilePrefixesForPlugin(basePrefixes: string[], plugin?: string): string[] {
+  return basePrefixes.map(base => (plugin ? `${base}-${plugin}` : base));
+}
+
+function filterValidInputFiles(inputFiles: string[], requiredPrefixes: string[]): string[] {
+  return inputFiles.filter(file =>
+    requiredPrefixes.some(prefix => file.startsWith(prefix))
+  );
 }
 
 function getMetricProcessor(metricType: string): ((data: CommitDependencyHistory) => any) | undefined {
