@@ -8,7 +8,9 @@ describe('test inspect command', () => {
 
         inspectImports(
             './results-test-meetvent/depinder-projects.json',
-            './results-test-meetvent/extracted-imports-meetvent.json'
+            './results-test-meetvent/extracted-imports-meetvent.json', {
+                results: 'results-inspect-meetvent2',
+            }
         )
 
         log.info('Inspect command completed')
