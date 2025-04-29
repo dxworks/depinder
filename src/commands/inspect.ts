@@ -75,23 +75,30 @@ function computeLibraryUsageResults(
     matches: { importStatement: ImportStatement, depinderDependency: DepinderDependency | null }[],
     resultsFolder: string
 ) {
+    const concernsMap = new Map<string, { strength: number, entity: string, tag: string }>()
     const libraryUsageMap = new Map<string, LibraryUsage>()
-    const libraryFileImportsSet = new Set<string>()
 
     for (const { importStatement, depinderDependency } of matches) {
         if (!depinderDependency) continue
 
         const { id: libraryId, name, version } = depinderDependency
         const filePath = importStatement.file
+        const normalizedLibraryId = libraryId.replace(/\./g, '_')
+        const concernMapKey = `${filePath}::${normalizedLibraryId}`
         const projectPath = importStatement.projectPath
 
-        // First result: unique import occurrences per file
-        const importOccurrence = {
-            nameOfLibrary: name,
-            versionOfLibrary: version,
-            file: filePath,
+        // First result
+        let concern = concernsMap.get(concernMapKey)
+        if (!concern) {
+            concern = {
+                strength: 0,
+                entity: filePath,
+                tag: `library.${normalizedLibraryId}`,
+            }
+            concernsMap.set(concernMapKey, concern)
         }
-        libraryFileImportsSet.add(JSON.stringify(importOccurrence))
+
+        concern.strength++
 
         // Second & Third results: per-library aggregation
         let usage = libraryUsageMap.get(libraryId)
@@ -108,7 +115,7 @@ function computeLibraryUsageResults(
         usage.projectNames.add(projectPath)
     }
 
-    writeLibraryFileImports(libraryFileImportsSet, resultsFolder)
+    writeLibraryFileImports(concernsMap, resultsFolder)
     writeLibraryUsageSummary(libraryUsageMap, resultsFolder)
     writeLibraryUsageCsvReport(libraryUsageMap, resultsFolder)
 
@@ -121,13 +128,30 @@ function computeLibraryUsageResults(
 
 /**
  * Writes unique library import occurrences per file.
- * Output format: [{nameOfLibrary, versionOfLibrary, file}}
+ * Output format:
+ *      {"file":
+ *          {"concerns":[
+ *                  {
+ *                  "strength":${number_of_occurences},
+ *                  "entity": ${file},
+ *                  "tag": `library.${libraryId}` // and in the libraryId where we have '.' we should have '_'
+ *                  }
+ *              ]
+ *          }
+ *      }
  */
-function writeLibraryFileImports(libraryFileImportsSet: Set<string>, resultsFolder: string) {
-    const libraryFileImports = Array.from(libraryFileImportsSet, s => JSON.parse(s))
+function writeLibraryFileImports(concernsMap: Map<string, { strength: number, entity: string, tag: string }>, resultsFolder: string) {
+    const concerns = Array.from(concernsMap.values())
+
+    const output = {
+        file: {
+            concerns,
+        },
+    }
+
     fs.writeFileSync(
         path.resolve(resultsFolder, 'library-file-imports.json'),
-        JSON.stringify(libraryFileImports, null, 2)
+        JSON.stringify(output, null, 2)
     )
 }
 
