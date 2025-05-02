@@ -1,21 +1,18 @@
 import { runMetrics } from "../src/commands/history-metrics/metrics-command";
 
-describe('test metric and chart generation', () => {
-  it('should generate the metric and corresponding chart', async () => {
+describe('test version change metric generation', () => {
+  it('should generate the version-changes metric', async () => {
     await runMetrics('/Users/avram/OutputReportsOfHistory', {
-      results: 'results-charts',
-      metric: 'growth-pattern',
+      results: 'results-charts-version-changes',
+      metric: 'version-changes',
       chart: true,
       chartType: ['line', 'bar', 'stacked', 'stacked-area'],
       inputFiles: [
-        'dependency-history-java-2025-04-21T19-40-53-470Z',
-        'commit-dependency-history-java-2025-04-21T19-40-53-473Z',
-        'library-info-2025-04-21T19-41-01-669Z'
+        'dependency-history-java-2025-04-21T19-40-53-470Z'
       ],
       plugin: 'java'
     });
 
-    console.log('✅ Done generating metric + chart.');
+    console.log('✅ Done generating version-changes metric.');
   });
 });
-

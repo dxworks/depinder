@@ -1,8 +1,8 @@
 import fs from 'fs'
 import path from 'path'
-import {GrowthPatternMetric } from "./metrics-generator"
-import {Command} from "commander"
-import {generateGrowthPatternChartData, generateHtmlChart} from "./chart-generator"
+import {GrowthPatternMetric, VersionChangeMetric} from './metrics-generator';
+import {Command} from 'commander';
+import {generateGrowthPatternChartData, generateHtmlChart, generateVersionChangeChartData} from './chart-generator';
 
 export const runMetricsCommand = new Command()
   .name('metrics')
@@ -50,10 +50,12 @@ export async function runMetrics(folder: string, options: MetricOptions): Promis
     const fileName = relativePath.endsWith('.json') ? relativePath : `${relativePath}.json`;
     const filePath = path.join(folder, fileName);
     const fileContents = fs.readFileSync(filePath, 'utf-8');
-    const data: CommitDependencyHistory = JSON.parse(fileContents);
+    const data = JSON.parse(fileContents);
     const results = metricProcessor(data);
+
     const resultsFolder = path.join(path.dirname(filePath), options.results);
     fs.mkdirSync(resultsFolder, { recursive: true });
+
     const outputFile = path.join(resultsFolder, `${path.parse(filePath).name}-${options.metric}-metric.json`);
     fs.writeFileSync(outputFile, JSON.stringify(results, null, 2));
 
@@ -70,20 +72,12 @@ export async function runMetrics(folder: string, options: MetricOptions): Promis
   }
 }
 
-function getFilePrefixesForPlugin(basePrefixes: string[], plugin?: string): string[] {
-  return basePrefixes.map(base => (plugin ? `${base}-${plugin}` : base));
-}
-
-function filterValidInputFiles(inputFiles: string[], requiredPrefixes: string[]): string[] {
-  return inputFiles.filter(file =>
-    requiredPrefixes.some(prefix => file.startsWith(prefix))
-  );
-}
-
-function getMetricProcessor(metricType: string): ((data: CommitDependencyHistory) => any) | undefined {
+function getMetricProcessor(metricType: string): ((data: any) => any) | undefined {
   switch (metricType) {
     case 'growth-pattern':
       return GrowthPatternMetric;
+    case 'version-changes':
+      return VersionChangeMetric;
     default:
       return undefined;
   }
@@ -93,6 +87,8 @@ function getRequiredInputFilesForMetric(metricType: string): string[] {
   switch (metricType) {
     case 'growth-pattern':
       return ['commit-dependency-history'];
+    case 'version-changes':
+      return ['dependency-history'];
     default:
       return [];
   }
@@ -100,13 +96,25 @@ function getRequiredInputFilesForMetric(metricType: string): string[] {
 
 function getChartDataForMetric(
   metricType: string,
-  results: any[],
+  results: any,
   options: MetricOptions
 ): { data: any[]; layout: any }[] | null {
   switch (metricType) {
     case 'growth-pattern':
       return generateGrowthPatternChartData(results, options);
+    case 'version-changes':
+      return generateVersionChangeChartData(results, options);
     default:
       return null;
   }
+}
+
+function getFilePrefixesForPlugin(basePrefixes: string[], plugin?: string): string[] {
+  return basePrefixes.map(base => (plugin ? `${base}-${plugin}` : base));
+}
+
+function filterValidInputFiles(inputFiles: string[], requiredPrefixes: string[]): string[] {
+  return inputFiles.filter(file =>
+    requiredPrefixes.some(prefix => file.startsWith(prefix))
+  );
 }
