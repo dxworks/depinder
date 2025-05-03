@@ -13,7 +13,6 @@ export const runMetricsCommand = new Command()
   .option('--chart', 'Generate chart visualization', false)
   .option('--chartType <chartType>', 'Chart type (bar | line | stacked)', 'bar')
   .option('--inputFiles <inputFiles...>', 'List of input files to use (without .json)')
-  .option('--plugin <plugin>', 'Plugin name to resolve input file prefixes')
   .action(runMetrics);
 
 export interface MetricOptions {
@@ -22,7 +21,6 @@ export interface MetricOptions {
   chart: boolean;
   chartType: ('line' | 'bar' | 'stacked' | 'stacked-area')[];
   inputFiles: string[];
-  plugin: string;
 }
 
 export async function runMetrics(folder: string, options: MetricOptions): Promise<void> {
@@ -32,31 +30,41 @@ export async function runMetrics(folder: string, options: MetricOptions): Promis
     return;
   }
 
+  const requiredPrefixes = getRequiredInputFilesForMetric(options.metric);
   if (!options.inputFiles || options.inputFiles.length === 0) {
     console.error('❌ No input files provided.');
     return;
   }
 
-  const basePrefixes = getRequiredInputFilesForMetric(options.metric);
-  const requiredPrefixes = getFilePrefixesForPlugin(basePrefixes, options.plugin);
-  const validInputFiles = filterValidInputFiles(options.inputFiles, requiredPrefixes);
+  const validInputFiles = options.inputFiles.filter(file =>
+    requiredPrefixes.some(prefix => file.startsWith(prefix))
+  );
 
   if (validInputFiles.length === 0) {
-    console.warn(`⚠️  No input files matched the required pattern for metric '${options.metric}'`);
+    console.warn(`⚠️ No input files match the required prefixes: ${requiredPrefixes.join(', ')}`);
     return;
   }
+
+  console.log(validInputFiles);
+  console.log(metricProcessor);
 
   for (const relativePath of validInputFiles) {
     const fileName = relativePath.endsWith('.json') ? relativePath : `${relativePath}.json`;
     const filePath = path.join(folder, fileName);
+
+    if (!fs.existsSync(filePath)) {
+      console.warn(`⚠️ File not found: ${filePath}`);
+      continue;
+    }
+
     const fileContents = fs.readFileSync(filePath, 'utf-8');
     const data = JSON.parse(fileContents);
     const results = metricProcessor(data);
 
-    const resultsFolder = path.join(path.dirname(filePath), options.results);
+    const resultsFolder = path.join(folder, options.results);
     fs.mkdirSync(resultsFolder, { recursive: true });
 
-    const outputFile = path.join(resultsFolder, `${path.parse(filePath).name}-${options.metric}-metric.json`);
+    const outputFile = path.join(resultsFolder, `${path.parse(fileName).name}-${options.metric}-metric.json`);
     fs.writeFileSync(outputFile, JSON.stringify(results, null, 2));
 
     if (options.chart) {
@@ -64,7 +72,7 @@ export async function runMetrics(folder: string, options: MetricOptions): Promis
       if (chartConfigs?.length) {
         await generateHtmlChart(outputFile, chartConfigs);
       } else {
-        console.warn(`⚠️  No chart generator defined for metric '${options.metric}'. Skipping chart.`);
+        console.warn(`⚠️ No chart generator defined for metric '${options.metric}'. Skipping chart.`);
       }
     }
 
@@ -109,12 +117,3 @@ function getChartDataForMetric(
   }
 }
 
-function getFilePrefixesForPlugin(basePrefixes: string[], plugin?: string): string[] {
-  return basePrefixes.map(base => (plugin ? `${base}-${plugin}` : base));
-}
-
-function filterValidInputFiles(inputFiles: string[], requiredPrefixes: string[]): string[] {
-  return inputFiles.filter(file =>
-    requiredPrefixes.some(prefix => file.startsWith(prefix))
-  );
-}

@@ -55,10 +55,7 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
 
   const pluginDependencyHistory = await compareDependenciesBetweenCommits(commitProjectsMap);
 
-  for (const [pluginName, dependencyHistory] of pluginDependencyHistory.entries()) {
-    await processDependencyHistory(pluginName, dependencyHistory);
-    await processCommitDependencyHistory(pluginName, dependencyHistory);
-  }
+  await saveCombinedDependencyHistory(pluginDependencyHistory);
 
   await saveLibrariesToJson(selectedPlugins, pluginDependencyHistory);
 }
@@ -109,23 +106,51 @@ async function saveLibrariesToJson(
   await fs.writeFile(filePath, JSON.stringify(libraryInfoMap, null, 2), 'utf8');
 }
 
-async function processDependencyHistory(pluginName: string, dependencyHistory: DependencyHistory): Promise<void> {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const homeDir = os.homedir();
-  const outputPath = path.join(homeDir, 'OutputReportsOfHistory');
-  await fs.mkdir(outputPath, { recursive: true });
-  const depHistoryFile = path.join(outputPath, `dependency-history-${pluginName}-${timestamp}.json`);
-  await fs.writeFile(depHistoryFile, JSON.stringify(dependencyHistory, null, 2), 'utf8');
-}
+async function saveCombinedDependencyHistory(
+  pluginDependencyHistory: Map<string, DependencyHistory>
+) {
+  const combinedDepHistory: DependencyHistory = {};
+  const combinedCommitDepHistory: CommitDependencyHistory = {};
 
-async function processCommitDependencyHistory(pluginName: string, dependencyHistory: DependencyHistory): Promise<void> {
-  const commitDepHistory: CommitDependencyHistory = createCommitDependencyHistory(dependencyHistory);
+  for (const [pluginName, depHistory] of pluginDependencyHistory.entries()) {
+    for (const [depName, depData] of Object.entries(depHistory)) {
+      if (!combinedDepHistory[depName]) {
+        combinedDepHistory[depName] = {history: []};
+      }
+      combinedDepHistory[depName].history.push(...depData.history);
+
+      for (const entry of depData.history) {
+        const {commitOid, ...rest} = entry;
+        if (!commitOid) continue;
+
+        if (!combinedCommitDepHistory[commitOid]) {
+          combinedCommitDepHistory[commitOid] = {history: []};
+        }
+
+        combinedCommitDepHistory[commitOid].history.push({
+          ...rest,
+          depinderDependencyName: depName,
+        });
+      }
+    }
+  }
+
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const homeDir = os.homedir();
   const outputPath = path.join(homeDir, 'OutputReportsOfHistory');
-  await fs.mkdir(outputPath, { recursive: true });
-  const commitDepHistoryFile = path.join(outputPath, `commit-dependency-history-${pluginName}-${timestamp}.json`);
-  await fs.writeFile(commitDepHistoryFile, JSON.stringify(commitDepHistory, null, 2), 'utf8');
+  await fs.mkdir(outputPath, {recursive: true});
+
+  await fs.writeFile(
+    path.join(outputPath, `dependency-history-${timestamp}.json`),
+    JSON.stringify(combinedDepHistory, null, 2),
+    'utf8'
+  );
+
+  await fs.writeFile(
+    path.join(outputPath, `commit-dependency-history-${timestamp}.json`),
+    JSON.stringify(combinedCommitDepHistory, null, 2),
+    'utf8'
+  );
 }
 
 function sortCommitsInOrder(commits: any[]): any[] {
@@ -262,10 +287,13 @@ function getDependencyMap(project: DepinderProject | undefined): Record<string, 
   if (!project) return {};
   return Object.values(project.dependencies).reduce((map, dep) => {
     const [name] = dep.id.split('@');
-    const isDirect = dep.requestedBy.length === 1 && dep.requestedBy[0] === 'root';
+    const directDep: boolean =
+      !dep.requestedBy ||
+      dep.requestedBy.some(it => it.startsWith(`${project.name}@${project.version}`));
+
     map[name] = {
       version: dep.version,
-      type: isDirect ? 'direct' : 'transitive'
+      type: directDep ? 'direct' : 'transitive'
     };
     return map;
   }, {} as Record<string, { version: string, type: "direct" | "transitive" }>);

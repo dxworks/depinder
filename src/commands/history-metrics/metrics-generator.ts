@@ -43,36 +43,38 @@ export function GrowthPatternMetric(data: CommitDependencyHistory): any {
   return Object.values(summary);
 }
 
+export function VersionChangeMetric(dependencies: Record<string, { history: any[] }>): any {
+  const results: Record<
+    string,
+    {
+      upgrades: number;
+      downgrades: number;
+    }
+  > = {};
 
-export function VersionChangeMetric(data: Record<string, { history: any[] }>) {
-  const result: Record<string, Record<string, {
-    upgrades: { from: string, to: string, date: string }[],
-    downgrades: { from: string, to: string, date: string }[]
-  }>> = {};
-
-  for (const [depName, depInfo] of Object.entries(data)) {
-    for (const entry of depInfo.history) {
-      if (entry.action === 'MODIFIED') {
-        const { fromVersion, toVersion, project, date } = entry;
-
-        if (!result[project]) {
-          result[project] = {};
-        }
-        if (!result[project][depName]) {
-          result[project][depName] = { upgrades: [], downgrades: [] };
-        }
-
-        if (semver.valid(fromVersion) && semver.valid(toVersion)) {
-          if (semver.gt(toVersion, fromVersion)) {
-            result[project][depName].upgrades.push({ from: fromVersion, to: toVersion, date });
-          } else if (semver.lt(toVersion, fromVersion)) {
-            result[project][depName].downgrades.push({ from: fromVersion, to: toVersion, date });
-          }
-        }
+  for (const { history } of Object.values(dependencies)) {
+    for (const entry of history) {
+      if (
+        entry.action !== 'MODIFIED' ||
+        !entry.fromVersion ||
+        !entry.toVersion ||
+        !semver.valid(entry.fromVersion) ||
+        !semver.valid(entry.toVersion) ||
+        !entry.date
+      ) {
+        continue;
       }
+
+      const dateKey = new Date(entry.date).toISOString().split('T')[0];
+      const changeType = semver.gt(entry.toVersion, entry.fromVersion) ? 'upgrades' : 'downgrades';
+
+      if (!results[dateKey]) {
+        results[dateKey] = { upgrades: 0, downgrades: 0 };
+      }
+
+      results[dateKey][changeType]++;
     }
   }
 
-  return result;
+  return results;
 }
-

@@ -118,8 +118,16 @@ export function generateGrowthPatternChartData(
 
     const traceTotalChanges = {
       x: xValues,
-      y: sorted.map(r => r.totalChanges ?? 0),
-      name: 'Total Changes',
+      y: (() => {
+        const totals: number[] = [];
+        let runningTotal = 0;
+        for (const r of sorted) {
+          runningTotal += r.totalChanges ?? 0;
+          totals.push(runningTotal);
+        }
+        return totals;
+      })(),
+      name: 'Total Changes (Cumulative)',
       type: 'scatter',
       mode: 'lines+markers',
       line: { width: 2, dash: 'dot', color: '#a63603' },
@@ -152,7 +160,7 @@ export function generateGrowthPatternChartData(
         side: 'left'
       },
       yaxis2: {
-        title: 'Total',
+        title: 'Total (Cumulative)',
         overlaying: 'y',
         side: 'right',
         showgrid: false
@@ -173,96 +181,63 @@ export function generateGrowthPatternChartData(
 }
 
 export function generateVersionChangeChartData(
-  results: Record<string, Record<string, {
-    upgrades: { from: string; to: string; date: string }[];
-    downgrades: { from: string; to: string; date: string }[];
-  }>>,
+  results: Record<string, { upgrades: number; downgrades: number }>,
   options: MetricOptions
 ): { data: any[]; layout: any }[] {
-  const charts: { data: any[]; layout: any }[] = [];
+  const sortedDates = Object.keys(results).sort();
+  const upgrades = sortedDates.map(date => results[date].upgrades);
+  const downgrades = sortedDates.map(date => results[date].downgrades);
 
-  // Prepare project-based daily counts
-  const projectChartData: {
-    [project: string]: { [date: string]: { upgrades: number; downgrades: number } }
-  } = {};
+  return options.chartType.map(type => {
+    const isLine = type === 'line';
+    const isStacked = type === 'stacked';
+    const isArea = type === 'stacked-area';
 
-  for (const [project, deps] of Object.entries(results)) {
-    if (!projectChartData[project]) projectChartData[project] = {};
+    const traceType = isLine || isArea ? 'scatter' : 'bar';
+    const commonTraceProps = {
+      type: traceType,
+      mode: isLine ? 'lines+markers' : undefined,
+      fill: isArea ? 'tonexty' : undefined,
+      stackgroup: isArea ? 'one' : undefined
+    };
 
-    for (const dep of Object.values(deps)) {
-      for (const { date } of dep.upgrades) {
-        const day = new Date(date).toISOString().split('T')[0];
-        projectChartData[project][day] ??= { upgrades: 0, downgrades: 0 };
-        projectChartData[project][day].upgrades += 1;
+    const upgradeTrace = {
+      x: sortedDates,
+      y: upgrades,
+      name: 'Upgrades',
+      ...commonTraceProps
+    };
+
+    const downgradeTrace = {
+      x: sortedDates,
+      y: downgrades,
+      name: 'Downgrades',
+      ...commonTraceProps
+    };
+
+    const layout = {
+      title: `🔄 Version Changes Over Time (${type})`,
+      barmode: isStacked ? 'stack' : (traceType === 'bar' ? 'group' : undefined),
+      xaxis: {
+        title: 'Date',
+        tickangle: -45,
+        automargin: true
+      },
+      yaxis: {
+        title: 'Change Count'
+      },
+      margin: {
+        l: 50,
+        r: 30,
+        t: 60,
+        b: 120
       }
-      for (const { date } of dep.downgrades) {
-        const day = new Date(date).toISOString().split('T')[0];
-        projectChartData[project][day] ??= { upgrades: 0, downgrades: 0 };
-        projectChartData[project][day].downgrades += 1;
-      }
-    }
-  }
+    };
 
-  // Generate chart for each chartType
-  for (const chartType of options.chartType) {
-    const isLine = chartType === 'line';
-    const isStacked = chartType === 'stacked';
-    const isArea = chartType === 'stacked-area';
-
-    for (const [project, dateCounts] of Object.entries(projectChartData)) {
-      const sortedDates = Object.keys(dateCounts).sort();
-      const x = sortedDates;
-      const upgrades = sortedDates.map(date => dateCounts[date].upgrades);
-      const downgrades = sortedDates.map(date => dateCounts[date].downgrades);
-
-      const baseType = isLine || isArea ? 'scatter' : 'bar';
-
-      const commonTraceProps: Partial<any> = {
-        type: baseType,
-        mode: isLine || isArea ? 'lines+markers' : undefined,
-        fill: isArea ? 'tonexty' : undefined,
-        stackgroup: isArea ? 'one' : undefined
-      };
-
-      const data = [
-        {
-          x,
-          y: upgrades,
-          name: 'Upgrades',
-          marker: { color: 'green' },
-          ...commonTraceProps
-        },
-        {
-          x,
-          y: downgrades,
-          name: 'Downgrades',
-          marker: { color: 'red' },
-          ...commonTraceProps
-        }
-      ];
-
-      const layout = {
-        title: `📦 Version Changes in "${project}" (${chartType})`,
-        barmode: isStacked ? 'stack' : 'group',
-        xaxis: {
-          title: 'Date',
-          tickangle: -45
-        },
-        yaxis: {
-          title: 'Change Count'
-        },
-        margin: {
-          l: 50,
-          r: 50,
-          t: 60,
-          b: 100
-        }
-      };
-
-      charts.push({ data, layout });
-    }
-  }
-
-  return charts;
+    return {
+      data: [upgradeTrace, downgradeTrace],
+      layout
+    };
+  });
 }
 
