@@ -7,8 +7,9 @@ import {generateGrowthPatternChartData, generateHtmlChart, generateVersionChange
 export const runMetricsCommand = new Command()
   .name('metrics')
   .description('Run metrics on dependency history and optionally generate charts')
-  .argument('<historyFolder>', 'Folder where the input files are located')
-  .option('--results, -r <resultsFolder>', 'The results folder', 'results')
+  .argument('<historyFolder>', 'Folder where the base input/output folders are located')
+  .option('--inputDir <inputDir>', 'Directory to look for input .json files', '')
+  .option('--results, -r <resultsFolder>', 'Folder to save results in', 'results')
   .option('--metric <metricType>', 'Metric type to calculate', 'addition-removal')
   .option('--chart', 'Generate chart visualization', false)
   .option('--chartType <chartType>', 'Chart type (bar | line | stacked)', 'bar')
@@ -16,6 +17,7 @@ export const runMetricsCommand = new Command()
   .action(runMetrics);
 
 export interface MetricOptions {
+  inputDir: string;
   results: string;
   metric: string;
   chart: boolean;
@@ -23,7 +25,7 @@ export interface MetricOptions {
   inputFiles: string[];
 }
 
-export async function runMetrics(folder: string, options: MetricOptions): Promise<void> {
+export async function runMetrics(historyFolder: string, options: MetricOptions): Promise<void> {
   const metricProcessor = getMetricProcessor(options.metric);
   if (!metricProcessor) {
     console.error(`❌ Unknown metric type: ${options.metric}`);
@@ -45,12 +47,13 @@ export async function runMetrics(folder: string, options: MetricOptions): Promis
     return;
   }
 
-  console.log(validInputFiles);
-  console.log(metricProcessor);
+  const inputBase = path.join(historyFolder, options.inputDir || '');
+  const outputBase = path.join(historyFolder, options.results);
+  fs.mkdirSync(outputBase, { recursive: true });
 
-  for (const relativePath of validInputFiles) {
-    const fileName = relativePath.endsWith('.json') ? relativePath : `${relativePath}.json`;
-    const filePath = path.join(folder, fileName);
+  for (const relativeName of validInputFiles) {
+    const fileName = relativeName.endsWith('.json') ? relativeName : `${relativeName}.json`;
+    const filePath = path.join(inputBase, fileName);
 
     if (!fs.existsSync(filePath)) {
       console.warn(`⚠️ File not found: ${filePath}`);
@@ -61,10 +64,7 @@ export async function runMetrics(folder: string, options: MetricOptions): Promis
     const data = JSON.parse(fileContents);
     const results = metricProcessor(data);
 
-    const resultsFolder = path.join(folder, options.results);
-    fs.mkdirSync(resultsFolder, { recursive: true });
-
-    const outputFile = path.join(resultsFolder, `${path.parse(fileName).name}-${options.metric}-metric.json`);
+    const outputFile = path.join(outputBase, `${path.parse(fileName).name}-${options.metric}-metric.json`);
     fs.writeFileSync(outputFile, JSON.stringify(results, null, 2));
 
     if (options.chart) {

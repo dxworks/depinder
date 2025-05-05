@@ -1,5 +1,4 @@
 import {Command} from 'commander'
-import {AnalyseOptions} from '../analyse'
 import {getPluginsFromNames} from '../../plugins'
 import { DepinderProject, Extractor, Parser } from "../../extension-points/extract"
 import {log} from '../../utils/logging'
@@ -11,6 +10,11 @@ import {LibraryInfo, Registrar} from "../../extension-points/registrar"
 import {VulnerabilityChecker} from "../../extension-points/vulnerability-checker"
 import {CodeFinder} from "../../extension-points/code-impact"
 import {getVulnerabilitiesFromGithub} from "../../utils/vulnerabilities"
+
+export interface HistoryOptions {
+  plugins?: string[]
+  results: string
+}
 
 export interface Plugin {
   name: string // the name of the technology (could be language name or package manager name)
@@ -31,7 +35,7 @@ export const historyCommand = new Command()
   .option('--plugins, -p [plugins...]', 'A list of plugins')
   .action(analyseHistory);
 
-export async function analyseHistory(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
+export async function analyseHistory(folders: string[], options: HistoryOptions, useCache = true): Promise<void> {
   const selectedPlugins: Plugin[] = getPluginsFromNames(options.plugins);
   if (folders.length === 0) {
     log.info('No folders provided to analyze.');
@@ -55,14 +59,15 @@ export async function analyseHistory(folders: string[], options: AnalyseOptions,
 
   const pluginDependencyHistory = await compareDependenciesBetweenCommits(commitProjectsMap);
 
-  await saveCombinedDependencyHistory(pluginDependencyHistory);
+  await saveCombinedDependencyHistory(pluginDependencyHistory, options.results);
+  await saveLibrariesToJson(selectedPlugins, pluginDependencyHistory, options.results);
 
-  await saveLibrariesToJson(selectedPlugins, pluginDependencyHistory);
 }
 
 async function saveLibrariesToJson(
   selectedPlugins: Plugin[],
-  pluginDependencyHistory: Map<string, DependencyHistory>
+  pluginDependencyHistory: Map<string, DependencyHistory>,
+  resultsFolder: string
 ) {
   const idsToUpdate = new Set<string>();
   for (const [pluginName, depHistory] of pluginDependencyHistory.entries()) {
@@ -70,7 +75,7 @@ async function saveLibrariesToJson(
       idsToUpdate.add(`${pluginName}:${depName}`);
     }
   }
-  const idsArray = Array.from(idsToUpdate).slice(0,5);
+  const idsArray = Array.from(idsToUpdate).slice(0, 5);
   const libraryInfoMap: Record<string, { plugin: string; info: LibraryInfo }> = {};
 
   for (const plugin of selectedPlugins) {
@@ -92,14 +97,13 @@ async function saveLibrariesToJson(
           plugin: plugin.name,
           info: lib
         };
-
       } catch {}
     }
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const homeDir = os.homedir();
-  const outputPath = path.join(homeDir, 'OutputReportsOfHistory');
+  const outputPath = path.join(homeDir, resultsFolder);
   await fs.mkdir(outputPath, { recursive: true });
 
   const filePath = path.join(outputPath, `library-info-${timestamp}.json`);
@@ -107,7 +111,8 @@ async function saveLibrariesToJson(
 }
 
 async function saveCombinedDependencyHistory(
-  pluginDependencyHistory: Map<string, DependencyHistory>
+  pluginDependencyHistory: Map<string, DependencyHistory>,
+  resultsFolder: string
 ) {
   const combinedDepHistory: DependencyHistory = {};
   const combinedCommitDepHistory: CommitDependencyHistory = {};
@@ -115,16 +120,16 @@ async function saveCombinedDependencyHistory(
   for (const [pluginName, depHistory] of pluginDependencyHistory.entries()) {
     for (const [depName, depData] of Object.entries(depHistory)) {
       if (!combinedDepHistory[depName]) {
-        combinedDepHistory[depName] = {history: []};
+        combinedDepHistory[depName] = { history: [] };
       }
       combinedDepHistory[depName].history.push(...depData.history);
 
       for (const entry of depData.history) {
-        const {commitOid, ...rest} = entry;
+        const { commitOid, ...rest } = entry;
         if (!commitOid) continue;
 
         if (!combinedCommitDepHistory[commitOid]) {
-          combinedCommitDepHistory[commitOid] = {history: []};
+          combinedCommitDepHistory[commitOid] = { history: [] };
         }
 
         combinedCommitDepHistory[commitOid].history.push({
@@ -137,7 +142,7 @@ async function saveCombinedDependencyHistory(
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const homeDir = os.homedir();
-  const outputPath = path.join(homeDir, 'OutputReportsOfHistory');
+  const outputPath = path.join(homeDir, resultsFolder);
   await fs.mkdir(outputPath, {recursive: true});
 
   await fs.writeFile(
