@@ -5,7 +5,12 @@ import {
     Extractor,
     Parser,
 } from '../../extension-points/extract'
-import {buildDepTreeFromFiles} from 'snyk-nodejs-lockfile-parser'
+import {
+    buildDepTreeFromFiles,
+    getLockfileVersionFromFile,
+    NodeLockfileVersion,
+    parseNpmLockV2Project
+} from 'snyk-nodejs-lockfile-parser'
 import path from 'path'
 import {SemVer} from 'semver'
 import {DepTreeDep} from 'snyk-nodejs-lockfile-parser/dist/parsers'
@@ -16,6 +21,7 @@ import {Plugin} from '../../extension-points/plugin'
 import {npm} from '../../utils/npm'
 import fs from 'fs'
 import {log} from '../../utils/logging'
+import {GraphNode} from '@snyk/dep-graph/dist/core/types'
 import {CodeFinder, ImportStatement} from '../../extension-points/code-impact'
 
 const extractor: Extractor = {
@@ -81,7 +87,7 @@ const parser: Parser = {
     parseDependencyTree: parseLockFile,
 }
 
-function recursivelyTransformDeps(tree: DepTreeDep, result: Map<string, DepinderDependency>) {
+function recursivelyTransformTreeDeps(tree: DepTreeDep, result: Map<string, DepinderDependency>) {
     const rootId = `${tree.name}@${tree.version}`
     Object.values(tree.dependencies ?? {}).forEach(dep => {
         const id = `${dep.name}@${dep.version}`
@@ -102,29 +108,123 @@ function recursivelyTransformDeps(tree: DepTreeDep, result: Map<string, Depinder
                 log.warn(`Invalid version! ${e}`)
             }
         }
-        recursivelyTransformDeps(dep, result)
+        recursivelyTransformTreeDeps(dep, result)
     })
 }
 
-function transformDeps(tree: DepTreeDep, root: string): Map<string, DepinderDependency> {
+function transformGraphDepsFlat(rootId: string, dependencies: GraphNode[] , result: Map<string, DepinderDependency>) {
+    dependencies.forEach(dependency => {
+        const lastAt = dependency.nodeId.lastIndexOf('@')
+        const name = dependency.nodeId.slice(0, lastAt)
+        const version = dependency.nodeId.slice(lastAt + 1)
+        const id = `${name}@${version}`
+        const cachedVersion = result.get(id)
+        if (cachedVersion) {
+            cachedVersion.requestedBy = [rootId, ...cachedVersion.requestedBy]
+        } else {
+            try {
+                const semver = new SemVer(version ?? '', true)
+                result.set(id, {
+                    id,
+                    version: version,
+                    name: name,
+                    semver: semver,
+                    requestedBy: [rootId],
+                } as DepinderDependency)
+            } catch (e) {
+                log.warn(`Invalid version! ${e}`)
+            }
+        }
+
+        dependency.deps.forEach((transitiveDep) => {
+            const lastAt = transitiveDep.nodeId.lastIndexOf('@')
+            const name = transitiveDep.nodeId.slice(0, lastAt)
+            const version = transitiveDep.nodeId.slice(lastAt + 1)
+            const id = `${name}@${version}`
+            const cachedVersion = result.get(id)
+            if (cachedVersion) {
+                cachedVersion.requestedBy = [dependency.nodeId, ...cachedVersion.requestedBy]
+            } else {
+                try {
+                    const semver = new SemVer(version ?? '', true)
+                    result.set(id, {
+                        id,
+                        version: version,
+                        name: name,
+                        semver: semver,
+                        requestedBy: [dependency.nodeId],
+                    } as DepinderDependency)
+                } catch (e) {
+                    log.warn(`Invalid version! ${e}`)
+                }
+            }
+
+        })
+    })
+}
+
+function transformTreeDeps(tree: DepTreeDep, root: string): Map<string, DepinderDependency> {
     log.info(`Starting recursive transformation for ${root}`)
     const result: Map<string, DepinderDependency> = new Map<string, DepinderDependency>()
-    recursivelyTransformDeps(tree, result)
+    recursivelyTransformTreeDeps(tree, result)
+    log.info(`End recursive transformation for ${root}.`)
+    return result
+}
+
+function transformGraphDeps(depGraphNodes: GraphNode[], root: string): Map<string, DepinderDependency> {
+    log.info(`Starting recursive transformation for ${root}`)
+    const result: Map<string, DepinderDependency> = new Map<string, DepinderDependency>()
+    transformGraphDepsFlat(depGraphNodes[0].pkgId, depGraphNodes, result)
     log.info(`End recursive transformation for ${root}.`)
     return result
 }
 
 async function parseLockFile({root, manifestFile, lockFile}: DependencyFileContext): Promise<DepinderProject> {
-    // const lockFileVersion = getLockfileVersionFromFile(lockFile)
-    // log.info(`parsing ${path.resolve(root, lockFile)}`)
-    const result = await buildDepTreeFromFiles(root, manifestFile ?? 'package.json', lockFile ?? '', true, false)
+    const manifestFilePath = path.resolve(root, manifestFile ?? 'package.json')
+    const lockFilePath = path.resolve(root, lockFile)
+    const lockFileVersion : NodeLockfileVersion = getLockfileVersionFromFile(lockFilePath)
+    switch (lockFileVersion) {
+        case NodeLockfileVersion.YarnLockV1:
+        case NodeLockfileVersion.YarnLockV2:
+        case NodeLockfileVersion.NpmLockV1: {
+            const result = await buildDepTreeFromFiles(root, manifestFile ?? 'package.json', lockFile ?? '', true, false)
 
-    const manifestJSON = JSON.parse(fs.readFileSync(path.resolve(root, manifestFile ?? 'package.json'), 'utf8'))
-    return {
-        path: path.resolve(root, manifestFile ?? 'package.json'),
-        name: result.name ?? manifestJSON.name,
-        version: result.version ?? manifestJSON.version,
-        dependencies: Object.fromEntries(transformDeps(result, root)),
+            const manifestJSON = JSON.parse(fs.readFileSync(manifestFilePath, 'utf8'))
+            return {
+                path: manifestFilePath,
+                name: result.name ?? manifestJSON.name,
+                version: result.version ?? manifestJSON.version,
+                dependencies: Object.fromEntries(transformTreeDeps(result, root)),
+            }
+        }
+        case NodeLockfileVersion.NpmLockV2:
+        case NodeLockfileVersion.NpmLockV3: {
+            // const oldResult = await buildDepTreeFromFiles(root, manifestFile ?? 'package.json', lockFile ?? '', true, false)
+            const manifestFileContent = fs.readFileSync(manifestFilePath, 'utf8')
+            const lockFileContent = fs.readFileSync(lockFilePath, 'utf8')
+            const result = await parseNpmLockV2Project(manifestFileContent, lockFileContent, {
+                includeDevDeps: true,
+                strictOutOfSync: false,
+                includeOptionalDeps: false,
+                pruneCycles: true,
+                includePeerDeps: false,
+                pruneNpmStrictOutOfSync: false
+            })
+            const manifestJSON = JSON.parse(fs.readFileSync(manifestFilePath, 'utf8'))
+            return {
+                path: manifestFilePath,
+                name: result.rootPkg.name ?? manifestJSON.name,
+                version: result.rootPkg.version ?? manifestJSON.version,
+                dependencies: Object.fromEntries(transformGraphDeps(result.toJSON().graph.nodes, root)),
+            }
+
+        }
+        case NodeLockfileVersion.PnpmLockV5:
+        case NodeLockfileVersion.PnpmLockV6:
+        case NodeLockfileVersion.PnpmLockV9:
+        default: {
+            throw new Error(`Lockfile version ${lockFileVersion} is not supported by Depinder. Please use npm v1 / v2 / v3 or yarn v1 / v2`)
+        }
     }
 }
 
