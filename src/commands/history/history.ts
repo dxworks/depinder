@@ -10,6 +10,7 @@ import {LibraryInfo, Registrar} from "../../extension-points/registrar"
 import {VulnerabilityChecker} from "../../extension-points/vulnerability-checker"
 import {CodeFinder} from "../../extension-points/code-impact"
 import {getVulnerabilitiesFromGithub} from "../../utils/vulnerabilities"
+import pLimit from 'p-limit'
 
 export interface HistoryOptions {
   plugins?: string[]
@@ -31,7 +32,6 @@ export const historyCommand = new Command()
   .name('history')
   .argument('[folders...]', 'A list of git repositories to analyse')
   .option('--results, -r', 'The results folder', 'results')
-  .option('--refresh', 'Refresh the cache', false)
   .option('--plugins, -p [plugins...]', 'A list of plugins')
   .action(analyseHistory);
 
@@ -75,13 +75,16 @@ async function saveLibrariesToJson(
       idsToUpdate.add(`${pluginName}:${depName}`);
     }
   }
-  const idsArray = Array.from(idsToUpdate).slice(0, 5);
+  const idsArray = Array.from(idsToUpdate);
   const libraryInfoMap: Record<string, { plugin: string; info: LibraryInfo }> = {};
 
-  for (const plugin of selectedPlugins) {
-    const libsToUpdate = idsArray.filter(id => id.startsWith(`${plugin.name}:`));
+  const limit = pLimit(10);
 
-    for (const id of libsToUpdate) {
+  const retrievalTasks = idsArray.map(id =>
+    limit(async () => {
+      const plugin = selectedPlugins.find(p => id.startsWith(`${p.name}:`));
+      if (!plugin) return;
+
       const libraryName = id.substring(plugin.name.length + 1);
       try {
         const lib = await plugin.registrar.retrieve(libraryName);
@@ -93,11 +96,24 @@ async function saveLibrariesToJson(
             );
           } catch {}
         }
-        libraryInfoMap[id] = {
+
+        return {
+          id,
           plugin: plugin.name,
           info: lib
         };
-      } catch {}
+      } catch {
+        return undefined;
+      }
+    })
+  );
+  const results = await Promise.all(retrievalTasks);
+  for (const result of results) {
+    if (result) {
+      libraryInfoMap[result.id] = {
+        plugin: result.plugin,
+        info: result.info
+      };
     }
   }
 
