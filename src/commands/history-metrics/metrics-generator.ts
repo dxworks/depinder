@@ -1,4 +1,5 @@
 import semver from "semver/preload";
+import { LibraryInfo } from "../../extension-points/registrar";
 
 export function GrowthPatternMetric(data: CommitDependencyHistory): any {
   const summary: Record<string, any> = {};
@@ -77,4 +78,53 @@ export function VersionChangeMetric(dependencies: Record<string, { history: any[
   }
 
   return results;
+}
+
+export function VulnerabilityFixBySeverityMetric(
+  commitHistory: CommitDependencyHistory,
+  libraryInfoMap: Record<string, { plugin: string; info: LibraryInfo }>
+): Record<string, Record<string, number>> {
+  const timeline: Record<string, Record<string, number>> = {};
+
+  for (const [, commitEntry] of Object.entries(commitHistory)) {
+    if (!commitEntry || !Array.isArray(commitEntry.history)) continue;
+    const historyArray = commitEntry.history;
+
+    for (const entry of historyArray) {
+      if (
+        entry.action !== 'MODIFIED' ||
+        !entry.fromVersion ||
+        !entry.toVersion ||
+        !entry.date ||
+        !entry.depinderDependencyName
+      ) continue;
+
+      const libKey = Object.keys(libraryInfoMap).find(k => k.endsWith(`:${entry.depinderDependencyName}`));
+      if (!libKey) continue;
+
+      const libInfo = libraryInfoMap[libKey];
+      const libVulnerabilities = libInfo?.info?.vulnerabilities || [];
+
+      const month = entry.date.slice(0, 7);
+
+      for (const vuln of libVulnerabilities) {
+        if (!vuln.vulnerableRange || !vuln.severity) continue;
+        const cleanRange = vuln.vulnerableRange.replace(/,/g, ' ').trim();
+
+        const wasVulnerable =
+          semver.valid(entry.fromVersion) && semver.satisfies(entry.fromVersion, cleanRange);
+        const stillVulnerable =
+          semver.valid(entry.toVersion) && semver.satisfies(entry.toVersion, cleanRange);
+        const isFixed = wasVulnerable && !stillVulnerable;
+
+        if (isFixed) {
+          if (!timeline[month]) timeline[month] = {};
+          if (!timeline[month][vuln.severity]) timeline[month][vuln.severity] = 0;
+          timeline[month][vuln.severity]++;
+        }
+      }
+    }
+  }
+
+  return timeline;
 }

@@ -3,7 +3,8 @@ import path from 'path'
 import {Command} from 'commander'
 import {
   GrowthPatternMetric,
-  VersionChangeMetric
+  VersionChangeMetric,
+  VulnerabilityFixBySeverityMetric
 } from './metrics-generator';
 import {
   generateGrowthPatternChartData,
@@ -32,12 +33,12 @@ export interface MetricOptions {
   inputFiles: string[];
 }
 
-type MetricType = 'growth-pattern' | 'version-changes';
+type MetricType = 'growth-pattern' | 'version-changes' | 'vulnerability-fixes-by-severity';
 
 interface MetricConfig {
-  processor: (data: any) => any;
+  processor: (data: any, libraryInfo?: any) => any;
   requiredPrefixes: string[];
-  chartGenerator: (results: any, options: MetricOptions) => { data: any[]; layout: any }[];
+  chartGenerator?: (results: any, options: MetricOptions) => { data: any[]; layout: any }[];
 }
 
 const metricsRegistry: Record<MetricType, MetricConfig> = {
@@ -50,6 +51,10 @@ const metricsRegistry: Record<MetricType, MetricConfig> = {
     processor: VersionChangeMetric,
     requiredPrefixes: ['dependency-history'],
     chartGenerator: generateVersionChangeChartData
+  },
+  'vulnerability-fixes-by-severity': {
+    processor: VulnerabilityFixBySeverityMetric,
+    requiredPrefixes: ['commit-dependency-history', 'library-info']
   }
 };
 
@@ -72,44 +77,59 @@ export async function runMetrics(historyFolder: string, options: MetricOptions):
     return;
   }
 
-  const validInputFiles = options.inputFiles.filter(file =>
-    config.requiredPrefixes.some(prefix => file.startsWith(prefix))
-  );
-
-  if (!validInputFiles.length) {
-    console.warn(`⚠️ No input files match the required prefixes: ${config.requiredPrefixes.join(', ')}`);
-    return;
-  }
-
   const inputBase = path.join(historyFolder, options.inputDir || '');
   const outputBase = path.join(historyFolder, options.results);
   fs.mkdirSync(outputBase, { recursive: true });
 
-  for (const relativeName of validInputFiles) {
-    const fileName = relativeName.endsWith('.json') ? relativeName : `${relativeName}.json`;
-    const filePath = path.join(inputBase, fileName);
+  let libraryInfo: any = undefined;
+  const libraryInfoFile = options.inputFiles.find(file => file.startsWith('library-info'));
 
-    if (!fs.existsSync(filePath)) {
-      console.warn(`⚠️ File not found: ${filePath}`);
-      continue;
+  if (libraryInfoFile) {
+    const libCandidates = [
+      path.join(inputBase, libraryInfoFile),
+      path.join(inputBase, `${libraryInfoFile}.json`)
+    ];
+    const libPath = libCandidates.find(p => fs.existsSync(p));
+    if (libPath) {
+      const libContent = fs.readFileSync(libPath, 'utf-8');
+      libraryInfo = JSON.parse(libContent);
+    } else {
+      console.warn(`⚠️ Specified library-info file not found for: ${libraryInfoFile}`);
     }
-
-    const fileContents = fs.readFileSync(filePath, 'utf-8');
-    const data = JSON.parse(fileContents);
-    const results = config.processor(data);
-
-    const outputFile = path.join(outputBase, `${path.parse(fileName).name}-${metricType}-metric.json`);
-    fs.writeFileSync(outputFile, JSON.stringify(results, null, 2));
-
-    if (options.chart) {
-      const chartConfigs = config.chartGenerator(results, options);
-      if (chartConfigs?.length) {
-        await generateHtmlChart(outputFile, chartConfigs);
-      } else {
-        console.warn(`⚠️ No chart data generated for metric '${metricType}'.`);
-      }
-    }
-
-    console.log(`✅ Metric calculated for ${filePath} and chart generated (if requested).`);
   }
+
+  const mainDataFile = options.inputFiles.find(file =>
+    config.requiredPrefixes.some(prefix => file.startsWith(prefix) && prefix !== 'library-info')
+  );
+
+  if (!mainDataFile) {
+    console.warn(`⚠️ No valid main data file found. Expected prefix: ${config.requiredPrefixes.join(', ')}`);
+    return;
+  }
+
+  const fileName = mainDataFile.endsWith('.json') ? mainDataFile : `${mainDataFile}.json`;
+  const filePath = path.join(inputBase, fileName);
+
+  if (!fs.existsSync(filePath)) {
+    console.warn(`⚠️ File not found: ${filePath}`);
+    return;
+  }
+
+  const fileContents = fs.readFileSync(filePath, 'utf-8');
+  const data = JSON.parse(fileContents);
+  const results = config.processor(data, libraryInfo);
+
+  const outputFile = path.join(outputBase, `${metricType}-metric.json`);
+  fs.writeFileSync(outputFile, JSON.stringify(results, null, 2));
+
+  if (options.chart && config.chartGenerator) {
+    const chartConfigs = config.chartGenerator(results, options);
+    if (chartConfigs?.length) {
+      await generateHtmlChart(outputFile, chartConfigs);
+    } else {
+      console.warn(`⚠️ No chart data generated for metric '${metricType}'.`);
+    }
+  }
+
+  console.log(`✅ Metric calculated for ${filePath} and chart generated (if requested).`);
 }
