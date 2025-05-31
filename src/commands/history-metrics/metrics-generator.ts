@@ -1,5 +1,6 @@
-import semver from "semver/preload";
-import { LibraryInfo } from "../../extension-points/registrar";
+import {LibraryInfo} from "../../extension-points/registrar"
+import semver from 'semver'
+import { differenceInBusinessDays, parseISO } from "date-fns"
 
 export function GrowthPatternMetric(data: CommitDependencyHistory): any {
   const summary: Record<string, any> = {};
@@ -121,6 +122,74 @@ export function VulnerabilityFixBySeverityMetric(
           if (!timeline[month]) timeline[month] = {};
           if (!timeline[month][vuln.severity]) timeline[month][vuln.severity] = 0;
           timeline[month][vuln.severity]++;
+        }
+      }
+    }
+  }
+
+  return timeline;
+}
+
+// ISO-based maximum business day fix deadlines by severity
+const severityFixTimeLimits: Record<string, number> = {
+  CRITICAL: 7,    // Must be fixed within 7 business days
+  HIGH: 15,       // Must be fixed within 15 business days
+  MEDIUM: 30,     // Must be fixed within 30 business days
+  LOW: 60         // Must be fixed within 60 business days
+};
+
+type SeverityLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+type FixCategory = 'fixedInTime' | 'fixedLate';
+type TimelinessRecord = { fixedInTime: number; fixedLate: number };
+
+export function VulnerabilityFixTimelinessMetric(
+  commitHistory: CommitDependencyHistory,
+  libraryInfoMap: Record<string, { plugin: string; info: LibraryInfo }>
+): Record<string, Record<SeverityLevel, TimelinessRecord>> {
+  const timeline: Record<string, Record<SeverityLevel, TimelinessRecord>> = {};
+  const firstSeenMap: Record<string, Date> = {};
+
+  for (const [, commitEntry] of Object.entries(commitHistory)) {
+    if (!commitEntry?.history?.length) continue;
+
+    for (const entry of commitEntry.history) {
+      if (!entry.date || !entry.fromVersion || !entry.depinderDependencyName) continue;
+      const libKey = Object.keys(libraryInfoMap).find(k => k.endsWith(`:${entry.depinderDependencyName}`));
+      if (!libKey) continue;
+
+      const vulnerabilities = libraryInfoMap[libKey]?.info?.vulnerabilities || [];
+      const entryDate = parseISO(entry.date);
+
+      for (const vuln of vulnerabilities) {
+        if (!vuln.vulnerableRange || !vuln.severity) continue;
+        const cleanRange = vuln.vulnerableRange.replace(/,/g, ' ').trim();
+        const key = `${entry.depinderDependencyName}@@${cleanRange}`;
+
+        const seenValid = semver.valid(entry.fromVersion) && semver.satisfies(entry.fromVersion, cleanRange);
+        if (seenValid) {
+          if (!firstSeenMap[key] || entryDate < firstSeenMap[key]) {
+            firstSeenMap[key] = entryDate;
+          }
+        }
+
+        const isFix = entry.action === 'MODIFIED' &&
+          !!entry.toVersion &&
+          semver.valid(entry.fromVersion) &&
+          semver.valid(entry.toVersion) &&
+          semver.satisfies(entry.fromVersion, cleanRange) &&
+          !semver.satisfies(entry.toVersion, cleanRange);
+
+        if (isFix) {
+          const introducedDate = firstSeenMap[key] ?? entryDate;
+          const daysToFix: number = differenceInBusinessDays(entryDate, introducedDate);
+          const severity: SeverityLevel = vuln.severity.toUpperCase() as SeverityLevel;
+          const fixDeadlineDays: number = severityFixTimeLimits[severity] ?? 999;
+          const fixCategory: FixCategory = daysToFix <= fixDeadlineDays ? 'fixedInTime' : 'fixedLate';
+          const month = entryDate.toISOString().slice(0, 7);
+
+          if (!timeline[month]) timeline[month] = {} as Record<SeverityLevel, TimelinessRecord>;
+          if (!timeline[month][severity]) timeline[month][severity] = { fixedInTime: 0, fixedLate: 0 };
+          timeline[month][severity][fixCategory]++;
         }
       }
     }

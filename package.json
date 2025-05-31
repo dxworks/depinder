@@ -45,6 +45,7 @@
     "commander": "^11.1.0",
     "cross-env": "^7.0.3",
     "csv": "^6.0.4",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.0.3",
     "isomorphic-git": "^1.27.1",
     "lodash": "^4.17.21",

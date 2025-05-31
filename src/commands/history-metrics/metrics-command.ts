@@ -4,7 +4,8 @@ import {Command} from 'commander'
 import {
   GrowthPatternMetric,
   VersionChangeMetric,
-  VulnerabilityFixBySeverityMetric
+  VulnerabilityFixBySeverityMetric,
+  VulnerabilityFixTimelinessMetric
 } from './metrics-generator';
 import {
   generateGrowthPatternChartData,
@@ -33,7 +34,11 @@ export interface MetricOptions {
   inputFiles: string[];
 }
 
-type MetricType = 'growth-pattern' | 'version-changes' | 'vulnerability-fixes-by-severity';
+type MetricType =
+  | 'growth-pattern'
+  | 'version-changes'
+  | 'vulnerability-fixes-by-severity'
+  | 'vulnerability-fix-timeliness';
 
 interface MetricConfig {
   processor: (data: any, libraryInfo?: any) => any;
@@ -54,6 +59,10 @@ const metricsRegistry: Record<MetricType, MetricConfig> = {
   },
   'vulnerability-fixes-by-severity': {
     processor: VulnerabilityFixBySeverityMetric,
+    requiredPrefixes: ['commit-dependency-history', 'library-info']
+  },
+  'vulnerability-fix-timeliness': {
+    processor: VulnerabilityFixTimelinessMetric,
     requiredPrefixes: ['commit-dependency-history', 'library-info']
   }
 };
