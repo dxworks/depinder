@@ -241,3 +241,135 @@ export function generateVersionChangeChartData(
   });
 }
 
+export function generateVulnerabilityFixBySeverityChartData(
+  results: Record<string, Record<string, number>>,
+  options: MetricOptions
+): { data: any[]; layout: any }[] {
+  const months = Object.keys(results).sort();
+
+  const formattedMonths = months.map(month => {
+    const [year, monthPart] = month.split('-');
+    const date = new Date(`${year}-${monthPart}-01`);
+    return date.toLocaleString('en-US', { month: 'short', year: 'numeric' }); // e.g., "May 2025"
+  });
+
+  const allSeverities = Array.from(new Set(months.flatMap(month => Object.keys(results[month]))));
+
+  return options.chartType.map(type => {
+    const isLine = type === 'line';
+    const isStacked = type === 'stacked';
+    const isArea = type === 'stacked-area';
+
+    const traceType = isLine || isArea ? 'scatter' : 'bar';
+    const commonTraceProps = {
+      type: traceType,
+      mode: isLine ? 'lines+markers' : undefined,
+      fill: isArea ? 'tonexty' : undefined,
+      stackgroup: isArea ? 'one' : undefined
+    };
+
+    const traces = allSeverities.map(severity => ({
+      x: formattedMonths,
+      y: months.map(month => results[month]?.[severity] || 0),
+      name: severity,
+      ...commonTraceProps
+    }));
+
+    const layout = {
+      title: `🛡️ Fixed Vulnerabilities by Severity Over Time (${type})`,
+      barmode: isStacked ? 'stack' : (traceType === 'bar' ? 'group' : undefined),
+      xaxis: {
+        title: 'Month',
+        tickangle: -45,
+        automargin: true
+      },
+      yaxis: {
+        title: 'Fix Count'
+      },
+      margin: {
+        l: 50,
+        r: 30,
+        t: 60,
+        b: 120
+      }
+    };
+
+    return {
+      data: traces,
+      layout
+    };
+  });
+}
+
+export function generateVulnerabilityFixTimelinessChartData(
+  results: Record<string, Record<string, { fixedInTime: number; fixedLate: number }>>,
+  options: MetricOptions
+): { data: any[]; layout: any }[] {
+  const months = Object.keys(results).sort();
+
+  const formattedMonths = months.map(month => {
+    const [year, monthPart] = month.split('-');
+    return new Date(`${year}-${monthPart}-01`).toLocaleString('en-US', {
+      month: 'short',
+      year: 'numeric'
+    });
+  });
+
+  const allSeverities = Array.from(
+    new Set(months.flatMap(m => Object.keys(results[m])))
+  );
+
+  return options.chartType.map(type => {
+    const traceType = type === 'line' || type === 'stacked-area' ? 'scatter' : 'bar';
+    const isStacked = type === 'stacked';
+    const isArea = type === 'stacked-area';
+
+    const commonProps = {
+      type: traceType,
+      mode: traceType === 'scatter' ? 'lines+markers' : undefined,
+      fill: isArea ? 'tonexty' : undefined,
+      stackgroup: isArea ? 'one' : undefined
+    };
+
+    const traces = allSeverities.flatMap(severity => {
+      const fixedInTime = {
+        x: formattedMonths,
+        y: months.map(m => results[m]?.[severity]?.fixedInTime || 0),
+        name: `${severity} - Fixed In Time`,
+        ...commonProps
+      };
+
+      const fixedLate = {
+        x: formattedMonths,
+        y: months.map(m => results[m]?.[severity]?.fixedLate || 0),
+        name: `${severity} - Fixed Late`,
+        ...commonProps
+      };
+
+      return [fixedInTime, fixedLate];
+    });
+
+    const layout = {
+      title: `⏱️ Timeliness of Vulnerability Fixes per Month according to ISO (${type})`,
+      barmode: isStacked ? 'stack' : (traceType === 'bar' ? 'group' : undefined),
+      xaxis: {
+        title: 'Month',
+        tickangle: -45,
+        automargin: true
+      },
+      yaxis: {
+        title: 'Fix Count'
+      },
+      margin: {
+        l: 50,
+        r: 30,
+        t: 60,
+        b: 120
+      }
+    };
+
+    return { data: traces, layout };
+  });
+}
+
+

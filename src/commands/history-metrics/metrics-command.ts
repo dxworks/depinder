@@ -10,7 +10,9 @@ import {
 import {
   generateGrowthPatternChartData,
   generateVersionChangeChartData,
-  generateHtmlChart
+  generateHtmlChart,
+  generateVulnerabilityFixBySeverityChartData,
+  generateVulnerabilityFixTimelinessChartData
 } from './chart-generator'
 
 export const runMetricsCommand = new Command()
@@ -59,11 +61,13 @@ const metricsRegistry: Record<MetricType, MetricConfig> = {
   },
   'vulnerability-fixes-by-severity': {
     processor: VulnerabilityFixBySeverityMetric,
-    requiredPrefixes: ['commit-dependency-history', 'library-info']
+    requiredPrefixes: ['commit-dependency-history', 'library-info'],
+    chartGenerator: generateVulnerabilityFixBySeverityChartData
   },
   'vulnerability-fix-timeliness': {
     processor: VulnerabilityFixTimelinessMetric,
-    requiredPrefixes: ['commit-dependency-history', 'library-info']
+    requiredPrefixes: ['commit-dependency-history', 'library-info'],
+    chartGenerator: generateVulnerabilityFixTimelinessChartData
   }
 };
 
