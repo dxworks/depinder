@@ -39,7 +39,7 @@ export interface MetricOptions {
 type MetricType =
   | 'growth-pattern'
   | 'version-changes'
-  | 'vulnerability-fixes-by-severity'
+  | 'vulnerability-fix-by-severity'
   | 'vulnerability-fix-timeliness';
 
 interface MetricConfig {
@@ -59,7 +59,7 @@ const metricsRegistry: Record<MetricType, MetricConfig> = {
     requiredPrefixes: ['dependency-history'],
     chartGenerator: generateVersionChangeChartData
   },
-  'vulnerability-fixes-by-severity': {
+  'vulnerability-fix-by-severity': {
     processor: VulnerabilityFixBySeverityMetric,
     requiredPrefixes: ['commit-dependency-history', 'library-info'],
     chartGenerator: generateVulnerabilityFixBySeverityChartData
