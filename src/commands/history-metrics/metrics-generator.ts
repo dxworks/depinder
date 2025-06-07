@@ -87,41 +87,35 @@ export function VulnerabilityFixBySeverityMetric(
 ): Record<string, Record<string, number>> {
   const timeline: Record<string, Record<string, number>> = {};
 
+  const isSemverVulnerable = (version: string | undefined, range: string): boolean =>
+    !!version && semver.valid(version) !== null && semver.satisfies(version, range);
+
   for (const [, commitEntry] of Object.entries(commitHistory)) {
-    if (!commitEntry || !Array.isArray(commitEntry.history)) continue;
-    const historyArray = commitEntry.history;
-
-    for (const entry of historyArray) {
-      if (
-        entry.action !== 'MODIFIED' ||
-        !entry.fromVersion ||
-        !entry.toVersion ||
-        !entry.date ||
-        !entry.depinderDependencyName
-      ) continue;
-
-      const libKey = Object.keys(libraryInfoMap).find(k => k.endsWith(`:${entry.depinderDependencyName}`));
+    if (!commitEntry?.history?.length) continue;
+    for (const entry of commitEntry.history) {
+      if (!entry.date || !entry.depinderDependencyName) continue;
+      const libKey = Object.keys(libraryInfoMap).find(k =>
+        k.endsWith(`:${entry.depinderDependencyName}`)
+      );
       if (!libKey) continue;
-
-      const libInfo = libraryInfoMap[libKey];
-      const libVulnerabilities = libInfo?.info?.vulnerabilities || [];
-
+      const vulnerabilities = libraryInfoMap[libKey]?.info?.vulnerabilities || [];
       const month = entry.date.slice(0, 7);
-
-      for (const vuln of libVulnerabilities) {
+      for (const vuln of vulnerabilities) {
         if (!vuln.vulnerableRange || !vuln.severity) continue;
         const cleanRange = vuln.vulnerableRange.replace(/,/g, ' ').trim();
-
-        const wasVulnerable =
-          semver.valid(entry.fromVersion) && semver.satisfies(entry.fromVersion, cleanRange);
-        const stillVulnerable =
-          semver.valid(entry.toVersion) && semver.satisfies(entry.toVersion, cleanRange);
-        const isFixed = wasVulnerable && !stillVulnerable;
-
+        const severity = vuln.severity;
+        let isFixed = false;
+        if (entry.action === 'MODIFIED') {
+          const wasVulnerable = isSemverVulnerable(entry.fromVersion, cleanRange);
+          const stillVulnerable = isSemverVulnerable(entry.toVersion, cleanRange);
+          isFixed = wasVulnerable && !stillVulnerable;
+        }
+        if (entry.action === 'DELETED') {
+          isFixed = isSemverVulnerable(entry.version, cleanRange);
+        }
         if (isFixed) {
           if (!timeline[month]) timeline[month] = {};
-          if (!timeline[month][vuln.severity]) timeline[month][vuln.severity] = 0;
-          timeline[month][vuln.severity]++;
+          timeline[month][severity] = (timeline[month][severity] || 0) + 1;
         }
       }
     }
@@ -153,8 +147,10 @@ export function VulnerabilityFixTimelinessMetric(
     if (!commitEntry?.history?.length) continue;
 
     for (const entry of commitEntry.history) {
-      if (!entry.date || !entry.fromVersion || !entry.depinderDependencyName) continue;
-      const libKey = Object.keys(libraryInfoMap).find(k => k.endsWith(`:${entry.depinderDependencyName}`));
+      if (!entry.date || !entry.depinderDependencyName) continue;
+      const libKey = Object.keys(libraryInfoMap).find(k =>
+        k.endsWith(`:${entry.depinderDependencyName}`)
+      );
       if (!libKey) continue;
 
       const vulnerabilities = libraryInfoMap[libKey]?.info?.vulnerabilities || [];
@@ -164,26 +160,32 @@ export function VulnerabilityFixTimelinessMetric(
         if (!vuln.vulnerableRange || !vuln.severity) continue;
         const cleanRange = vuln.vulnerableRange.replace(/,/g, ' ').trim();
         const key = `${entry.depinderDependencyName}@@${cleanRange}`;
-
-        const seenValid = semver.valid(entry.fromVersion) && semver.satisfies(entry.fromVersion, cleanRange);
-        if (seenValid) {
+        const versionToCheck =
+          entry.action === 'MODIFIED' ? entry.fromVersion :
+            entry.action === 'DELETED' ? entry.version :
+              undefined;
+        const isVersionVulnerable =
+          !!versionToCheck && semver.valid(versionToCheck) && semver.satisfies(versionToCheck, cleanRange);
+        if (isVersionVulnerable) {
           if (!firstSeenMap[key] || entryDate < firstSeenMap[key]) {
             firstSeenMap[key] = entryDate;
           }
         }
-
-        const isFix = entry.action === 'MODIFIED' &&
+        const isFixViaModification =
+          entry.action === 'MODIFIED' &&
           !!entry.toVersion &&
-          semver.valid(entry.fromVersion) &&
           semver.valid(entry.toVersion) &&
-          semver.satisfies(entry.fromVersion, cleanRange) &&
+          isVersionVulnerable &&
           !semver.satisfies(entry.toVersion, cleanRange);
-
+        const isFixViaDeletion =
+          entry.action === 'DELETED' &&
+          isVersionVulnerable;
+        const isFix = isFixViaModification || isFixViaDeletion;
         if (isFix) {
           const introducedDate = firstSeenMap[key] ?? entryDate;
-          const daysToFix: number = differenceInBusinessDays(entryDate, introducedDate);
-          const severity: SeverityLevel = vuln.severity.toUpperCase() as SeverityLevel;
-          const fixDeadlineDays: number = severityFixTimeLimits[severity] ?? 999;
+          const daysToFix = differenceInBusinessDays(entryDate, introducedDate);
+          const severity = vuln.severity.toUpperCase() as SeverityLevel;
+          const fixDeadlineDays: any= severityFixTimeLimits[severity] ?? 999;
           const fixCategory: FixCategory = daysToFix <= fixDeadlineDays ? 'fixedInTime' : 'fixedLate';
           const month = entryDate.toISOString().slice(0, 7);
 
