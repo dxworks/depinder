@@ -322,7 +322,7 @@ export function generateVulnerabilityFixBySeverityChartData(
 }
 
 export function generateVulnerabilityFixTimelinessChartData(
-  results: Record<string, Record<string, { fixedInTime: number; fixedLate: number }>>,
+  results: Record<string, Record<string, { fixedInTime: number; fixedLate: number } & { totalVulnerabilities?: number }>>,
   options: MetricOptions
 ): { data: any[]; layout: any }[] {
   const months = Object.keys(results).sort();
@@ -336,7 +336,7 @@ export function generateVulnerabilityFixTimelinessChartData(
   });
 
   const allSeverities = Array.from(
-    new Set(months.flatMap(m => Object.keys(results[m])))
+    new Set(months.flatMap(m => Object.keys(results[m]).filter(k => k !== 'totalVulnerabilities')))
   );
 
   return options.chartType.map(type => {
@@ -351,7 +351,7 @@ export function generateVulnerabilityFixTimelinessChartData(
       stackgroup: isArea ? 'one' : undefined
     };
 
-    const traces = allSeverities.flatMap(severity => {
+    const fixTraces = allSeverities.flatMap(severity => {
       const fixedInTime = {
         x: formattedMonths,
         y: months.map(m => results[m]?.[severity]?.fixedInTime || 0),
@@ -369,6 +369,18 @@ export function generateVulnerabilityFixTimelinessChartData(
       return [fixedInTime, fixedLate];
     });
 
+    const totalVulnerabilitiesTrace = {
+      x: formattedMonths,
+      y: months.map(m => results[m]?.totalVulnerabilities || 0),
+      name: 'Total Vulnerabilities',
+      type: 'scatter',
+      mode: 'lines+markers',
+      line: { dash: 'dot', width: 3 },
+      marker: { size: 6 }
+    };
+
+    const data = [...fixTraces, totalVulnerabilitiesTrace];
+
     const layout = {
       title: `⏱️ Timeliness of Vulnerability Fixes per Month according to ISO (${type})`,
       barmode: isStacked ? 'stack' : (traceType === 'bar' ? 'group' : undefined),
@@ -378,7 +390,7 @@ export function generateVulnerabilityFixTimelinessChartData(
         automargin: true
       },
       yaxis: {
-        title: 'Fix Count'
+        title: 'Count'
       },
       margin: {
         l: 50,
@@ -388,7 +400,7 @@ export function generateVulnerabilityFixTimelinessChartData(
       }
     };
 
-    return { data: traces, layout };
+    return { data, layout };
   });
 }
 

@@ -134,13 +134,12 @@ const severityFixTimeLimits: Record<string, number> = {
 
 type SeverityLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 type FixCategory = 'fixedInTime' | 'fixedLate';
-type TimelinessRecord = { fixedInTime: number; fixedLate: number };
 
 export function VulnerabilityFixTimelinessMetric(
   commitHistory: CommitDependencyHistory,
   libraryInfoMap: Record<string, { plugin: string; info: LibraryInfo }>
-): Record<string, Record<SeverityLevel, TimelinessRecord>> {
-  const timeline: Record<string, Record<SeverityLevel, TimelinessRecord>> = {};
+): Record<string, Record<string, any>> {
+  const timeline: Record<string, Record<string, any>> = {};
   const firstSeenMap: Record<string, Date> = {};
 
   for (const [, commitEntry] of Object.entries(commitHistory)) {
@@ -155,6 +154,7 @@ export function VulnerabilityFixTimelinessMetric(
 
       const vulnerabilities = libraryInfoMap[libKey]?.info?.vulnerabilities || [];
       const entryDate = parseISO(entry.date);
+      const month = entryDate.toISOString().slice(0, 7);
 
       for (const vuln of vulnerabilities) {
         if (!vuln.vulnerableRange || !vuln.severity) continue;
@@ -163,13 +163,16 @@ export function VulnerabilityFixTimelinessMetric(
         const versionToCheck =
           entry.action === 'MODIFIED' ? entry.fromVersion :
             entry.action === 'DELETED' ? entry.version :
-              undefined;
+              entry.action === 'ADDED' ? entry.version :
+                undefined;
         const isVersionVulnerable =
           !!versionToCheck && semver.valid(versionToCheck) && semver.satisfies(versionToCheck, cleanRange);
         if (isVersionVulnerable) {
           if (!firstSeenMap[key] || entryDate < firstSeenMap[key]) {
             firstSeenMap[key] = entryDate;
           }
+          if (!timeline[month]) timeline[month] = { totalVulnerabilities: 0 };
+          timeline[month].totalVulnerabilities++;
         }
         const isFixViaModification =
           entry.action === 'MODIFIED' &&
@@ -185,11 +188,9 @@ export function VulnerabilityFixTimelinessMetric(
           const introducedDate = firstSeenMap[key] ?? entryDate;
           const daysToFix = differenceInBusinessDays(entryDate, introducedDate);
           const severity = vuln.severity.toUpperCase() as SeverityLevel;
-          const fixDeadlineDays: any= severityFixTimeLimits[severity] ?? 999;
+          const fixDeadlineDays: any = severityFixTimeLimits[severity] ?? 999;
           const fixCategory: FixCategory = daysToFix <= fixDeadlineDays ? 'fixedInTime' : 'fixedLate';
-          const month = entryDate.toISOString().slice(0, 7);
-
-          if (!timeline[month]) timeline[month] = {} as Record<SeverityLevel, TimelinessRecord>;
+          if (!timeline[month]) timeline[month] = { totalVulnerabilities: 0 };
           if (!timeline[month][severity]) timeline[month][severity] = { fixedInTime: 0, fixedLate: 0 };
           timeline[month][severity][fixCategory]++;
         }
