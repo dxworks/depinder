@@ -52,15 +52,35 @@ export function generateGrowthPatternChartData(
   results: any[],
   options: MetricOptions
 ): { data: any[]; layout: any }[] {
-  const sorted = [...results].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  const monthlySummary: Record<string, any> = {};
 
-  const xValues = sorted.map(r => {
-    const date = new Date(r.date).toISOString().split('T')[0];
-    const shortCommit = r.commit?.substring(0, 7) ?? '';
-    return `${date} (${shortCommit})`;
-  });
+  for (const r of results) {
+    const date = new Date(r.date);
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+    if (!monthlySummary[monthKey]) {
+      monthlySummary[monthKey] = {
+        added: { direct: 0, transitive: 0 },
+        removed: { direct: 0, transitive: 0 },
+        modified: { direct: 0, transitive: 0 },
+        totalChanges: 0
+      };
+    }
+
+    const m = monthlySummary[monthKey];
+
+    m.added.direct += r.added?.direct ?? 0;
+    m.added.transitive += r.added?.transitive ?? 0;
+    m.removed.direct += r.removed?.direct ?? 0;
+    m.removed.transitive += r.removed?.transitive ?? 0;
+    m.modified.direct += r.modified?.direct ?? 0;
+    m.modified.transitive += r.modified?.transitive ?? 0;
+
+    m.totalChanges += r.totalChanges ?? 0;
+  }
+
+  const sortedMonths = Object.keys(monthlySummary).sort();
+  const aggregated = sortedMonths.map(month => ({ month, ...monthlySummary[month] }));
 
   return options.chartType.map(type => {
     const traceType = type === 'line' ? 'scatter' : 'bar';
@@ -75,59 +95,59 @@ export function generateGrowthPatternChartData(
     };
 
     const traceDirectAdded = {
-      x: xValues,
-      y: sorted.map(r => r.added?.direct ?? 0),
+      x: sortedMonths,
+      y: aggregated.map(r => r.added.direct),
       name: 'Direct Added',
       ...commonTraceProps
     };
 
     const traceTransitiveAdded = {
-      x: xValues,
-      y: sorted.map(r => r.added?.transitive ?? 0),
+      x: sortedMonths,
+      y: aggregated.map(r => r.added.transitive),
       name: 'Transitive Added',
       ...commonTraceProps
     };
 
     const traceDirectRemoved = {
-      x: xValues,
-      y: sorted.map(r => r.removed?.direct ?? 0),
+      x: sortedMonths,
+      y: aggregated.map(r => r.removed.direct),
       name: 'Direct Removed',
       ...commonTraceProps
     };
 
     const traceTransitiveRemoved = {
-      x: xValues,
-      y: sorted.map(r => r.removed?.transitive ?? 0),
+      x: sortedMonths,
+      y: aggregated.map(r => r.removed.transitive),
       name: 'Transitive Removed',
       ...commonTraceProps
     };
 
     const traceDirectModified = {
-      x: xValues,
-      y: sorted.map(r => r.modified?.direct ?? 0),
+      x: sortedMonths,
+      y: aggregated.map(r => r.modified.direct),
       name: 'Direct Modified',
       ...commonTraceProps
     };
 
     const traceTransitiveModified = {
-      x: xValues,
-      y: sorted.map(r => r.modified?.transitive ?? 0),
+      x: sortedMonths,
+      y: aggregated.map(r => r.modified.transitive),
       name: 'Transitive Modified',
       ...commonTraceProps
     };
 
     const traceTotalChanges = {
-      x: xValues,
+      x: sortedMonths,
       y: (() => {
         const totals: number[] = [];
         let runningTotal = 0;
-        for (const r of sorted) {
-          runningTotal += r.totalChanges ?? 0;
+        for (const r of aggregated) {
+          runningTotal += r.totalChanges;
           totals.push(runningTotal);
         }
         return totals;
       })(),
-      name: 'Total Changes (Cumulative)',
+      name: 'Total Changes',
       type: 'scatter',
       mode: 'lines+markers',
       line: { width: 2, dash: 'dot', color: '#a63603' },
@@ -148,11 +168,11 @@ export function generateGrowthPatternChartData(
     const nonZeroTraces = traces.filter(trace => trace.y.some((y: number) => y > 0));
 
     const layout = {
-      title: `📈 Growth Pattern of Dependencies Over Time (${type})`,
+      title: `📈 Growth Pattern of Dependencies (${type})`,
       barmode: isStacked ? 'stack' : undefined,
       xaxis: {
-        title: 'Commit (Date)',
-        tickangle: -45,
+        title: 'Month',
+        tickangle: -30,
         automargin: true
       },
       yaxis: {
@@ -160,16 +180,16 @@ export function generateGrowthPatternChartData(
         side: 'left'
       },
       yaxis2: {
-        title: 'Total (Cumulative)',
+        title: 'Total',
         overlaying: 'y',
         side: 'right',
         showgrid: false
       },
       margin: {
         l: 50,
-        r: 50,
+        r: 100,
         t: 80,
-        b: 120
+        b: 100
       }
     };
 

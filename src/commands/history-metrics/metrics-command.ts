@@ -15,7 +15,7 @@ import {
   generateVulnerabilityFixTimelinessChartData
 } from './chart-generator'
 
-export const runMetricsCommand = new Command()
+export const metricsCommand = new Command()
   .name('metrics')
   .description('Run metrics on dependency history and optionally generate charts')
   .argument('<historyFolder>', 'Folder where the base input/output folders are located')

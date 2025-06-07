@@ -51,8 +51,7 @@ export async function analyseHistory(folders: string[], options: HistoryOptions,
       continue;
     }
     const sortedCommits = sortCommitsInOrder(commits);
-    const testCommits = sortedCommits.slice(0, 20); // take only the first 20 commits for testing
-    for (const commit of testCommits) {
+    for (const commit of sortedCommits) {
       await processCommitForPlugins(commit, folder, selectedPlugins, commitProjectsMap);
     }
   }
