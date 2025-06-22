@@ -275,6 +275,13 @@ export function generateVulnerabilityFixBySeverityChartData(
 
   const allSeverities = Array.from(new Set(months.flatMap(month => Object.keys(results[month]))));
 
+  const colorMap: Record<string, string> = {
+    CRITICAL: '#8B0000',
+    HIGH: '#FF8F00',
+    MODERATE: '#1565C0',
+    LOW: '#2E7D32'
+  };
+
   return options.chartType.map(type => {
     const isLine = type === 'line';
     const isStacked = type === 'stacked';
@@ -288,12 +295,20 @@ export function generateVulnerabilityFixBySeverityChartData(
       stackgroup: isArea ? 'one' : undefined
     };
 
-    const traces = allSeverities.map(severity => ({
-      x: formattedMonths,
-      y: months.map(month => results[month]?.[severity] || 0),
-      name: severity,
-      ...commonTraceProps
-    }));
+    const traces = allSeverities.map(severity => {
+      const severityLabel = severity.toUpperCase();
+      const color = colorMap[severityLabel] || '#888';
+
+      return {
+        x: formattedMonths,
+        y: months.map(month => results[month]?.[severity] || 0),
+        name: severityLabel,
+        ...commonTraceProps,
+        ...(traceType === 'bar'
+          ? { marker: { color } }
+          : { line: { color } })
+      };
+    });
 
     const layout = {
       title: `🛡️ Fixed Vulnerabilities by Severity Over Time (${type})`,
@@ -339,6 +354,18 @@ export function generateVulnerabilityFixTimelinessChartData(
     new Set(months.flatMap(m => Object.keys(results[m]).filter(k => k !== 'totalVulnerabilities')))
   );
 
+  const colorMap: Record<string, string> = {
+    'CRITICAL - Fixed In Time': '#8B0000',
+    'CRITICAL - Fixed Late': '#E57373',
+    'HIGH - Fixed In Time': '#FF8F00',
+    'HIGH - Fixed Late': '#FFD54F',
+    'MODERATE - Fixed In Time': '#1565C0',
+    'MODERATE - Fixed Late': '#64B5F6',
+    'LOW - Fixed In Time': '#2E7D32',
+    'LOW - Fixed Late': '#81C784',
+    'Total Vulnerabilities': '#424242'
+  };
+
   return options.chartType.map(type => {
     const traceType = type === 'line' || type === 'stacked-area' ? 'scatter' : 'bar';
     const isStacked = type === 'stacked';
@@ -352,18 +379,28 @@ export function generateVulnerabilityFixTimelinessChartData(
     };
 
     const fixTraces = allSeverities.flatMap(severity => {
+      const severityLabel = severity.toUpperCase();
+      const fixedInTimeName = `${severityLabel} - Fixed In Time`;
+      const fixedLateName = `${severityLabel} - Fixed Late`;
+
       const fixedInTime = {
         x: formattedMonths,
         y: months.map(m => results[m]?.[severity]?.fixedInTime || 0),
-        name: `${severity} - Fixed In Time`,
-        ...commonProps
+        name: fixedInTimeName,
+        ...commonProps,
+        ...(traceType === 'bar'
+          ? { marker: { color: colorMap[fixedInTimeName] } }
+          : { line: { color: colorMap[fixedInTimeName] } })
       };
 
       const fixedLate = {
         x: formattedMonths,
         y: months.map(m => results[m]?.[severity]?.fixedLate || 0),
-        name: `${severity} - Fixed Late`,
-        ...commonProps
+        name: fixedLateName,
+        ...commonProps,
+        ...(traceType === 'bar'
+          ? { marker: { color: colorMap[fixedLateName] } }
+          : { line: { color: colorMap[fixedLateName] } })
       };
 
       return [fixedInTime, fixedLate];
@@ -375,7 +412,11 @@ export function generateVulnerabilityFixTimelinessChartData(
       name: 'Total Vulnerabilities',
       type: 'scatter',
       mode: 'lines+markers',
-      line: { dash: 'dot', width: 3 },
+      line: {
+        dash: 'dot',
+        width: 3,
+        color: colorMap['Total Vulnerabilities']
+      },
       marker: { size: 6 }
     };
 
