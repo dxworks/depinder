@@ -6,10 +6,18 @@ export async function generateHtmlChart(outputFile: string, charts: { data: any[
   const html = generateMultiChartHtml(charts);
 
   fs.writeFileSync(chartFile, html);
+  console.log(`📊 Chart generated: ${chartFile}`);
 
   if (process.env.NODE_ENV !== 'test') {
-    const open = (await import('open')).default;
-    await open(chartFile);
+    try {
+      const openModule = await import('open');
+      const open = openModule.default || openModule;
+      await open(chartFile);
+      console.log(`🌐 Chart opened in browser`);
+    } catch (error: any) {
+      console.log(`⚠️ Could not automatically open chart in browser: ${error.message}`);
+      console.log(`📁 Please manually open: ${chartFile}`);
+    }
   }
 }
 

@@ -31,11 +31,13 @@ export interface Plugin {
 export const historyCommand = new Command()
   .name('history')
   .argument('[folders...]', 'A list of git repositories to analyse')
-  .option('--results, -r', 'The results folder', 'results')
-  .option('--plugins, -p [plugins...]', 'A list of plugins')
+  .option('--results <folder>', 'The results folder', 'results')
+  .option('--plugins <plugins...>', 'A list of plugins')
   .action(analyseHistory);
 
-export async function analyseHistory(folders: string[], options: HistoryOptions, useCache = true): Promise<void> {
+export async function  analyseHistory(folders: string[], options: HistoryOptions, useCache = true): Promise<void> {
+  console.log('Input folders:', folders);
+  console.log('Results folder:', options.results);
   const selectedPlugins: Plugin[] = getPluginsFromNames(options.plugins);
   if (folders.length === 0) {
     log.info('No folders provided to analyze.');
