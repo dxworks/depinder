@@ -1,6 +1,26 @@
 import {LibraryInfo} from "../../extension-points/registrar"
 import semver from 'semver'
-import { differenceInBusinessDays, parseISO } from "date-fns"
+import moment from 'moment'
+
+function differenceInBusinessDays(laterDate: Date, earlierDate: Date): number {
+  const start = moment(earlierDate);
+  const end = moment(laterDate);
+  let businessDays = 0;
+
+  while (start.isBefore(end)) {
+    const dayOfWeek = start.day();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      businessDays++;
+    }
+    start.add(1, 'day');
+  }
+
+  return businessDays;
+}
+
+function parseISO(dateString: string): Date {
+  return new Date(dateString);
+}
 
 export function GrowthPatternMetric(data: CommitDependencyHistory): any {
   const summary: Record<string, any> = {};
