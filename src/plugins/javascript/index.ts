@@ -114,28 +114,6 @@ function recursivelyTransformTreeDeps(tree: DepTreeDep, result: Map<string, Depi
 
 function transformGraphDepsFlat(rootId: string, dependencies: GraphNode[] , result: Map<string, DepinderDependency>) {
     dependencies.forEach(dependency => {
-        const lastAt = dependency.nodeId.lastIndexOf('@')
-        const name = dependency.nodeId.slice(0, lastAt)
-        const version = dependency.nodeId.slice(lastAt + 1)
-        const id = `${name}@${version}`
-        const cachedVersion = result.get(id)
-        if (cachedVersion) {
-            cachedVersion.requestedBy = [rootId, ...cachedVersion.requestedBy]
-        } else {
-            try {
-                const semver = new SemVer(version ?? '', true)
-                result.set(id, {
-                    id,
-                    version: version,
-                    name: name,
-                    semver: semver,
-                    requestedBy: [rootId],
-                } as DepinderDependency)
-            } catch (e) {
-                log.warn(`Invalid version! ${e}`)
-            }
-        }
-
         dependency.deps.forEach((transitiveDep) => {
             const lastAt = transitiveDep.nodeId.lastIndexOf('@')
             const name = transitiveDep.nodeId.slice(0, lastAt)
@@ -152,13 +130,12 @@ function transformGraphDepsFlat(rootId: string, dependencies: GraphNode[] , resu
                         version: version,
                         name: name,
                         semver: semver,
-                        requestedBy: [dependency.nodeId],
+                        requestedBy: [dependency.pkgId === rootId ? rootId : dependency.nodeId],
                     } as DepinderDependency)
                 } catch (e) {
                     log.warn(`Invalid version! ${e}`)
                 }
             }
-
         })
     })
 }
