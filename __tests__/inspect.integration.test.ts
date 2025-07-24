@@ -7,9 +7,9 @@ describe('test inspect command', () => {
     runOnlyLocally('test inspect', () => {
 
         inspectImports(
-            './results-test-meetvent/depinder-projects.json',
-            './results-test-meetvent/extracted-imports-meetvent.json', {
-                results: 'results-inspect-meetvent2',
+            './demo/habitica/depinder-projects.json',
+            '/Users/mario/ImportFinder/tests/extracted-imports-habitica.json', {
+                results: './demo/habitica/results-habitica',
             }
         )
 
