@@ -69,6 +69,7 @@ type LibraryUsage = {
     versionOfLibrary: string;
     fileNames: Set<string>;
     projectNames: Set<string>;
+    vulnerabilities: string;
 };
 
 function computeLibraryUsageResults(
@@ -81,11 +82,13 @@ function computeLibraryUsageResults(
     for (const { importStatement, depinderDependency } of matches) {
         if (!depinderDependency) continue
 
-        const { id: libraryId, name, version } = depinderDependency
+        const { id: libraryId, name, version, vulnerabilities } = depinderDependency
         const filePath = importStatement.file
         const normalizedLibraryId = libraryId.replace(/\./g, '_')
         const concernMapKey = `${filePath}::${normalizedLibraryId}`
         const projectPath = importStatement.projectPath
+
+        const vulnerabilitiesMapped = vulnerabilities?.map(v => `${v.severity} - ${v.permalink}`).join('\n')
 
         // First result
         let concern = concernsMap.get(concernMapKey)
@@ -108,6 +111,7 @@ function computeLibraryUsageResults(
                 versionOfLibrary: version,
                 fileNames: new Set<string>(),
                 projectNames: new Set<string>(),
+                vulnerabilities: vulnerabilitiesMapped ?? '',
             }
             libraryUsageMap.set(libraryId, usage)
         }
@@ -192,13 +196,13 @@ function writeLibraryUsageCsvReport(
     resultsFolder: string
 ) {
     const csvRows = [
-        'name of library,version of library,number of projects,number of files,projects',
+        'name of library,version of library,vulnerabilities,number of files,number of projects,projects',
     ]
 
     for (const usage of libraryUsageMap.values()) {
         const projectsMultiline = Array.from(usage.projectNames).sort().join('\n').replace(/"/g, '""')
         csvRows.push(
-            `"${usage.nameOfLibrary}","${usage.versionOfLibrary}",${usage.projectNames.size},${usage.fileNames.size},"${projectsMultiline}"`
+            `"${usage.nameOfLibrary}","${usage.versionOfLibrary}","${usage.vulnerabilities}",${usage.fileNames.size},${usage.projectNames.size},"${projectsMultiline}"`
         )
     }
 
