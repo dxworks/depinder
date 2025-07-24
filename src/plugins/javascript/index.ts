@@ -9,7 +9,7 @@ import {
     buildDepTreeFromFiles,
     getLockfileVersionFromFile,
     NodeLockfileVersion,
-    parseNpmLockV2Project
+    parseNpmLockV2Project,
 } from 'snyk-nodejs-lockfile-parser'
 import path from 'path'
 import {SemVer} from 'semver'
@@ -185,7 +185,7 @@ async function parseLockFile({root, manifestFile, lockFile}: DependencyFileConte
                 includeOptionalDeps: false,
                 pruneCycles: true,
                 includePeerDeps: false,
-                pruneNpmStrictOutOfSync: false
+                pruneNpmStrictOutOfSync: false,
             })
             const manifestJSON = JSON.parse(fs.readFileSync(manifestFilePath, 'utf8'))
             return {
