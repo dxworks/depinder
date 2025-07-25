@@ -95,7 +95,37 @@ async function extract(rootPath: string): Promise<FrameworkVersionPerProject[]> 
 
     }
 
+    const pipfiles = await findFiles(rootPath, /^Pipfile$/);
+    for (const pipfile of pipfiles) {
+        const pythonVersion = await extractPythonVersionFromPipfile(pipfile);
+
+        const relativePath = path.relative(rootPath, pipfile);
+        const component = getComponent(relativePath);
+        results.push({
+            programmingLanguage: 'PYTHON',
+            projectFile: relativePath,
+            frameworkVersion: pythonVersion,
+            component,
+            group: component,
+            notes: 'Extracted from Pipfile',
+        });
+    }
+
     return results;
+}
+
+async function extractPythonVersionFromPipfile(pipfilePath: string): Promise<string> {
+    try {
+        const content = await fs.readFile(pipfilePath, 'utf-8');
+        // Look for a line like: python_version = "3.11"
+        const match = content.match(/python_version\s*=\s*["']([\d.]+)["']/);
+        if (match) {
+            return match[1];
+        }
+        return '';
+    } catch {
+        return '';
+    }
 }
 
 async function extractJavaVersionFromGradle(gradleFilePath: string): Promise<string> {
@@ -116,7 +146,7 @@ async function extractJavaVersionFromGradle(gradleFilePath: string): Promise<str
 async function extractJavaVersionFromMaven(pomFilePath: string): Promise<string> {
     try {
         const xmlData = await fs.readFile(pomFilePath, 'utf-8');
-        const result = await parseStringPromise(xmlData);
+        const result = await parseXml(xmlData);
 
         if (!result || !result.project) {
             console.error('Invalid POM structure');
@@ -154,15 +184,30 @@ async function extractJavaVersionFromMaven(pomFilePath: string): Promise<string>
     }
 }
 
+async function parseXml(xmlData: string) {
+    const xmlStart = xmlData.indexOf('<?xml');
+    if (xmlStart === -1) {
+        return await parseStringPromise(xmlData);
+    }
+
+    const cleanXml = xmlData.slice(xmlStart);
+    return await parseStringPromise(cleanXml);
+}
+
 async function extractTargetFramework(projectFile: string): Promise<string> {
     try {
         const content = await fs.readFile(projectFile, 'utf-8');
-        const xml = await parseStringPromise(content);
+        const xml = await parseXml(content);
         const frameworkTags = ['TargetFramework', 'TargetFrameworks', 'TargetFrameworkVersion'];
 
-        for (const tag of frameworkTags) {
-            const value = xml?.Project?.PropertyGroup?.[0]?.[tag]?.[0];
-            if (value) return value;
+        const propertyGroups = xml?.Project?.PropertyGroup || [];
+
+        for (const group of propertyGroups) {
+            for (const tag of frameworkTags) {
+                if (group[tag]) {
+                    return group[tag][0];
+                }
+            }
         }
         return '';
     } catch {
@@ -189,7 +234,7 @@ async function getParameterFromProps(rootPath: string, filePath: string, paramet
 async function extractParameterValueFromProps(propsFilePath: string, parameterName: string): Promise<string> {
     try {
         const content = await fs.readFile(propsFilePath, 'utf-8');
-        const xml = await parseStringPromise(content);
+        const xml = await parseXml(content);
         const cleanParameterName = parameterName.replace(/[\$()]/g, '');
         return xml?.Project?.PropertyGroup?.[0]?.[cleanParameterName]?.[0] || '';
     } catch {
