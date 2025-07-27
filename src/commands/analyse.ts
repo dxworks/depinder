@@ -109,7 +109,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
 
     const selectedPlugins = getPluginsFromNames(options.plugins)
 
-    const depinderDependencies: Record<string, Record<string, DepinderDependency>> = {}
+    const depinderDependencies: Record<string, Record<string, DepinderDependency & {projectName: string, projectVersion: string }>> = {}
 
     for (const plugin of selectedPlugins) {
         log.info(`Plugin ${plugin.name} starting`)
@@ -185,7 +185,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
             if (plugin.codeFinder){
                 for (const  dependency of Object.values(project.dependencies)) {
                     const key = plugin.codeFinder?.getDependencyKey(dependency)
-                    depinderDependencies[plugin.name][key] = dependency
+                    depinderDependencies[plugin.name][key] = {projectName: project.name, projectVersion: project.version, ...dependency}
                 }
             } else {
                 console.warn(`Plugin '${plugin.name}' does not support CodeFinder yet.`)

@@ -29,13 +29,14 @@ export function inspectImports(jsonPath: string, importsPath: string, options: I
     }
 
     log.info(`Reading DepinderProjects JSON: ${jsonPath}`)
-    const depinderDependencies = readJSON<Record<string, Record<string, DepinderDependency>>>(jsonPath)
+    const depinderDependencies = readJSON<Record<string, Record<string, DepinderDependency & {projectName: string, projectVersion: string }>>>(jsonPath)
 
     log.info(`Reading imports JSON: ${importsPath}`)
     const importData = readJSON<ImportStatement[]>(importsPath)
 
     log.info('\n--- Matching imports ---')
     const matchedImportsToDependencies: { importStatement: ImportStatement; depinderDependency: DepinderDependency | null }[] = []
+    const matchedDepIds = new Set<string>()
     for (const importStatement of importData) {
         const plugin = getPluginFromImportLanguage(importStatement.language)
         if (!plugin) {
@@ -48,11 +49,39 @@ export function inspectImports(jsonPath: string, importsPath: string, options: I
         }
         const depinderDependenciesPluginSpecific = depinderDependencies[plugin.name]
         const matchFunction = plugin.codeFinder.matchImportToLibrary
+        const matchedDepinderDependency = matchFunction(importStatement, depinderDependenciesPluginSpecific)
+
+        if (matchedDepinderDependency) {
+            matchedDepIds.add(matchedDepinderDependency.id)
+        }
+
         matchedImportsToDependencies.push({
             importStatement,
-            depinderDependency: matchFunction(importStatement, depinderDependenciesPluginSpecific),
+            depinderDependency: matchedDepinderDependency,
         })
     }
+
+    log.info('\n--- Finding unused direct dependencies ---')
+    const unusedDirectDependencies: { plugin: string; dependency: DepinderDependency & {projectName: string, projectVersion: string } }[] = []
+
+    for (const [pluginName, depsMap] of Object.entries(depinderDependencies)) {
+        for (const dep of Object.values(depsMap)) {
+            const isDirect = !dep.requestedBy || dep.requestedBy.some(it =>
+                it.startsWith(`${dep.projectName}@${dep.projectVersion}`))
+            if (isDirect && !matchedDepIds.has(dep.id)) {
+                unusedDirectDependencies.push({ plugin: pluginName, dependency: dep })
+            }
+        }
+    }
+
+    const csvHeader = 'library,version,files'
+
+    const csvRows = unusedDirectDependencies.map(({ dependency: dep }) =>
+        `${dep.name},${dep.version},0`
+    )
+
+    const csvContent = [csvHeader, ...csvRows].join('\n')
+    fs.writeFileSync(path.join(resultsFolder, 'unused-direct-dependencies.csv'), csvContent)
 
     computeLibraryUsageResults(matchedImportsToDependencies, resultsFolder)
 }
