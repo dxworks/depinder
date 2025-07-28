@@ -1,4 +1,12 @@
-import { extractProjectInfo } from '../src/utils/projectMapping';
+import { extractProjectInfo, verifyProjectPath, ProjectPathInfo } from '../src/utils/projectMapping';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Mock fs.existsSync
+jest.mock('fs', () => ({
+  ...jest.requireActual('fs'),
+  existsSync: jest.fn()
+}));
 
 describe('Project Mapping', () => {
   describe('extractProjectInfo', () => {
@@ -77,8 +85,13 @@ describe('Project Mapping', () => {
       expect(result.projectPath).toBe('data-library/DataLibrary/src/DataLibrary');
     });
 
-    it('should extract project path when version is unspecified for Gradle', () => {
-      const result = extractProjectInfo('Deliver-Fast:idapi:unspecified:deliverfast/idapi:-gradle/androidx.fragment:fragment:1.5.4/androidx.activity:activity:1.7.0', 'maven');
+    it('should extract project path with placeholder version suffix', () => {
+      const result = extractProjectInfo('Service.Report/1.3.0.0-placeholder/../../Download/voyager-target/service-report/Service.Report.Test/Service.Report.Test.csproj/-nuget/Moq/4.15.0', 'nuget');
+      expect(result.projectPath).toBe('service-report/Service.Report.Test');
+    });
+
+    it('should extract project path when version is upsecified for Gradle', () => {
+      const result = extractProjectInfo('Deliver-Fast-2:idapi:unspecified:deliverfast/idapi:-gradle/androidx.fragment:fragment:1.5.4/androidx.activity:activity:1.7.0', 'maven');
       expect(result.projectPath).toBe('deliverfast/idapi');
     });
 
@@ -87,6 +100,83 @@ describe('Project Mapping', () => {
       expect(() => {
         extractProjectInfo('path/without/any/recognizable/pattern/or/version', 'unknown');
       }).toThrow('No end delimiter found in path');
+    });
+  });
+
+  describe('verifyProjectPath', () => {
+    beforeEach(() => {
+      // Reset mock before each test
+      jest.clearAllMocks();
+    });
+
+    it('should return projectPathExists=true when path exists', () => {
+      // Mock fs.existsSync to return true
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      
+      const result = verifyProjectPath('some/project/path', '/base/path');
+      
+      expect(result.projectPath).toBe('some/project/path');
+      expect(result.verifiedPath).toBe('some/project/path');
+      expect(result.projectPathExists).toBe(true);
+      expect(fs.existsSync).toHaveBeenCalled();
+    });
+
+    it('should return projectPathExists=false when path does not exist', () => {
+      // Mock fs.existsSync to return false
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+      
+      const result = verifyProjectPath('some/project/path', '/base/path');
+      
+      expect(result.projectPath).toBe('some/project/path');
+      expect(result.verifiedPath).toBe('some/project/path');
+      expect(result.projectPathExists).toBe(false);
+      expect(fs.existsSync).toHaveBeenCalled();
+    });
+
+    it('should handle empty paths gracefully', () => {
+      const result = verifyProjectPath('', '/base/path');
+      
+      expect(result.projectPath).toBe('');
+      expect(result.verifiedPath).toBe('');
+      expect(result.projectPathExists).toBe(false);
+      expect(fs.existsSync).not.toHaveBeenCalled();
+    });
+
+    it('should handle empty base path gracefully', () => {
+      const result = verifyProjectPath('some/project/path', '');
+      
+      expect(result.projectPath).toBe('some/project/path');
+      expect(result.verifiedPath).toBe('some/project/path');
+      expect(result.projectPathExists).toBe(false);
+      expect(fs.existsSync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('extractProjectInfo with basePath', () => {
+    beforeEach(() => {
+      // Reset mock before each test
+      jest.clearAllMocks();
+    });
+
+    it('should verify path when basePath is provided', () => {
+      // Mock fs.existsSync to return true
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      
+      const result = extractProjectInfo('my-project/-npm/react/17.0.2', 'npmjs', '/base/path');
+      
+      expect(result.projectPath).toBe('my-project');
+      expect(result.verifiedPath).toBe('my-project');
+      expect(result.projectPathExists).toBe(true);
+      expect(fs.existsSync).toHaveBeenCalled();
+    });
+
+    it('should set projectPathExists to undefined when basePath is not provided', () => {
+      const result = extractProjectInfo('my-project/-npm/react/17.0.2', 'npmjs');
+      
+      expect(result.projectPath).toBe('my-project');
+      expect(result.verifiedPath).toBe('my-project');
+      expect(result.projectPathExists).toBeUndefined();
+      expect(fs.existsSync).not.toHaveBeenCalled();
     });
   });
 });

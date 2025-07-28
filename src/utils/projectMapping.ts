@@ -1,6 +1,8 @@
 /**
  * Project mapping utilities for extracting project information from dependency paths
  */
+import * as fs from 'fs';
+import * as path from 'path';
 
 const END_DELIMITERS = [
   '-yarn',
@@ -22,6 +24,7 @@ const MONOREPO_PATTERN = /packages[\\/]([^\\/]+)[\\/]local[\\/]([^\\/]+)[\\/]-ya
 export interface ProjectPathInfo {
   projectPath: string;
   verifiedPath: string;
+  projectPathExists?: boolean;
 }
 
 /**
@@ -32,7 +35,7 @@ export interface ProjectPathInfo {
 function isVersionSegment(segment: string): boolean {
   return /^\d+\.\d+\.\d+(-.*)?$/i.test(segment) || 
          /^REPLACE_BY_CI$/i.test(segment) || 
-         /^[\d\.]+(-SNAPSHOT)?$/i.test(segment) ||
+         /^[\d\.]+(-SNAPSHOT|-placeholder)?$/i.test(segment) ||
          segment.toLowerCase() === 'unspecified';
 }
 
@@ -185,19 +188,53 @@ function getEndDelimiterIndex(segments: string[]) {
 }
 
 /**
+ * Verify if a project path exists on the file system
+ * @param projectPath The extracted project path
+ * @param basePath Base directory to check against
+ * @returns Verified path information
+ */
+export function verifyProjectPath(projectPath: string, basePath: string): ProjectPathInfo {
+  if (!projectPath || !basePath) {
+    return { projectPath, verifiedPath: projectPath, projectPathExists: false };
+  }
+  
+  try {
+    const fullPath = path.join(basePath, projectPath);
+    const exists = fs.existsSync(fullPath);
+    
+    return { 
+      projectPath, 
+      verifiedPath: projectPath, 
+      projectPathExists: exists 
+    };
+  } catch (error) {
+    console.error(`Error verifying project path: ${error}`);
+    return { projectPath, verifiedPath: projectPath, projectPathExists: false };
+  }
+}
+
+/**
  * Extract project information from a dependency path based on origin type
  * @param dependencyPath The path from the Black Duck report
  * @param originName The origin name (e.g., npmjs, maven, nuget, pypi, sbt)
+ * @param basePath Optional base path to verify against
  * @returns Object containing project path and verified path information
  */
-export function extractProjectInfo(dependencyPath: string, originName: string): ProjectPathInfo {
+export function extractProjectInfo(dependencyPath: string, originName: string, basePath?: string): ProjectPathInfo {
   if (!dependencyPath) {
-    return { projectPath: '', verifiedPath: '' };
+    return { projectPath: '', verifiedPath: '', projectPathExists: false };
   }
   
   try {
     const projectPath = parseProjectPath(dependencyPath);
-    return { projectPath, verifiedPath: projectPath };
+    
+    // Verify the path if basePath is provided
+    if (basePath) {
+      return verifyProjectPath(projectPath, basePath);
+    }
+    
+    // Otherwise return unverified path
+    return { projectPath, verifiedPath: projectPath, projectPathExists: undefined };
   } catch (error) {
     console.error(`Error extracting project info: ${error}`);
     throw error;

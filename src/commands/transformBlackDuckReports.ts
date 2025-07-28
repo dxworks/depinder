@@ -3,7 +3,7 @@ import path from 'path';
 import { Command } from 'commander';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
-import { extractProjectInfo } from '../utils/projectMapping';
+import { extractProjectInfo, ProjectPathInfo } from '../utils/projectMapping';
 
 /**
  * Common options for CSV parsing
@@ -93,6 +93,7 @@ const DEPENDENCIES_SOURCES_COLUMN_ORDER = [
   'Match type',
   'Path',
   'ProjectPath',
+  'ProjectPathExists',
   'VerifiedPath',
   'Origin name',
   'License names',
@@ -280,11 +281,13 @@ function transformDependencies(components: ComponentRecord[]): Record<string, st
  * Transforms sources and components data into dependencies_sources records
  * @param sources Raw source records from Black Duck
  * @param components Raw component records from Black Duck
+ * @param basePath Optional base path for verifying project paths
  * @returns Transformed dependency source records
  */
 function transformDependenciesSources(
   sources: SourceRecord[], 
-  components: ComponentRecord[]
+  components: ComponentRecord[],
+  basePath?: string
 ): Record<string, string>[] {
   return sources.map(src => {
     const comp = components.find(c => c['Version id'] === src['Version id']);
@@ -293,7 +296,7 @@ function transformDependenciesSources(
     const counts = calculateVulnerabilityCounts(comp);
     
     // Extract project information from the path and origin name
-    const projectInfo = extractProjectInfo(src['Path'], src['Origin name']);
+    const projectInfo = extractProjectInfo(src['Path'], src['Origin name'], basePath);
     
     return {
       'Component name': src['Component name'],
@@ -303,6 +306,7 @@ function transformDependenciesSources(
       'Path': src['Path'],
       'ProjectPath': projectInfo.projectPath,
       'VerifiedPath': projectInfo.verifiedPath,
+      'ProjectPathExists': projectInfo.projectPathExists !== undefined ? String(projectInfo.projectPathExists) : '',
       'Origin name': src['Origin name'],
       'License names': comp['License names'],
       'License families': comp['License families'],
@@ -424,14 +428,15 @@ function validateRequiredFiles(entries: string[]): {
 /**
  * Transforms raw Black Duck CSV exports into four cleaned and shareable CSV reports
  * @param reportDir Directory containing Black Duck report files
+ * @param options Command options including optional basePath
  */
-export async function transformBlackDuckReports(reportDir: string): Promise<void> {
+export async function transformBlackDuckReports(reportDir: string, options?: { basePath?: string }): Promise<void> {
   try {
     // Find and validate required input files
     const entries = await fs.readdir(reportDir);
     const { componentFile, sourceFile, securityFile, upgradeFile } = validateRequiredFiles(entries);
 
-    // Read input files 
+    // Read input files
     const componentsRawData = await fs.readFile(path.join(reportDir, componentFile), 'utf-8');
     const sourcesRawData = await fs.readFile(path.join(reportDir, sourceFile), 'utf-8');
     const securityRawData = await fs.readFile(path.join(reportDir, securityFile), 'utf-8');
@@ -443,7 +448,7 @@ export async function transformBlackDuckReports(reportDir: string): Promise<void
     const securityRecords: SecurityRecord[] = parse(securityRawData, CSV_PARSE_OPTIONS);
 
     // Transform and write _dependencies_sources.csv
-    const dependenciesSourcesRecords = transformDependenciesSources(sources, components);
+    const dependenciesSourcesRecords = transformDependenciesSources(sources, components, options?.basePath);
     const formattedDependenciesSources = formatRecordsWithColumnOrder(
       dependenciesSourcesRecords, 
       DEPENDENCIES_SOURCES_COLUMN_ORDER
@@ -480,4 +485,5 @@ export const transformBlackDuckReportsCommand = new Command()
   .command('transformBlackDuckReports')
   .description('Transforms Black Duck CSV reports to shareable format')
   .argument('<reportPath>', 'Path to the directory with Black Duck CSVs')
+  .option('-b, --basePath <path>', 'Base path for verifying project paths')
   .action(transformBlackDuckReports);
