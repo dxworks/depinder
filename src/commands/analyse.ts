@@ -262,7 +262,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
     )
     if (shouldSaveDepinderOutput){
         fs.writeFileSync(
-            path.resolve(process.cwd(), resultFolder, 'depinder-projects.json'),
+            path.resolve(process.cwd(), resultFolder, 'depinder-dependencies.json'),
             JSON.stringify(depinderDependencies, null, 2)
         )
     }
