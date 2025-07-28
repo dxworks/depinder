@@ -1,4 +1,10 @@
-import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
+import {
+    DependencyFileContext,
+    DepinderDependency,
+    DepinderProject,
+    Extractor,
+    Parser,
+} from '../../extension-points/extract'
 // @ts-ignore
 import path from 'path'
 import {AbstractRegistrar, LibrariesIORegistrar, LibraryInfo} from '../../extension-points/registrar'
@@ -9,6 +15,7 @@ import fs from 'fs'
 import {depinderTempFolder} from '../../utils/utils'
 import {parseMavenDependencyTree} from './parsers/maven'
 import {log} from '../../utils/logging'
+import {CodeFinder, ImportStatement} from '../../extension-points/code-impact'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pomParser = require('pom-parser')
@@ -156,6 +163,23 @@ export class MavenCentralRegistrar extends AbstractRegistrar {
 
 const javaRegistrar = new MavenCentralRegistrar(new LibrariesIORegistrar('maven'))
 
+function matchImportToLibrary (
+    importStatement: ImportStatement,
+    depinderDependencies: Record<string, DepinderDependency>
+): DepinderDependency | null  {
+    return depinderDependencies[importStatement.library]
+}
+
+function getDependencyKey(depinderDependency: DepinderDependency): string {
+    const parts = depinderDependency.id.split(':')
+    return parts[1] // artifactId
+}
+
+const codeFinder: CodeFinder = {
+    matchImportToLibrary,
+    getDependencyKey,
+}
+
 export const java: Plugin = {
     name: 'java',
     aliases: ['maven', 'gradle'],
@@ -163,5 +187,6 @@ export const java: Plugin = {
     parser,
     registrar: javaRegistrar,
     checker,
+    codeFinder,
 }
 

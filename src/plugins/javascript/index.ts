@@ -9,7 +9,7 @@ import {
     buildDepTreeFromFiles,
     getLockfileVersionFromFile,
     NodeLockfileVersion,
-    parseNpmLockV2Project
+    parseNpmLockV2Project,
 } from 'snyk-nodejs-lockfile-parser'
 import path from 'path'
 import {SemVer} from 'semver'
@@ -22,6 +22,7 @@ import {npm} from '../../utils/npm'
 import fs from 'fs'
 import {log} from '../../utils/logging'
 import {GraphNode} from '@snyk/dep-graph/dist/core/types'
+import {CodeFinder, ImportStatement} from '../../extension-points/code-impact'
 
 const extractor: Extractor = {
     files: ['package.json', 'package-lock.json', 'yarn.lock'],
@@ -113,28 +114,6 @@ function recursivelyTransformTreeDeps(tree: DepTreeDep, result: Map<string, Depi
 
 function transformGraphDepsFlat(rootId: string, dependencies: GraphNode[] , result: Map<string, DepinderDependency>) {
     dependencies.forEach(dependency => {
-        const lastAt = dependency.nodeId.lastIndexOf('@')
-        const name = dependency.nodeId.slice(0, lastAt)
-        const version = dependency.nodeId.slice(lastAt + 1)
-        const id = `${name}@${version}`
-        const cachedVersion = result.get(id)
-        if (cachedVersion) {
-            cachedVersion.requestedBy = [rootId, ...cachedVersion.requestedBy]
-        } else {
-            try {
-                const semver = new SemVer(version ?? '', true)
-                result.set(id, {
-                    id,
-                    version: version,
-                    name: name,
-                    semver: semver,
-                    requestedBy: [rootId],
-                } as DepinderDependency)
-            } catch (e) {
-                log.warn(`Invalid version! ${e}`)
-            }
-        }
-
         dependency.deps.forEach((transitiveDep) => {
             const lastAt = transitiveDep.nodeId.lastIndexOf('@')
             const name = transitiveDep.nodeId.slice(0, lastAt)
@@ -151,13 +130,12 @@ function transformGraphDepsFlat(rootId: string, dependencies: GraphNode[] , resu
                         version: version,
                         name: name,
                         semver: semver,
-                        requestedBy: [dependency.nodeId],
+                        requestedBy: [dependency.pkgId === rootId ? rootId : dependency.nodeId],
                     } as DepinderDependency)
                 } catch (e) {
                     log.warn(`Invalid version! ${e}`)
                 }
             }
-
         })
     })
 }
@@ -207,7 +185,7 @@ async function parseLockFile({root, manifestFile, lockFile}: DependencyFileConte
                 includeOptionalDeps: false,
                 pruneCycles: true,
                 includePeerDeps: false,
-                pruneNpmStrictOutOfSync: false
+                pruneNpmStrictOutOfSync: false,
             })
             const manifestJSON = JSON.parse(fs.readFileSync(manifestFilePath, 'utf8'))
             return {
@@ -257,12 +235,26 @@ const checker: VulnerabilityChecker = {
     getPURL: (lib, ver) => `pkg:npm/${lib.replace('@', '%40')}@${ver}`,
 }
 
+function matchImportToLibrary (importStatement: ImportStatement, depinderDependencies: Record<string, DepinderDependency>): DepinderDependency | null  {
+    return depinderDependencies[importStatement.library]
+}
+
+function getDependencyKey(depinderDependency: DepinderDependency): string {
+    return depinderDependency.id
+}
+
+const codeFinder: CodeFinder = {
+    matchImportToLibrary,
+    getDependencyKey,
+}
+
 export const javascript: Plugin = {
     name: 'npm',
-    aliases: ['js', 'javascript', 'node', 'nodejs', 'yarn'],
+    aliases: ['js', 'javascript', 'javascript (jsx)', 'ts', 'typescript', 'typescript (tsx)', 'node', 'nodejs', 'yarn'],
     extractor,
     parser,
     registrar,
     checker,
+    codeFinder,
 }
 
