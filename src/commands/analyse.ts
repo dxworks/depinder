@@ -109,6 +109,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
 
     const selectedPlugins = getPluginsFromNames(options.plugins)
 
+    // { pluginName: { depName: DepinderDependency & {projectName: string, projectVersion: string } } }
     const depinderDependencies: Record<string, Record<string, DepinderDependency & {projectName: string, projectVersion: string }>> = {}
 
     for (const plugin of selectedPlugins) {
