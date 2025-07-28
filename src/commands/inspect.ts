@@ -8,6 +8,13 @@ import {Plugin} from '../extension-points/plugin'
 import {defaultPlugins} from '../extension-points/plugin-loader'
 import {readJSON} from '../utils/utils'
 
+/*
+*   Before running this command, you have to:
+*      - run the `analyze` command, which will create a `depinder-dependencies.json` file;
+*      - run the ImportFinder to extract the imports from the codebase, which will create an `extracted-imports.json` file;
+*  These two file paths will be passed as arguments to this `inspect` command.
+ */
+
 export const inspectCommand = new Command('inspect')
     .name('inspect')
     .description('Inspect library usage by looking at import statements')
