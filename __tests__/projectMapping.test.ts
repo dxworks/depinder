@@ -67,14 +67,26 @@ describe('Project Mapping', () => {
       expect(result.projectPath).toBe('database-library/DatabaseLibrary');
     });
 
+    it('should extract project path from .NET paths with longer relative paths', () => {
+        const result = extractProjectInfo('DatabaseLibrary/1.0.0-/../../../user/Downloads/voyager-target/database-library/DatabaseLibrary/DatabaseLibrary.csproj/-nuget/System.Text.Json/8.0.4', 'nuget');
+        expect(result.projectPath).toBe('database-library/DatabaseLibrary');
+    });
+
     it('should extract project path from .NET paths with more segments', () => {
       const result = extractProjectInfo('DatabaseLibrary/1.0.0-/../../Downloads/voyager-target/data-library/DataLibrary/src/DataLibrary/DataLibrary.csproj/-nuget/Amazon.Lambda/2.7.1', 'nuget');
       expect(result.projectPath).toBe('data-library/DataLibrary/src/DataLibrary');
     });
 
-    it('should extract project path using generic parser for unknown origins', () => {
-      const result = extractProjectInfo('some/unknown/path/format', 'unknown');
-      expect(result.projectPath).toBe('some/unknown');
+    it('should extract project path when version is unspecified for Gradle', () => {
+      const result = extractProjectInfo('Deliver-Fast:idapi:unspecified:deliverfast/idapi:-gradle/androidx.fragment:fragment:1.5.4/androidx.activity:activity:1.7.0', 'maven');
+      expect(result.projectPath).toBe('deliverfast/idapi');
+    });
+
+    it('should throw error when generic parser cannot determine project path', () => {
+      // Path with no recognizable pattern and no version segments
+      expect(() => {
+        extractProjectInfo('path/without/any/recognizable/pattern/or/version', 'unknown');
+      }).toThrow('No end delimiter found in path');
     });
   });
 });
