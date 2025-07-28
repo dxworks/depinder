@@ -5,7 +5,7 @@ describe('test analyse for default plugins', () => {
 
     runOnlyLocally('test analyse for javascript', async () => {
 
-        await analyseFiles(['/Users/mario//test-projects/habitica'], {results:'demo/habitica', refresh: false,
+        await analyseFiles(['/Users/mario/test-projects/habitica'], {results:'demo/habitica', refresh: false,
             plugins: ['npm']})
 
         console.log('done')
