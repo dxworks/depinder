@@ -128,7 +128,7 @@ describe('Project Mapping', () => {
       const result = verifyProjectPath('some/project/path', '/base/path');
       
       expect(result.projectPath).toBe('some/project/path');
-      expect(result.verifiedPath).toBe('some/project/path');
+      expect(result.verifiedPath).toBe('');
       expect(result.projectPathExists).toBe(false);
       expect(fs.existsSync).toHaveBeenCalled();
     });
@@ -146,7 +146,7 @@ describe('Project Mapping', () => {
       const result = verifyProjectPath('some/project/path', '');
       
       expect(result.projectPath).toBe('some/project/path');
-      expect(result.verifiedPath).toBe('some/project/path');
+      expect(result.verifiedPath).toBe('');
       expect(result.projectPathExists).toBe(false);
       expect(fs.existsSync).not.toHaveBeenCalled();
     });
@@ -174,9 +174,10 @@ describe('Project Mapping', () => {
       const result = extractProjectInfo('my-project/-npm/react/17.0.2', 'npmjs');
       
       expect(result.projectPath).toBe('my-project');
-      expect(result.verifiedPath).toBe('my-project');
+      expect(result.verifiedPath).toBe('');
       expect(result.projectPathExists).toBeUndefined();
       expect(fs.existsSync).not.toHaveBeenCalled();
     });
   });
+
 });

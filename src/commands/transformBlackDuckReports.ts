@@ -1,9 +1,10 @@
 import fs from 'fs/promises';
+import * as fsSync from 'fs';
 import path from 'path';
 import { Command } from 'commander';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
-import { extractProjectInfo, ProjectPathInfo } from '../utils/projectMapping';
+import { extractProjectInfo, ProjectPathInfo, PathMappings, createPathMappings } from '../utils/projectMapping';
 
 /**
  * Common options for CSV parsing
@@ -287,7 +288,8 @@ function transformDependencies(components: ComponentRecord[]): Record<string, st
 function transformDependenciesSources(
   sources: SourceRecord[], 
   components: ComponentRecord[],
-  basePath?: string
+  basePath?: string,
+  pathMappings?: PathMappings
 ): Record<string, string>[] {
   return sources.map(src => {
     const comp = components.find(c => c['Version id'] === src['Version id']);
@@ -295,8 +297,10 @@ function transformDependenciesSources(
 
     const counts = calculateVulnerabilityCounts(comp);
     
-    // Extract project information from the path and origin name
-    const projectInfo = extractProjectInfo(src['Path'], src['Origin name'], basePath);
+    // Extract project information from path
+    const projectInfo = basePath
+      ? extractProjectInfo(src['Path'], src['Origin name'], basePath, pathMappings)
+      : extractProjectInfo(src['Path'], src['Origin name']);
     
     return {
       'Component name': src['Component name'],
@@ -428,15 +432,17 @@ function validateRequiredFiles(entries: string[]): {
 /**
  * Transforms raw Black Duck CSV exports into four cleaned and shareable CSV reports
  * @param reportDir Directory containing Black Duck report files
- * @param options Command options including optional basePath
+ * @param options Command options including optional basePath and pathMappings
  */
-export async function transformBlackDuckReports(reportDir: string, options?: { basePath?: string }): Promise<void> {
+export async function transformBlackDuckReports(reportDir: string, options?: { basePath?: string, pathMappings?: string }): Promise<void> {
   try {
     // Find and validate required input files
     const entries = await fs.readdir(reportDir);
     const { componentFile, sourceFile, securityFile, upgradeFile } = validateRequiredFiles(entries);
+    
+    let pathMappings: PathMappings | undefined = loadPathMappings(options);
 
-    // Read input files
+    // Read input files 
     const componentsRawData = await fs.readFile(path.join(reportDir, componentFile), 'utf-8');
     const sourcesRawData = await fs.readFile(path.join(reportDir, sourceFile), 'utf-8');
     const securityRawData = await fs.readFile(path.join(reportDir, securityFile), 'utf-8');
@@ -448,7 +454,7 @@ export async function transformBlackDuckReports(reportDir: string, options?: { b
     const securityRecords: SecurityRecord[] = parse(securityRawData, CSV_PARSE_OPTIONS);
 
     // Transform and write _dependencies_sources.csv
-    const dependenciesSourcesRecords = transformDependenciesSources(sources, components, options?.basePath);
+    const dependenciesSourcesRecords = transformDependenciesSources(sources, components, options?.basePath, pathMappings);
     const formattedDependenciesSources = formatRecordsWithColumnOrder(
       dependenciesSourcesRecords, 
       DEPENDENCIES_SOURCES_COLUMN_ORDER
@@ -486,4 +492,31 @@ export const transformBlackDuckReportsCommand = new Command()
   .description('Transforms Black Duck CSV reports to shareable format')
   .argument('<reportPath>', 'Path to the directory with Black Duck CSVs')
   .option('-b, --basePath <path>', 'Base path for verifying project paths')
+  .option('-m, --pathMappings <path>', 'Path to JSON file containing path mappings')
   .action(transformBlackDuckReports);
+
+function loadPathMappings(options: { basePath?: string; pathMappings?: string; } | undefined) {
+  let pathMappings: PathMappings | undefined = undefined;
+  if (options?.pathMappings) {
+    try {
+      console.log(`Loading path mappings from ${options.pathMappings}`);
+
+      if (!fsSync.existsSync(options.pathMappings)) {
+        console.warn(`Path mapping file not found: ${options.pathMappings}`);
+      } else {
+        const fileContent = fsSync.readFileSync(options.pathMappings, 'utf8');
+        const mappingData = JSON.parse(fileContent);
+
+        if (!mappingData.pathMappings || !Array.isArray(mappingData.pathMappings)) {
+          console.warn(`Invalid path mapping file format: ${options.pathMappings}`);
+        } else {
+          pathMappings = createPathMappings(mappingData.pathMappings);
+          console.log(`Loaded ${pathMappings.size} path mappings from ${options.pathMappings}`);
+        }
+      }
+    } catch (error) {
+      console.error(`Error loading path mappings: ${error}`);
+    }
+  }
+  return pathMappings;
+}

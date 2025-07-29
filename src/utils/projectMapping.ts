@@ -4,6 +4,19 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+/**
+ * Interface for path mapping configuration
+ */
+export interface PathMapping {
+  extractedPath: string;
+  actualPath: string;
+}
+
+/**
+ * Map of extracted paths to actual paths
+ */
+export type PathMappings = Map<string, string>;
+
 const END_DELIMITERS = [
   '-yarn',
   '-npm',
@@ -188,28 +201,67 @@ function getEndDelimiterIndex(segments: string[]) {
 }
 
 /**
+ * Create path mappings from mapping data
+ * @param mappings Array of path mapping objects
+ * @returns Map of extracted paths to actual paths
+ */
+export function createPathMappings(mappings: PathMapping[]): PathMappings {
+  const pathMappings = new Map<string, string>();
+  
+  for (const mapping of mappings) {
+    if (mapping.extractedPath && mapping.actualPath) {
+      pathMappings.set(mapping.extractedPath, mapping.actualPath);
+    }
+  }
+  
+  return pathMappings;
+}
+
+/**
  * Verify if a project path exists on the file system
  * @param projectPath The extracted project path
  * @param basePath Base directory to check against
+ * @param pathMappings Optional path mappings to use for verification
  * @returns Verified path information
  */
-export function verifyProjectPath(projectPath: string, basePath: string): ProjectPathInfo {
+export function verifyProjectPath(projectPath: string, basePath: string, pathMappings?: PathMappings): ProjectPathInfo {
   if (!projectPath || !basePath) {
-    return { projectPath, verifiedPath: projectPath, projectPathExists: false };
+    return { projectPath, verifiedPath: '', projectPathExists: false };
   }
   
   try {
     const fullPath = path.join(basePath, projectPath);
-    const exists = fs.existsSync(fullPath);
+    const originalExists = fs.existsSync(fullPath);
     
+    if (originalExists) {
+      return { 
+        projectPath, 
+        verifiedPath: projectPath, 
+        projectPathExists: true 
+      };
+    }
+    
+    if (pathMappings && pathMappings.has(projectPath)) {
+      const mappedPath = pathMappings.get(projectPath) as string; 
+      const mappedFullPath = path.join(basePath, mappedPath);
+      const mappedExists = fs.existsSync(mappedFullPath);
+      
+      return { 
+        projectPath, 
+        verifiedPath: mappedExists ? mappedPath : '',
+        projectPathExists: originalExists 
+      };
+    }
+    
+    // No mapping found or mapped path doesn't exist
     return { 
       projectPath, 
-      verifiedPath: projectPath, 
-      projectPathExists: exists 
+      verifiedPath: '', 
+      projectPathExists: false 
     };
   } catch (error) {
     console.error(`Error verifying project path: ${error}`);
-    return { projectPath, verifiedPath: projectPath, projectPathExists: false };
+    return { projectPath, verifiedPath: '', projectPathExists: false };
   }
 }
 
@@ -220,7 +272,7 @@ export function verifyProjectPath(projectPath: string, basePath: string): Projec
  * @param basePath Optional base path to verify against
  * @returns Object containing project path and verified path information
  */
-export function extractProjectInfo(dependencyPath: string, originName: string, basePath?: string): ProjectPathInfo {
+export function extractProjectInfo(dependencyPath: string, originName: string, basePath?: string, pathMappings?: PathMappings): ProjectPathInfo {
   if (!dependencyPath) {
     return { projectPath: '', verifiedPath: '', projectPathExists: false };
   }
@@ -230,11 +282,11 @@ export function extractProjectInfo(dependencyPath: string, originName: string, b
     
     // Verify the path if basePath is provided
     if (basePath) {
-      return verifyProjectPath(projectPath, basePath);
+      return verifyProjectPath(projectPath, basePath, pathMappings);
     }
     
-    // Otherwise return unverified path
-    return { projectPath, verifiedPath: projectPath, projectPathExists: undefined };
+    // Otherwise return unverified path with empty verifiedPath
+    return { projectPath, verifiedPath: '', projectPathExists: undefined };
   } catch (error) {
     console.error(`Error extracting project info: ${error}`);
     throw error;
