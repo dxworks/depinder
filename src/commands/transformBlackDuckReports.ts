@@ -60,7 +60,7 @@ interface SecurityRecord {
 const DEPENDENCIES_COLUMN_ORDER = [
   'Component name',
   'Component version name',
-  'Component Origin Id',
+  'Component Version Origin Id',
   'License names',
   'License families',
   'Match type',
@@ -90,7 +90,7 @@ const DEPENDENCIES_COLUMN_ORDER = [
 const DEPENDENCIES_SOURCES_COLUMN_ORDER = [
   'Component name',
   'Component version name',
-  'Component Origin Id',
+  'Component Version Origin Id',
   'Match type',
   'Path',
   'ProjectPath',
@@ -118,7 +118,7 @@ const DEPENDENCIES_SOURCES_COLUMN_ORDER = [
 const VULNERABILITY_DETAILS_HEADERS = [
   'Component name', 
   'Component version name', 
-  'Component Origin Id',
+  'Component Version Origin Id',
   'Vulnerability id', 
   'Description', 
   'Published on', 
@@ -148,6 +148,7 @@ const UPGRADE_GUIDANCE_COLUMNS_TO_REMOVE = new Set([
   'Used by', 
   'Component Id', 
   'Component Version Id', 
+  'Component Origin Id', 
   'Component Origin Version Name', 
   'Short Term Recommended Version Id',
   'Long Term Recommended Version Id', 
@@ -248,7 +249,7 @@ function transformDependencies(components: ComponentRecord[]): Record<string, st
     const result: Record<string, string> = {
       'Component name': component['Component name'],
       'Component version name': component['Component version name'],
-      'Component Origin Id': component['Origin id'] || '',
+      'Component Version Origin Id': component['Origin id'] || '',
       'License names': component['License names'],
       'License families': component['License families'],
       'Match type': normalizeMatchType(component['Match type']),
@@ -305,7 +306,7 @@ function transformDependenciesSources(
     return {
       'Component name': src['Component name'],
       'Component version name': src['Component version name'],
-      'Component Origin Id': src['Origin name id'],
+      'Component Version Origin Id': src['Origin name id'],
       'Match type': normalizeMatchType(src['Match type']),
       'Path': src['Path'],
       'ProjectPath': projectInfo.projectPath,
@@ -345,7 +346,7 @@ function transformVulnerabilityDetails(
     for (const key of VULNERABILITY_DETAILS_HEADERS) {
       if (key === 'Published on' || key === 'Updated on') {
         result[key] = formatDateField(record[key] || '');
-      } else if (key === 'Component Origin Id') {
+      } else if (key === 'Component Version Origin Id') {
         result[key] = normalizeValue(record['Component origin id']);
       } else {
         result[key] = normalizeValue(record[key]);
@@ -365,9 +366,9 @@ function transformUpgradeGuidance(upgradeRaw: string): string {
   const [headerLine, ...lines] = upgradeRaw.trim().split('\n');
   const headers = headerLine.split(',');
   
-  // Replace 'Component Origin External Id' with 'Component Origin Id'
+  // Replace 'Component Origin External Id' with 'Component Version Origin Id'
   const modifiedHeaders = headers.map(h => 
-    h.trim() === 'Component Origin External Id' ? 'Component Origin Id' : h
+    h.trim() === 'Component Origin External Id' ? 'Component Version Origin Id' : h
   );
 
   const keepIndexes = modifiedHeaders
