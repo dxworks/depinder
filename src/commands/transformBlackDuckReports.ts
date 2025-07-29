@@ -455,6 +455,12 @@ export async function transformBlackDuckReports(reportDir: string, options?: { b
 
     // Transform and write _dependencies_sources.csv
     const dependenciesSourcesRecords = transformDependenciesSources(sources, components, options?.basePath, pathMappings);
+    
+    const emptyVerifiedPaths = dependenciesSourcesRecords.filter(record => record['VerifiedPath'] === '');
+    if (emptyVerifiedPaths.length > 0) {
+      console.warn(`Found ${emptyVerifiedPaths.length} out of ${dependenciesSourcesRecords.length} dependencies with empty verified paths.`);
+    }
+    
     const formattedDependenciesSources = formatRecordsWithColumnOrder(
       dependenciesSourcesRecords, 
       DEPENDENCIES_SOURCES_COLUMN_ORDER
