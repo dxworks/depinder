@@ -60,13 +60,13 @@ interface SecurityRecord {
 const DEPENDENCIES_COLUMN_ORDER = [
   'Component name',
   'Component version name',
+  'Component Origin Id',
   'License names',
   'License families',
   'Match type',
   'Usage',
   'Operational Risk',
   'Origin name',
-  'Origin id',
   'License Risk',
   'Total Vulnerability Count',
   'Critical and High Vulnerability Count',
@@ -90,7 +90,7 @@ const DEPENDENCIES_COLUMN_ORDER = [
 const DEPENDENCIES_SOURCES_COLUMN_ORDER = [
   'Component name',
   'Component version name',
-  'ComponentWithVersion',
+  'Component Origin Id',
   'Match type',
   'Path',
   'ProjectPath',
@@ -118,6 +118,7 @@ const DEPENDENCIES_SOURCES_COLUMN_ORDER = [
 const VULNERABILITY_DETAILS_HEADERS = [
   'Component name', 
   'Component version name', 
+  'Component Origin Id',
   'Vulnerability id', 
   'Description', 
   'Published on', 
@@ -147,7 +148,6 @@ const UPGRADE_GUIDANCE_COLUMNS_TO_REMOVE = new Set([
   'Used by', 
   'Component Id', 
   'Component Version Id', 
-  'Component Origin Id',
   'Component Origin Version Name', 
   'Short Term Recommended Version Id',
   'Long Term Recommended Version Id', 
@@ -248,6 +248,7 @@ function transformDependencies(components: ComponentRecord[]): Record<string, st
     const result: Record<string, string> = {
       'Component name': component['Component name'],
       'Component version name': component['Component version name'],
+      'Component Origin Id': component['Origin id'] || '',
       'License names': component['License names'],
       'License families': component['License families'],
       'Match type': normalizeMatchType(component['Match type']),
@@ -267,7 +268,6 @@ function transformDependencies(components: ComponentRecord[]): Record<string, st
     
     // Handle optional fields
     result['Origin name'] = component['Origin name'] || '';
-    result['Origin id'] = component['Origin id'] || '';
     result['Commit Activity'] = component['Commit Activity'] || '';
     result['Commits in Past 12 Months'] = component['Commits in Past 12 Months'] || '';
     result['Contributors in Past 12 Months'] = component['Contributors in Past 12 Months'] || '';
@@ -305,7 +305,7 @@ function transformDependenciesSources(
     return {
       'Component name': src['Component name'],
       'Component version name': src['Component version name'],
-      'ComponentWithVersion': `${src['Component name']}/${src['Component version name']}`,
+      'Component Origin Id': src['Origin name id'],
       'Match type': normalizeMatchType(src['Match type']),
       'Path': src['Path'],
       'ProjectPath': projectInfo.projectPath,
@@ -345,6 +345,8 @@ function transformVulnerabilityDetails(
     for (const key of VULNERABILITY_DETAILS_HEADERS) {
       if (key === 'Published on' || key === 'Updated on') {
         result[key] = formatDateField(record[key] || '');
+      } else if (key === 'Component Origin Id') {
+        result[key] = normalizeValue(record['Component origin id']);
       } else {
         result[key] = normalizeValue(record[key]);
       }
@@ -362,13 +364,18 @@ function transformVulnerabilityDetails(
 function transformUpgradeGuidance(upgradeRaw: string): string {
   const [headerLine, ...lines] = upgradeRaw.trim().split('\n');
   const headers = headerLine.split(',');
+  
+  // Replace 'Component Origin External Id' with 'Component Origin Id'
+  const modifiedHeaders = headers.map(h => 
+    h.trim() === 'Component Origin External Id' ? 'Component Origin Id' : h
+  );
 
-  const keepIndexes = headers
+  const keepIndexes = modifiedHeaders
     .map((h, i) => UPGRADE_GUIDANCE_COLUMNS_TO_REMOVE.has(h.trim()) ? -1 : i)
     .filter(i => i >= 0);
     
   return [
-    keepIndexes.map(i => headers[i]).join(','),
+    keepIndexes.map(i => modifiedHeaders[i]).join(','),
     ...lines.map(line => {
       const parts = line.split(',');
       return keepIndexes.map(i => parts[i] ?? '').join(',');
