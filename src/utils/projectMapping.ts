@@ -63,6 +63,16 @@ function isFileSegment(segment: string): boolean {
 }
 
 /**
+ * Check if a segment is an organization/company prefix that should be skipped
+ * @param segment Path segment to check
+ * @returns True if the segment looks like an organization prefix
+ */
+function isOrganizationPrefix(segment: string): boolean {
+    // Common organization prefixes like com.company, org.apache, etc.
+    return /^(com|org|net|edu|gov)\.[a-zA-Z0-9.-]+$/.test(segment);
+}
+
+/**
  * Resolves a path with relative segments (.., .)
  * @param pathSegments Array of path segments to resolve
  * @returns Array of resolved path segments
@@ -181,7 +191,10 @@ function getStartDelimiterIndex(projectSegments: string[]) {
     for (let i = 0; i < projectSegments.length; i++) {
         if (isVersionSegment(projectSegments[i])) {
             startIndex = i;
-            break;
+            break; // Stop after finding a version segment
+        } else if (isOrganizationPrefix(projectSegments[i])) {
+            startIndex = i;
+            // Continue looking for version segments after organization prefix
         }
     }
     return startIndex;
