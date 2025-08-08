@@ -185,13 +185,13 @@ async function extractJavaVersionFromMaven(pomFilePath: string): Promise<string>
 }
 
 async function parseXml(xmlData: string) {
-    const xmlStart = xmlData.indexOf('<?xml');
-    if (xmlStart === -1) {
-        return await parseStringPromise(xmlData);
-    }
+    // Remove multi-line comments from the entire file
+    const withoutComments = xmlData.replace(/\/\*[\s\S]*?\*\//g, '');
 
-    const cleanXml = xmlData.slice(xmlStart);
-    return await parseStringPromise(cleanXml);
+    // Remove empty lines and whitespace from the beginning of the file only
+    const trimmedXml = withoutComments.replace(/^\s*[\r\n]+/, '');
+
+    return await parseStringPromise(trimmedXml);
 }
 
 async function extractTargetFramework(projectFile: string): Promise<string> {
@@ -210,7 +210,8 @@ async function extractTargetFramework(projectFile: string): Promise<string> {
             }
         }
         return '';
-    } catch {
+    } catch (error) {
+        console.error(`Error extracting target framework from ${projectFile}:`, error);
         return '';
     }
 }
