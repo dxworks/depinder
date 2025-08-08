@@ -65,6 +65,11 @@ describe('Project Mapping', () => {
             expect(result.projectPath).toBe('some-app');
         });
 
+        it('should extract project path from Maven paths with org prefix', () => {
+            const result = extractProjectInfo('com.endava:chronos2-license-app:1.0.0-SNAPSHOT:-maven/com.fasterxml.jackson.core:jackson-databind:2.18.2', 'maven');
+            expect(result.projectPath).toBe('chronos2-license-app');
+        });
+
         it('should extract project path from Maven paths with pom.xml', () => {
             const result = extractProjectInfo('xlmapp/pom.xml/-maven/org.apache.logging.log4j:log4j-core:2.7', 'maven');
             expect(result.projectPath).toBe('xlmapp');
@@ -73,6 +78,11 @@ describe('Project Mapping', () => {
         it('should extract project path from .NET paths', () => {
             const result = extractProjectInfo('Portal/1.0.0-/customer/Portal/Self/Self.csproj/-nuget/Chr.Avro/7.1.0', 'nuget');
             expect(result.projectPath).toBe('customer/Portal/Self');
+        });
+
+        it('should extract project path from directory props', () => {
+            const result = extractProjectInfo('customer/Portal/Service/Directory.Packages.props/-nuget/Chr.Avro/7.3.0', 'nuget');
+            expect(result.projectPath).toBe('customer/Portal/Service');
         });
 
         it('should extract project path from .NET paths with relative paths', () => {
@@ -136,6 +146,30 @@ describe('Project Mapping', () => {
             expect(result.verifiedPath).toBe('');
             expect(result.projectPathExists).toBe(false);
             expect(fs.existsSync).toHaveBeenCalled();
+        });
+
+        it('should try path without first segment when original path does not exist', () => {
+            // Setup constants once and normalize them
+            const expectedOriginal = path.normalize('/base/path/API/project/path');
+            const expectedFallback = path.normalize('/base/path/project/path');
+            // Mock fs.existsSync to return false for original path, true for path without first segment
+            (fs.existsSync as jest.Mock).mockImplementation((pathArg: string) => {
+                console.log('Mock called with:', pathArg);
+                if (pathArg === expectedFallback) {
+                    return true;
+                }
+                return false;
+            });
+
+            const result = verifyProjectPath('API/project/path', '/base/path');
+
+            expect(result.projectPath).toBe('API/project/path');
+            expect(result.verifiedPath).toBe('project/path');
+            expect(result.projectPathExists).toBe(false);
+
+            expect(fs.existsSync).toHaveBeenCalledTimes(2);
+            expect(fs.existsSync).toHaveBeenCalledWith(expectedOriginal);
+            expect(fs.existsSync).toHaveBeenCalledWith(expectedFallback);
         });
 
         it('should handle empty paths gracefully', () => {

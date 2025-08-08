@@ -59,6 +59,7 @@ function isVersionSegment(segment: string): boolean {
  */
 function isFileSegment(segment: string): boolean {
     return segment.toLowerCase().endsWith('.csproj') ||
+        segment.toLowerCase().endsWith('.props') ||
         segment.toLowerCase() === 'pom.xml';
 }
 
@@ -266,7 +267,23 @@ export function verifyProjectPath(projectPath: string, basePath: string, pathMap
             };
         }
 
-        // No mapping found or mapped path doesn't exist
+        // Try without the first path segment
+        const segments = projectPath.split('/');
+        if (segments.length > 1) {
+            const pathWithoutFirstSegment = segments.slice(1).join('/');
+            const modifiedFullPath = path.join(basePath, pathWithoutFirstSegment);
+            const modifiedExists = fs.existsSync(modifiedFullPath);
+
+            if (modifiedExists) {
+                return {
+                    projectPath,
+                    verifiedPath: pathWithoutFirstSegment,
+                    projectPathExists: false
+                };
+            }
+        }
+
+        // No mapping found or modified path doesn't exist
         return {
             projectPath,
             verifiedPath: '',
