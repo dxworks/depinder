@@ -238,6 +238,32 @@ function calculateVulnerabilityCounts(component: ComponentRecord): Vulnerability
 }
 
 /**
+ * Extracts a single origin name from a potentially comma-separated list
+ * @param originName Origin name string that might contain multiple comma-separated values
+ * @returns A single origin name if all values are the same, otherwise throws an exception
+ */
+function getSingleOriginName(originName: string): string {
+    if (!originName) {
+        return '';
+    }
+
+    const origins = originName.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0);
+
+    if (origins.length === 0) {
+        return '';
+    }
+
+    const firstOrigin = origins[0];
+    const allSame = origins.every(origin => origin === firstOrigin);
+
+    if (!allSame) {
+        throw new Error(`Multiple different origin names found: ${originName}`);
+    }
+
+    return firstOrigin;
+}
+
+/**
  * Transforms components data into dependencies records
  * @param components Raw component records from Black Duck
  * @returns Transformed dependency records
@@ -268,7 +294,7 @@ function transformDependencies(components: ComponentRecord[]): Record<string, st
         };
 
         // Handle optional fields
-        result['Origin name'] = component['Origin name'] || '';
+        result['Origin name'] = getSingleOriginName(component['Origin name'] || '');
         result['Commit Activity'] = component['Commit Activity'] || '';
         result['Commits in Past 12 Months'] = component['Commits in Past 12 Months'] || '';
         result['Contributors in Past 12 Months'] = component['Contributors in Past 12 Months'] || '';
