@@ -25,7 +25,9 @@ const END_DELIMITERS = [
     '-maven',
     '-gradle',
     '-nuget',
-    '-sbt'
+    '-sbt',
+    '-cargo',
+    '-packagist'
 ];
 
 // Special case pattern for monorepo
