@@ -8,8 +8,8 @@ import * as path from 'path';
  * Interface for path mapping configuration
  */
 export interface PathMapping {
-    extractedPath: string;
-    actualPath: string;
+  extractedPath: string;
+  actualPath: string;
 }
 
 /**
@@ -18,16 +18,16 @@ export interface PathMapping {
 export type PathMappings = Map<string, string>;
 
 const END_DELIMITERS = [
-    '-yarn',
-    '-npm',
-    'node_modules',
-    '-pip',
-    '-maven',
-    '-gradle',
-    '-nuget',
-    '-sbt',
-    '-cargo',
-    '-packagist'
+  '-yarn',
+  '-npm',
+  'node_modules',
+  '-pip',
+  '-maven',
+  '-gradle',
+  '-nuget',
+  '-sbt',
+  '-cargo',
+  '-packagist'
 ];
 
 // Special case pattern for monorepo
@@ -37,9 +37,9 @@ const MONOREPO_PATTERN = /packages[\\/]([^\\/]+)[\\/]local[\\/]([^\\/]+)[\\/]-ya
  * Interface representing a parsed project path
  */
 export interface ProjectPathInfo {
-    projectPath: string;
-    verifiedPath: string;
-    projectPathExists?: boolean;
+  projectPath: string;
+  verifiedPath: string;
+  projectPathExists?: boolean;
 }
 
 /**
@@ -48,10 +48,9 @@ export interface ProjectPathInfo {
  * @returns True if the segment looks like a version
  */
 function isVersionSegment(segment: string): boolean {
-    return /^\d+\.\d+\.\d+(-.*)?$/i.test(segment) ||
-        /^REPLACE_BY_CI$/i.test(segment) ||
-        /^[\d\.]+(-SNAPSHOT|-placeholder)?$/i.test(segment) ||
-        segment.toLowerCase() === 'unspecified';
+  return /^\d+\.\d+\.\d+(?:[-.][A-Za-z0-9]+)*-?$/i.test(segment) ||
+         /^REPLACE_BY_CI$/i.test(segment) || 
+         segment.toLowerCase() === 'unspecified';
 }
 
 /**
@@ -60,9 +59,9 @@ function isVersionSegment(segment: string): boolean {
  * @returns True if the segment contains a file to exclude
  */
 function isFileSegment(segment: string): boolean {
-    return segment.toLowerCase().endsWith('.csproj') ||
-        segment.toLowerCase().endsWith('.props') ||
-        segment.toLowerCase() === 'pom.xml';
+  return segment.toLowerCase().endsWith('.csproj') || 
+         segment.toLowerCase().endsWith('.props') || 
+         segment.toLowerCase() === 'pom.xml';
 }
 
 /**
@@ -71,8 +70,8 @@ function isFileSegment(segment: string): boolean {
  * @returns True if the segment looks like an organization prefix
  */
 function isOrganizationPrefix(segment: string): boolean {
-    // Common organization prefixes like com.company, org.apache, etc.
-    return /^(com|org|net|edu|gov)\.[a-zA-Z0-9.-]+$/.test(segment);
+  // Common organization prefixes like com.company, org.apache, etc.
+  return /^(com|org|net|edu|gov)\.[a-zA-Z0-9.-]+$/.test(segment);
 }
 
 /**
@@ -81,22 +80,22 @@ function isOrganizationPrefix(segment: string): boolean {
  * @returns Array of resolved path segments
  */
 function resolveRelativePath(pathSegments: string[]): string[] {
-    const result: string[] = [];
-    let skipCount = 0;
+  const result: string[] = [];
+  let skipCount = 0;
 
-    for (const segment of pathSegments) {
-        if (segment === '..') {
-            skipCount++;
-        } else if (segment !== '.' && segment !== '') {
-            if (skipCount > 0) {
-                // This segment is skipped because of a '..'
-                skipCount--;
-            } else {
-                result.push(segment);
-            }
-        }
+  for (const segment of pathSegments) {
+    if (segment === '..') {
+      skipCount++;
+    } else if (segment !== '.' && segment !== '') {
+      if (skipCount > 0) {
+        // This segment is skipped because of a '..'
+        skipCount--;
+      } else {
+        result.push(segment);
+      }
     }
-    return result;
+  }
+  return result;
 }
 
 /**
@@ -105,23 +104,23 @@ function resolveRelativePath(pathSegments: string[]): string[] {
  * @returns Standardized path
  */
 function standardizePath(inputPath: string): string {
-    if (!inputPath) {
-        return '';
-    }
-
-    let normalizedPath = inputPath.replace(/\\/g, '/');
-
-    normalizedPath = normalizedPath.replace(/:/g, '/');
-
-    if (normalizedPath.startsWith('/')) {
-        normalizedPath = normalizedPath.substring(1);
-    }
-
-    if (normalizedPath.endsWith('/')) {
-        normalizedPath = normalizedPath.substring(0, normalizedPath.length - 1);
-    }
-
-    return normalizedPath;
+  if (!inputPath) {
+    return '';
+  }
+  
+  let normalizedPath = inputPath.replace(/\\/g, '/');
+  
+  normalizedPath = normalizedPath.replace(/:/g, '/');
+  
+  if (normalizedPath.startsWith('/')) {
+    normalizedPath = normalizedPath.substring(1);
+  }
+  
+  if (normalizedPath.endsWith('/')) {
+    normalizedPath = normalizedPath.substring(0, normalizedPath.length - 1);
+  }
+  
+  return normalizedPath;
 }
 
 /**
@@ -130,11 +129,11 @@ function standardizePath(inputPath: string): string {
  * @returns Project path if monorepo pattern matches, null otherwise
  */
 function handleMonorepoPattern(path: string): string | null {
-    const matches = path.match(MONOREPO_PATTERN);
-    if (matches) {
-        return `${matches[2]}/packages/${matches[1]}`;
-    }
-    return null;
+  const matches = path.match(MONOREPO_PATTERN);
+  if (matches) {
+    return `${matches[2]}/packages/${matches[1]}`;
+  }
+  return null;
 }
 
 /**
@@ -143,77 +142,77 @@ function handleMonorepoPattern(path: string): string | null {
  * @returns Extracted project path
  */
 function parseProjectPath(dependencyPath: string): string {
-    if (!dependencyPath) {
-        return '';
+  if (!dependencyPath) {
+    return '';
+  }
+  
+  try {
+    const normalizedPath = standardizePath(dependencyPath);
+    
+    const monorepoPath = handleMonorepoPattern(normalizedPath);
+    if (monorepoPath) {
+      return monorepoPath;
     }
-
-    try {
-        const normalizedPath = standardizePath(dependencyPath);
-
-        const monorepoPath = handleMonorepoPattern(normalizedPath);
-        if (monorepoPath) {
-            return monorepoPath;
-        }
-
-        const segments = normalizedPath.split('/');
-
-        let endDelimiterIndex = getEndDelimiterIndex(segments);
-
-        if (endDelimiterIndex === -1) {
-            throw new Error(`No end delimiter found in path: ${normalizedPath}`);
-        }
-
-        let projectSegments = segments.slice(0, endDelimiterIndex);
-
-        if (projectSegments.length > 0 && isVersionSegment(projectSegments[projectSegments.length - 1])) {
-            projectSegments.pop(); // Remove the version segment
-        }
-
-        if (projectSegments.length > 0 && isFileSegment(projectSegments[projectSegments.length - 1])) {
-            projectSegments.pop(); // Remove the last segment if it's a file segment
-        }
-
-        let startIndex = getStartDelimiterIndex(projectSegments);
-
-        if (startIndex !== -1) {
-            projectSegments = projectSegments.slice(startIndex + 1);
-        }
-
-        const resolvedSegments = resolveRelativePath(projectSegments);
-
-        return resolvedSegments.join('/');
-    } catch (error) {
-        console.error(`Error parsing path: ${error}`);
-        throw error;
+    
+    const segments = normalizedPath.split('/');
+    
+    let endDelimiterIndex = getEndDelimiterIndex(segments);
+    
+    if (endDelimiterIndex === -1) {
+      throw new Error(`No end delimiter found in path: ${normalizedPath}`);
     }
+    
+    let projectSegments = segments.slice(0, endDelimiterIndex);
+    
+    if (projectSegments.length > 0 && isVersionSegment(projectSegments[projectSegments.length - 1])) {
+      projectSegments.pop(); // Remove the version segment
+    }
+    
+    if (projectSegments.length > 0 && isFileSegment(projectSegments[projectSegments.length - 1])) {
+      projectSegments.pop(); // Remove the last segment if it's a file segment
+    }
+    
+    let startIndex = getStartDelimiterIndex(projectSegments);
+    
+    if (startIndex !== -1) {
+      projectSegments = projectSegments.slice(startIndex + 1);
+    }
+    
+    const resolvedSegments = resolveRelativePath(projectSegments);
+    
+    return resolvedSegments.join('/');
+  } catch (error) {
+    console.error(`Error parsing path: ${error}`);
+    throw error;
+  }
 }
 
 function getStartDelimiterIndex(projectSegments: string[]) {
-    let startIndex = -1;
+  let startIndex = -1;
 
-    for (let i = 0; i < projectSegments.length; i++) {
-        if (isVersionSegment(projectSegments[i])) {
-            startIndex = i;
-            break; // Stop after finding a version segment
-        } else if (isOrganizationPrefix(projectSegments[i])) {
-            startIndex = i;
-            // Continue looking for version segments after organization prefix
-        }
+  for (let i = 0; i < projectSegments.length; i++) {
+    if (isVersionSegment(projectSegments[i])) {
+      startIndex = i;
+      break; // Stop after finding a version segment
+    } else if (isOrganizationPrefix(projectSegments[i])) {
+      startIndex = i;
+      // Continue looking for version segments after organization prefix
     }
-    return startIndex;
+  }
+  return startIndex;
 }
 
 function getEndDelimiterIndex(segments: string[]) {
-    let endDelimiterIndex = -1;
+  let endDelimiterIndex = -1;
 
-    for (let i = 0; i < segments.length; i++) {
-        const lowerSegment = segments[i].toLowerCase();
-        if (END_DELIMITERS.some(delimiter => lowerSegment === delimiter)) {
-            endDelimiterIndex = i;
-            break;
-        }
+  for (let i = 0; i < segments.length; i++) {
+    const lowerSegment = segments[i].toLowerCase();
+    if (END_DELIMITERS.some(delimiter => lowerSegment === delimiter)) {
+      endDelimiterIndex = i;
+      break;
     }
-    return endDelimiterIndex;
+  }
+  return endDelimiterIndex;
 }
 
 /**
@@ -222,15 +221,15 @@ function getEndDelimiterIndex(segments: string[]) {
  * @returns Map of extracted paths to actual paths
  */
 export function createPathMappings(mappings: PathMapping[]): PathMappings {
-    const pathMappings = new Map<string, string>();
-
-    for (const mapping of mappings) {
-        if (mapping.extractedPath && mapping.actualPath) {
-            pathMappings.set(mapping.extractedPath, mapping.actualPath);
-        }
+  const pathMappings = new Map<string, string>();
+  
+  for (const mapping of mappings) {
+    if (mapping.extractedPath && mapping.actualPath) {
+      pathMappings.set(mapping.extractedPath, mapping.actualPath);
     }
-
-    return pathMappings;
+  }
+  
+  return pathMappings;
 }
 
 /**
@@ -241,60 +240,60 @@ export function createPathMappings(mappings: PathMapping[]): PathMappings {
  * @returns Verified path information
  */
 export function verifyProjectPath(projectPath: string, basePath: string, pathMappings?: PathMappings): ProjectPathInfo {
-    if (!projectPath || !basePath) {
-        return { projectPath, verifiedPath: '', projectPathExists: false };
+  if (!projectPath || !basePath) {
+    return { projectPath, verifiedPath: '', projectPathExists: false };
+  }
+  
+  try {
+    const fullPath = path.join(basePath, projectPath);
+    const originalExists = fs.existsSync(fullPath);
+    
+    if (originalExists) {
+      return { 
+        projectPath, 
+        verifiedPath: projectPath, 
+        projectPathExists: true 
+      };
     }
-
-    try {
-        const fullPath = path.join(basePath, projectPath);
-        const originalExists = fs.existsSync(fullPath);
-
-        if (originalExists) {
-            return {
-                projectPath,
-                verifiedPath: projectPath,
-                projectPathExists: true
-            };
-        }
-
-        if (pathMappings && pathMappings.has(projectPath)) {
-            const mappedPath = pathMappings.get(projectPath) as string;
-            const mappedFullPath = path.join(basePath, mappedPath);
-            const mappedExists = fs.existsSync(mappedFullPath);
-
-            return {
-                projectPath,
-                verifiedPath: mappedExists ? mappedPath : '',
-                projectPathExists: originalExists
-            };
-        }
-
-        // Try without the first path segment
-        const segments = projectPath.split('/');
-        if (segments.length > 1) {
-            const pathWithoutFirstSegment = segments.slice(1).join('/');
-            const modifiedFullPath = path.join(basePath, pathWithoutFirstSegment);
-            const modifiedExists = fs.existsSync(modifiedFullPath);
-
-            if (modifiedExists) {
-                return {
-                    projectPath,
-                    verifiedPath: pathWithoutFirstSegment,
-                    projectPathExists: false
-                };
-            }
-        }
-
-        // No mapping found or modified path doesn't exist
+    
+    if (pathMappings && pathMappings.has(projectPath)) {
+      const mappedPath = pathMappings.get(projectPath) as string; 
+      const mappedFullPath = path.join(basePath, mappedPath);
+      const mappedExists = fs.existsSync(mappedFullPath);
+      
+      return { 
+        projectPath, 
+        verifiedPath: mappedExists ? mappedPath : '',
+        projectPathExists: originalExists 
+      };
+    }
+    
+    // Try without the first path segment
+    const segments = projectPath.split('/');
+    if (segments.length > 1) {
+      const pathWithoutFirstSegment = segments.slice(1).join('/');
+      const modifiedFullPath = path.join(basePath, pathWithoutFirstSegment);
+      const modifiedExists = fs.existsSync(modifiedFullPath);
+      
+      if (modifiedExists) {
         return {
-            projectPath,
-            verifiedPath: '',
-            projectPathExists: false
+          projectPath,
+          verifiedPath: pathWithoutFirstSegment,
+          projectPathExists: false
         };
-    } catch (error) {
-        console.error(`Error verifying project path: ${error}`);
-        return { projectPath, verifiedPath: '', projectPathExists: false };
+      }
     }
+    
+    // No mapping found or modified path doesn't exist
+    return { 
+      projectPath, 
+      verifiedPath: '', 
+      projectPathExists: false 
+    };
+  } catch (error) {
+    console.error(`Error verifying project path: ${error}`);
+    return { projectPath, verifiedPath: '', projectPathExists: false };
+  }
 }
 
 /**
@@ -305,22 +304,22 @@ export function verifyProjectPath(projectPath: string, basePath: string, pathMap
  * @returns Object containing project path and verified path information
  */
 export function extractProjectInfo(dependencyPath: string, originName: string, basePath?: string, pathMappings?: PathMappings): ProjectPathInfo {
-    if (!dependencyPath) {
-        return { projectPath: '', verifiedPath: '', projectPathExists: false };
+  if (!dependencyPath) {
+    return { projectPath: '', verifiedPath: '', projectPathExists: false };
+  }
+  
+  try {
+    const projectPath = parseProjectPath(dependencyPath);
+    
+    // Verify the path if basePath is provided
+    if (basePath) {
+      return verifyProjectPath(projectPath, basePath, pathMappings);
     }
-
-    try {
-        const projectPath = parseProjectPath(dependencyPath);
-
-        // Verify the path if basePath is provided
-        if (basePath) {
-            return verifyProjectPath(projectPath, basePath, pathMappings);
-        }
-
-        // Otherwise return unverified path with empty verifiedPath
-        return { projectPath, verifiedPath: '', projectPathExists: undefined };
-    } catch (error) {
-        console.error(`Error extracting project info: ${error}`);
-        throw error;
-    }
+    
+    // Otherwise return unverified path with empty verifiedPath
+    return { projectPath, verifiedPath: '', projectPathExists: undefined };
+  } catch (error) {
+    console.error(`Error extracting project info: ${error}`);
+    throw error;
+  }
 }
