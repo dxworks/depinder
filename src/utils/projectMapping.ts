@@ -27,6 +27,7 @@ const END_DELIMITERS = [
   '-nuget',
   '-sbt',
   '-cargo',
+  '-rubygems',
   '-packagist'
 ];
 
