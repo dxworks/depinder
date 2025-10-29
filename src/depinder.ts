@@ -4,6 +4,7 @@ import {analyseCommand} from './commands/analyse'
 import {cacheCommand} from './commands/cache'
 import {updateCommand} from './commands/update'
 import {extractFrameworkVersionsCommand} from './commands/extractFrameworkVersion'
+import {transformBlackDuckReportsCommand} from './commands/transformBlackDuckReports'
 
 export const mainCommand = new Command()
     .name('depinder')
@@ -13,4 +14,4 @@ export const mainCommand = new Command()
     .addCommand(updateCommand)
     .addCommand(cacheCommand)
     .addCommand(extractFrameworkVersionsCommand)
-
+    .addCommand(transformBlackDuckReportsCommand)
