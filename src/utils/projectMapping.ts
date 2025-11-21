@@ -28,7 +28,11 @@ const END_DELIMITERS = [
   '-sbt',
   '-cargo',
   '-rubygems',
-  '-packagist'
+  '-packagist',
+  '-cocoapods',
+  '-swift',
+  '-xcode',
+  '-go_mod'
 ];
 
 // Special case pattern for monorepo
