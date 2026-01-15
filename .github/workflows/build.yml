@@ -16,22 +16,20 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: '18.x'
           cache: 'npm'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@dxworks'
 
       - name: Build Node App
         run: |
           npm ci
           npm run create
         env:
-          GH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+#          GH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
           CI: true
 
 
