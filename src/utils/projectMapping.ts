@@ -32,7 +32,8 @@ const END_DELIMITERS = [
   '-cocoapods',
   '-swift',
   '-xcode',
-  '-go_mod'
+  '-go_mod',
+  '-setuptools'
 ];
 
 // Special case pattern for monorepo
