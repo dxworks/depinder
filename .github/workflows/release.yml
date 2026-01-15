@@ -5,14 +5,16 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
 jobs:
   Publish-and-Release:
     name: Publish NPM Package and Create Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write
-
     steps:
       - uses: actions/checkout@v6
 
