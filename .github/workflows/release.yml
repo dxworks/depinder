@@ -46,7 +46,7 @@ jobs:
           VERSION: ${{ steps.semver_parser.outputs.semver }}
 
       - name: Publish on NPM
-        run: npm publish --access public
+        run: npm publish
 
       - name: Prepare Release Notes
         run: touch ${{ github.workspace }}/releaseNotes/v${{ steps.semver_parser.outputs.semver }}.md
