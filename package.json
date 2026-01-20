@@ -42,7 +42,7 @@
   "dependencies": {
     "@dxworks/nuget-inspector": "^1.2.0",
     "axios": "^1.7.0",
-    "@octokit/graphql": "^7.0.0",
+    "@octokit/graphql": "^4.8.0",
     "@snyk/gemfile": "^1.2.0",
     "chalk": "^4.1.2",
     "cli-progress": "^3.11.2",
