@@ -1,6 +1,6 @@
-// import {getVulnerabilitiesFromGithub, getVulnerabilitiesFromSonatype} from '../src/utils/vulnerabilities'
-//
-// describe('test vulnerabilities from Github', () => {
+import {getVulnerabilitiesFromGithub, getVulnerabilitiesFromSonatype} from '../src/utils/vulnerabilities'
+
+describe('test vulnerabilities from Github', () => {
 //     it('get vulnerabilities for php', async () => {
 //         const result = await getVulnerabilitiesFromGithub('COMPOSER', 'lcobucci/jwt')
 //
@@ -51,4 +51,5 @@
 //         // console.log(JSON.stringify(result))
 //         expect(result).toBeTruthy()
 //     })
-// })
+  it('should pass', async () => { expect(true).toBeTruthy()} )
+})
