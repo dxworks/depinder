@@ -5,7 +5,7 @@ describe('default test', () => {
     it('should pass', async () => {
         const res = await new NugetRegistrar().retrieve('Unity')
 
-        console.log(res)
+        // console.log(res)
     })
 
     it('should match just files with *proj extension', async () => {

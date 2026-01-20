@@ -21,7 +21,7 @@ describe('test parse deptree.txt', () => {
 |  +- org.springframework:spring-core:jar:5.0.8.RELEASE:compile
 |  |  \\- org.springframework:spring-jcl:jar:5.0.8.RELEASE:compile
 |  \\- org.yaml:snakeyaml:jar:1.19:runtime
-+- org.projectlombok:lombok:jar:1.16.16:compile (optional) 
++- org.projectlombok:lombok:jar:1.16.16:compile (optional)
 \\- org.springframework.boot:spring-boot-starter-test:jar:2.0.4.RELEASE:test
    +- org.springframework.boot:spring-boot-test:jar:2.0.4.RELEASE:test
    +- org.springframework.boot:spring-boot-test-autoconfigure:jar:2.0.4.RELEASE:test
@@ -41,6 +41,6 @@ describe('test parse deptree.txt', () => {
    +- org.springframework:spring-test:jar:5.0.8.RELEASE:test
    \\- org.xmlunit:xmlunit-core:jar:2.5.1:test`)
 
-        console.log(depinderProject)
+        // console.log(depinderProject)
     }, 7200000)
 })
