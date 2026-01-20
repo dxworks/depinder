@@ -1,5 +1,5 @@
 import {dotnet, NugetRegistrar} from '../src/plugins/dotnet'
-import minimatch from 'minimatch'
+import { minimatch } from 'minimatch'
 
 describe('default test', () => {
     it('should pass', async () => {

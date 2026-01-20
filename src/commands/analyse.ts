@@ -17,7 +17,7 @@ import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {MultiBar, Presets} from 'cli-progress'
 import {walkDir} from '../utils/utils'
 import {blacklistedGlobs} from '../utils/blacklist'
-import minimatch from 'minimatch'
+import { minimatch } from 'minimatch'
 import {mongoCache} from '../cache/mongo-cache'
 import {log} from '../utils/logging'
 // eslint-disable-next-line @typescript-eslint/no-var-requires

@@ -2,7 +2,6 @@ import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../e
 // @ts-ignore
 import path from 'path'
 import {AbstractRegistrar, LibrariesIORegistrar, LibraryInfo} from '../../extension-points/registrar'
-import fetch from 'node-fetch'
 import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
 import {Plugin} from '../../extension-points/plugin'
 import fs from 'fs'

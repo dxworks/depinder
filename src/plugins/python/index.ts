@@ -7,7 +7,6 @@ import {
 } from '../../extension-points/extract'
 import path from 'path'
 import {AbstractRegistrar, LibrariesIORegistrar, LibraryInfo, Registrar} from '../../extension-points/registrar'
-import fetch from 'node-fetch'
 import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
 import {Plugin} from '../../extension-points/plugin'
 import fs from 'fs'
