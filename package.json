@@ -1,6 +1,6 @@
 {
   "name": "@dxworks/depinder",
-  "version": "0.1.0",
+  "version": "0.1.7",
   "description": "",
   "keywords": [
     "dxworks",
@@ -42,7 +42,7 @@
     "@snyk/gemfile": "^1.2.0",
     "chalk": "^4.1.2",
     "cli-progress": "^3.11.2",
-    "commander": "^11.1.0",
+    "commander": "^14.0.2",
     "cross-env": "^7.0.3",
     "csv": "^6.0.4",
     "dotenv": "^16.0.3",

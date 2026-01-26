@@ -9,7 +9,7 @@ import {transformBlackDuckReportsCommand} from './commands/transformBlackDuckRep
 export const mainCommand = new Command()
     .name('depinder')
     .description(_package.description)
-    .version(_package.version, '-v, -version, --version, -V')
+    .version(_package.version, '-v, --version')
     .addCommand(analyseCommand)
     .addCommand(updateCommand)
     .addCommand(cacheCommand)
