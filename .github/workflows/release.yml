@@ -7,14 +7,12 @@ on:
 
 permissions:
   id-token: write  # Required for OIDC
-  contents: read
+  contents: write
 
 jobs:
   Publish-and-Release:
     name: Publish NPM Package and Create Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v6
 
@@ -33,6 +31,8 @@ jobs:
         with:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Npm CI
         run: npm ci
@@ -46,7 +46,7 @@ jobs:
           VERSION: ${{ steps.semver_parser.outputs.semver }}
 
       - name: Publish on NPM
-        run: npm publish
+        run: npm publish --access public
 
       - name: Prepare Release Notes
         run: touch ${{ github.workspace }}/releaseNotes/v${{ steps.semver_parser.outputs.semver }}.md
