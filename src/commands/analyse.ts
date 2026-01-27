@@ -36,9 +36,9 @@ export const analyseCommand = new Command()
     .name('analyse')
     .argument('[folders...]', 'A list of folders to walk for files')
     // .argument('[depext-files...]', 'A list of files to parse for dependency information')
-    .option('--results, -r', 'The results folder', 'results')
+    .option('-r, --results <folder>', 'The results folder', 'results')
     .option('--refresh', 'Refresh the cache', false)
-    .option('--plugins, -p [plugins...]', 'A list of plugins')
+    .option('-p, --plugins [plugins...]', 'A list of plugins')
     .action(analyseFiles)
 
 
