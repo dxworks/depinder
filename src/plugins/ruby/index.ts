@@ -10,7 +10,6 @@ import * as gemfile from '@snyk/gemfile'
 import path from 'path'
 import semver from 'semver/preload'
 import {LibraryInfo, Registrar} from '../../extension-points/registrar'
-import fetch from 'node-fetch'
 import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
 import {Plugin} from '../../extension-points/plugin'
 
