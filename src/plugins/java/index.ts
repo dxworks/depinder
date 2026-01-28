@@ -9,8 +9,7 @@ import {depinderTempFolder} from '../../utils/utils'
 import {parseMavenDependencyTree} from './parsers/maven'
 import {log} from '../../utils/logging'
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pomParser = require('pom-parser')
+import {XMLParser} from 'fast-xml-parser'
 
 const extractor: Extractor = {
     files: ['pom.xml', 'build.gradle', 'build.gradle.kts'],
@@ -70,15 +69,11 @@ function parseLockFile(context: DependencyFileContext): DepinderProject {
     throw new Error(`Unsupported context type: ${context.type}`)
 }
 
-async function parsePomFile(pomFile: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-        pomParser.parse({filePath: pomFile}, (err: any, pom: any) => {
-            if (err) {
-                reject(err)
-            }
-            resolve(pom)
-        })
-    })
+function parsePomFile(pomFile: string): any {
+    const xmlContent = fs.readFileSync(pomFile, 'utf-8')
+    const parser = new XMLParser()
+    const result = parser.parse(xmlContent)
+    return { pomObject: result }
 }
 
 async function getLatestAvailablePom(groupId: string, artifactId: string, docs: any[]): Promise<any> {
@@ -147,7 +142,7 @@ export class MavenCentralRegistrar extends AbstractRegistrar {
         const pomFile = path.resolve(depinderTempFolder, `${libraryName}.pom`)
         fs.writeFileSync(pomFile, pomData)
 
-        const pom: any = await parsePomFile(pomFile)
+        const pom: any = parsePomFile(pomFile)
         fs.rmSync(pomFile)
         return pom
     }

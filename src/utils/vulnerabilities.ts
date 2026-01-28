@@ -1,63 +1,65 @@
-import {graphql} from '@octokit/graphql'
 import axios from 'axios'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 
 export async function getVulnerabilitiesFromGithub(ecosystem: string, packageName: string): Promise<Vulnerability[]> {
-    const authGraphql = graphql.defaults({
-        headers: {
-            authorization: `token ${process.env.GH_TOKEN}`,
-        },
-    })
-
-    const response: any = await authGraphql(
-        `
-            query securityVulnerabilities($ecosystem: SecurityAdvisoryEcosystem, $package: String!){
-              securityVulnerabilities(first: 100, ecosystem: $ecosystem package: $package) {
-                pageInfo {
-                  endCursor
-                  hasNextPage
+    const query = `
+        query securityVulnerabilities($ecosystem: SecurityAdvisoryEcosystem, $package: String!){
+          securityVulnerabilities(first: 100, ecosystem: $ecosystem package: $package) {
+            pageInfo {
+              endCursor
+              hasNextPage
+            }
+            nodes {
+              firstPatchedVersion {
+                identifier
+              }
+              package {
+                name
+                ecosystem
+              }
+              severity
+              updatedAt
+              vulnerableVersionRange
+              advisory {
+                identifiers {
+                  value
+                  type
                 }
-                nodes {
-                  firstPatchedVersion {
-                    identifier
-                  }
-                  package {
-                    name
-                    ecosystem
-                  }
-                  severity
-                  updatedAt
-                  vulnerableVersionRange
-                  advisory {
-                    identifiers {
-                      value
-                      type
-                    }
-                    databaseId
-                    description
-                    ghsaId
-                    id
-                    origin
-                    permalink
-                    publishedAt
-                    references {
-                      url
-                    }
-                    severity
-                    summary
-                    updatedAt
-                    withdrawnAt
-                  }
+                databaseId
+                description
+                ghsaId
+                id
+                origin
+                permalink
+                publishedAt
+                references {
+                  url
                 }
+                severity
+                summary
+                updatedAt
+                withdrawnAt
               }
             }
-        `.trim(),
+          }
+        }
+    `.trim()
+
+    const { data: response } = await axios.post(
+        'https://api.github.com/graphql',
         {
-            ecosystem: ecosystem,
-            package: packageName,
+            query,
+            variables: { ecosystem, package: packageName }
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${process.env.GH_TOKEN}`,
+                'Content-Type': 'application/json',
+            }
         }
     )
-    return response.securityVulnerabilities.nodes.map((it: any) => {
+
+    return response.data.securityVulnerabilities.nodes.map((it: any) => {
         return {
             severity: it.severity,
             updatedAt: it.updatedAt,

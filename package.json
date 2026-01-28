@@ -41,15 +41,16 @@
   },
   "dependencies": {
     "@dxworks/nuget-inspector": "^1.2.0",
-    "axios": "^1.7.0",
-    "@octokit/graphql": "^4.8.0",
+    "@snyk/dep-graph": "^2.13.0",
     "@snyk/gemfile": "^1.2.0",
+    "axios": "^1.7.0",
     "chalk": "^4.1.2",
     "cli-progress": "^3.11.2",
     "commander": "^14.0.2",
     "cross-env": "^10.0.0",
     "csv": "^6.0.4",
     "dotenv": "^17.0.0",
+    "fast-xml-parser": "^5.3.3",
     "lodash": "^4.17.21",
     "minimatch": "^10.0.0",
     "moment": "^2.30.0",
@@ -58,19 +59,17 @@
     "node-html-parser": "^7.0.0",
     "npm": "^11.0.0",
     "npm-registry-fetch": "^19.0.0",
-    "pom-parser": "^1.2.0",
     "puppeteer": "^24.0.0",
     "semver": "^7.7.0",
-    "snyk-gradle-plugin": "^5.1.0",
-    "snyk-nodejs-lockfile-parser": "^2.0.0",
+    "snyk-nodejs-lockfile-parser": "^2.5.0",
     "spdx-correct": "^3.1.1",
     "spdx-license-ids": "^3.0.10",
     "tmp": "^0.2.1",
     "toml": "^3.0.0",
-    "winston": "^3.17.0",
-    "xml2js": "^0.6.2"
+    "winston": "^3.17.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
     "@types/cli-progress": "^3.11.0",
     "@types/dockerode": "^4.0.0",
     "@types/fs-extra": "^11.0.0",
@@ -84,9 +83,6 @@
     "@types/string-template": "^1.0.0",
     "@types/tmp": "^0.2.0",
     "@types/ws": "^8.18.0",
-    "@types/xml2js": "^0.4.0",
-    "@eslint/js": "^9.0.0",
-    "typescript-eslint": "^8.0.0",
     "copyfiles": "^2.4.1",
     "eslint": "^9.0.0",
     "i": "^0.3.7",
@@ -97,7 +93,8 @@
     "sort-package-json": "^3.0.0",
     "ts-jest": "^29.0.0",
     "ts-node": "^10.9.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.0.0"
   },
   "dxw": {
     "commands": [
