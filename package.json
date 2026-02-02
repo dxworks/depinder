@@ -37,7 +37,7 @@
     "test:dev": "jest --watch"
   },
   "dependencies": {
-    "@dxworks/nuget-inspector": "^1.2.0",
+    "@dxworks/nuget-inspector": "^1.2.1",
     "@octokit/graphql": "^4.8.0",
     "@snyk/gemfile": "^1.2.0",
     "chalk": "^4.1.2",
@@ -52,8 +52,8 @@
     "mongodb": "^5.8.1",
     "mongoose": "^7.5.2",
     "node-html-parser": "^6.1.4",
-    "npm": "^9.9.0",
-    "npm-registry-fetch": "^12.0.1",
+    "npm": "^11.6.1",
+    "npm-registry-fetch": "^18.0.1",
     "packageurl-js": "^0.0.5",
     "pom-parser": "^1.2.0",
     "puppeteer": "18.0.1",
