@@ -1,6 +1,6 @@
 {
   "name": "@dxworks/depinder",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "",
   "keywords": [
     "dxworks",
@@ -57,9 +57,8 @@
     "mongodb": "^7.0.0",
     "mongoose": "^9.0.0",
     "node-html-parser": "^7.0.0",
-    "npm": "^11.0.0",
+    "npm": "^11.12.1",
     "npm-registry-fetch": "^19.0.0",
-    "puppeteer": "^24.0.0",
     "semver": "^7.7.0",
     "snyk-nodejs-lockfile-parser": "^2.5.0",
     "spdx-correct": "^3.1.1",
