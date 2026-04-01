@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { parseStringPromise } from 'xml2js';
+import { XMLParser } from 'fast-xml-parser';
 import { Command } from 'commander';
 
 interface FrameworkVersionPerProject {
@@ -146,7 +146,7 @@ async function extractJavaVersionFromGradle(gradleFilePath: string): Promise<str
 async function extractJavaVersionFromMaven(pomFilePath: string): Promise<string> {
     try {
         const xmlData = await fs.readFile(pomFilePath, 'utf-8');
-        const result = await parseXml(xmlData);
+        const result = parseXml(xmlData);
 
         if (!result || !result.project) {
             console.error('Invalid POM structure');
@@ -154,24 +154,25 @@ async function extractJavaVersionFromMaven(pomFilePath: string): Promise<string>
         }
 
         // Extract properties if they exist
-        const properties = result.project.properties?.[0];
+        const properties = result.project.properties;
         if (properties) {
             if (properties['java.version']) {
-                return properties['java.version'][0];
+                return String(properties['java.version']);
             }
             if (properties['maven.compiler.source']) {
-                return properties['maven.compiler.source'][0];
+                return String(properties['maven.compiler.source']);
             }
         }
 
         // Check maven-compiler-plugin configuration
-        const build = result.project.build?.[0];
+        const build = result.project.build;
         if (build && build.plugins) {
-            for (const plugin of build.plugins) {
-                if (plugin.artifactId?.[0] === 'maven-compiler-plugin' && plugin.configuration?.[0]) {
-                    const config = plugin.configuration[0];
+            const plugins = Array.isArray(build.plugins.plugin) ? build.plugins.plugin : [build.plugins.plugin];
+            for (const plugin of plugins) {
+                if (plugin?.artifactId === 'maven-compiler-plugin' && plugin.configuration) {
+                    const config = plugin.configuration;
                     if (config['source']) {
-                        return config['source'][0];
+                        return String(config['source']);
                     }
                 }
             }
@@ -184,28 +185,33 @@ async function extractJavaVersionFromMaven(pomFilePath: string): Promise<string>
     }
 }
 
-async function parseXml(xmlData: string) {
+function parseXml(xmlData: string) {
     // Remove multi-line comments from the entire file
     const withoutComments = xmlData.replace(/\/\*[\s\S]*?\*\//g, '');
 
     // Remove empty lines and whitespace from the beginning of the file only
     const trimmedXml = withoutComments.replace(/^\s*[\r\n]+/, '');
 
-    return await parseStringPromise(trimmedXml);
+    const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@_',
+    });
+    return parser.parse(trimmedXml);
 }
 
 async function extractTargetFramework(projectFile: string): Promise<string> {
     try {
         const content = await fs.readFile(projectFile, 'utf-8');
-        const xml = await parseXml(content);
+        const xml = parseXml(content);
         const frameworkTags = ['TargetFramework', 'TargetFrameworks', 'TargetFrameworkVersion'];
 
-        const propertyGroups = xml?.Project?.PropertyGroup || [];
+        const propertyGroupData = xml?.Project?.PropertyGroup;
+        const propertyGroups = Array.isArray(propertyGroupData) ? propertyGroupData : (propertyGroupData ? [propertyGroupData] : []);
 
         for (const group of propertyGroups) {
             for (const tag of frameworkTags) {
                 if (group[tag]) {
-                    return group[tag][0];
+                    return String(group[tag]);
                 }
             }
         }
@@ -235,9 +241,12 @@ async function getParameterFromProps(rootPath: string, filePath: string, paramet
 async function extractParameterValueFromProps(propsFilePath: string, parameterName: string): Promise<string> {
     try {
         const content = await fs.readFile(propsFilePath, 'utf-8');
-        const xml = await parseXml(content);
+        const xml = parseXml(content);
         const cleanParameterName = parameterName.replace(/[\$()]/g, '');
-        return xml?.Project?.PropertyGroup?.[0]?.[cleanParameterName]?.[0] || '';
+        const propertyGroupData = xml?.Project?.PropertyGroup;
+        const propertyGroup = Array.isArray(propertyGroupData) ? propertyGroupData[0] : propertyGroupData;
+        const value = propertyGroup?.[cleanParameterName];
+        return value ? String(value) : '';
     } catch {
         return '';
     }
