@@ -110,6 +110,11 @@ describe('Project Mapping', () => {
       expect(result.projectPath).toBe('service-report/Service.Report.Test');
     });
 
+    it('should extract project path with wildcard version suffix', () => {
+      const result = extractProjectInfo('MyApp/1.0.0.*/myapp/MyApp.Log/MyApp.Log.csproj/-nuget/log4net/3.0.3', 'nuget');
+      expect(result.projectPath).toBe('myapp/MyApp.Log');
+    });
+
     it('should extract project path when version is upsecified for Gradle', () => {
       const result = extractProjectInfo('Deliver-Fast-2:idapi:unspecified:deliverfast/idapi:-gradle/androidx.fragment:fragment:1.5.4/androidx.activity:activity:1.7.0', 'maven');
       expect(result.projectPath).toBe('deliverfast/idapi');

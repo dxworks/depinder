@@ -56,7 +56,7 @@ export interface ProjectPathInfo {
  * @returns True if the segment looks like a version
  */
 function isVersionSegment(segment: string): boolean {
-  return /^\d+\.\d+\.\d+(?:[-.][A-Za-z0-9]+)*-?$/i.test(segment) ||
+  return /^\d+\.\d+\.\d+(?:[-.][A-Za-z0-9*]+)*-?$/i.test(segment) ||
          /^REPLACE_BY_CI$/i.test(segment) || 
          segment.toLowerCase() === 'unspecified';
 }
