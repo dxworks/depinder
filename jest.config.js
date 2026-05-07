@@ -11,4 +11,8 @@ module.exports = {
         '^.+\\.(ts|tsx)$': 'ts-jest',
     },
     'testEnvironment': 'node',
+    'moduleNameMapper': {
+        '^csv-parse/sync$': '<rootDir>/node_modules/csv-parse/dist/cjs/sync.cjs',
+        '^csv-stringify/sync$': '<rootDir>/node_modules/csv-stringify/dist/cjs/sync.cjs',
+    },
 }

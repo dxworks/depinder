@@ -390,9 +390,13 @@ function transformVulnerabilityDetails(
  * @param upgradeRaw Raw upgrade guidance CSV content
  * @returns Transformed upgrade guidance CSV content
  */
-function transformUpgradeGuidance(upgradeRaw: string): string {
-    const [headerLine, ...lines] = upgradeRaw.trim().split('\n');
-    const headers = headerLine.split(',');
+export function transformUpgradeGuidance(upgradeRaw: string): string {
+    const rows = parse(upgradeRaw, { skip_empty_lines: true }) as string[][];
+    if (rows.length === 0) {
+        return '';
+    }
+
+    const [headers, ...dataRows] = rows;
 
     // Replace 'Component Origin External Id' with 'Component Version Origin Id'
     const modifiedHeaders = headers.map(h =>
@@ -403,13 +407,14 @@ function transformUpgradeGuidance(upgradeRaw: string): string {
         .map((h, i) => UPGRADE_GUIDANCE_COLUMNS_TO_REMOVE.has(h.trim()) ? -1 : i)
         .filter(i => i >= 0);
 
-    return [
-        keepIndexes.map(i => modifiedHeaders[i]).join(','),
-        ...lines.map(line => {
-            const parts = line.split(',');
-            return keepIndexes.map(i => parts[i] ?? '').join(',');
-        })
-    ].join('\n');
+    const transformedRows = dataRows.map(row =>
+        keepIndexes.map(i => row[i] ?? '')
+    );
+
+    return stringify([
+        keepIndexes.map(i => modifiedHeaders[i]),
+        ...transformedRows
+    ], { header: false });
 }
 
 /**
