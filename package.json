@@ -37,7 +37,7 @@
     "test:dev": "jest --watch"
   },
   "dependencies": {
-    "@dxworks/nuget-inspector": "^1.2.0",
+    "@dxworks/nuget-inspector": "^1.2.1",
     "@octokit/graphql": "^4.8.0",
     "@snyk/gemfile": "^1.2.0",
     "chalk": "^4.1.2",
