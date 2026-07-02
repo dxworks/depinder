@@ -35,6 +35,16 @@ describe('Project Mapping', () => {
       expect(result.projectPath).toBe('my-client/test');
     });
 
+    it('should extract project path from npm paths with v-prefixed version number segments', () => {
+      const result = extractProjectInfo('distribution/v3.0.0/web-repo/apps/legacy-web/-npm/jv/8.1.1', 'npmjs');
+      expect(result.projectPath).toBe('web-repo/apps/legacy-web');
+    });
+
+    it('should extract project path from paths with wildcard version number segments', () => {
+      const result = extractProjectInfo('Example.Product.App/3.3.*/Example.Product.App/Example.Installer/-nuget/Newtonsoft.Json/13.0.3', 'nuget');
+      expect(result.projectPath).toBe('Example.Product.App/Example.Installer');
+    });
+
     it('should extract project path from npm paths with GA version suffix', () => {
       const result = extractProjectInfo('@lib/my-client/5.1.0.GA/my-client/test/-npm/@testing-library/jest-dom/5.17.0/@adobe/css-tools/4.4.0', 'npmjs');
       expect(result.projectPath).toBe('my-client/test');
