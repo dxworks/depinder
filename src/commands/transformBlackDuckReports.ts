@@ -5,6 +5,7 @@ import { Command } from 'commander';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
 import { extractProjectInfo, ProjectPathInfo, PathMappings, createPathMappings } from '../utils/projectMapping';
+import { addCategoriesToBlackDuckReports } from '../utils/blackDuckReportCategories';
 
 /**
  * Common options for CSV parsing
@@ -475,7 +476,7 @@ function validateRequiredFiles(entries: string[]): {
  * @param reportDir Directory containing Black Duck report files
  * @param options Command options including optional basePath and pathMappings
  */
-export async function transformBlackDuckReports(reportDir: string, options?: { basePath?: string, pathMappings?: string }): Promise<void> {
+export async function transformBlackDuckReports(reportDir: string, options?: { basePath?: string, pathMappings?: string, repoCategories?: string }): Promise<void> {
     try {
         // Find and validate required input files
         const entries = await fs.readdir(reportDir);
@@ -526,6 +527,10 @@ export async function transformBlackDuckReports(reportDir: string, options?: { b
         // Transform and write _upgrade_guidance.csv
         const upgradeGuidanceCSV = transformUpgradeGuidance(upgradeRawData);
         await fs.writeFile(path.join(reportDir, '_upgrade_guidance.csv'), upgradeGuidanceCSV);
+
+        if (options?.repoCategories) {
+            await addCategoriesToBlackDuckReports(reportDir, options.repoCategories);
+        }
     } catch (error) {
         if (error instanceof Error) {
             throw new Error(`Failed to transform Black Duck reports: ${error.message}`);
@@ -540,9 +545,10 @@ export const transformBlackDuckReportsCommand = new Command()
     .argument('<reportPath>', 'Path to the directory with Black Duck CSVs')
     .option('-b, --basePath <path>', 'Base path for verifying project paths')
     .option('-m, --pathMappings <path>', 'Path to JSON file containing path mappings')
+    .option('--repoCategories <path>', 'Path to repo-to-category.csv')
     .action(transformBlackDuckReports);
 
-function loadPathMappings(options: { basePath?: string; pathMappings?: string; } | undefined) {
+function loadPathMappings(options: { basePath?: string; pathMappings?: string; repoCategories?: string; } | undefined) {
     let pathMappings: PathMappings | undefined = undefined;
     if (options?.pathMappings) {
         try {

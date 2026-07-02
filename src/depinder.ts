@@ -5,6 +5,7 @@ import {cacheCommand} from './commands/cache'
 import {updateCommand} from './commands/update'
 import {extractFrameworkVersionsCommand} from './commands/extractFrameworkVersion'
 import {transformBlackDuckReportsCommand} from './commands/transformBlackDuckReports'
+import {addCategoriesToBlackDuckReportsCommand} from './commands/addCategoriesToBlackDuckReports'
 
 export const mainCommand = new Command()
     .name('depinder')
@@ -15,3 +16,4 @@ export const mainCommand = new Command()
     .addCommand(cacheCommand)
     .addCommand(extractFrameworkVersionsCommand)
     .addCommand(transformBlackDuckReportsCommand)
+    .addCommand(addCategoriesToBlackDuckReportsCommand)
