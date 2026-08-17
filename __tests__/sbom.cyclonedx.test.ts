@@ -135,6 +135,64 @@ describe('parseCycloneDxFile — Syft shape (no project nodes)', () => {
         expect(deps['org.slf4j:slf4j-reload4j@1.7.35'].libraryInfo).toBeUndefined()
     })
 
+    it('reads all three CycloneDX license shapes, including compound expressions', () => {
+        const bom = {
+            metadata: {component: {'bom-ref': 'r', type: 'file', name: '/repo'}},
+            components: [
+                {
+                    'bom-ref': 'a', name: 'a', version: '1.0.0', purl: 'pkg:npm/a@1.0.0',
+                    licenses: [{license: {id: 'MIT'}}],
+                },
+                {
+                    'bom-ref': 'b', name: 'b', version: '1.0.0', purl: 'pkg:npm/b@1.0.0',
+                    licenses: [{license: {name: 'The Apache Software License, Version 2.0', url: 'https://x'}}],
+                },
+                {
+                    'bom-ref': 'c', name: 'c', version: '1.0.0', purl: 'pkg:npm/c@1.0.0',
+                    licenses: [{expression: 'BSD-3-Clause OR MIT'}],
+                },
+                {
+                    'bom-ref': 'd', name: 'd', version: '1.0.0', purl: 'pkg:npm/d@1.0.0',
+                    licenses: [{license: {}}],
+                },
+            ],
+            dependencies: [],
+        }
+        const deps = parseCycloneDxFile(writeBom('lic.cdx.json', bom), 'npm')[0].dependencies
+        expect(deps['a@1.0.0'].libraryInfo?.licenses).toEqual(['MIT'])
+        expect(deps['b@1.0.0'].libraryInfo?.licenses).toEqual(['The Apache Software License, Version 2.0'])
+        expect(deps['c@1.0.0'].libraryInfo?.licenses).toEqual(['BSD-3-Clause OR MIT'])
+        expect(deps['d@1.0.0'].libraryInfo).toBeUndefined()
+    })
+
+    it('merges duplicate components so a license on any copy survives, whatever the order', () => {
+        // Real Syft output duplicates a package when it is found in several locations, and the
+        // copies disagree: on Zeppelin 31 purls are duplicated, 11 with a license on only some.
+        const bom = (licenseFirst: boolean) => ({
+            metadata: {component: {'bom-ref': 'r', type: 'file', name: '/repo'}},
+            components: [
+                {
+                    'bom-ref': 'dup-1', name: 'amdefine', version: '1.0.1',
+                    purl: 'pkg:npm/amdefine@1.0.1?package-id=aaa',
+                    licenses: licenseFirst ? [{expression: 'BSD-3-Clause OR MIT'}] : undefined,
+                },
+                {
+                    'bom-ref': 'dup-2', name: 'amdefine', version: '1.0.1',
+                    purl: 'pkg:npm/amdefine@1.0.1?package-id=bbb',
+                    licenses: licenseFirst ? undefined : [{expression: 'BSD-3-Clause OR MIT'}],
+                },
+            ],
+            dependencies: [],
+        })
+
+        for (const licenseFirst of [true, false]) {
+            const file = writeBom(`dup-${licenseFirst}.cdx.json`, bom(licenseFirst))
+            const deps = parseCycloneDxFile(file, 'npm')[0].dependencies
+            expect(Object.keys(deps)).toEqual(['amdefine@1.0.1'])
+            expect(deps['amdefine@1.0.1'].libraryInfo?.licenses).toEqual(['BSD-3-Clause OR MIT'])
+        }
+    })
+
     it('leaves type undefined, because no SBOM format carries dependency scope', () => {
         const deps = parseCycloneDxFile(writeBom('e.cdx.json', syftBom), 'maven')[0].dependencies
         expect(deps['org.slf4j:slf4j-api@1.7.35'].type).toBeUndefined()

@@ -28,7 +28,13 @@ export interface CycloneDxComponent {
     name?: string
     version?: string
     purl?: string
-    licenses?: { license?: { id?: string, name?: string } }[]
+    /**
+     * CycloneDX allows three shapes here, and real Syft output uses all of them:
+     *   { license: { id: 'MIT' } }                                  — an SPDX id
+     *   { license: { name: 'The Apache ... 2.0', url: '...' } }      — a non-SPDX name
+     *   { expression: 'BSD-3-Clause OR MIT' }                       — a compound SPDX expression
+     */
+    licenses?: { license?: { id?: string, name?: string }, expression?: string }[]
     properties?: { name: string, value: string }[]
 }
 
@@ -92,8 +98,10 @@ export function parsePurl(purl: string): ParsedPurl | undefined {
 
 function firstLicense(component: CycloneDxComponent): string | undefined {
     for (const entry of component.licenses ?? []) {
-        const id = entry?.license?.id ?? entry?.license?.name
-        if (id) return id
+        // `expression` holds compound SPDX expressions ('BSD-3-Clause OR MIT') and is a sibling of
+        // `license`, not a field inside it — reading only `license` silently drops those.
+        const value = entry?.license?.id ?? entry?.license?.name ?? entry?.expression
+        if (value) return value
     }
     return undefined
 }
@@ -230,6 +238,19 @@ export function parseCycloneDxFile(sbomFile: string, purlType: string): Depinder
             const component = byRef.get(ref)
             const license = component && firstLicense(component)
             const id = `${parsed.name}@${parsed.version}`
+
+            // The same package can appear under several bom-refs when it was found in several
+            // locations, and those copies do not always agree: on Zeppelin, 31 purls are duplicated
+            // and in 11 of them only some copies carry a license. Merging rather than overwriting
+            // keeps whichever copy knows the license, instead of whichever happened to come last.
+            const existing = dependencies[id]
+            if (existing) {
+                if (license && !existing.libraryInfo) {
+                    existing.libraryInfo = {name: parsed.name, licenses: [license], versions: []}
+                }
+                continue
+            }
+
             dependencies[id] = {
                 id,
                 name: parsed.name,
