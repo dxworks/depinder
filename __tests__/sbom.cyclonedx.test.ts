@@ -56,6 +56,15 @@ const syftBom = {
     ],
 }
 
+/**
+ * Real Trivy output inserts the module's OWN artifact (the self-anchor) between each pom.xml
+ * application node and the real dependencies. The parser must re-root direct attribution on that
+ * anchor and keep the anchor itself out of its own project's dependency map.
+ *
+ *   moduleA/pom.xml -> module-a (anchor, sole child) -> guava -> gson
+ *   moduleB/pom.xml -> module-b (anchor, has outgoing edges) + commons-io (genuine direct leaf)
+ *                       module-b -> gson, module-a   (moduleA's artifact as a REAL dep here)
+ */
 const trivyBom = {
     metadata: {component: {'bom-ref': 'root-uuid', type: 'application', name: '/abs/path/to/repo'}},
     components: [
@@ -68,6 +77,14 @@ const trivyBom = {
             properties: [{name: 'aquasecurity:trivy:Type', value: 'pom'}],
         },
         {
+            'bom-ref': 'anchor-a', type: 'library', group: 'org.example', name: 'module-a',
+            version: '1.0.0', purl: 'pkg:maven/org.example/module-a@1.0.0',
+        },
+        {
+            'bom-ref': 'anchor-b', type: 'library', group: 'org.example', name: 'module-b',
+            version: '1.0.0', purl: 'pkg:maven/org.example/module-b@1.0.0',
+        },
+        {
             'bom-ref': 'dep-guava', type: 'library', group: 'com.google.guava', name: 'guava',
             version: '14.0.1', purl: 'pkg:maven/com.google.guava/guava@14.0.1',
             licenses: [{license: {id: 'Apache-2.0'}}],
@@ -76,12 +93,85 @@ const trivyBom = {
             'bom-ref': 'dep-gson', type: 'library', group: 'com.google.code.gson', name: 'gson',
             version: '2.8.9', purl: 'pkg:maven/com.google.code.gson/gson@2.8.9',
         },
+        {
+            'bom-ref': 'dep-commons', type: 'library', group: 'commons-io', name: 'commons-io',
+            version: '2.11.0', purl: 'pkg:maven/commons-io/commons-io@2.11.0',
+        },
     ],
     dependencies: [
         {ref: 'root-uuid', dependsOn: ['proj-a', 'proj-b']},
-        {ref: 'proj-a', dependsOn: ['dep-guava']},
+        // moduleA: the anchor is the SOLE child of the application node.
+        {ref: 'proj-a', dependsOn: ['anchor-a']},
+        {ref: 'anchor-a', dependsOn: ['dep-guava']},
         {ref: 'dep-guava', dependsOn: ['dep-gson']},
-        {ref: 'proj-b', dependsOn: ['dep-gson']},
+        // moduleB: anchor (identified by its outgoing edges) PLUS a genuine direct-dep sibling.
+        {ref: 'proj-b', dependsOn: ['anchor-b', 'dep-commons']},
+        {ref: 'anchor-b', dependsOn: ['dep-gson', 'anchor-a']},
+    ],
+}
+
+/**
+ * Real Syft output over a Maven monorepo is FLAT: the root `file` node has no edges, so without
+ * reconstruction the whole SBOM collapses into one project. Module boundaries are rebuilt from
+ * each component's `syft:location:0:path` property (grouped by pom.xml), the monorepo groupId is
+ * bootstrapped from the SBOM itself (groupId occurring exactly once per group, degenerate
+ * `<name>/<name>` purls skipped), and each group's unique monorepo-groupId component is the
+ * module's anchor. Membership is dependsOn-reachability from the anchor, NOT the location group.
+ */
+const loc = (p: string) => [{name: 'syft:location:0:path', value: p}]
+const syftMonorepoBom = {
+    metadata: {component: {'bom-ref': 'root-hash', type: 'file', name: '/abs/path/to/repo'}},
+    components: [
+        // Root pom group: the root anchor + slf4j twice (org.slf4j occurs TWICE here, so it must
+        // score zero for the bootstrap despite being frequent) + gson (located here but pulled in
+        // by moduleA — membership must follow edges, not location).
+        {
+            'bom-ref': 'anchor-root', type: 'library', name: 'zeppelin', version: '0.13.0',
+            purl: 'pkg:maven/org.zeppelin/zeppelin@0.13.0', properties: loc('/pom.xml'),
+        },
+        {
+            'bom-ref': 'dep-reload4j', type: 'library', name: 'slf4j-reload4j', version: '1.7.35',
+            purl: 'pkg:maven/org.slf4j/slf4j-reload4j@1.7.35', properties: loc('/pom.xml'),
+        },
+        {
+            'bom-ref': 'dep-slf4j', type: 'library', name: 'slf4j-api', version: '1.7.35',
+            purl: 'pkg:maven/org.slf4j/slf4j-api@1.7.35', properties: loc('/pom.xml'),
+        },
+        {
+            'bom-ref': 'dep-gson', type: 'library', name: 'gson', version: '2.8.9',
+            purl: 'pkg:maven/com.google.code.gson/gson@2.8.9', properties: loc('/pom.xml'),
+        },
+        // moduleA group: anchor + guava.
+        {
+            'bom-ref': 'anchor-a', type: 'library', name: 'zeppelin-a', version: '0.13.0',
+            purl: 'pkg:maven/org.zeppelin/zeppelin-a@0.13.0', properties: loc('/moduleA/pom.xml'),
+        },
+        {
+            'bom-ref': 'dep-guava', type: 'library', name: 'guava', version: '14.0.1',
+            purl: 'pkg:maven/com.google.guava/guava@14.0.1', properties: loc('/moduleA/pom.xml'),
+        },
+        // moduleB group: anchor + a DEGENERATE purl (Syft could not resolve the groupId and wrote
+        // namespace == artifact). It must stay a plain dependency, never become an anchor.
+        {
+            'bom-ref': 'anchor-b', type: 'library', name: 'zeppelin-b', version: '0.13.0',
+            purl: 'pkg:maven/org.zeppelin/zeppelin-b@0.13.0', properties: loc('/moduleB/pom.xml'),
+        },
+        {
+            'bom-ref': 'dep-degenerate', type: 'library', name: 'zeppelin-x', version: '1.0.0',
+            purl: 'pkg:maven/zeppelin-x/zeppelin-x@1.0.0', properties: loc('/moduleB/pom.xml'),
+        },
+        // An npm component: other ecosystems keep the single-project behavior.
+        {
+            'bom-ref': 'dep-npm', type: 'library', name: 'side-channel', version: '1.1.0',
+            purl: 'pkg:npm/side-channel@1.1.0', properties: loc('/package.json'),
+        },
+    ],
+    dependencies: [
+        {ref: 'anchor-root', dependsOn: ['dep-reload4j']},
+        {ref: 'dep-reload4j', dependsOn: ['dep-slf4j']},
+        {ref: 'anchor-a', dependsOn: ['dep-guava']},
+        {ref: 'dep-guava', dependsOn: ['dep-gson']},
+        {ref: 'anchor-b', dependsOn: ['dep-degenerate']},
     ],
 }
 
@@ -193,9 +283,146 @@ describe('parseCycloneDxFile — Syft shape (no project nodes)', () => {
         }
     })
 
+    it('falls back to the component version for versionless purls, and skips them without one', () => {
+        // Syft emits versionless purls with version 'UNKNOWN' on the component when it cannot
+        // resolve a version (23 real maven deps on Zeppelin). Trivy's versionless purls carry no
+        // component version either, so they must stay excluded.
+        const bom = {
+            metadata: {component: {'bom-ref': 'r', type: 'file', name: '/repo'}},
+            components: [
+                {
+                    'bom-ref': 'v1', name: 'phoenix-core', version: 'UNKNOWN',
+                    purl: 'pkg:maven/org.apache.phoenix/phoenix-core',
+                },
+                {'bom-ref': 'v2', name: 'bcutil-jdk18on', purl: 'pkg:maven/org.bouncycastle/bcutil-jdk18on'},
+            ],
+            dependencies: [],
+        }
+        const deps = parseCycloneDxFile(writeBom('nover.cdx.json', bom), 'maven')[0].dependencies
+        expect(Object.keys(deps)).toEqual(['org.apache.phoenix:phoenix-core@UNKNOWN'])
+    })
+
     it('leaves type undefined, because no SBOM format carries dependency scope', () => {
         const deps = parseCycloneDxFile(writeBom('e.cdx.json', syftBom), 'maven')[0].dependencies
         expect(deps['org.slf4j:slf4j-api@1.7.35'].type).toBeUndefined()
+    })
+})
+
+describe('parseCycloneDxFile — Syft maven monorepo (per-module reconstruction)', () => {
+    it('groups by pom.xml location and picks each module\'s anchor via the bootstrapped groupId', () => {
+        const projects = parseCycloneDxFile(writeBom('s1.cdx.json', syftMonorepoBom), 'maven')
+        // org.zeppelin occurs exactly once in all 3 groups (score 3); org.slf4j occurs twice in the
+        // root group (score 0); guava/gson score 1 each; the degenerate zeppelin-x is skipped.
+        expect(projects.map(p => p.name).sort()).toEqual(['moduleA', 'moduleB', 's1'])
+        const a = projects.find(p => p.name === 'moduleA')!
+        expect(a.version).toBe('0.13.0') // the anchor's version, not the SBOM root's
+        expect(a.path).toBe('/moduleA/pom.xml')
+    })
+
+    it('names the root-pom module after the SBOM file, mirroring the Trivy convention', () => {
+        const projects = parseCycloneDxFile(writeBom('s2.cdx.json', syftMonorepoBom), 'maven')
+        const root = projects.find(p => p.path === '/pom.xml')!
+        expect(root.name).toBe('s2')
+    })
+
+    it('scopes a module by edge reachability from its anchor, not by location group', () => {
+        const projects = parseCycloneDxFile(writeBom('s3.cdx.json', syftMonorepoBom), 'maven')
+        const a = projects.find(p => p.name === 'moduleA')!
+        // gson is LOCATED in the root pom group but reached through guava: it belongs to moduleA.
+        expect(Object.keys(a.dependencies).sort())
+            .toEqual(['com.google.code.gson:gson@2.8.9', 'com.google.guava:guava@14.0.1'])
+        // ...and conversely the root project holds only what its own anchor reaches.
+        const root = projects.find(p => p.path === '/pom.xml')!
+        expect(Object.keys(root.dependencies).sort())
+            .toEqual(['org.slf4j:slf4j-api@1.7.35', 'org.slf4j:slf4j-reload4j@1.7.35'])
+    })
+
+    it('attributes the anchor\'s outgoing edges as direct and deeper edges as transitive', () => {
+        const projects = parseCycloneDxFile(writeBom('s4.cdx.json', syftMonorepoBom), 'maven')
+        const a = projects.find(p => p.name === 'moduleA')!
+        expect(a.dependencies['com.google.guava:guava@14.0.1'].requestedBy)
+            .toEqual([`${a.name}@${a.version}`])
+        expect(a.dependencies['com.google.code.gson:gson@2.8.9'].requestedBy)
+            .toEqual(['com.google.guava:guava@14.0.1'])
+    })
+
+    it('keeps each module\'s own anchor out of its dependency map', () => {
+        const projects = parseCycloneDxFile(writeBom('s5.cdx.json', syftMonorepoBom), 'maven')
+        for (const p of projects) {
+            expect(p.dependencies['org.zeppelin:zeppelin@0.13.0']).toBeUndefined()
+            expect(p.dependencies[`org.zeppelin:${p.name === 'moduleA' ? 'zeppelin-a' : 'zeppelin-b'}@0.13.0`])
+                .toBeUndefined()
+        }
+    })
+
+    it('treats a degenerate namespace==name purl as a plain dependency, never as an anchor', () => {
+        const projects = parseCycloneDxFile(writeBom('s6.cdx.json', syftMonorepoBom), 'maven')
+        expect(projects.map(p => p.name)).not.toContain('zeppelin-x')
+        const b = projects.find(p => p.name === 'moduleB')!
+        expect(b.dependencies['zeppelin-x:zeppelin-x@1.0.0'].requestedBy)
+            .toEqual([`${b.name}@${b.version}`])
+    })
+
+    it('does not extend the reconstruction to non-maven ecosystems', () => {
+        const projects = parseCycloneDxFile(writeBom('s7.cdx.json', syftMonorepoBom), 'npm')
+        expect(projects).toHaveLength(1)
+        expect(projects[0].name).toBe('s7')
+        expect(Object.keys(projects[0].dependencies)).toEqual(['side-channel@1.1.0'])
+    })
+
+    it('falls back to a single project when no monorepo groupId can be bootstrapped', () => {
+        // All pom-located purls are degenerate: grouping succeeds but the bootstrap yields nothing.
+        const bom = {
+            metadata: {component: {'bom-ref': 'r', type: 'file', name: '/repo'}},
+            components: [
+                {
+                    'bom-ref': 'x', name: 'x', version: '1.0.0',
+                    purl: 'pkg:maven/x/x@1.0.0', properties: loc('/a/pom.xml'),
+                },
+                {
+                    'bom-ref': 'y', name: 'y', version: '2.0.0',
+                    purl: 'pkg:maven/y/y@2.0.0', properties: loc('/b/pom.xml'),
+                },
+            ],
+            dependencies: [],
+        }
+        const projects = parseCycloneDxFile(writeBom('s8.cdx.json', bom), 'maven')
+        expect(projects).toHaveLength(1)
+        expect(projects[0].name).toBe('s8')
+        expect(Object.keys(projects[0].dependencies).sort()).toEqual(['x:x@1.0.0', 'y:y@2.0.0'])
+    })
+
+    it('keeps a module whose anchor reaches nothing, as an empty project', () => {
+        const bom = {
+            metadata: {component: {'bom-ref': 'r', type: 'file', name: '/repo'}},
+            components: [
+                {
+                    'bom-ref': 'anchor-1', name: 'mono-a', version: '1.0.0',
+                    purl: 'pkg:maven/org.mono/mono-a@1.0.0', properties: loc('/a/pom.xml'),
+                },
+                {
+                    'bom-ref': 'anchor-2', name: 'mono-b', version: '1.0.0',
+                    purl: 'pkg:maven/org.mono/mono-b@1.0.0', properties: loc('/b/pom.xml'),
+                },
+                {
+                    'bom-ref': 'dep-1', name: 'guava', version: '14.0.1',
+                    purl: 'pkg:maven/com.google.guava/guava@14.0.1', properties: loc('/a/pom.xml'),
+                },
+            ],
+            dependencies: [{ref: 'anchor-1', dependsOn: ['dep-1']}],
+        }
+        const projects = parseCycloneDxFile(writeBom('s9.cdx.json', bom), 'maven')
+        expect(projects.map(p => p.name).sort()).toEqual(['a', 'b'])
+        expect(projects.find(p => p.name === 'b')!.dependencies).toEqual({})
+    })
+
+    it('handles pom paths without a leading slash the same way', () => {
+        const bom = JSON.parse(JSON.stringify(syftMonorepoBom))
+        for (const c of bom.components) {
+            if (c.properties) c.properties[0].value = c.properties[0].value.replace(/^\//, '')
+        }
+        const projects = parseCycloneDxFile(writeBom('s10.cdx.json', bom), 'maven')
+        expect(projects.map(p => p.name).sort()).toEqual(['moduleA', 'moduleB', 's10'])
     })
 })
 
@@ -206,27 +433,78 @@ describe('parseCycloneDxFile — Trivy shape (application nodes are the projects
         expect(projects.map(p => p.path).sort()).toEqual(['moduleA/pom.xml', 'moduleB/pom.xml'])
     })
 
-    it('scopes each project to what is reachable from its own node', () => {
+    it('scopes each project to what is reachable from its own node, minus its own anchor', () => {
         const projects = parseCycloneDxFile(writeBom('g.trivy.cdx.json', trivyBom), 'maven')
         const a = projects.find(p => p.name === 'moduleA')
         const b = projects.find(p => p.name === 'moduleB')
-        // moduleA reaches gson transitively through guava; moduleB depends on gson directly only.
+        // moduleA: guava direct via the anchor, gson transitively; module-a itself excluded.
         expect(Object.keys(a!.dependencies).sort())
             .toEqual(['com.google.code.gson:gson@2.8.9', 'com.google.guava:guava@14.0.1'])
-        expect(Object.keys(b!.dependencies)).toEqual(['com.google.code.gson:gson@2.8.9'])
+        // moduleB: commons-io + gson direct, module-a as a REAL dep, guava through module-a;
+        // its own anchor module-b excluded.
+        expect(Object.keys(b!.dependencies).sort()).toEqual([
+            'com.google.code.gson:gson@2.8.9',
+            'com.google.guava:guava@14.0.1',
+            'commons-io:commons-io@2.11.0',
+            'org.example:module-a@1.0.0',
+        ])
     })
 
-    it('attributes a project-node edge to the project id, so depinder sees it as direct', () => {
+    it('re-roots direct attribution on a sole-child anchor: its deps become the project\'s direct deps', () => {
         const projects = parseCycloneDxFile(writeBom('h.trivy.cdx.json', trivyBom), 'maven')
         const a = projects.find(p => p.name === 'moduleA')!
         const guava = a.dependencies['com.google.guava:guava@14.0.1']
         expect(guava.requestedBy).toEqual([`${a.name}@${a.version}`])
+        // The anchor must not appear as a dependency of its own project.
+        expect(a.dependencies['org.example:module-a@1.0.0']).toBeUndefined()
 
         // This is the exact expression analyse.ts uses to classify direct vs indirect.
         const isDirect = (d: typeof guava) =>
             !d.requestedBy.length || d.requestedBy.some(r => r.startsWith(`${a.name}@${a.version}`))
         expect(isDirect(guava)).toBe(true)
         expect(isDirect(a.dependencies['com.google.code.gson:gson@2.8.9'])).toBe(false)
+    })
+
+    it('handles an anchor with genuine direct-dep siblings: both the sibling and the anchor\'s deps are direct', () => {
+        const projects = parseCycloneDxFile(writeBom('h2.trivy.cdx.json', trivyBom), 'maven')
+        const b = projects.find(p => p.name === 'moduleB')!
+        const projectId = `${b.name}@${b.version}`
+        // anchor-b is the anchor (it has outgoing edges); dep-commons is a real direct dep leaf.
+        expect(b.dependencies['commons-io:commons-io@2.11.0'].requestedBy).toEqual([projectId])
+        expect(b.dependencies['com.google.code.gson:gson@2.8.9'].requestedBy).toContain(projectId)
+        expect(b.dependencies['org.example:module-b@1.0.0']).toBeUndefined()
+    })
+
+    it('treats another module\'s artifact inside a different subtree as a real dependency', () => {
+        const projects = parseCycloneDxFile(writeBom('h3.trivy.cdx.json', trivyBom), 'maven')
+        const b = projects.find(p => p.name === 'moduleB')!
+        const projectId = `${b.name}@${b.version}`
+        // moduleA's own artifact is a genuine (direct) dependency of moduleB...
+        expect(b.dependencies['org.example:module-a@1.0.0'].requestedBy).toEqual([projectId])
+        // ...and its transitive deps keep their normal requestedBy chain (guava is NOT direct here).
+        expect(b.dependencies['com.google.guava:guava@14.0.1'].requestedBy)
+            .toEqual(['org.example:module-a@1.0.0'])
+    })
+
+    it('keeps a module whose only in-ecosystem component was its own anchor, with zero deps', () => {
+        const bom = {
+            metadata: {component: {'bom-ref': 'root', type: 'application', name: '/repo'}},
+            components: [
+                {'bom-ref': 'proj', type: 'application', name: 'empty/pom.xml'},
+                {
+                    'bom-ref': 'anchor', type: 'library', group: 'org.example', name: 'empty-module',
+                    version: '1.0.0', purl: 'pkg:maven/org.example/empty-module@1.0.0',
+                },
+            ],
+            dependencies: [
+                {ref: 'root', dependsOn: ['proj']},
+                {ref: 'proj', dependsOn: ['anchor']},
+            ],
+        }
+        const projects = parseCycloneDxFile(writeBom('h4.trivy.cdx.json', bom), 'maven')
+        expect(projects).toHaveLength(1)
+        expect(projects[0].name).toBe('empty')
+        expect(projects[0].dependencies).toEqual({})
     })
 
     it('parses semver where possible and yields null instead of throwing where not', () => {

@@ -14,7 +14,9 @@ import {log} from '../../utils/logging'
  *  - Trivy emits a three-level graph: root -> one `application` node per manifest -> dependencies.
  *    Those intermediate nodes are the projects, already named by their manifest's relative path.
  *  - Syft emits a two-level graph with no project anchor at all; its root is a `file` node that
- *    does not appear in the dependency graph. A Syft SBOM therefore maps to a single project.
+ *    does not appear in the dependency graph. For maven, module boundaries are reconstructed from
+ *    each component's `syft:location:0:path` property (see findSyftMavenModules); for every other
+ *    ecosystem, and whenever reconstruction finds nothing, a Syft SBOM maps to a single project.
  *
  * In both tools `dependencies[].ref` and `dependsOn[]` are the target's `bom-ref` verbatim, so refs
  * resolve by plain string lookup. Syft's bom-ref happens to look like a purl with a `package-id`
@@ -96,6 +98,22 @@ export function parsePurl(purl: string): ParsedPurl | undefined {
     return {type, name, version}
 }
 
+/**
+ * Parses a component's purl, supplying the component's own `version` field when the purl carries
+ * none. Syft emits versionless purls (with `version: 'UNKNOWN'` on the component) for dependencies
+ * whose version it could not resolve — on Zeppelin, 23 real maven dependencies whose version lives
+ * in a `dependencyManagement` block. Trivy's rare versionless purls carry no component version
+ * either, so this fallback never fires for them.
+ */
+function parseComponentPurl(component: CycloneDxComponent): ParsedPurl | undefined {
+    if (!component.purl) return undefined
+    const direct = parsePurl(component.purl)
+    if (direct) return direct
+    if (!component.version) return undefined
+    const base = component.purl.split('?')[0].split('#')[0]
+    return parsePurl(`${base}@${encodeURIComponent(component.version)}`)
+}
+
 function firstLicense(component: CycloneDxComponent): string | undefined {
     for (const entry of component.licenses ?? []) {
         // `expression` holds compound SPDX expressions ('BSD-3-Clause OR MIT') and is a sibling of
@@ -122,19 +140,170 @@ interface ProjectNode {
     version: string
     path: string
     /**
-     * True for the Syft shape, where the root is a `file` node that carries no dependsOn edges.
-     * Reachability from it yields nothing, so the project's scope is every component in the BOM.
+     * True for the single-project Syft shape, where the root is a `file` node that carries no
+     * dependsOn edges. Reachability from it yields nothing, so the scope is the whole BOM.
      */
     allComponents: boolean
+    /**
+     * Pre-resolved self-anchor refs, set only by the Syft per-module reconstruction (where the
+     * project node IS the anchor). When present, the Trivy self-anchor detection is skipped and
+     * these refs are used verbatim.
+     */
+    anchorRefs?: string[]
+}
+
+/**
+ * Reconstructs one project per Maven module from a Syft SBOM, which is otherwise flat.
+ *
+ * Syft records where each component was first seen as a `syft:location:0:path` property (every
+ * non-file component carries exactly one). The reconstruction, validated 67/67 against pom-derived
+ * ground truth on Apache Zeppelin:
+ *
+ *  1. Group maven components by that location; keep only groups whose path is a `pom.xml`. Each
+ *     such group corresponds to one module.
+ *  2. Bootstrap the monorepo's groupId from the SBOM itself: score each purl groupId by the number
+ *     of groups in which it occurs EXACTLY once, and take the highest. The module's own artifact
+ *     appears once per pom, while shared third-party groups (org.slf4j, ...) repeat within groups.
+ *     Degenerate purls are skipped: when Syft cannot resolve a groupId it emits
+ *     `pkg:maven/<name>/<name>@v` (namespace equal to the artifact name), which says nothing.
+ *  3. In each group the anchor is the unique component whose groupId is the monorepo groupId.
+ *     Defensive tie-breaks if several match: prefer one that is the target of no dependsOn edge,
+ *     then one carrying the modal candidate version across groups.
+ *
+ * Membership is deliberately NOT the location group: Syft dedups components repo-wide, so a
+ * component's location is merely where it was first seen. The module's dependency set is the
+ * dependsOn-reachability from its anchor, exactly like the Trivy path.
+ *
+ * Returns undefined when no pom groups exist or no groupId can be bootstrapped (non-monorepo or
+ * non-maven SBOM), so the caller falls back to the single-project shape.
+ */
+function findSyftMavenModules(
+    bom: CycloneDxBom,
+    edges: Map<string, string[]>,
+    sbomFile: string,
+): ProjectNode[] | undefined {
+    interface Candidate {
+        ref: string
+        groupId: string
+        artifact: string
+        version: string
+        degenerate: boolean
+    }
+
+    // 1. Group maven components by their Syft location, keeping pom.xml groups only.
+    //    Both `flink/pom.xml` and `/flink/pom.xml` forms occur in the wild.
+    const pomGroups = new Map<string, Candidate[]>()
+    for (const component of bom.components ?? []) {
+        const parsed = parseComponentPurl(component)
+        if (!parsed || parsed.type !== 'maven') continue
+        const location = component.properties?.find(p => p.name === 'syft:location:0:path')?.value
+        if (!location || !(location === 'pom.xml' || location.endsWith('/pom.xml'))) continue
+
+        const colon = parsed.name.indexOf(':')
+        const groupId = parsed.name.slice(0, colon)
+        const artifact = parsed.name.slice(colon + 1)
+        const group = pomGroups.get(location) ?? []
+        group.push({
+            ref: component['bom-ref'],
+            groupId,
+            artifact,
+            version: parsed.version,
+            degenerate: groupId === artifact,
+        })
+        pomGroups.set(location, group)
+    }
+    if (pomGroups.size === 0) return undefined
+
+    // 2. Bootstrap the monorepo groupId: +1 per group where the groupId occurs exactly once.
+    const score = new Map<string, number>()
+    for (const group of pomGroups.values()) {
+        const occurrences = new Map<string, number>()
+        for (const c of group) {
+            if (c.degenerate) continue
+            occurrences.set(c.groupId, (occurrences.get(c.groupId) ?? 0) + 1)
+        }
+        for (const [groupId, n] of occurrences) {
+            if (n === 1) score.set(groupId, (score.get(groupId) ?? 0) + 1)
+        }
+    }
+    let monoGroupId: string | undefined
+    let bestScore = 0
+    for (const [groupId, n] of score) {
+        if (n > bestScore) {
+            bestScore = n
+            monoGroupId = groupId
+        }
+    }
+    if (!monoGroupId) return undefined
+
+    // Tie-break inputs: refs that are the target of any dependsOn edge, and the modal version
+    // among anchor candidates across all groups.
+    const edgeTargets = new Set<string>()
+    for (const targets of edges.values()) {
+        for (const target of targets) edgeTargets.add(target)
+    }
+    const versionCounts = new Map<string, number>()
+    for (const group of pomGroups.values()) {
+        for (const c of group) {
+            if (c.groupId === monoGroupId) versionCounts.set(c.version, (versionCounts.get(c.version) ?? 0) + 1)
+        }
+    }
+    let modalVersion: string | undefined
+    let modalCount = 0
+    for (const [version, n] of versionCounts) {
+        if (n > modalCount) {
+            modalCount = n
+            modalVersion = version
+        }
+    }
+
+    // 3. Pick each group's anchor and derive the project from it.
+    const nodes: ProjectNode[] = []
+    for (const [pomPath, group] of pomGroups) {
+        let anchors = group.filter(c => c.groupId === monoGroupId)
+        if (anchors.length > 1) {
+            const rootLike = anchors.filter(c => !edgeTargets.has(c.ref))
+            if (rootLike.length > 0) anchors = rootLike
+        }
+        if (anchors.length > 1 && modalVersion) {
+            const modal = anchors.filter(c => c.version === modalVersion)
+            if (modal.length > 0) anchors = modal
+        }
+        if (anchors.length === 0) continue // a pom group with no in-monorepo artifact is not a module
+        const anchor = anchors[0]
+
+        const relative = pomPath.replace(/^\//, '')
+        const dir = path.dirname(relative)
+        nodes.push({
+            ref: anchor.ref,
+            // 'flink/pom.xml' -> 'flink'; the root 'pom.xml' -> the SBOM's own basename,
+            // mirroring the Trivy naming convention below.
+            name: dir === '.'
+                ? path.basename(sbomFile).replace(/\.(trivy\.)?cdx\.json$/, '')
+                : dir,
+            version: anchor.version,
+            path: pomPath,
+            allComponents: false,
+            anchorRefs: [anchor.ref],
+        })
+    }
+    return nodes.length > 0 ? nodes : undefined
 }
 
 /**
  * Identifies the project nodes in a BOM.
  *
  * Trivy: the root's direct children of type `application` (one per manifest file).
- * Syft:  no project nodes exist, so the whole BOM is one project named after the scan root.
+ * Syft:  no project nodes exist. For maven, per-module reconstruction from Syft's location
+ *        properties (findSyftMavenModules); otherwise one project spanning the whole BOM.
  */
-function findProjectNodes(bom: CycloneDxBom, byRef: Map<string, CycloneDxComponent>, sbomFile: string): ProjectNode[] {
+function findProjectNodes(
+    bom: CycloneDxBom,
+    byRef: Map<string, CycloneDxComponent>,
+    edges: Map<string, string[]>,
+    sbomFile: string,
+    purlType: string,
+): ProjectNode[] {
     const rootRef = bom.metadata?.component?.['bom-ref']
     const rootChildren = rootRef
         ? bom.dependencies?.find(d => d.ref === rootRef)?.dependsOn ?? []
@@ -160,7 +329,14 @@ function findProjectNodes(bom: CycloneDxBom, byRef: Map<string, CycloneDxCompone
         })
     }
 
-    // Syft shape: one project for the entire SBOM.
+    // Syft shape. For maven, try to reconstruct one project per module first; other ecosystems
+    // keep the single-project behavior (no equivalent rule has been validated for them yet).
+    if (purlType === 'maven') {
+        const modules = findSyftMavenModules(bom, edges, sbomFile)
+        if (modules) return modules
+    }
+
+    // Syft shape, no reconstructable modules: one project for the entire SBOM.
     return [{
         ref: rootRef ?? '',
         name: path.basename(sbomFile).replace(/\.(trivy\.)?cdx\.json$/, ''),
@@ -208,7 +384,7 @@ export function parseCycloneDxFile(sbomFile: string, purlType: string): Depinder
         if (entry.dependsOn?.length) edges.set(entry.ref, entry.dependsOn)
     }
 
-    const projectNodes = findProjectNodes(bom, byRef, sbomFile)
+    const projectNodes = findProjectNodes(bom, byRef, edges, sbomFile, purlType)
     const projects: DepinderProject[] = []
 
     for (const node of projectNodes) {
@@ -217,16 +393,37 @@ export function parseCycloneDxFile(sbomFile: string, purlType: string): Depinder
             ? new Set(byRef.keys())
             : reachableFrom(node.ref, edges)
 
+        // Trivy inserts the module's OWN artifact (e.g. org.apache.zeppelin:zeppelin-markdown) as
+        // an intermediate node between a pom.xml application node and the real dependencies:
+        //   markdown/pom.xml -> zeppelin-markdown -> real deps
+        // Reading the application node's children as "direct" therefore yields exactly one direct
+        // dep per module — the module itself. Detect that self-anchor and re-root on it.
+        //
+        // Rule (validated 67/67 on the real Zeppelin SBOM): a child of a pom.xml application node
+        // is the self-anchor iff it is the SOLE child, OR it has outgoing dependsOn edges. Children
+        // that are neither (e.g. a versionless leaf sitting directly under the application node)
+        // are genuine direct dependencies and must stay. This applies only to DIRECT children of
+        // the application node — the same artifact deeper in another module's subtree is a real dep.
+        // Syft per-module nodes arrive with their anchor already resolved; only the Trivy shape
+        // needs the detection below.
+        const anchorRefs = new Set<string>(node.anchorRefs ?? [])
+        if (node.anchorRefs === undefined && !node.allComponents && node.path.endsWith('pom.xml')) {
+            const children = edges.get(node.ref) ?? []
+            for (const child of children) {
+                if (children.length === 1 || (edges.get(child)?.length ?? 0) > 0) {
+                    anchorRefs.add(child)
+                }
+            }
+        }
+
         // Resolve each in-scope ref to a purl of the requested ecosystem.
         const parsedByRef = new Map<string, ParsedPurl>()
         for (const ref of inScope) {
             const component = byRef.get(ref)
             if (!component?.purl) continue // no purl -> not a package (GitHub Actions, directories)
-            const parsed = parsePurl(component.purl)
+            const parsed = parseComponentPurl(component)
             if (parsed && parsed.type === purlType) parsedByRef.set(ref, parsed)
         }
-
-        if (parsedByRef.size === 0) continue
 
         const dependencies: { [id: string]: DepinderDependency } = {}
         const idOf = (ref: string) => {
@@ -234,10 +431,31 @@ export function parseCycloneDxFile(sbomFile: string, purlType: string): Depinder
             return parsed ? `${parsed.name}@${parsed.version}` : undefined
         }
 
+        // The self-anchor is the module itself, not a dependency of it — keep it out of the map
+        // entirely (by id, so a duplicate bom-ref for the same artifact cannot sneak it back in).
+        const anchorIds = new Set<string>()
+        for (const ref of anchorRefs) {
+            // A Syft anchor is the traversal's start, so it sits OUTSIDE its own reachable set and
+            // parsedByRef does not know it — parse its purl directly in that case.
+            let parsed = parsedByRef.get(ref)
+            if (!parsed) {
+                const component = byRef.get(ref)
+                const fromPurl = component ? parseComponentPurl(component) : undefined
+                if (fromPurl && fromPurl.type === purlType) parsed = fromPurl
+            }
+            if (parsed) anchorIds.add(`${parsed.name}@${parsed.version}`)
+        }
+
+        // Nothing of this ecosystem is in scope AND the module itself is not of this ecosystem:
+        // the project simply does not exist for this purl type. (A module whose ONLY in-ecosystem
+        // component is its own anchor stays, as an empty project — see the note above `projects.push`.)
+        if (parsedByRef.size === 0 && anchorIds.size === 0) continue
+
         for (const [ref, parsed] of parsedByRef) {
             const component = byRef.get(ref)
             const license = component && firstLicense(component)
             const id = `${parsed.name}@${parsed.version}`
+            if (anchorIds.has(id)) continue
 
             // The same package can appear under several bom-refs when it was found in several
             // locations, and those copies do not always agree: on Zeppelin, 31 purls are duplicated
@@ -271,17 +489,24 @@ export function parseCycloneDxFile(sbomFile: string, purlType: string): Depinder
         // attributed to the project itself, so a maven dep pulled in under a project node still
         // reads as direct rather than orphaned.
         for (const [source, targets] of edges) {
-            if (source !== node.ref && !parsedByRef.has(source)) continue
-            const sourceId = source === node.ref ? projectId : idOf(source)
+            if (source !== node.ref && !anchorRefs.has(source) && !parsedByRef.has(source)) continue
+            // Edges out of the self-anchor are the module's true direct dependencies — attribute
+            // them to the project id, exactly as if the application node pointed at them itself.
+            const sourceId = source === node.ref || anchorRefs.has(source)
+                ? projectId
+                : idOf(source)
             if (!sourceId) continue
             for (const target of targets) {
                 const targetId = idOf(target)
-                if (!targetId || targetId === sourceId) continue
+                if (!targetId || targetId === sourceId || anchorIds.has(targetId)) continue
                 const requestedBy: string[] = dependencies[targetId].requestedBy
                 if (!requestedBy.includes(sourceId)) requestedBy.push(sourceId)
             }
         }
 
+        // Excluding the anchor can leave a module with zero dependencies (its only in-ecosystem
+        // component was its own artifact). Keep the project: an empty module is a true result,
+        // and hiding it would silently shrink the project list. On Zeppelin this affects 8 of 67.
         projects.push({
             name: node.name,
             version: node.version,
