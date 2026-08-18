@@ -173,9 +173,14 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
                         if (!fetch) {
                             fetch = (async () => {
                                 const fetched = await retrieveWithRetry(plugin, dep.name)
-                                if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
-                                    // log.info(`Getting vulnerabilities for ${fetched.name}`)
-                                    fetched.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, fetched.name)
+                                if (plugin.checker?.githubSecurityAdvisoryEcosystem && process.env.GH_TOKEN) {
+                                    // A failed advisory lookup must not discard the registry data
+                                    // already fetched — degrade to no vulnerabilities instead.
+                                    try {
+                                        fetched.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, fetched.name)
+                                    } catch (e: any) {
+                                        log.warn(`Vulnerability lookup failed for ${fetched.name}: ${e.message ?? e}`)
+                                    }
                                 }
                                 await cache.set(cacheKey, fetched)
                                 if (options.refresh) refreshedLibs.push(dep.name)
