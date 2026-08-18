@@ -203,7 +203,12 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
                             return false
                         }
                     })
-                    dep.vulnerabilities = thisVersionVulnerabilities || []
+                    // The sbom plugins attach exact-version findings from local scanners (Trivy +
+                    // Grype) at parse time; when they did, that result wins — the range filter
+                    // above is for advisory data and must not drop scanner-confirmed findings.
+                    if (dep.vulnerabilities === undefined) {
+                        dep.vulnerabilities = thisVersionVulnerabilities || []
+                    }
                 } catch (e: any) {
                     log.warn(`Exception getting remote info for ${dep.name}`)
                     log.error(e)

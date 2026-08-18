@@ -2,6 +2,7 @@ import path from 'path'
 import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
 import {Plugin} from '../../extension-points/plugin'
 import {parseCycloneDxFile} from './cyclonedx'
+import {scanSbomFileOnce} from './local-scan'
 import {java} from '../java'
 import {javascript} from '../javascript'
 import {ruby} from '../ruby'
@@ -61,7 +62,7 @@ function createExtractor(purlType: string): Extractor {
 
 function createParser(purlType: string): Parser {
     return {
-        parseDependencyTree: (context: DependencyFileContext) => {
+        parseDependencyTree: async (context: DependencyFileContext) => {
             const parts = context.type?.split(':') ?? []
             if (parts[0] !== CONTEXT_TYPE_PREFIX) {
                 throw new Error(`Unsupported context type: ${context.type}`)
@@ -74,6 +75,18 @@ function createParser(purlType: string): Parser {
             const project = projects[index]
             if (!project) {
                 throw new Error(`No ${purlType} project at index ${index} in ${context.lockFile}`)
+            }
+
+            // Local vulnerability scan of the SBOM (Trivy + Grype), once per file per process.
+            // When at least one scanner ran, its exact-version findings are attached here and win
+            // over the GHSA range-filtered path downstream (analyse.ts only fills
+            // `vulnerabilities` when the parser left it undefined). When no scanner is available
+            // the field stays undefined, so the GHSA path still works with a GH_TOKEN.
+            const scan = await scanSbomFileOnce(sbomFile)
+            if (scan.available) {
+                for (const dep of Object.values(project.dependencies)) {
+                    dep.vulnerabilities = scan.index.get(dep.id) ?? []
+                }
             }
             return project
         },
