@@ -99,6 +99,26 @@ async function cacheHit(cache: Cache, plugin: Plugin, dep: DepinderDependency, r
     return cache.has(`${plugin.name}:${dep.name}`)
 }
 
+const REGISTRY_CONCURRENCY = 8
+const RATE_LIMIT_RETRY_DELAYS_MS = [2000, 4000, 8000]
+
+function isRateLimit(e: any): boolean {
+    return e?.response?.status === 429 || e?.status === 429
+}
+
+async function retrieveWithRetry(plugin: Plugin, name: string): Promise<LibraryInfo> {
+    for (let attempt = 0; ; attempt++) {
+        try {
+            return await plugin.registrar.retrieve(name)
+        } catch (e: any) {
+            if (!isRateLimit(e) || attempt >= RATE_LIMIT_RETRY_DELAYS_MS.length) throw e
+            const delay = RATE_LIMIT_RETRY_DELAYS_MS[attempt]
+            log.warn(`Rate limited (429) retrieving ${name}, retrying in ${delay}ms`)
+            await new Promise(resolve => setTimeout(resolve, delay))
+        }
+    }
+}
+
 export async function analyseFiles(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
     const resultFolder = options.results || 'results'
     if (!fs.existsSync(path.resolve(process.cwd(), resultFolder))) {
@@ -115,6 +135,8 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
         const cache: Cache = useCache ? chooseCacheOption() : noCache
         await cache.load()
         const refreshedLibs = [] as string[]
+        const inFlight = new Map<string, Promise<LibraryInfo>>()
+        let newLookups = 0
 
         const files = allFiles
             .filter(it => plugin.extractor.filter ? plugin.extractor.filter(it) : true)
@@ -139,21 +161,31 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
             })
             let depsWithInfo = 0
 
-            for (const dep of filteredDependencies) {
+            const processDep = async (dep: DepinderDependency) => {
                 try {
                     let lib
+                    const cacheKey = `${plugin.name}:${dep.name}`
                     if (await cacheHit(cache, plugin, dep, options.refresh, refreshedLibs)) {
-                        lib = await cache.get(`${plugin.name}:${dep.name}`) as LibraryInfo
+                        lib = await cache.get(cacheKey) as LibraryInfo
                     } else {
                         // log.info(`Getting remote information on ${dep.name}`)
-
-                        lib = await plugin.registrar.retrieve(dep.name)
-                        if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
-                            // log.info(`Getting vulnerabilities for ${lib.name}`)
-                            lib.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, lib.name)
+                        let fetch = inFlight.get(cacheKey)
+                        if (!fetch) {
+                            fetch = (async () => {
+                                const fetched = await retrieveWithRetry(plugin, dep.name)
+                                if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
+                                    // log.info(`Getting vulnerabilities for ${fetched.name}`)
+                                    fetched.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, fetched.name)
+                                }
+                                await cache.set(cacheKey, fetched)
+                                if (options.refresh) refreshedLibs.push(dep.name)
+                                if (++newLookups % 50 === 0) await cache.write()
+                                return fetched
+                            })()
+                            inFlight.set(cacheKey, fetch)
+                            fetch.finally(() => inFlight.delete(cacheKey)).catch(() => { /* handled by awaiters */ })
                         }
-                        await cache.set(`${plugin.name}:${dep.name}`, lib)
-                        if (options.refresh) refreshedLibs.push(dep.name)
+                        lib = await fetch
                     }
                     dep.libraryInfo = lib
                     const thisVersionVulnerabilities = lib.vulnerabilities?.filter((it: Vulnerability) => {
@@ -175,6 +207,17 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
                 depsWithInfo++
                 log.info(`Got remote information on ${dep.name} (${depsWithInfo}/${filteredDependencies.length})`)
             }
+
+            let nextDepIndex = 0
+            await Promise.all(Array.from(
+                {length: Math.min(REGISTRY_CONCURRENCY, filteredDependencies.length)},
+                async () => {
+                    while (nextDepIndex < filteredDependencies.length) {
+                        const dep = filteredDependencies[nextDepIndex++]
+                        await processDep(dep)
+                    }
+                }
+            ))
             depProgressBar.stop()
             projectsBar.increment()
         }
