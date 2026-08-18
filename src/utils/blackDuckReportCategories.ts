@@ -13,7 +13,7 @@ const DEPENDENCIES_FILE = '_dependencies.csv';
 const DEPENDENCIES_SOURCES_FILE = '_dependencies_sources.csv';
 const DEPENDENCIES_BY_CATEGORY_FILE = '_dependencies_by_category.csv';
 const DEPENDENCIES_SOURCES_BY_CATEGORY_FILE = '_dependencies_sources_by_category.csv';
-const JOIN_KEY = 'Component Version Origin Id';
+const JOIN_KEY = 'Version id';
 
 export const COULD_NOT_MAP_REPOSITORY_CATEGORY = 'COULD_NOT_MAP_REPOSITORY';
 

@@ -61,6 +61,7 @@ interface SecurityRecord {
 const DEPENDENCIES_COLUMN_ORDER = [
     'Component name',
     'Component version name',
+    'Version id',
     'Component Version Origin Id',
     'License names',
     'License families',
@@ -91,6 +92,7 @@ const DEPENDENCIES_COLUMN_ORDER = [
 const DEPENDENCIES_SOURCES_COLUMN_ORDER = [
     'Component name',
     'Component version name',
+    'Version id',
     'Component Version Origin Id',
     'Match type',
     'Path',
@@ -276,6 +278,7 @@ function transformDependencies(components: ComponentRecord[]): Record<string, st
         const result: Record<string, string> = {
             'Component name': component['Component name'],
             'Component version name': component['Component version name'],
+            'Version id': component['Version id'],
             'Component Version Origin Id': component['Origin id'] || '',
             'License names': component['License names'],
             'License families': component['License families'],
@@ -335,6 +338,7 @@ function transformDependenciesSources(
         return {
             'Component name': src['Component name'],
             'Component version name': src['Component version name'],
+            'Version id': src['Version id'],
             'Component Version Origin Id': src['Origin name id'],
             'Match type': normalizeMatchType(src['Match type']),
             'Path': src['Path'],

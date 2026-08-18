@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { XMLParser } from 'fast-xml-parser';
 import { Command } from 'commander';
+import { stringify } from 'csv-stringify/sync';
 
 interface FrameworkVersionPerProject {
     programmingLanguage: string;
@@ -19,23 +20,21 @@ async function extractFrameworkVersions(rootPath: string, outputPath: string) {
     await fs.writeFile(outputPath, csvContent, 'utf-8');
 }
 
-function convertToCSV(data: FrameworkVersionPerProject[]): string {
+export function convertToCSV(data: FrameworkVersionPerProject[]): string {
     const headers = ['programmingLanguage', 'frameworkVersion', 'projectFile', 'component', 'group', 'notes'];
-    const csvRows = data.map(item =>
-        [
+    const rows = data.map(item => [
             item.programmingLanguage,
             item.frameworkVersion,
             item.projectFile,
             item.component,
             item.group,
             item.notes || ''
-        ].map(value => `${value}`).join(',')
-    );
+        ]);
 
-    return [headers.join(','), ...csvRows].join('\n');
+    return stringify([headers, ...rows]);
 }
 
-async function extract(rootPath: string): Promise<FrameworkVersionPerProject[]> {
+export async function extract(rootPath: string): Promise<FrameworkVersionPerProject[]> {
     const results: FrameworkVersionPerProject[] = [];
     const dotNetProjectFiles = await findFiles(rootPath, /.*\.(csproj|vbproj|fsproj)$/);
 
@@ -44,6 +43,12 @@ async function extract(rootPath: string): Promise<FrameworkVersionPerProject[]> 
         let targetFramework = await extractTargetFramework(projectFile);
         const relativePath = path.relative(rootPath, projectFile);
         const component = getComponent(relativePath);
+
+        if (!targetFramework) {
+            const propsResult = await extractTargetFrameworkFromProps(rootPath, projectFile);
+            targetFramework = propsResult.targetFramework;
+            notes = propsResult.propsFilePath;
+        }
 
         if (targetFramework.startsWith('$')) {
             const { parameterValue, propsFilePath } = await getParameterFromProps(rootPath, projectFile, targetFramework);
@@ -199,7 +204,7 @@ function parseXml(xmlData: string) {
     return parser.parse(trimmedXml);
 }
 
-async function extractTargetFramework(projectFile: string): Promise<string> {
+export async function extractTargetFramework(projectFile: string): Promise<string> {
     try {
         const content = await fs.readFile(projectFile, 'utf-8');
         const xml = parseXml(content);
@@ -208,34 +213,76 @@ async function extractTargetFramework(projectFile: string): Promise<string> {
         const propertyGroupData = xml?.Project?.PropertyGroup;
         const propertyGroups = Array.isArray(propertyGroupData) ? propertyGroupData : (propertyGroupData ? [propertyGroupData] : []);
 
+        const targetFrameworks: string[] = [];
         for (const group of propertyGroups) {
             for (const tag of frameworkTags) {
                 if (group[tag]) {
-                    return String(group[tag]);
+                    targetFrameworks.push(...getXmlValues(group[tag]));
                 }
             }
         }
-        return '';
+        return targetFrameworks.join(' | ');
     } catch (error) {
         console.error(`Error extracting target framework from ${projectFile}:`, error);
         return '';
     }
 }
 
+async function extractTargetFrameworkFromProps(rootPath: string, projectFile: string): Promise<{ targetFramework: string; propsFilePath: string }> {
+    const result = await findInParentProps(rootPath, projectFile, async propsFilePath => {
+        const targetFramework = await extractTargetFramework(propsFilePath);
+        return targetFramework || undefined;
+    });
+
+    return result
+        ? { targetFramework: result.value, propsFilePath: result.propsFilePath }
+        : { targetFramework: '', propsFilePath: '' };
+}
+
 async function getParameterFromProps(rootPath: string, filePath: string, parameterName: string) {
-    let currentDirectory = path.dirname(filePath);
-    while (currentDirectory && currentDirectory !== rootPath) {
-        const propsFiles = await findFiles(currentDirectory, /\.props$/);
-        if (propsFiles.length > 0) {
-            const propsFilePath = propsFiles[0];
-            const parameterValue = await extractParameterValueFromProps(propsFilePath, parameterName);
-            if (parameterValue) {
-                return { parameterValue, propsFilePath };
-            }
-        }
-        currentDirectory = path.dirname(currentDirectory);
+    const result = await findInParentProps(rootPath, filePath, propsFilePath =>
+        extractParameterValueFromProps(propsFilePath, parameterName)
+    );
+
+    if (result) {
+        return { parameterValue: result.value, propsFilePath: result.propsFilePath };
     }
     throw new Error(`No .props file found from '${filePath}' up to '${rootPath}'.`);
+}
+
+async function findInParentProps<T>(rootPath: string, projectFile: string, findValue: (propsFilePath: string) => Promise<T | undefined>): Promise<{ value: T; propsFilePath: string } | undefined> {
+    let currentDirectory = path.dirname(projectFile);
+
+    while (currentDirectory && currentDirectory !== rootPath) {
+        const entries = await fs.readdir(currentDirectory, { withFileTypes: true });
+        const propsFiles = entries
+            .filter(entry => entry.isFile() && entry.name.endsWith('.props'))
+            .map(entry => path.join(currentDirectory, entry.name))
+            .sort();
+
+        for (const propsFilePath of propsFiles) {
+            const value = await findValue(propsFilePath);
+            if (value) {
+                return { value, propsFilePath };
+            }
+        }
+
+        currentDirectory = path.dirname(currentDirectory);
+    }
+    return undefined;
+}
+
+function getXmlValues(value: unknown): string[] {
+    if (Array.isArray(value)) {
+        return value.flatMap(getXmlValues);
+    }
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return [String(value)];
+    }
+    if (value && typeof value === 'object' && '#text' in value) {
+        return getXmlValues(value['#text']);
+    }
+    return [];
 }
 
 async function extractParameterValueFromProps(propsFilePath: string, parameterName: string): Promise<string> {
