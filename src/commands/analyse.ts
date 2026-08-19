@@ -56,7 +56,21 @@ function extractLicenses(dep: DepinderDependency) {
     })
 }
 
-function convertDepToRow(proj: DepinderProject, dep: DepinderDependency): string {
+/**
+ * RFC 4180: a cell containing a comma, a quote or a newline must be quoted, and embedded quotes
+ * doubled. Versions carry commas in the wild — Maven range strings such as `[4.1,4.2000)` — and an
+ * unquoted one splits into two cells, shifting every column after it for that row.
+ */
+function csvCell(value: unknown): string {
+    const text = value === undefined || value === null ? '' : String(value)
+    return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+}
+
+export function csvRow(cells: unknown[]): string {
+    return cells.map(csvCell).join(',')
+}
+
+export function convertDepToRow(proj: DepinderProject, dep: DepinderDependency): string {
     const latestVersion = dep.libraryInfo?.versions.find(it => it.latest)
     const currentVersion = dep.libraryInfo?.versions.find(it => it.version == dep.version.trim())
     const latestVersionMoment = moment(latestVersion?.timestamp)
@@ -66,7 +80,13 @@ function convertDepToRow(proj: DepinderProject, dep: DepinderDependency): string
     const dateFormat = 'MMM YYYY'
     const vulnerabilities = dep.vulnerabilities?.map(v => `${v.severity} - ${v.permalink}`).join('\n')
     const directDep: boolean = !dep.requestedBy || dep.requestedBy.some(it => it.startsWith(`${proj.name}@${proj.version}`))
-    return `${proj.path},${proj.name},${dep.name},${dep.version},${latestVersion?.version},${currentVersionMoment?.format(dateFormat)},${latestVersionMoment?.format(dateFormat)},${latestVersionMoment?.diff(currentVersionMoment, 'months')},${now?.diff(currentVersionMoment, 'months')},${now?.diff(latestVersionMoment, 'months')},${dep.vulnerabilities?.length},"${vulnerabilities}",${directDep},${dep.type},"${extractLicenses(dep)}"`
+    return csvRow([
+        proj.path, proj.name, dep.name, dep.version, latestVersion?.version,
+        currentVersionMoment?.format(dateFormat), latestVersionMoment?.format(dateFormat),
+        latestVersionMoment?.diff(currentVersionMoment, 'months'),
+        now?.diff(currentVersionMoment, 'months'), now?.diff(latestVersionMoment, 'months'),
+        dep.vulnerabilities?.length, vulnerabilities, directDep, dep.type, extractLicenses(dep),
+    ])
 }
 
 async function extractProjects(plugin: Plugin, files: string[]) {
@@ -112,6 +132,22 @@ export function advisoriesMatchingVersion(lib: LibraryInfo, version: string): Vu
 export function resolveVulnerabilities(project: DepinderProject, dep: DepinderDependency, lib: LibraryInfo): Vulnerability[] {
     if (project.exactVersionVulnerabilities) return dep.vulnerabilities ?? []
     return advisoriesMatchingVersion(lib, dep.version)
+}
+
+/**
+ * The license a library is grouped under. Library-level `licenses` is the field every registrar
+ * fills (and the one libs.csv reports); the per-version list is optional and left empty by some —
+ * the maven registrar sets `licenses: []` on every version — so grouping on it alone reported
+ * everything as unknown. Fall back to the per-version list for registrars that only fill that.
+ */
+function licenseOf(lib: LibraryInfo): string {
+    const license = lib.licenses?.find(it => typeof it === 'string' && it)
+        ?? lib.versions.flatMap(it => it.licenses).find(it => typeof it === 'string' && it)
+    if (!license || typeof license !== 'string')
+        return 'unknown'
+    if (!licenseIds.includes(license))
+        return spdxCorrect(license) || 'unknown'
+    return license
 }
 
 function chooseCacheOption(): Cache {
@@ -260,18 +296,13 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
         const allLibsInfo = projects.flatMap(proj => Object.values(proj.dependencies).map(dep => dep.libraryInfo))
             .filter(it => it !== undefined && it != null).map(it => it as LibraryInfo)
 
-        const allLicenses = _.groupBy(allLibsInfo, (lib: LibraryInfo) => {
-            const license: string | undefined = lib.versions.flatMap(it => it.licenses).find(() => true)
-            if (!license || typeof license !== 'string')
-                return 'unknown'
-            if (!licenseIds.includes(license))
-                return spdxCorrect(license || 'unknown') || 'unknown'
-            return license
-        })
+        const allLicenses = _.groupBy(allLibsInfo, licenseOf)
 
-        fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-licenses.csv`), Object.keys(allLicenses).map(l => {
-            return `${l},${allLicenses[l].length},${allLicenses[l].map((it: any) => it.name)}`
-        }).join('\n'))
+        const licensesHeader = 'License,Libraries,Library Names\n'
+        fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-licenses.csv`),
+            licensesHeader + Object.keys(allLicenses).map(license =>
+                csvRow([license, allLicenses[license].length, allLicenses[license].map(it => it.name).join(', ')])
+            ).join('\n'))
 
         const header = 'Project Path,Project,Library,Used Version,Latest Version,Used Version Release Date,Latest Version Release Date,Latest-Used,Now-Used,Now-latest,Vulnerabilities,Vulnerability Details,DirectDependency,Type,Licenses\n'
         fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-libs.csv`), header + projects.flatMap(proj =>
@@ -312,7 +343,12 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
             const directOutOfSupport = directDeps.filter(dep => dep.now_latest > outOfSupportThreshold)
             const indirectOutOfSupport = indirectDeps.filter(dep => dep.now_latest > outOfSupportThreshold)
 
-            return `${proj.path},${proj.name},${directDeps.length},${indirectDeps.length},${directOutdated.length},${directOutDatedPercent},${indirectOutdated.length},${indirectOutDatedPercent},${directVulnerable.length},${indirectVulnerable.length},${directOutOfSupport.length},${indirectOutOfSupport.length}`
+            return csvRow([
+                proj.path, proj.name, directDeps.length, indirectDeps.length,
+                directOutdated.length, directOutDatedPercent, indirectOutdated.length,
+                indirectOutDatedPercent, directVulnerable.length, indirectVulnerable.length,
+                directOutOfSupport.length, indirectOutOfSupport.length,
+            ])
         }).join('\n'))
     }
 
