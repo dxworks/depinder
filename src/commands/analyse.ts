@@ -32,14 +32,22 @@ export interface AnalyseOptions {
     refresh: boolean
 }
 
-export const analyseCommand = new Command()
-    .name('analyse')
-    .argument('[folders...]', 'A list of folders to walk for files')
-    // .argument('[depext-files...]', 'A list of files to parse for dependency information')
-    .option('--results, -r', 'The results folder', 'results')
-    .option('--refresh', 'Refresh the cache', false)
-    .option('--plugins, -p [plugins...]', 'A list of plugins')
-    .action(analyseFiles)
+/** A factory rather than a single instance, so tests can parse arguments from a clean slate. */
+export function createAnalyseCommand(): Command {
+    return new Command()
+        .name('analyse')
+        .argument('[folders...]', 'A list of folders to walk for files')
+        // .argument('[depext-files...]', 'A list of files to parse for dependency information')
+        // Both value-taking options need a <value> placeholder: without one Commander registers
+        // them as booleans, so `-r out` set `{R: true}` and left `out` to be walked as another
+        // folder, and `--plugins` never reached getPluginsFromNames.
+        .option('-r, --results <folder>', 'The results folder', 'results')
+        .option('--refresh', 'Refresh the cache', false)
+        .option('-p, --plugins <plugins...>', 'A list of plugins')
+        .action(analyseFiles)
+}
+
+export const analyseCommand = createAnalyseCommand()
 
 
 function extractLicenses(dep: DepinderDependency) {
