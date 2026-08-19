@@ -2,6 +2,12 @@ import {Command} from 'commander'
 import fs from 'fs'
 import path from 'path'
 import {getPluginsFromNames} from '../plugins'
+import {sbomFilesFor} from '../plugins/sbom'
+import {
+    preflightScanners,
+    scannerPreflightMessages,
+    scannerSummaryLine,
+} from '../plugins/sbom/local-scan'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
 import {LibraryInfo} from '../extension-points/registrar'
 import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
@@ -197,6 +203,17 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
 
     const selectedPlugins = getPluginsFromNames(options.plugins)
 
+    // Scanner preflight, before any parsing: the SBOM parsers shell out to Trivy and Grype, and a
+    // missing binary used to surface only as a mid-run warning per file — leaving the user with a
+    // completed run, empty vulnerability columns and nothing that said so. Run once, say it up
+    // front, and never abort: a run without scanners is degraded, not invalid.
+    const sbomFiles = sbomFilesFor(selectedPlugins, allFiles)
+    const hasGithubToken = !!process.env.GH_TOKEN
+    const preflight = sbomFiles.length > 0 ? await preflightScanners() : undefined
+    if (preflight) {
+        for (const message of scannerPreflightMessages(preflight, hasGithubToken)) log[message.level](message.text)
+    }
+
     for (const plugin of selectedPlugins) {
         log.info(`Plugin ${plugin.name} starting`)
 
@@ -350,6 +367,13 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
                 directOutOfSupport.length, indirectOutOfSupport.length,
             ])
         }).join('\n'))
+    }
+
+    if (preflight) {
+        // Repeated here because the preflight banner is thousands of log lines back by now, and
+        // because a CSV is only readable next to the matcher and DB build that produced it.
+        const summary = scannerSummaryLine(preflight, hasGithubToken)
+        log[summary.level](summary.text)
     }
 
     log.info(`Results are written to ${path.resolve(process.cwd(), resultFolder)}`)

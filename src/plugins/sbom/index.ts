@@ -1,4 +1,5 @@
 import path from 'path'
+import minimatch from 'minimatch'
 import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
 import {Plugin} from '../../extension-points/plugin'
 import {parseCycloneDxFile} from './cyclonedx'
@@ -129,6 +130,18 @@ export const sbomPlugins: Plugin[] = [
     sbomPhp,
     sbomDotnet,
 ]
+
+/**
+ * The SBOM files a given plugin selection would scan.
+ *
+ * The parser is the only layer that holds an SBOM path, but the scanner preflight has to run once
+ * and up front, before any parsing — so analyse.ts needs to know whether the SBOM route is live
+ * from the file list alone. Same globs the extractors use, so the two cannot drift apart.
+ */
+export function sbomFilesFor(plugins: Plugin[], files: string[]): string[] {
+    if (!plugins.some(plugin => sbomPlugins.includes(plugin))) return []
+    return files.filter(file => SBOM_GLOBS.some(glob => minimatch(file, glob, {matchBase: true})))
+}
 
 /** Exposed for tests, which need each parse to start from a clean slate. */
 export function clearSbomCache(): void {
