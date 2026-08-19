@@ -23,7 +23,8 @@ import {log} from '../../utils/logging'
  * without that tool's findings.
  *
  * Which binaries exist, and at what version, is established ONCE up front by `preflightScanners()`
- * so the user is told before the run rather than in a warning buried mid-log.
+ * so the user is told before the run rather than in a warning buried mid-log, and is recorded in
+ * `sbom-scan-provenance.json` so a count can be traced back to the matcher that produced it.
  */
 
 const execFileAsync = promisify(execFile)
@@ -535,6 +536,51 @@ export function scannerSummaryLine(preflight: ScannerPreflight, hasGithubToken: 
 }
 
 // ---------------------------------------------------------------------------
+// Provenance of the run
+// ---------------------------------------------------------------------------
+
+/** What one SBOM file's scan actually produced — the per-file half of the provenance record. */
+export interface ScannedFileRecord {
+    file: string
+    trivy: 'ok' | 'skipped'
+    grype: 'ok' | 'skipped'
+    findingEntries: number
+    packageKeys: number
+}
+
+const scannedFiles = new Map<string, ScannedFileRecord>()
+
+export const PROVENANCE_FILE = 'sbom-scan-provenance.json'
+
+/**
+ * Records how the vulnerability numbers in the CSVs were produced.
+ *
+ * A count without its matcher and DB build date is untraceable: two runs a week apart can disagree
+ * by tens of percent for entirely legitimate reasons, and without this file that is indistinguishable
+ * from a regression (DECISIONS.md D-16). One file per run, not a column per row.
+ */
+export async function writeScanProvenance(resultFolder: string, hasGithubToken: boolean): Promise<string> {
+    const preflight = await preflightScanners()
+    const provenance = {
+        generatedAt: new Date().toISOString(),
+        decision: 'DECISIONS.md D-16 — scanner versions pinned by documentation, verified at runtime, recorded here',
+        pinnedVersions: PINNED_SCANNER_VERSIONS,
+        scanners: {
+            trivy: preflight.trivy,
+            grype: preflight.grype,
+        },
+        githubAdvisoryFallback: preflight.installedCount === 0 && hasGithubToken,
+        vulnerabilityAnalysis: preflight.installedCount > 0
+            ? (preflight.installedCount === 2 ? 'complete' : 'partial')
+            : (hasGithubToken ? 'github-advisories-only' : 'disabled'),
+        sbomFiles: [...scannedFiles.values()],
+    }
+    const file = path.resolve(resultFolder, PROVENANCE_FILE)
+    fs.writeFileSync(file, JSON.stringify(provenance, null, 2))
+    return file
+}
+
+// ---------------------------------------------------------------------------
 // Scanner execution + per-file cache
 // ---------------------------------------------------------------------------
 
@@ -595,6 +641,15 @@ async function scanFile(sbomFile: string): Promise<LocalScanResult> {
     const trivy = parseReport<TrivyReport>('trivy', trivyJson)
     const grype = parseReport<GrypeReport>('grype', grypeJson)
 
+    const record: ScannedFileRecord = {
+        file: sbomFile,
+        trivy: trivy ? 'ok' : 'skipped',
+        grype: grype ? 'ok' : 'skipped',
+        findingEntries: 0,
+        packageKeys: 0,
+    }
+    scannedFiles.set(sbomFile, record)
+
     if (!trivy && !grype) {
         log.warn(`No local vulnerability scanner available for ${path.basename(sbomFile)} — vulnerability columns will be empty`)
         return {available: false, index: new Map()}
@@ -603,8 +658,10 @@ async function scanFile(sbomFile: string): Promise<LocalScanResult> {
     const index = buildVulnerabilityIndex(trivy, grype)
     let findings = 0
     for (const list of index.values()) findings += list.length
+    record.findingEntries = findings
+    record.packageKeys = index.size
     log.info(`Local scan of ${path.basename(sbomFile)}: ${findings} finding entries across ${index.size} package keys`
-        + ` (trivy: ${trivy ? 'ok' : 'skipped'}, grype: ${grype ? 'ok' : 'skipped'})`)
+        + ` (trivy: ${record.trivy}, grype: ${record.grype})`)
     return {available: true, index}
 }
 
@@ -624,5 +681,6 @@ export function scanSbomFileOnce(sbomFile: string): Promise<LocalScanResult> {
 /** Exposed for tests. Clears every process-global piece of scan state, including the preflight. */
 export function clearLocalScanCache(): void {
     scanCache.clear()
+    scannedFiles.clear()
     preflightPromise = undefined
 }

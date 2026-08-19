@@ -3,11 +3,14 @@ import os from 'os'
 import path from 'path'
 import {
     PINNED_SCANNER_VERSIONS,
+    PROVENANCE_FILE,
     ScannerPreflight,
     clearLocalScanCache,
     preflightScanners,
+    scanSbomFileOnce,
     scannerPreflightMessages,
     scannerSummaryLine,
+    writeScanProvenance,
 } from '../src/plugins/sbom/local-scan'
 import {sbomFilesFor, sbomJava} from '../src/plugins/sbom'
 import {java} from '../src/plugins/java'
@@ -210,6 +213,43 @@ describe('preflight messages', () => {
         expect(warnings).toHaveLength(1)
         expect(warnings[0].text).toContain(`trivy 0.99.9 differs from the pinned reference version ${PINNED_SCANNER_VERSIONS.trivy}`)
         expect(warnings[0].text).toContain('D-16')
+    })
+})
+
+describe('scan provenance', () => {
+    it('records tool and DB versions, the files scanned and whether each scanner ran', async () => {
+        process.env.TRIVY_BIN = stubTrivy('trivy-prov.sh', PINNED_SCANNER_VERSIONS.trivy)
+        process.env.GRYPE_BIN = missing('grype')
+
+        const result = await scanSbomFileOnce(sbomFile)
+        expect(result.available).toBe(true)
+
+        const resultFolder = fs.mkdtempSync(path.join(tmpDir, 'results-'))
+        const file = await writeScanProvenance(resultFolder, false)
+
+        expect(path.basename(file)).toBe(PROVENANCE_FILE)
+        const provenance = JSON.parse(fs.readFileSync(file, 'utf8'))
+        expect(provenance.vulnerabilityAnalysis).toBe('partial')
+        expect(provenance.pinnedVersions).toEqual(PINNED_SCANNER_VERSIONS)
+        expect(provenance.scanners.trivy).toMatchObject({
+            installed: true, version: PINNED_SCANNER_VERSIONS.trivy, dbVersion: '2', dbBuiltAt: '2026-08-18T12:56:24Z',
+        })
+        expect(provenance.scanners.grype.installed).toBe(false)
+        // One finding, indexed under both the purl and the name@version key.
+        expect(provenance.sbomFiles).toEqual([
+            {file: sbomFile, trivy: 'ok', grype: 'skipped', findingEntries: 2, packageKeys: 2},
+        ])
+    })
+
+    it('marks the run disabled when nothing ran and no token is set', async () => {
+        process.env.TRIVY_BIN = missing('trivy')
+        process.env.GRYPE_BIN = missing('grype')
+
+        const resultFolder = fs.mkdtempSync(path.join(tmpDir, 'results-'))
+        const provenance = JSON.parse(fs.readFileSync(await writeScanProvenance(resultFolder, false), 'utf8'))
+
+        expect(provenance.vulnerabilityAnalysis).toBe('disabled')
+        expect(provenance.githubAdvisoryFallback).toBe(false)
     })
 })
 

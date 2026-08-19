@@ -7,6 +7,7 @@ import {
     preflightScanners,
     scannerPreflightMessages,
     scannerSummaryLine,
+    writeScanProvenance,
 } from '../plugins/sbom/local-scan'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
 import {LibraryInfo} from '../extension-points/registrar'
@@ -374,6 +375,12 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
         // because a CSV is only readable next to the matcher and DB build that produced it.
         const summary = scannerSummaryLine(preflight, hasGithubToken)
         log[summary.level](summary.text)
+        try {
+            const provenanceFile = await writeScanProvenance(path.resolve(process.cwd(), resultFolder), hasGithubToken)
+            log.info(`Scan provenance written to ${provenanceFile}`)
+        } catch (e: any) {
+            log.warn(`Could not write scan provenance: ${e?.message ?? e}`)
+        }
     }
 
     log.info(`Results are written to ${path.resolve(process.cwd(), resultFolder)}`)
