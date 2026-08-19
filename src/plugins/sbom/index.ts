@@ -78,15 +78,18 @@ function createParser(purlType: string): Parser {
             }
 
             // Local vulnerability scan of the SBOM (Trivy + Grype), once per file per process.
-            // When at least one scanner ran, its exact-version findings are attached here and win
-            // over the GHSA range-filtered path downstream (analyse.ts only fills
-            // `vulnerabilities` when the parser left it undefined). When no scanner is available
-            // the field stays undefined, so the GHSA path still works with a GH_TOKEN.
+            // The scanners matched the exact version recorded in the SBOM, so these findings are
+            // final: `exactVersionVulnerabilities` is what tells analyse.ts not to range-filter
+            // them. When no scanner is available the flag stays unset and the GHSA path runs
+            // exactly as it does for a native plugin. `projectsOf` memoises projects by reference,
+            // so the flag sticks for the process — correct here, since it is a property of the
+            // file, not of the caller.
             const scan = await scanSbomFileOnce(sbomFile)
             if (scan.available) {
                 for (const dep of Object.values(project.dependencies)) {
                     dep.vulnerabilities = scan.index.get(dep.id) ?? []
                 }
+                project.exactVersionVulnerabilities = true
             }
             return project
         },

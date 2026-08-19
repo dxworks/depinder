@@ -82,6 +82,30 @@ async function extractProjects(plugin: Plugin, files: string[]) {
     return projects
 }
 
+/**
+ * `LibraryInfo.vulnerabilities` is library-level advisory data covering all versions, so it must be
+ * narrowed to the version actually in use. An unparseable range is treated as "does not apply".
+ */
+export function advisoriesMatchingVersion(lib: LibraryInfo, version: string): Vulnerability[] {
+    return (lib.vulnerabilities ?? []).filter((it: Vulnerability) => {
+        try {
+            return new Range(it.vulnerableRange?.replaceAll(',', ' ') ?? '').test(version)
+        } catch (e: any) {
+            return false
+        }
+    })
+}
+
+/**
+ * Two vulnerability shapes reach a dependency, and only one of them may be range-filtered:
+ *  - a parser that scanned the artefact already matched this exact version -> take verbatim
+ *  - otherwise, library-level advisories from the registrar -> narrow to this version
+ */
+export function resolveVulnerabilities(project: DepinderProject, dep: DepinderDependency, lib: LibraryInfo): Vulnerability[] {
+    if (project.exactVersionVulnerabilities) return dep.vulnerabilities ?? []
+    return advisoriesMatchingVersion(lib, dep.version)
+}
+
 function chooseCacheOption(): Cache {
 
     if (getMongoDockerContainerStatus() != 'running') {
@@ -193,22 +217,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
                         lib = await fetch
                     }
                     dep.libraryInfo = lib
-                    const thisVersionVulnerabilities = lib.vulnerabilities?.filter((it: Vulnerability) => {
-                        try {
-                            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                            const range = new Range(it.vulnerableRange?.replaceAll(',', ' ') ?? '')
-                            return range.test(dep.version)
-                        } catch (e: any) {
-                            // log.warn(`Vulnerable range unknown: ${it.vulnerableRange}`)
-                            return false
-                        }
-                    })
-                    // The sbom plugins attach exact-version findings from local scanners (Trivy +
-                    // Grype) at parse time; when they did, that result wins — the range filter
-                    // above is for advisory data and must not drop scanner-confirmed findings.
-                    if (dep.vulnerabilities === undefined) {
-                        dep.vulnerabilities = thisVersionVulnerabilities || []
-                    }
+                    dep.vulnerabilities = resolveVulnerabilities(project, dep, lib)
                 } catch (e: any) {
                     log.warn(`Exception getting remote info for ${dep.name}`)
                     log.error(e)
