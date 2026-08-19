@@ -9,7 +9,7 @@ import {Range} from 'semver'
 import _ from 'lodash'
 import spdxCorrect from 'spdx-correct'
 import moment from 'moment'
-import {Plugin} from '../extension-points/plugin'
+import {ecosystemOf, Plugin} from '../extension-points/plugin'
 import {Cache, noCache} from '../cache/cache'
 import {getMongoDockerContainerStatus} from './cache'
 import {jsonCache} from '../cache/json-cache'
@@ -116,11 +116,11 @@ function chooseCacheOption(): Cache {
     return mongoCache
 }
 
-async function cacheHit(cache: Cache, plugin: Plugin, dep: DepinderDependency, refresh: boolean, refreshedLibs: any[]) {
+async function cacheHit(cache: Cache, cacheKey: string, dep: DepinderDependency, refresh: boolean, refreshedLibs: any[]) {
     if (refresh && !refreshedLibs.includes(dep.name)) {
         return false
     }
-    return cache.has(`${plugin.name}:${dep.name}`)
+    return cache.has(cacheKey)
 }
 
 const REGISTRY_CONCURRENCY = 8
@@ -188,8 +188,11 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
             const processDep = async (dep: DepinderDependency) => {
                 try {
                     let lib
-                    const cacheKey = `${plugin.name}:${dep.name}`
-                    if (await cacheHit(cache, plugin, dep, options.refresh, refreshedLibs)) {
+                    // Keyed by ecosystem, not plugin name: `java` and `sbom-java` share a
+                    // registrar, so they must share cache entries rather than fetch each library
+                    // twice. `update.ts` reconstructs library names from this same prefix.
+                    const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
+                    if (await cacheHit(cache, cacheKey, dep, options.refresh, refreshedLibs)) {
                         lib = await cache.get(cacheKey) as LibraryInfo
                     } else {
                         // log.info(`Getting remote information on ${dep.name}`)

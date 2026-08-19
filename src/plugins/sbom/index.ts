@@ -104,6 +104,9 @@ function sbomPluginFor(name: string, purlType: string, source: Plugin): Plugin {
     return {
         name,
         aliases: [`sbom-${purlType}`],
+        // Share the native plugin's cache namespace: same registrar, same library names, so the
+        // enrichment cache must not be fetched twice.
+        ecosystem: source.ecosystem ?? source.name,
         extractor: createExtractor(purlType),
         parser: createParser(purlType),
         registrar: source.registrar,
