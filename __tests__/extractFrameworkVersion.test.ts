@@ -37,7 +37,7 @@ describe('extractFrameworkVersion', () => {
         await fs.writeFile(path.join(root, 'src', 'framework.props'), '<Project><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>');
         await fs.writeFile(path.join(sourceDirectory, 'app.csproj'), '<Project />');
 
-        await expect(extract(root)).resolves.toEqual(expect.arrayContaining([
+        await expect(extract(`${root}${path.sep}`)).resolves.toEqual(expect.arrayContaining([
             expect.objectContaining({
                 projectFile: path.join('src', 'app', 'app.csproj'),
                 frameworkVersion: 'net8.0',

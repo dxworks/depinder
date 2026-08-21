@@ -251,9 +251,10 @@ async function getParameterFromProps(rootPath: string, filePath: string, paramet
 }
 
 async function findInParentProps<T>(rootPath: string, projectFile: string, findValue: (propsFilePath: string) => Promise<T | undefined>): Promise<{ value: T; propsFilePath: string } | undefined> {
+    const rootDirectory = path.resolve(rootPath);
     let currentDirectory = path.dirname(projectFile);
 
-    while (currentDirectory && currentDirectory !== rootPath) {
+    while (currentDirectory) {
         const entries = await fs.readdir(currentDirectory, { withFileTypes: true });
         const propsFiles = entries
             .filter(entry => entry.isFile() && entry.name.endsWith('.props'))
@@ -267,7 +268,10 @@ async function findInParentProps<T>(rootPath: string, projectFile: string, findV
             }
         }
 
-        currentDirectory = path.dirname(currentDirectory);
+        if (currentDirectory === rootDirectory) break;
+        const parentDirectory = path.dirname(currentDirectory);
+        if (parentDirectory === currentDirectory) break;
+        currentDirectory = parentDirectory;
     }
     return undefined;
 }
