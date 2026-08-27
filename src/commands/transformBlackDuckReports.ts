@@ -4,7 +4,7 @@ import path from 'path';
 import { Command } from 'commander';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
-import { extractProjectInfo, ProjectPathInfo, PathMappings, createPathMappings } from '../utils/projectMapping';
+import { extractProjectInfo, PathMappings, createPathMappings } from '../utils/projectMapping';
 import { addCategoriesToBlackDuckReports } from '../utils/blackDuckReportCategories';
 
 /**
@@ -97,8 +97,8 @@ const DEPENDENCIES_SOURCES_COLUMN_ORDER = [
     'Match type',
     'Path',
     'ProjectPath',
-    'ProjectPathExists',
     'VerifiedPath',
+    'VerifiedPathMethod',
     'Origin name',
     'License names',
     'License families',
@@ -344,7 +344,7 @@ function transformDependenciesSources(
             'Path': src['Path'],
             'ProjectPath': projectInfo.projectPath,
             'VerifiedPath': projectInfo.verifiedPath,
-            'ProjectPathExists': projectInfo.projectPathExists !== undefined ? String(projectInfo.projectPathExists) : '',
+            'VerifiedPathMethod': projectInfo.verifiedPathMethod,
             'Origin name': src['Origin name'],
             'License names': comp['License names'],
             'License families': comp['License families'],

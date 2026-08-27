@@ -48,8 +48,16 @@ const MONOREPO_PATTERN = /packages[\\/]([^\\/]+)[\\/]local[\\/]([^\\/]+)[\\/]-ya
 export interface ProjectPathInfo {
   projectPath: string;
   verifiedPath: string;
-  projectPathExists?: boolean;
+  verifiedPathMethod: VerifiedPathMethod;
 }
+
+export type VerifiedPathMethod =
+  | 'exact'
+  | 'mapping'
+  | 'maven-artifact-parent'
+  | 'drop-first-segment'
+  | 'none'
+  | 'not-checked';
 
 /**
  * Check if a segment contains a version-like pattern
@@ -57,7 +65,7 @@ export interface ProjectPathInfo {
  * @returns True if the segment looks like a version
  */
 function isVersionSegment(segment: string): boolean {
-  return /^v?(?:\d+|\*)\.(?:\d+|\*)\.(?:\d+|\*)(?:[-.][A-Za-z0-9*]+)*-?$/i.test(segment) ||
+  return /^v?(?:\d+|\*)\.(?:\d+|\*)(?:\.(?:\d+|\*))?(?:[-.][A-Za-z0-9*]+)*-?$/i.test(segment) ||
          /^REPLACE_BY_CI$/i.test(segment) || 
          segment.toLowerCase() === 'unspecified';
 }
@@ -67,10 +75,13 @@ function isVersionSegment(segment: string): boolean {
  * @param segment Path segment to check
  * @returns True if the segment contains a file to exclude
  */
-function isFileSegment(segment: string): boolean {
-  return segment.toLowerCase().endsWith('.csproj') || 
-         segment.toLowerCase().endsWith('.props') || 
-         segment.toLowerCase() === 'pom.xml';
+function isProjectDescriptorSegment(segment: string): boolean {
+  const lowerSegment = segment.toLowerCase();
+  return lowerSegment.endsWith('.csproj') ||
+         lowerSegment.endsWith('.props') ||
+         lowerSegment === 'pom.xml' ||
+         lowerSegment === 'build.gradle' ||
+         lowerSegment === 'build.gradle.kts';
 }
 
 /**
@@ -177,7 +188,7 @@ function parseProjectPath(dependencyPath: string): string {
       projectSegments.pop(); // Remove the version segment
     }
     
-    if (projectSegments.length > 0 && isFileSegment(projectSegments[projectSegments.length - 1])) {
+    if (projectSegments.length > 0 && isProjectDescriptorSegment(projectSegments[projectSegments.length - 1])) {
       projectSegments.pop(); // Remove the last segment if it's a file segment
     }
     
@@ -225,6 +236,16 @@ function getEndDelimiterIndex(segments: string[]) {
 }
 
 /**
+ * Extract the artifact name from a Black Duck Maven path.
+ * Expected prefix: groupId:artifactId:version:projectPath:-maven
+ */
+function getMavenArtifactName(dependencyPath: string): string | undefined {
+  const normalizedPath = dependencyPath.replace(/\\/g, '/');
+  const match = normalizedPath.match(/^[^:]+:([^:]+):[^:]+:.+:-maven(?:\/|$)/i);
+  return match?.[1];
+}
+
+/**
  * Create path mappings from mapping data
  * @param mappings Array of path mapping objects
  * @returns Map of extracted paths to actual paths
@@ -248,9 +269,18 @@ export function createPathMappings(mappings: PathMapping[]): PathMappings {
  * @param pathMappings Optional path mappings to use for verification
  * @returns Verified path information
  */
-export function verifyProjectPath(projectPath: string, basePath: string, pathMappings?: PathMappings): ProjectPathInfo {
+export function verifyProjectPath(
+  projectPath: string,
+  basePath: string,
+  pathMappings?: PathMappings,
+  mavenArtifactName?: string
+): ProjectPathInfo {
   if (!projectPath || !basePath) {
-    return { projectPath, verifiedPath: '', projectPathExists: false };
+    return {
+      projectPath,
+      verifiedPath: '',
+      verifiedPathMethod: basePath ? 'none' : 'not-checked'
+    };
   }
   
   try {
@@ -261,7 +291,7 @@ export function verifyProjectPath(projectPath: string, basePath: string, pathMap
       return { 
         projectPath, 
         verifiedPath: projectPath, 
-        projectPathExists: true 
+        verifiedPathMethod: 'exact'
       };
     }
     
@@ -273,12 +303,26 @@ export function verifyProjectPath(projectPath: string, basePath: string, pathMap
       return { 
         projectPath, 
         verifiedPath: mappedExists ? mappedPath : '',
-        projectPathExists: originalExists 
+        verifiedPathMethod: mappedExists ? 'mapping' : 'none'
       };
+    }
+
+    const segments = projectPath.split('/');
+    const finalSegment = segments[segments.length - 1];
+    if (mavenArtifactName && segments.length > 1 && finalSegment === mavenArtifactName) {
+      const parentPath = segments.slice(0, -1).join('/');
+      const parentFullPath = path.join(basePath, parentPath);
+
+      if (fs.existsSync(parentFullPath)) {
+        return {
+          projectPath,
+          verifiedPath: parentPath,
+          verifiedPathMethod: 'maven-artifact-parent'
+        };
+      }
     }
     
     // Try without the first path segment
-    const segments = projectPath.split('/');
     if (segments.length > 1) {
       const pathWithoutFirstSegment = segments.slice(1).join('/');
       const modifiedFullPath = path.join(basePath, pathWithoutFirstSegment);
@@ -288,7 +332,7 @@ export function verifyProjectPath(projectPath: string, basePath: string, pathMap
         return {
           projectPath,
           verifiedPath: pathWithoutFirstSegment,
-          projectPathExists: false
+          verifiedPathMethod: 'drop-first-segment'
         };
       }
     }
@@ -297,11 +341,11 @@ export function verifyProjectPath(projectPath: string, basePath: string, pathMap
     return { 
       projectPath, 
       verifiedPath: '', 
-      projectPathExists: false 
+      verifiedPathMethod: 'none'
     };
   } catch (error) {
     console.error(`Error verifying project path: ${error}`);
-    return { projectPath, verifiedPath: '', projectPathExists: false };
+    return { projectPath, verifiedPath: '', verifiedPathMethod: 'none' };
   }
 }
 
@@ -314,7 +358,7 @@ export function verifyProjectPath(projectPath: string, basePath: string, pathMap
  */
 export function extractProjectInfo(dependencyPath: string, originName: string, basePath?: string, pathMappings?: PathMappings): ProjectPathInfo {
   if (!dependencyPath) {
-    return { projectPath: '', verifiedPath: '', projectPathExists: false };
+    return { projectPath: '', verifiedPath: '', verifiedPathMethod: basePath ? 'none' : 'not-checked' };
   }
   
   try {
@@ -322,11 +366,12 @@ export function extractProjectInfo(dependencyPath: string, originName: string, b
     
     // Verify the path if basePath is provided
     if (basePath) {
-      return verifyProjectPath(projectPath, basePath, pathMappings);
+      const mavenArtifactName = getMavenArtifactName(dependencyPath);
+      return verifyProjectPath(projectPath, basePath, pathMappings, mavenArtifactName);
     }
     
     // Otherwise return unverified path with empty verifiedPath
-    return { projectPath, verifiedPath: '', projectPathExists: undefined };
+    return { projectPath, verifiedPath: '', verifiedPathMethod: 'not-checked' };
   } catch (error) {
     console.error(`Error extracting project info: ${error}`);
     throw error;
