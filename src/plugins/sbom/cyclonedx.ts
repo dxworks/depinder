@@ -46,6 +46,28 @@ export interface CycloneDxBom {
     dependencies?: { ref: string, dependsOn?: string[] }[]
 }
 
+/** A BOM with its two lookups built: components by bom-ref, and dependsOn edges by source ref. */
+export interface BomGraph {
+    bom: CycloneDxBom
+    byRef: Map<string, CycloneDxComponent>
+    edges: Map<string, string[]>
+}
+
+export function readBomGraph(sbomFile: string): BomGraph {
+    const bom = JSON.parse(fs.readFileSync(sbomFile, 'utf8')) as CycloneDxBom
+    const byRef = new Map<string, CycloneDxComponent>((bom.components ?? []).map(c => [c['bom-ref'], c]))
+    const edges = new Map<string, string[]>()
+    for (const entry of bom.dependencies ?? []) {
+        if (entry.dependsOn?.length) edges.set(entry.ref, entry.dependsOn)
+    }
+    return {bom, byRef, edges}
+}
+
+/** `ruby-mastodon.trivy.cdx.json` and `ruby-mastodon.cdx.json` are both the project `ruby-mastodon`. */
+export function projectNameOf(sbomFile: string): string {
+    return path.basename(sbomFile).replace(/\.(trivy\.)?cdx\.json$/, '')
+}
+
 /** A parsed purl, reduced to what depinder's model needs. */
 export interface ParsedPurl {
     type: string  // maven, npm, gem, pypi, nuget, composer, ...
@@ -98,6 +120,11 @@ export function parsePurl(purl: string): ParsedPurl | undefined {
     return {type, name, version}
 }
 
+/** The manifest a component was read from — Syft records it; Trivy's components carry none. */
+export function locationOf(component: CycloneDxComponent): string | undefined {
+    return component.properties?.find(p => p.name === 'syft:location:0:path')?.value
+}
+
 /**
  * Parses a component's purl, supplying the component's own `version` field when the purl carries
  * none. Syft emits versionless purls (with `version: 'UNKNOWN'` on the component) for dependencies
@@ -133,23 +160,78 @@ function toSemVer(version: string): SemVer | null {
     }
 }
 
-/** The subset of a project we can derive before walking dependencies. */
-interface ProjectNode {
+/**
+ * A project found in a BOM: the node its dependency walk starts from, and what it is called. The
+ * export's dependency paths start from the same nodes, so that `Direct` in `_dependencies.csv`
+ * and a one-segment `Path` in `_dependencies_sources.csv` can never disagree.
+ */
+export interface ProjectNode {
     ref: string
+    /** The module directory (`neo4j` for `neo4j/pom.xml`); empty for a top-level manifest. */
+    module: string
+    /** `module`, or the SBOM's own basename for a top-level manifest. */
     name: string
     version: string
     path: string
     /**
-     * True for the single-project Syft shape, where the root is a `file` node that carries no
-     * dependsOn edges. Reachability from it yields nothing, so the scope is the whole BOM.
+     * True for the Syft shape, where the root is a `file` node that carries no dependsOn edges.
+     * Reachability from it yields nothing, so the scope is the whole BOM.
      */
     allComponents: boolean
     /**
-     * Pre-resolved self-anchor refs, set only by the Syft per-module reconstruction (where the
-     * project node IS the anchor). When present, the Trivy self-anchor detection is skipped and
-     * these refs are used verbatim.
+     * The project's own artifacts inside the graph — the nodes whose outgoing edges are the
+     * project's direct dependencies, and which are not dependencies themselves. See
+     * `SELF_ANCHORED_MANIFESTS` and `YARN_WORKSPACE_VERSION` for where they come from.
      */
-    anchorRefs?: string[]
+    anchorRefs: string[]
+}
+
+/**
+ * Manifests under which Trivy nests the project's OWN artifact between the application node and
+ * the real dependencies:
+ *
+ *     markdown/pom.xml -> org.apache.zeppelin:zeppelin-markdown -> real deps
+ *     go.mod           -> github.com/caddyserver/caddy/v2       -> real deps
+ *     Cargo.lock       -> ripgrep@15.2.0                        -> real deps
+ *
+ * Reading the application node's children as "direct" would yield exactly one direct dependency
+ * per project — the project itself — so the walk is re-rooted on that self-anchor. Lockfiles of
+ * the other ecosystems (yarn.lock, Gemfile.lock, composer.lock, ...) list the dependencies flat
+ * under the application node and must not be re-rooted: a project with a single direct dependency
+ * would otherwise lose it.
+ */
+const SELF_ANCHORED_MANIFESTS = ['pom.xml', 'go.mod', 'Cargo.lock']
+
+/**
+ * Yarn berry resolves a `workspace:` entry to this version in yarn.lock, and Syft copies it into
+ * the SBOM verbatim. It is the one marker in either tool's output that a component is the project
+ * itself rather than a dependency of it, and a workspace's `dependsOn` edges are the packages its
+ * package.json declares — which is what Black Duck calls Direct. Trivy drops the workspace entries
+ * and instead marks direct whatever nothing else depends on; nothing in its SBOM can say better.
+ */
+const YARN_WORKSPACE_VERSION = '0.0.0-use.local'
+
+/**
+ * The self-anchors under a Trivy application node.
+ *
+ * Rule (validated 67/67 on the real Zeppelin SBOM): a child of a self-anchored manifest's node is
+ * the self-anchor iff it is the SOLE child, OR it has outgoing dependsOn edges. Children that are
+ * neither (e.g. a versionless leaf sitting directly under the application node) are genuine direct
+ * dependencies and must stay. This applies only to DIRECT children of the application node — the
+ * same artifact deeper in another module's subtree is a real dep.
+ */
+function selfAnchorsOf(applicationRef: string, manifest: string, edges: Map<string, string[]>): string[] {
+    if (!SELF_ANCHORED_MANIFESTS.some(it => manifest === it || manifest.endsWith(`/${it}`))) return []
+    const children = edges.get(applicationRef) ?? []
+    return children.filter(child => children.length === 1 || (edges.get(child)?.length ?? 0) > 0)
+}
+
+/** Syft's yarn-berry workspace nodes of this ecosystem, when the SBOM carries any. */
+function workspaceAnchorsOf(bom: CycloneDxBom, edges: Map<string, string[]>, purlType: string): string[] {
+    return (bom.components ?? [])
+        .filter(c => c.version === YARN_WORKSPACE_VERSION && edges.has(c['bom-ref']))
+        .filter(c => parseComponentPurl(c)?.type === purlType)
+        .map(c => c['bom-ref'])
 }
 
 /**
@@ -196,7 +278,7 @@ function findSyftMavenModules(
     for (const component of bom.components ?? []) {
         const parsed = parseComponentPurl(component)
         if (!parsed || parsed.type !== 'maven') continue
-        const location = component.properties?.find(p => p.name === 'syft:location:0:path')?.value
+        const location = locationOf(component)
         if (!location || !(location === 'pom.xml' || location.endsWith('/pom.xml'))) continue
 
         const colon = parsed.name.indexOf(':')
@@ -272,15 +354,10 @@ function findSyftMavenModules(
         if (anchors.length === 0) continue // a pom group with no in-monorepo artifact is not a module
         const anchor = anchors[0]
 
-        const relative = pomPath.replace(/^\//, '')
-        const dir = path.dirname(relative)
+        // The Syft anchor IS the project node: the walk starts from it.
         nodes.push({
             ref: anchor.ref,
-            // 'flink/pom.xml' -> 'flink'; the root 'pom.xml' -> the SBOM's own basename,
-            // mirroring the Trivy naming convention below.
-            name: dir === '.'
-                ? path.basename(sbomFile).replace(/\.(trivy\.)?cdx\.json$/, '')
-                : dir,
+            ...moduleNames(pomPath.replace(/^\//, ''), sbomFile),
             version: anchor.version,
             path: pomPath,
             allComponents: false,
@@ -290,24 +367,26 @@ function findSyftMavenModules(
     return nodes.length > 0 ? nodes : undefined
 }
 
+/** `neo4j/pom.xml` -> module `neo4j`; a top-level `pom.xml` -> no module, named after the SBOM. */
+function moduleNames(manifestPath: string, sbomFile: string): {module: string, name: string} {
+    const dir = path.dirname(manifestPath)
+    const module = dir === '.' ? '' : dir
+    return {module, name: module || projectNameOf(sbomFile)}
+}
+
 /**
- * Identifies the project nodes in a BOM.
+ * Identifies the project nodes in a BOM, for one ecosystem.
  *
- * Trivy: the root's direct children of type `application` (one per manifest file).
+ * Trivy: the root's direct children of type `application` (one per manifest file), re-rooted on
+ *        their self-anchor where the manifest nests one (SELF_ANCHORED_MANIFESTS).
  * Syft:  no project nodes exist. For maven, per-module reconstruction from Syft's location
- *        properties (findSyftMavenModules); otherwise one project spanning the whole BOM.
+ *        properties (findSyftMavenModules); otherwise one project spanning the whole BOM, whose
+ *        direct dependencies are the yarn workspaces' declared ones when the SBOM carries
+ *        workspace nodes (YARN_WORKSPACE_VERSION).
  */
-function findProjectNodes(
-    bom: CycloneDxBom,
-    byRef: Map<string, CycloneDxComponent>,
-    edges: Map<string, string[]>,
-    sbomFile: string,
-    purlType: string,
-): ProjectNode[] {
+export function findProjectNodes({bom, byRef, edges}: BomGraph, sbomFile: string, purlType: string): ProjectNode[] {
     const rootRef = bom.metadata?.component?.['bom-ref']
-    const rootChildren = rootRef
-        ? bom.dependencies?.find(d => d.ref === rootRef)?.dependsOn ?? []
-        : []
+    const rootChildren = rootRef ? edges.get(rootRef) ?? [] : []
 
     const applicationChildren = rootChildren
         .map(ref => byRef.get(ref))
@@ -318,13 +397,11 @@ function findProjectNodes(
             const manifestPath = c.name ?? 'unknown'
             return {
                 ref: c['bom-ref'],
-                // 'neo4j/pom.xml' -> 'neo4j'; a top-level 'pom.xml' -> the SBOM's own basename.
-                name: path.dirname(manifestPath) === '.'
-                    ? path.basename(sbomFile).replace(/\.(trivy\.)?cdx\.json$/, '')
-                    : path.dirname(manifestPath),
+                ...moduleNames(manifestPath, sbomFile),
                 version: c.version ?? 'unknown',
                 path: manifestPath,
                 allComponents: false,
+                anchorRefs: selfAnchorsOf(c['bom-ref'], manifestPath, edges),
             }
         })
     }
@@ -339,10 +416,12 @@ function findProjectNodes(
     // Syft shape, no reconstructable modules: one project for the entire SBOM.
     return [{
         ref: rootRef ?? '',
-        name: path.basename(sbomFile).replace(/\.(trivy\.)?cdx\.json$/, ''),
+        module: '',
+        name: projectNameOf(sbomFile),
         version: bom.metadata?.component?.version ?? 'unknown',
         path: sbomFile,
         allComponents: true,
+        anchorRefs: workspaceAnchorsOf(bom, edges, purlType),
     }]
 }
 
@@ -374,17 +453,10 @@ function reachableFrom(startRef: string, edges: Map<string, string[]>): Set<stri
  * filtered, which lets each ecosystem reuse its existing registrar unchanged.
  */
 export function parseCycloneDxFile(sbomFile: string, purlType: string): DepinderProject[] {
-    const bom = JSON.parse(fs.readFileSync(sbomFile).toString()) as CycloneDxBom
+    const graph = readBomGraph(sbomFile)
+    const {byRef, edges} = graph
 
-    const components = bom.components ?? []
-    const byRef = new Map<string, CycloneDxComponent>(components.map(c => [c['bom-ref'], c]))
-
-    const edges = new Map<string, string[]>()
-    for (const entry of bom.dependencies ?? []) {
-        if (entry.dependsOn?.length) edges.set(entry.ref, entry.dependsOn)
-    }
-
-    const projectNodes = findProjectNodes(bom, byRef, edges, sbomFile, purlType)
+    const projectNodes = findProjectNodes(graph, sbomFile, purlType)
     const projects: DepinderProject[] = []
 
     for (const node of projectNodes) {
@@ -393,28 +465,9 @@ export function parseCycloneDxFile(sbomFile: string, purlType: string): Depinder
             ? new Set(byRef.keys())
             : reachableFrom(node.ref, edges)
 
-        // Trivy inserts the module's OWN artifact (e.g. org.apache.zeppelin:zeppelin-markdown) as
-        // an intermediate node between a pom.xml application node and the real dependencies:
-        //   markdown/pom.xml -> zeppelin-markdown -> real deps
-        // Reading the application node's children as "direct" therefore yields exactly one direct
-        // dep per module — the module itself. Detect that self-anchor and re-root on it.
-        //
-        // Rule (validated 67/67 on the real Zeppelin SBOM): a child of a pom.xml application node
-        // is the self-anchor iff it is the SOLE child, OR it has outgoing dependsOn edges. Children
-        // that are neither (e.g. a versionless leaf sitting directly under the application node)
-        // are genuine direct dependencies and must stay. This applies only to DIRECT children of
-        // the application node — the same artifact deeper in another module's subtree is a real dep.
-        // Syft per-module nodes arrive with their anchor already resolved; only the Trivy shape
-        // needs the detection below.
-        const anchorRefs = new Set<string>(node.anchorRefs ?? [])
-        if (node.anchorRefs === undefined && !node.allComponents && node.path.endsWith('pom.xml')) {
-            const children = edges.get(node.ref) ?? []
-            for (const child of children) {
-                if (children.length === 1 || (edges.get(child)?.length ?? 0) > 0) {
-                    anchorRefs.add(child)
-                }
-            }
-        }
+        // The project's own artifacts: their outgoing edges are the project's direct dependencies,
+        // and they are kept out of the dependency map themselves.
+        const anchorRefs = new Set<string>(node.anchorRefs)
 
         // Resolve each in-scope ref to a purl of the requested ecosystem.
         const parsedByRef = new Map<string, ParsedPurl>()

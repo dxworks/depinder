@@ -517,3 +517,100 @@ describe('parseCycloneDxFile — Trivy shape (application nodes are the projects
         expect(parseCycloneDxFile(writeBom('j.trivy.cdx.json', trivyBom), 'gem')).toEqual([])
     })
 })
+
+/**
+ * Trivy nests the project's own artifact under go.mod and Cargo.lock exactly as it does under
+ * pom.xml — the main module, the workspace crate — while yarn.lock, Gemfile.lock and the other
+ * lockfiles list dependencies flat. The self-anchor rule must follow the manifest, not the shape:
+ * a yarn project with a single direct dependency looks like a self-anchor and is not one.
+ */
+const trivyGoAndCargoBom = {
+    metadata: {component: {'bom-ref': 'root', type: 'application', name: '/repo'}},
+    components: [
+        {'bom-ref': 'gomod', type: 'application', name: 'go.mod'},
+        {'bom-ref': 'cargo', type: 'application', name: 'Cargo.lock'},
+        {'bom-ref': 'yarn', type: 'application', name: 'yarn.lock'},
+        // The main module: Trivy gives it no version, hence no parseable purl.
+        {'bom-ref': 'caddy', type: 'library', name: 'github.com/caddyserver/caddy/v2', purl: 'pkg:golang/github.com/caddyserver/caddy/v2'},
+        {'bom-ref': 'certmagic', type: 'library', name: 'github.com/caddyserver/certmagic', version: 'v0.25.4', purl: 'pkg:golang/github.com/caddyserver/certmagic@v0.25.4'},
+        {'bom-ref': 'ripgrep', type: 'library', name: 'ripgrep', version: '15.2.0', purl: 'pkg:cargo/ripgrep@15.2.0'},
+        {'bom-ref': 'grep', type: 'library', name: 'grep', version: '0.4.1', purl: 'pkg:cargo/grep@0.4.1'},
+        {'bom-ref': 'memchr', type: 'library', name: 'memchr', version: '2.7.4', purl: 'pkg:cargo/memchr@2.7.4'},
+        {'bom-ref': 'express', type: 'library', name: 'express', version: '4.18.0', purl: 'pkg:npm/express@4.18.0'},
+        {'bom-ref': 'qs', type: 'library', name: 'qs', version: '6.10.2', purl: 'pkg:npm/qs@6.10.2'},
+    ],
+    dependencies: [
+        {ref: 'root', dependsOn: ['gomod', 'cargo', 'yarn']},
+        {ref: 'gomod', dependsOn: ['caddy']},
+        {ref: 'caddy', dependsOn: ['certmagic']},
+        {ref: 'cargo', dependsOn: ['ripgrep']},
+        {ref: 'ripgrep', dependsOn: ['grep']},
+        {ref: 'grep', dependsOn: ['memchr']},
+        {ref: 'yarn', dependsOn: ['express']},
+        {ref: 'express', dependsOn: ['qs']},
+    ],
+}
+
+describe('parseCycloneDxFile — Trivy self-anchors under go.mod and Cargo.lock', () => {
+    it('re-roots a go.mod project on its main module, even though that module has no version', () => {
+        const [project] = parseCycloneDxFile(writeBom('go.trivy.cdx.json', trivyGoAndCargoBom), 'golang')
+        expect(Object.keys(project.dependencies)).toEqual(['github.com/caddyserver/certmagic@v0.25.4'])
+        expect(project.dependencies['github.com/caddyserver/certmagic@v0.25.4'].requestedBy)
+            .toEqual([`${project.name}@${project.version}`])
+    })
+
+    it('re-roots a Cargo.lock project on its workspace crate and keeps the crate out of its own deps', () => {
+        const [project] = parseCycloneDxFile(writeBom('cargo.trivy.cdx.json', trivyGoAndCargoBom), 'cargo')
+        expect(Object.keys(project.dependencies).sort()).toEqual(['grep@0.4.1', 'memchr@2.7.4'])
+        expect(project.dependencies['grep@0.4.1'].requestedBy).toEqual([`${project.name}@${project.version}`])
+        expect(project.dependencies['memchr@2.7.4'].requestedBy).toEqual(['grep@0.4.1'])
+    })
+
+    it('does not re-root a flat lockfile whose single direct dependency happens to have deps', () => {
+        const [project] = parseCycloneDxFile(writeBom('yarn.trivy.cdx.json', trivyGoAndCargoBom), 'npm')
+        expect(Object.keys(project.dependencies).sort()).toEqual(['express@4.18.0', 'qs@6.10.2'])
+        expect(project.dependencies['express@4.18.0'].requestedBy).toEqual([`${project.name}@${project.version}`])
+    })
+})
+
+/**
+ * Syft copies yarn berry's `0.0.0-use.local` workspace entries into the SBOM, and their dependsOn
+ * edges are the packages each workspace's package.json declares. Those, and only those, are the
+ * project's direct dependencies — a lockfile entry nothing depends on is not.
+ */
+const syftYarnWorkspaceBom = {
+    metadata: {component: {'bom-ref': 'root-hash', type: 'file', name: '/repo'}},
+    components: [
+        {'bom-ref': 'ws-app', type: 'library', name: '@mastodon/mastodon', version: '0.0.0-use.local', purl: 'pkg:npm/%40mastodon/mastodon@0.0.0-use.local'},
+        {'bom-ref': 'ws-streaming', type: 'library', name: '@mastodon/streaming', version: '0.0.0-use.local', purl: 'pkg:npm/%40mastodon/streaming@0.0.0-use.local'},
+        {'bom-ref': 'react', type: 'library', name: 'react', version: '19.2.8', purl: 'pkg:npm/react@19.2.8'},
+        {'bom-ref': 'vite', type: 'library', name: 'vite', version: '7.3.1', purl: 'pkg:npm/vite@7.3.1'},
+        {'bom-ref': 'rollup', type: 'library', name: 'rollup', version: '4.60.1', purl: 'pkg:npm/rollup@4.60.1'},
+        {'bom-ref': 'ws', type: 'library', name: 'ws', version: '8.21.1', purl: 'pkg:npm/ws@8.21.1'},
+        // Nothing depends on it and no workspace declares it.
+        {'bom-ref': 'stray', type: 'library', name: 'cacheable', version: '2.3.4', purl: 'pkg:npm/cacheable@2.3.4'},
+    ],
+    dependencies: [
+        {ref: 'ws-app', dependsOn: ['react', 'vite']},
+        {ref: 'vite', dependsOn: ['rollup']},
+        {ref: 'ws-streaming', dependsOn: ['ws']},
+    ],
+}
+
+describe('parseCycloneDxFile — Syft yarn workspaces define what is direct', () => {
+    it('attributes each workspace\'s declared packages to the project and the rest to their parents', () => {
+        const [project] = parseCycloneDxFile(writeBom('ws.cdx.json', syftYarnWorkspaceBom), 'npm')
+        const projectId = `${project.name}@${project.version}`
+        expect(project.dependencies['react@19.2.8'].requestedBy).toEqual([projectId])
+        expect(project.dependencies['ws@8.21.1'].requestedBy).toEqual([projectId])
+        // Declared by no workspace, so vite's, not the project's: Transitive, as Black Duck says.
+        expect(project.dependencies['rollup@4.60.1'].requestedBy).toEqual(['vite@7.3.1'])
+    })
+
+    it('keeps the workspace nodes out of the dependency map and the stray package in it', () => {
+        const [project] = parseCycloneDxFile(writeBom('ws2.cdx.json', syftYarnWorkspaceBom), 'npm')
+        expect(Object.keys(project.dependencies).sort())
+            .toEqual(['cacheable@2.3.4', 'react@19.2.8', 'rollup@4.60.1', 'vite@7.3.1', 'ws@8.21.1'])
+        expect(project.dependencies['cacheable@2.3.4'].requestedBy).toEqual([])
+    })
+})
