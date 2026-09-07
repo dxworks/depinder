@@ -116,7 +116,7 @@ export function packageKeys(purl: string | undefined, name?: string, version?: s
 }
 
 /** CVE id if one is known, else the first id (typically a GHSA) — the cross-tool dedup handle. */
-function canonicalId(ids: string[]): string | undefined {
+export function canonicalId(ids: string[]): string | undefined {
     return ids.find(id => id.toUpperCase().startsWith('CVE-')) ?? ids[0]
 }
 

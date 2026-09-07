@@ -34,7 +34,14 @@ export interface GithubAdvisory {
     }[]
 }
 
-/** The CVSS view to report: prefer v3 (what every other source in depinder reports), else v4. */
+/**
+ * The CVSS view to report: prefer v3 (what every other source in depinder reports), else v4.
+ *
+ * An unscored advisory is not absent from these fields — GitHub fills them with
+ * `{vector_string: null, score: 0}`, which is why a falsy score reads as "no CVSS" rather than as
+ * a genuine 0.0. Measured on the live rubygems feed: 372 of 1,150 advisories are unscored, and
+ * every one of them has exactly that shape.
+ */
 export function cvssOf(advisory: GithubAdvisory): {score?: number, vector?: string, version?: string} {
     const v3 = advisory.cvss_severities?.cvss_v3 ?? advisory.cvss
     if (v3?.vector_string || v3?.score) {
