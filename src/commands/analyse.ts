@@ -20,6 +20,7 @@ import {ecosystemOf, Plugin} from '../extension-points/plugin'
 import {Cache, noCache} from '../cache/cache'
 import {getMongoDockerContainerStatus} from './cache'
 import {jsonCache} from '../cache/json-cache'
+import {MISS_TTL_HOURS, missCache, MissCache, noMissCache} from '../cache/misses'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {MultiBar, Presets} from 'cli-progress'
 import {walkDir} from '../utils/utils'
@@ -192,6 +193,12 @@ async function cacheHit(cache: Cache, cacheKey: string, dep: DepinderDependency,
 }
 
 const REGISTRY_CONCURRENCY = 8
+/**
+ * How often the caches are flushed mid-run, so a crash loses at most this much work. Time-based
+ * rather than every N lookups because a flush serialises the whole positive cache (tens of MB),
+ * and doing that every 50 lookups on a cold run cost more than the lookups it protected.
+ */
+const CACHE_CHECKPOINT_MS = 60_000
 const RATE_LIMIT_RETRY_DELAYS_MS = [2000, 4000, 8000]
 
 function isRateLimit(e: any): boolean {
@@ -286,10 +293,18 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         log.info(`Plugin ${plugin.name} starting`)
 
         const cache: Cache = useCache ? chooseCacheOption() : noCache
-        await timePhase('cache:load', () => cache.load())
+        const misses: MissCache = useCache ? missCache : noMissCache
+        await timePhase('cache:load', async () => {
+            await cache.load()
+            misses.load()
+        })
+        const checkpoint = () => timePhase('cache:write', async () => {
+            await cache.write()
+            misses.write()
+        })
         const refreshedLibs = [] as string[]
         const inFlight = new Map<string, Promise<LibraryInfo>>()
-        let newLookups = 0
+        let lastCheckpoint = Date.now()
 
         const files = allFiles
             .filter(it => plugin.extractor.filter ? plugin.extractor.filter(it) : true)
@@ -325,13 +340,25 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
                         if (await cacheHit(cache, cacheKey, dep, options.refresh, refreshedLibs)) {
                             count('cache:hit')
                             lib = await cache.get(cacheKey) as LibraryInfo
+                        } else if (!options.refresh && misses.has(cacheKey)) {
+                            // Same outcome as the failed lookup it remembers: the dependency
+                            // keeps whatever the parser gave it, untouched.
+                            count('cache:known-miss')
+                            log.warn(`Skipping ${dep.name}: its registry lookup failed within the last ${MISS_TTL_HOURS}h (--refresh to retry)`)
+                            return
                         } else {
                             count('cache:miss')
                             // log.info(`Getting remote information on ${dep.name}`)
                             let fetch = inFlight.get(cacheKey)
                             if (!fetch) {
                                 fetch = (async () => {
-                                    const fetched = await retrieveWithRetry(plugin, dep.name)
+                                    let fetched: LibraryInfo
+                                    try {
+                                        fetched = await retrieveWithRetry(plugin, dep.name)
+                                    } catch (e: any) {
+                                        if (!isRateLimit(e)) misses.set(cacheKey)
+                                        throw e
+                                    }
                                     if (plugin.checker?.githubSecurityAdvisoryEcosystem && process.env.GH_TOKEN) {
                                         // A failed advisory lookup must not discard the registry data
                                         // already fetched — degrade to no vulnerabilities instead.
@@ -343,7 +370,10 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
                                     }
                                     await cache.set(cacheKey, fetched)
                                     if (options.refresh) refreshedLibs.push(dep.name)
-                                    if (++newLookups % 50 === 0) await cache.write()
+                                    if (Date.now() - lastCheckpoint > CACHE_CHECKPOINT_MS) {
+                                        lastCheckpoint = Date.now()
+                                        await checkpoint()
+                                    }
                                     return fetched
                                 })()
                                 inFlight.set(cacheKey, fetch)
@@ -357,10 +387,11 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
                         count('registry:error')
                         log.warn(`Exception getting remote info for ${dep.name}`)
                         log.error(e)
+                    } finally {
+                        depProgressBar.increment()
+                        depsWithInfo++
+                        log.info(`Got remote information on ${dep.name} (${depsWithInfo}/${filteredDependencies.length})`)
                     }
-                    depProgressBar.increment()
-                    depsWithInfo++
-                    log.info(`Got remote information on ${dep.name} (${depsWithInfo}/${filteredDependencies.length})`)
                 }
 
                 let nextDepIndex = 0
@@ -381,7 +412,7 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
 
         multiProgressBar.stop()
 
-        await timePhase('cache:write', () => cache.write())
+        await checkpoint()
 
         timePhaseSync(`csv:${plugin.name}`, () => {
 
