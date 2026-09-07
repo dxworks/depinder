@@ -12,12 +12,14 @@ import {ComparatorFamily} from './ecosystems'
  *
  * Three of the four families are borrowed rather than written, because getting them subtly wrong
  * is how a vulnerability matcher reports confident nonsense:
- *   - semver  -> node `semver`, loose mode (npm)
+ *   - semver  -> node `semver`, loose mode (npm, go, cargo — all three specify SemVer 2.0, and a
+ *               leading `v` and `+incompatible` build metadata are accepted by loose mode)
  *   - pep440  -> `@renovatebot/pep440` (PyPI: `1.0rc1`, `1.0.post1`, `2!1.0`)
  *   - gem     -> `@renovatebot/ruby-semver` (RubyGems: `1.0.0.pre`, `1.2.3.beta1`)
  *
- * The fourth, `generic`, is ours, and covers maven, nuget, composer, go and cargo. See its
- * documentation below for exactly what it promises and what it does not.
+ * The fourth, `generic`, is ours, and covers maven, nuget and composer — the ecosystems whose
+ * ordering nobody has written down precisely. See its documentation below for exactly what it
+ * promises and what it does not.
  */
 export type VersionComparator = (a: string, b: string) => number
 
@@ -98,16 +100,20 @@ function compareTokens(a: Token | undefined, b: Token | undefined): number {
 }
 
 /**
- * The comparator for maven, nuget, composer, go and cargo.
+ * The comparator for maven, nuget and composer.
  *
  * What it promises: numeric segments compare numerically and of any length (`2.10 > 2.9`,
  * `1.2.3.4 > 1.2.3`); trailing zero segments are insignificant (`1.0` == `1.0.0`); pre-release
  * qualifiers order alpha < beta < milestone < rc < snapshot < release < sp, with unknown
- * qualifiers after the release; a pre-release is always below its release (`1.0.0-rc1 < 1.0.0`);
- * case and separator style are insignificant; build metadata after `+` is ignored.
+ * qualifiers after the release; a WORDED pre-release is always below its release
+ * (`1.0.0-rc1 < 1.0.0`); case and separator style are insignificant; build metadata after `+` is
+ * ignored.
  *
- * What it does not promise: Composer's `dev-<branch>` names, which are unordered by construction,
- * and NuGet's SemVer2 rule that a longer pre-release identifier list wins ties. Both are rare in
+ * What it does not promise: a NUMERIC pre-release. `-` is read as a plain separator, so
+ * `1.0.0-1` sorts above `1.0.0` where SemVer puts it below — which is why the three ecosystems
+ * that really are SemVer use `compareSemver` instead. Nor Composer's `dev-<branch>` names, which
+ * are unordered by construction, nor NuGet's SemVer2 rule that a longer pre-release identifier
+ * list wins ties. Both are rare in
  * advisory ranges and both fail towards "not affected" rather than towards a false positive,
  * because an unorderable token compares as an unknown qualifier and lands above the release.
  */

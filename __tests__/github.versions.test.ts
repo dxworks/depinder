@@ -7,6 +7,7 @@ import {
     tokenizeVersion,
 } from '../src/vuln-sources/github/versions'
 import {parseRange, satisfiesRange} from '../src/vuln-sources/github/ranges'
+import {ecosystemByName, ecosystemForPurlType} from '../src/vuln-sources/github/ecosystems'
 
 /**
  * The version algebra is where a vulnerability matcher fails silently, so every comparator is
@@ -121,7 +122,7 @@ describe('rubygems / Gem::Version comparator', () => {
     })
 })
 
-describe('generic comparator (maven, nuget, composer, go, cargo)', () => {
+describe('generic comparator (maven, nuget, composer)', () => {
     it('matches the ranges GitHub publishes for those ecosystems', () => {
         expectRanges(compareGeneric, [
             ['2.9.10.3', '>= 2.9.0, < 2.9.10.4', true],
@@ -161,6 +162,44 @@ describe('generic comparator (maven, nuget, composer, go, cargo)', () => {
             {kind: 'num', value: 1}, {kind: 'num', value: 0}, {kind: 'num', value: 0},
             {kind: 'str', value: 'rc'}, {kind: 'num', value: 1},
         ])
+    })
+})
+
+/**
+ * Go and Cargo specify SemVer 2.0, so they use `compareSemver`. The bug this pins down: under the
+ * generic order `-` is a plain separator, so a NUMERIC pre-release sorts above its release — and
+ * every Go pseudo-version has exactly that shape. An advisory reading
+ * `< 0.0.0-20231218163308-9d2ee975ef9f` would then clear a module the Go team calls vulnerable.
+ */
+describe('go and cargo version ordering', () => {
+    const compare = comparatorFor(ecosystemForPurlType('golang')?.comparator ?? 'generic')
+
+    it('uses the semver comparator for go and for cargo', () => {
+        expect(ecosystemByName('go')?.comparator).toBe('semver')
+        expect(ecosystemByName('rust')?.comparator).toBe('semver')
+    })
+
+    it('puts a pseudo-version below the release it is a pre-release of', () => {
+        expect(compare('0.0.0-20231218163308-9d2ee975ef9f', '0.0.0')).toBeLessThan(0)
+        expect(compareGeneric('0.0.0-20231218163308-9d2ee975ef9f', '0.0.0')).toBeGreaterThan(0)
+    })
+
+    it('orders two pseudo-versions by their timestamps', () => {
+        expect(compare('v0.0.0-20200220183623-bac4c82f6975', 'v0.0.0-20200124225646-8b5121be2f68'))
+            .toBeGreaterThan(0)
+    })
+
+    it('accepts the leading v and +incompatible that Go module versions carry', () => {
+        expect(compare('v0.54.0', '0.55.0')).toBeLessThan(0)
+        expect(compare('v2.0.0+incompatible', 'v2.0.0')).toBe(0)
+    })
+
+    it('still matches the real advisory ranges on the go corpus', () => {
+        // golang.org/x/crypto@v0.54.0 against the ranges the cached go advisories really carry.
+        expect(satisfiesRange('v0.54.0', '< 0.52.0', compare)).toBe(false)
+        expect(satisfiesRange('v1.82.1', '<= 1.83.0', compare)).toBe(true)
+        expect(satisfiesRange('v1.82.1', '< 1.82.1', compare)).toBe(false)
+        expect(satisfiesRange('v0.54.0', '< 0.0.0-20231218163308-9d2ee975ef9f', compare)).toBe(false)
     })
 })
 

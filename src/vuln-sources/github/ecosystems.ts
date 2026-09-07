@@ -9,7 +9,17 @@
  * zero findings, so it is stated once here and nowhere else.
  */
 
-/** The version-ordering rule an ecosystem obeys. See `versions.ts` for the implementations. */
+/**
+ * The version-ordering rule an ecosystem obeys. See `versions.ts` for the implementations.
+ *
+ * `go` and `rust` are `semver` rather than `generic` because both specify SemVer 2.0 outright, and
+ * the difference is not academic: a numeric pre-release is BELOW its release under SemVer and
+ * ABOVE it under the generic order, which reads `-` as a plain separator. Every Go pseudo-version
+ * is exactly that shape — `v0.0.0-20231218163308-9d2ee975ef9f` is a pre-release of `0.0.0`, and
+ * the generic order ranked it above `0.0.0`, so an advisory reading
+ * `< 0.0.0-20231218163308-9d2ee975ef9f` would clear a module the Go team considers vulnerable.
+ * Cargo has the same rule and the same defect.
+ */
 export type ComparatorFamily = 'semver' | 'pep440' | 'gem' | 'generic'
 
 export interface GithubEcosystem {
@@ -32,8 +42,8 @@ export const GITHUB_ECOSYSTEMS: readonly GithubEcosystem[] = [
     {name: 'maven', purlType: 'maven', comparator: 'generic'},
     {name: 'nuget', purlType: 'nuget', comparator: 'generic'},
     {name: 'composer', purlType: 'composer', comparator: 'generic'},
-    {name: 'go', purlType: 'golang', comparator: 'generic'},
-    {name: 'rust', purlType: 'cargo', comparator: 'generic'},
+    {name: 'go', purlType: 'golang', comparator: 'semver'},
+    {name: 'rust', purlType: 'cargo', comparator: 'semver'},
     {name: 'erlang', purlType: 'hex', comparator: 'generic'},
     {name: 'actions', purlType: 'github', comparator: 'generic'},
     {name: 'pub', purlType: 'pub', comparator: 'generic'},
