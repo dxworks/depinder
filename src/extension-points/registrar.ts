@@ -5,6 +5,12 @@ import {delay} from '../utils/utils'
 
 export interface Registrar {
     retrieve: RegistryRetriever
+    /**
+     * False when the registrar cannot answer at all in this environment — a paid API with no key
+     * configured, say. A fallback chain skips such a link instead of paying for a request that
+     * is known to fail. Absent means always available.
+     */
+    isConfigured?: () => boolean
 }
 
 export type RegistryRetriever = (libraryName: string) => LibraryInfo | Promise<LibraryInfo>
@@ -46,7 +52,7 @@ export abstract class AbstractRegistrar implements Registrar {
         try {
             return await this.retrieveFromRegistry(libraryName)
         } catch (e) {
-            if (this.next) {
+            if (this.next && (this.next.isConfigured?.() ?? true)) {
                 return this.next.retrieve(libraryName)
             }
             else throw e
@@ -64,6 +70,11 @@ export class LibrariesIORegistrar extends AbstractRegistrar {
     constructor(registryType: RegistryType) {
         super()
         this.registryType = registryType
+    }
+
+    /** Without a key libraries.io answers every request with `Forbidden`; do not ask. */
+    isConfigured(): boolean {
+        return !!process.env.LIBRARIES_IO_API_KEY
     }
 
     async retrieveFromRegistry(libraryName: string): Promise<LibraryInfo> {
