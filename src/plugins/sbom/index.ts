@@ -174,6 +174,17 @@ export function sbomFilesFor(plugins: Plugin[], files: string[]): string[] {
 }
 
 /**
+ * The SBOM files at least one of the selected sbom plugins will actually parse. A file whose
+ * ecosystems none of them covers yields no project and is never scanned by the parser either, so
+ * scanning it up front would only add a file to the provenance record.
+ */
+export function sbomFilesToParse(plugins: Plugin[], files: string[]): string[] {
+    const selected = plugins.filter(plugin => sbomPlugins.includes(plugin))
+    return sbomFilesFor(plugins, files)
+        .filter(file => selected.some(plugin => plugin.extractor.createContexts([file]).length > 0))
+}
+
+/**
  * The purl type an SBOM plugin filters on — `sbom-npm` -> `npm`. The alias is where that type is
  * already recorded, so reading it back beats a second table that could drift out of step. Returns
  * undefined for a native plugin, which has no single purl type.

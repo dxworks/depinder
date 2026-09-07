@@ -2,9 +2,10 @@ import {Command} from 'commander'
 import fs from 'fs'
 import path from 'path'
 import {getPluginsFromNames} from '../plugins'
-import {purlTypeOfEcosystem, purlTypeOfPlugin, sbomFilesFor} from '../plugins/sbom'
+import {purlTypeOfEcosystem, purlTypeOfPlugin, sbomFilesFor, sbomFilesToParse} from '../plugins/sbom'
 import {
     preflightScanners,
+    scanSbomFileOnce,
     scannerPreflightMessages,
     scannerSummaryLine,
     writeScanProvenance,
@@ -285,6 +286,14 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         } catch (e: any) {
             log.warn(`GitHub advisory refresh skipped: ${e?.message ?? e}`)
         }
+    }
+
+    // Trivy and Grype run on every SBOM a plugin will parse, all at once and up front. Each file
+    // is scanned exactly once either way — the parser memoises — but the parser reaches the files
+    // one project at a time, which serialised a dozen one-to-two-second Grype runs.
+    if (preflight) {
+        await timePhase('scan:prescan', () =>
+            Promise.all(sbomFilesToParse(selectedPlugins, sbomFiles).map(file => scanSbomFileOnce(file))))
     }
 
     const analysed: AnalysisResult[] = []
