@@ -39,6 +39,8 @@
   "dependencies": {
     "@dxworks/nuget-inspector": "^1.2.0",
     "@octokit/graphql": "^4.8.0",
+    "@renovatebot/pep440": "^4.2.4",
+    "@renovatebot/ruby-semver": "^4.1.3",
     "@snyk/gemfile": "^1.2.0",
     "chalk": "^4.1.2",
     "cli-progress": "^3.11.2",
