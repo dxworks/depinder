@@ -249,6 +249,18 @@ depinder cache stop
 
 To see what is available in the cache, please visit the [Mongo Express Dashboard](http://localhost:8002/).
 
+### The library cache
+
+Without MongoDB, registry answers are kept in `cache/libs.json` under the working directory, so
+a second run over the same libraries makes no registry calls. Lookups that *failed* are kept too,
+in `cache/misses.json`, for 24 hours: a library a registry cannot find — or a registry that does
+not answer — would otherwise be asked again on every run, and a failed lookup is the slowest kind.
+`--refresh` bypasses both. A rate-limited (429) lookup is never remembered as a miss.
+
+Add `--profile` to `analyse` or `export-blackduck` to get, at the end of the run, the wall-clock
+of each phase (parse, scans, registry enrichment, CSV writing), the cache hit/miss counts and the
+number of HTTP requests made to each host.
+
 ### Analyse
 To analyse a project, run the following command:
 
