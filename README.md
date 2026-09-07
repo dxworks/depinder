@@ -27,6 +27,39 @@ depinder --version
 - `GH_TOKEN` should contain a `GitHub` token with the `read:packages` scope.
 - `LIBRARIES_IO_API_KEY` should contain the `Libraries.io` API Key.
 
+### GitHub advisories as a vulnerability source
+
+The SBOM analysis can match components against a local copy of GitHub's reviewed security
+advisories, alongside (or instead of) Trivy and Grype:
+
+```shell
+# Fill the cache for just the ecosystems a set of SBOMs contains
+depinder github-advisories download --sbom ./sboms
+depinder github-advisories status
+
+# Analyse with the GitHub source
+depinder analyse ./sboms -r out -p sbom-npm --vuln-source github
+```
+
+`--vuln-source` takes a comma-separated list of `trivy`, `grype`, `github` and `all`, and defaults
+to `trivy,grype` — today's behaviour. Whichever sources run, the findings also go to
+`sbom-security.csv` next to the libs CSVs, one row per (component, advisory, project).
+
+The download needs GitHub tokens. Put them in a dotenv-style file — `.github-tokens` in the working
+directory by default, `--github-token-file` to point elsewhere:
+
+```
+GH_TOKEN_1=ghp_...
+GH_TOKEN_2=ghp_...
+```
+
+Numbering must be contiguous from 1; a bare `GH_TOKEN` is accepted as a pool of one, and the same
+variables are read from the environment when no file exists. Tokens are used in rotation, one
+in-flight request each (so the pool size is the concurrency, capped at 4), and each is stood down
+before its rate-limit window is exhausted rather than after. The cache lives in
+`cache/github-advisories/`, one JSON file per ecosystem, and is re-downloaded when older than
+`--github-max-age` hours (default 24).
+
 ## Preprocess data
 If you want to run `Depinder` on a project that has not been processed by `Depminer` before, 
 you need to run the following command to generate the folder structure:
