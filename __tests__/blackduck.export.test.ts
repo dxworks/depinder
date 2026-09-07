@@ -245,6 +245,49 @@ describe('dependency paths', () => {
         expect(qs.map(it => it.path)).toEqual(['demo/-npm/body-parser/1.20.0/qs/6.10.2'])
     })
 
+    // Black Duck breaks a tie between equally short chains towards the greater parent.
+    it('breaks a tie between equally short chains towards the greater parent', () => {
+        const file = write({
+            metadata: {component: {'bom-ref': 'root'}},
+            components: [
+                {'bom-ref': 'app', type: 'application', name: 'Gemfile.lock'},
+                {'bom-ref': 'a', name: 'active_model_serializers', version: '0.10.16', purl: 'pkg:gem/active_model_serializers@0.10.16'},
+                {'bom-ref': 'b', name: 'rspec-rails', version: '8.0.4', purl: 'pkg:gem/rspec-rails@8.0.4'},
+                {'bom-ref': 'c', name: 'actionpack', version: '8.1.3.1', purl: 'pkg:gem/actionpack@8.1.3.1'},
+            ],
+            dependencies: [
+                {ref: 'root', dependsOn: ['app']},
+                {ref: 'app', dependsOn: ['a', 'b']},
+                {ref: 'a', dependsOn: ['c']},
+                {ref: 'b', dependsOn: ['c']},
+            ],
+        })
+        const actionpack = sbomPaths(file, 'demo', new Set(['gem'])).find(it => it.name === 'actionpack')
+        expect(actionpack?.path).toBe('demo/-rubygems/rspec-rails/8.0.4/actionpack/8.1.3.1')
+    })
+
+    // Black Duck joins a segment's name and version the way the origin id does: a colon for
+    // maven and packagist, a slash elsewhere.
+    it('joins a segment with the separator its origin id uses', () => {
+        const file = write({
+            metadata: {component: {'bom-ref': 'root'}},
+            components: [
+                {'bom-ref': 'app', type: 'application', name: 'composer.lock'},
+                {'bom-ref': 'a', purl: 'pkg:composer/laravel/fortify@v1.28.0'},
+                {'bom-ref': 'b', purl: 'pkg:composer/bacon/bacon-qr-code@v3.0.1'},
+            ],
+            dependencies: [
+                {ref: 'root', dependsOn: ['app']},
+                {ref: 'app', dependsOn: ['a']},
+                {ref: 'a', dependsOn: ['b']},
+            ],
+        })
+        expect(sbomPaths(file, 'php-monica', new Set(['composer'])).map(it => it.path)).toEqual([
+            'php-monica/-packagist/laravel/fortify:v1.28.0',
+            'php-monica/-packagist/laravel/fortify:v1.28.0/bacon/bacon-qr-code:v3.0.1',
+        ])
+    })
+
     it('starts a self-anchored manifest below its own artifact, which is never a segment', () => {
         const file = write({
             metadata: {component: {'bom-ref': 'root'}},
@@ -261,7 +304,7 @@ describe('dependency paths', () => {
         })
         expect(sbomPaths(file, 'go-caddy', new Set(['golang']))).toEqual([
             {name: 'github.com/caddyserver/certmagic', version: 'v0.25.4', purlType: 'golang', projectPath: 'go-caddy',
-                matchType: 'Direct', path: 'go-caddy/-go_mod/github.com/caddyserver/certmagic/v0.25.4'},
+                matchType: 'Direct', path: 'go-caddy/-go_mod/github.com/caddyserver/certmagic:v0.25.4'},
         ])
     })
 

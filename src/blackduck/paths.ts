@@ -9,7 +9,7 @@ import {
     readBomGraph,
 } from '../plugins/sbom/cyclonedx'
 import {log} from '../utils/logging'
-import {originFor} from './origins'
+import {originFor, pathSegment} from './origins'
 
 /**
  * The `Path` column of `_dependencies_sources.csv`: where in the dependency graph a component was
@@ -38,7 +38,7 @@ export interface SbomPath {
     name: string
     version: string
     purlType: string
-    /** `<repo>/-<package manager>/<name>/<version>/…` — the chain, as Black Duck writes it. */
+    /** `<repo>/-<package manager>/<name>/<version>/…` — the chain, as Black Duck writes it (`<name>:<version>` where the origin id uses a colon). */
     path: string
     /** `<repo>`, or `<repo>/<module>` when the SBOM names its modules. */
     projectPath: string
@@ -74,8 +74,20 @@ export function packageManagerTag(manifest: string | undefined): string | undefi
     return PACKAGE_MANAGER_TAGS.find(([pattern]) => pattern.test(base))?.[1]
 }
 
-/** The shortest chain of refs from `start` to every ref reachable from it (`start` itself: `[]`). */
-function shortestChains(start: string, edges: Map<string, string[]>): Map<string, string[]> {
+/**
+ * The shortest chain of refs from `start` to every ref reachable from it (`start` itself: `[]`).
+ *
+ * Where two chains tie on length, Black Duck reports the one through the greater parent — its
+ * path to `actionpack` runs through `rspec-rails`, not `active_model_serializers`; to `@emotion/hash`
+ * through `@emotion/serialize`, not `@emotion/babel-plugin`. Visiting neighbours in descending
+ * order reproduces that: on ruby-mastodon it matched 636 of 800 Black Duck paths against 616 in
+ * the SBOM's own edge order (Trivy), and 449 against 426 (Syft).
+ */
+function shortestChains(start: string, graph: BomGraph): Map<string, string[]> {
+    const label = (ref: string) => {
+        const component = graph.byRef.get(ref)
+        return component ? `${component.name}@${component.version}` : ref
+    }
     const chains = new Map<string, string[]>([[start, []]])
     const queue = [start]
     while (queue.length > 0) {
@@ -83,7 +95,8 @@ function shortestChains(start: string, edges: Map<string, string[]>): Map<string
         const current = queue.shift()!
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const chain = chains.get(current)!
-        for (const next of edges.get(current) ?? []) {
+        const neighbours = [...(graph.edges.get(current) ?? [])].sort((a, b) => label(b).localeCompare(label(a)))
+        for (const next of neighbours) {
             if (chains.has(next)) continue
             chains.set(next, [...chain, next])
             queue.push(next)
@@ -118,7 +131,7 @@ function projectPaths(graph: BomGraph, node: ProjectNode, repo: string, purlType
             .filter((it): it is ParsedPurl => !!it)
         if (segments.length === 0) return
         const rendered = `${projectPath}/-${tagOf(chain[chain.length - 1], target)}/`
-            + segments.map(it => `${it.name}/${it.version}`).join('/')
+            + segments.map(it => pathSegment(originFor(purlType, it.name), it.name, it.version)).join('/')
         // Syft lists a package once per location it was seen in; one path per package is enough.
         const key = `${target.name}|${target.version}|${rendered}`
         if (seen.has(key)) return
@@ -137,7 +150,7 @@ function projectPaths(graph: BomGraph, node: ProjectNode, repo: string, purlType
     const starts = node.allComponents ? node.anchorRefs : [node.ref]
     const reached = new Set<string>()
     for (const start of starts) {
-        for (const [ref, chain] of shortestChains(start, graph.edges)) {
+        for (const [ref, chain] of shortestChains(start, graph)) {
             if (ref === start) continue
             reached.add(ref)
             emit(chain)

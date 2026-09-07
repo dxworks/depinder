@@ -98,6 +98,16 @@ export function originId(origin: Origin, name: string, version: string): string 
 }
 
 /**
+ * One segment of a `Path`. Black Duck joins name and version the way the origin id does —
+ * `org.eclipse.angus:angus-mail:2.0.5`, `laravel-lang/common:6.7.1`, `lodash/4.17.21` — with two
+ * differences for Go: the segment keeps the full import path (`golang.org/x/sys:v0.47.0`, not the
+ * go.googlesource.com id) and `long_tail`'s `#` is a colon there too.
+ */
+export function pathSegment(origin: Origin, name: string, version: string): string {
+    return `${name}${origin.versionSeparator === '/' ? '/' : ':'}${version}`
+}
+
+/**
  * `Component Link`. The registrar's own homepage is preferred — it is what Black Duck fills the
  * column with — and the registry page is the fallback for the components no registrar reached.
  */

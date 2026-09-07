@@ -130,7 +130,12 @@ than guessed.
 the parser builds projects from, so `Direct` in `_dependencies.csv` and a one-segment path here are
 the same statement. Black Duck writes **one row per (component, project)** — the shortest chain
 from the manifest to the component (1,122 rows for ruby-mastodon's 1,239 components) — and so do
-we: a package pulled in by two parents appears once, under whichever reaches it soonest.
+we: a package pulled in by two parents appears once, under whichever reaches it soonest, and
+where two chains tie on length, under the greater parent (Black Duck reaches `actionpack` through
+`rspec-rails`, not `active_model_serializers`; measured on ruby-mastodon, that tie-break matches
+636 of 800 chains against 616 in the SBOM's own edge order). A segment joins name and version the
+way the origin id does — `org.eclipse.angus:angus-mail:2.0.5`, `laravel/fortify:v1.28.0`,
+`lodash/4.17.21` — except that a Go module keeps its full import path (`golang.org/x/sys:v0.47.0`).
 
 The tag after the project is the **package manager whose manifest was walked**, in Black Duck's
 spelling: `-yarn`, `-npm` and `-pnpm` for the three JavaScript lockfiles, `-rubygems`, `-maven`,
