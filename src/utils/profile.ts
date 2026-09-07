@@ -36,6 +36,15 @@ export async function timePhase<T>(phase: string, fn: () => T | Promise<T>): Pro
     }
 }
 
+/**
+ * For a phase that spans a block too large to wrap in a callback: `const phase = startPhase(...)`,
+ * then `phase.end()` when the block is done.
+ */
+export function startPhase(phase: string): {end: () => void} {
+    const started = Date.now()
+    return {end: () => phases.set(phase, (phases.get(phase) ?? 0) + Date.now() - started)}
+}
+
 /** The synchronous twin of `timePhase`, for parsers and writers that never await. */
 export function timePhaseSync<T>(phase: string, fn: () => T): T {
     const started = Date.now()

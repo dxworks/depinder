@@ -42,7 +42,7 @@ import {AnalysedEcosystem, buildModel} from '../blackduck/model'
 import {writeSecurityCsv} from '../blackduck/export'
 import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
-import {count, enableProfile, logProfile, timePhase, timePhaseSync} from '../utils/profile'
+import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/profile'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
 
@@ -328,164 +328,164 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         const projectsBar = multiProgressBar.create(projects.length, 0, {name: 'Projects', state: 'Analysing'})
 
 
-        await timePhase(`enrich:${plugin.name}`, async () => {
-            for (const project of projects) {
-                log.info(`Plugin ${plugin.name} analyzing project ${project.name}@${project.version}`)
-                const dependencies = Object.values(project.dependencies)
-                const filteredDependencies = dependencies.filter(it => !blacklistedGlobs.some(glob => minimatch(it.name, glob)))
-                const depProgressBar = multiProgressBar.create(filteredDependencies.length, 0, {
-                    name: 'Deps',
-                    state: 'Analysing deps',
-                })
-                let depsWithInfo = 0
+        const enrich = startPhase(`enrich:${plugin.name}`)
+        for (const project of projects) {
+            log.info(`Plugin ${plugin.name} analyzing project ${project.name}@${project.version}`)
+            const dependencies = Object.values(project.dependencies)
+            const filteredDependencies = dependencies.filter(it => !blacklistedGlobs.some(glob => minimatch(it.name, glob)))
+            const depProgressBar = multiProgressBar.create(filteredDependencies.length, 0, {
+                name: 'Deps',
+                state: 'Analysing deps',
+            })
+            let depsWithInfo = 0
 
-                const processDep = async (dep: DepinderDependency) => {
-                    try {
-                        let lib
-                        // Keyed by ecosystem, not plugin name: `java` and `sbom-java` share a
-                        // registrar, so they must share cache entries rather than fetch each library
-                        // twice. `update.ts` reconstructs library names from this same prefix.
-                        const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
-                        if (await cacheHit(cache, cacheKey, dep, options.refresh, refreshedLibs)) {
-                            count('cache:hit')
-                            lib = await cache.get(cacheKey) as LibraryInfo
-                        } else if (!options.refresh && misses.has(cacheKey)) {
-                            // Same outcome as the failed lookup it remembers: the dependency
-                            // keeps whatever the parser gave it, untouched.
-                            count('cache:known-miss')
-                            log.warn(`Skipping ${dep.name}: its registry lookup failed within the last ${MISS_TTL_HOURS}h (--refresh to retry)`)
-                            return
-                        } else {
-                            count('cache:miss')
-                            // log.info(`Getting remote information on ${dep.name}`)
-                            let fetch = inFlight.get(cacheKey)
-                            if (!fetch) {
-                                fetch = (async () => {
-                                    let fetched: LibraryInfo
+            const processDep = async (dep: DepinderDependency) => {
+                try {
+                    let lib
+                    // Keyed by ecosystem, not plugin name: `java` and `sbom-java` share a
+                    // registrar, so they must share cache entries rather than fetch each library
+                    // twice. `update.ts` reconstructs library names from this same prefix.
+                    const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
+                    if (await cacheHit(cache, cacheKey, dep, options.refresh, refreshedLibs)) {
+                        count('cache:hit')
+                        lib = await cache.get(cacheKey) as LibraryInfo
+                    } else if (!options.refresh && misses.has(cacheKey)) {
+                        // Same outcome as the failed lookup it remembers: the dependency
+                        // keeps whatever the parser gave it, untouched.
+                        count('cache:known-miss')
+                        log.warn(`Skipping ${dep.name}: its registry lookup failed within the last ${MISS_TTL_HOURS}h (--refresh to retry)`)
+                        return
+                    } else {
+                        count('cache:miss')
+                        // log.info(`Getting remote information on ${dep.name}`)
+                        let fetch = inFlight.get(cacheKey)
+                        if (!fetch) {
+                            fetch = (async () => {
+                                let fetched: LibraryInfo
+                                try {
+                                    fetched = await retrieveWithRetry(plugin, dep.name)
+                                } catch (e: any) {
+                                    if (!isRateLimit(e)) misses.set(cacheKey)
+                                    throw e
+                                }
+                                if (plugin.checker?.githubSecurityAdvisoryEcosystem && process.env.GH_TOKEN) {
+                                    // A failed advisory lookup must not discard the registry data
+                                    // already fetched — degrade to no vulnerabilities instead.
                                     try {
-                                        fetched = await retrieveWithRetry(plugin, dep.name)
+                                        fetched.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, fetched.name)
                                     } catch (e: any) {
-                                        if (!isRateLimit(e)) misses.set(cacheKey)
-                                        throw e
+                                        log.warn(`Vulnerability lookup failed for ${fetched.name}: ${e.message ?? e}`)
                                     }
-                                    if (plugin.checker?.githubSecurityAdvisoryEcosystem && process.env.GH_TOKEN) {
-                                        // A failed advisory lookup must not discard the registry data
-                                        // already fetched — degrade to no vulnerabilities instead.
-                                        try {
-                                            fetched.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, fetched.name)
-                                        } catch (e: any) {
-                                            log.warn(`Vulnerability lookup failed for ${fetched.name}: ${e.message ?? e}`)
-                                        }
-                                    }
-                                    await cache.set(cacheKey, fetched)
-                                    if (options.refresh) refreshedLibs.push(dep.name)
-                                    if (Date.now() - lastCheckpoint > CACHE_CHECKPOINT_MS) {
-                                        lastCheckpoint = Date.now()
-                                        await checkpoint()
-                                    }
-                                    return fetched
-                                })()
-                                inFlight.set(cacheKey, fetch)
-                                fetch.finally(() => inFlight.delete(cacheKey)).catch(() => { /* handled by awaiters */ })
-                            }
-                            lib = await fetch
+                                }
+                                await cache.set(cacheKey, fetched)
+                                if (options.refresh) refreshedLibs.push(dep.name)
+                                if (Date.now() - lastCheckpoint > CACHE_CHECKPOINT_MS) {
+                                    lastCheckpoint = Date.now()
+                                    await checkpoint()
+                                }
+                                return fetched
+                            })()
+                            inFlight.set(cacheKey, fetch)
+                            fetch.finally(() => inFlight.delete(cacheKey)).catch(() => { /* handled by awaiters */ })
                         }
-                        dep.libraryInfo = lib
-                        dep.vulnerabilities = resolveVulnerabilities(project, dep, lib)
-                    } catch (e: any) {
-                        count('registry:error')
-                        log.warn(`Exception getting remote info for ${dep.name}`)
-                        log.error(e)
-                    } finally {
-                        depProgressBar.increment()
-                        depsWithInfo++
-                        log.info(`Got remote information on ${dep.name} (${depsWithInfo}/${filteredDependencies.length})`)
+                        lib = await fetch
+                    }
+                    dep.libraryInfo = lib
+                    dep.vulnerabilities = resolveVulnerabilities(project, dep, lib)
+                } catch (e: any) {
+                    count('registry:error')
+                    log.warn(`Exception getting remote info for ${dep.name}`)
+                    log.error(e)
+                } finally {
+                    depProgressBar.increment()
+                    depsWithInfo++
+                    log.info(`Got remote information on ${dep.name} (${depsWithInfo}/${filteredDependencies.length})`)
+                }
+            }
+
+            let nextDepIndex = 0
+            await Promise.all(Array.from(
+                {length: Math.min(REGISTRY_CONCURRENCY, filteredDependencies.length)},
+                async () => {
+                    while (nextDepIndex < filteredDependencies.length) {
+                        const dep = filteredDependencies[nextDepIndex++]
+                        await processDep(dep)
                     }
                 }
-
-                let nextDepIndex = 0
-                await Promise.all(Array.from(
-                    {length: Math.min(REGISTRY_CONCURRENCY, filteredDependencies.length)},
-                    async () => {
-                        while (nextDepIndex < filteredDependencies.length) {
-                            const dep = filteredDependencies[nextDepIndex++]
-                            await processDep(dep)
-                        }
-                    }
-                ))
-                depProgressBar.stop()
-                projectsBar.increment()
-            }
-        })
+            ))
+            depProgressBar.stop()
+            projectsBar.increment()
+        }
+        enrich.end()
         projectsBar.stop()
 
         multiProgressBar.stop()
 
         await checkpoint()
 
-        timePhaseSync(`csv:${plugin.name}`, () => {
+        const csv = startPhase(`csv:${plugin.name}`)
 
-            const allLibsInfo = projects.flatMap(proj => Object.values(proj.dependencies).map(dep => dep.libraryInfo))
-                .filter(it => it !== undefined && it != null).map(it => it as LibraryInfo)
+        const allLibsInfo = projects.flatMap(proj => Object.values(proj.dependencies).map(dep => dep.libraryInfo))
+            .filter(it => it !== undefined && it != null).map(it => it as LibraryInfo)
 
-            const allLicenses = _.groupBy(allLibsInfo, licenseOf)
+        const allLicenses = _.groupBy(allLibsInfo, licenseOf)
 
-            const licensesHeader = 'License,Libraries,Library Names\n'
-            fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-licenses.csv`),
-                licensesHeader + Object.keys(allLicenses).map(license =>
-                    csvRow([license, allLicenses[license].length, allLicenses[license].map(it => it.name).join(', ')])
-                ).join('\n'))
+        const licensesHeader = 'License,Libraries,Library Names\n'
+        fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-licenses.csv`),
+            licensesHeader + Object.keys(allLicenses).map(license =>
+                csvRow([license, allLicenses[license].length, allLicenses[license].map(it => it.name).join(', ')])
+            ).join('\n'))
 
-            const header = 'Project Path,Project,Library,Used Version,Latest Version,Used Version Release Date,Latest Version Release Date,Latest-Used,Now-Used,Now-latest,Vulnerabilities,Vulnerability Details,DirectDependency,Type,Licenses\n'
-            fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-libs.csv`), header + projects.flatMap(proj =>
-                Object.values(proj.dependencies).map(dep => convertDepToRow(proj, dep))).join('\n'))
+        const header = 'Project Path,Project,Library,Used Version,Latest Version,Used Version Release Date,Latest Version Release Date,Latest-Used,Now-Used,Now-latest,Vulnerabilities,Vulnerability Details,DirectDependency,Type,Licenses\n'
+        fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-libs.csv`), header + projects.flatMap(proj =>
+            Object.values(proj.dependencies).map(dep => convertDepToRow(proj, dep))).join('\n'))
 
 
-            const purlType = purlTypeOfPlugin(plugin) ?? purlTypeOfEcosystem(ecosystemOf(plugin))
-            if (purlType) analysed.push({purlType, projects})
+        const purlType = purlTypeOfPlugin(plugin) ?? purlTypeOfEcosystem(ecosystemOf(plugin))
+        if (purlType) analysed.push({purlType, projects})
 
-            const projectStatsHeader = 'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct Out of Support, Indirect Out of Support\n'
-            fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-project-stats.csv`), projectStatsHeader + projects.map(proj => {
-                const enhancedDeps: DependencyInfo[] = Object.values(proj.dependencies).map(dep => {
-                    const latestVersion = dep.libraryInfo?.versions.find(it => it.latest)
-                    const currentVersion = dep.libraryInfo?.versions.find(it => it.version == dep.version.trim())
-                    const latestVersionMoment = moment(latestVersion?.timestamp)
-                    const currentVersionMoment = moment(currentVersion?.timestamp)
-                    const now = moment()
-                    const directDep: boolean = !dep.requestedBy || dep.requestedBy.some(it => it.startsWith(`${proj.name}@${proj.version}`))
+        const projectStatsHeader = 'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct Out of Support, Indirect Out of Support\n'
+        fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-project-stats.csv`), projectStatsHeader + projects.map(proj => {
+            const enhancedDeps: DependencyInfo[] = Object.values(proj.dependencies).map(dep => {
+                const latestVersion = dep.libraryInfo?.versions.find(it => it.latest)
+                const currentVersion = dep.libraryInfo?.versions.find(it => it.version == dep.version.trim())
+                const latestVersionMoment = moment(latestVersion?.timestamp)
+                const currentVersionMoment = moment(currentVersion?.timestamp)
+                const now = moment()
+                const directDep: boolean = !dep.requestedBy || dep.requestedBy.some(it => it.startsWith(`${proj.name}@${proj.version}`))
 
-                    return {
-                        ...dep,
-                        direct: directDep,
-                        latest_used: latestVersionMoment.diff(currentVersionMoment, 'months'),
-                        now_used: now.diff(currentVersionMoment, 'months'),
-                        now_latest: now.diff(latestVersionMoment, 'months'),
-                    } as DependencyInfo
-                })
-                const directDeps = enhancedDeps.filter(dep => dep.direct)
-                const indirectDeps = enhancedDeps.filter(dep => !dep.direct)
+                return {
+                    ...dep,
+                    direct: directDep,
+                    latest_used: latestVersionMoment.diff(currentVersionMoment, 'months'),
+                    now_used: now.diff(currentVersionMoment, 'months'),
+                    now_latest: now.diff(latestVersionMoment, 'months'),
+                } as DependencyInfo
+            })
+            const directDeps = enhancedDeps.filter(dep => dep.direct)
+            const indirectDeps = enhancedDeps.filter(dep => !dep.direct)
 
-                const outdatedThreshold = 15
+            const outdatedThreshold = 15
 
-                const directOutdated = directDeps.filter(dep => dep.latest_used > outdatedThreshold)
-                const directOutDatedPercent = directDeps.length == 0 ? 0 : directOutdated.length / directDeps.length * 100
-                const indirectOutdated = indirectDeps.filter(dep => dep.latest_used > outdatedThreshold)
-                const indirectOutDatedPercent = indirectDeps.length == 0 ? 0 : indirectOutdated.length / indirectDeps.length * 100
-                const directVulnerable = directDeps.filter(dep => dep.vulnerabilities && dep.vulnerabilities.length > 0)
-                const indirectVulnerable = indirectDeps.filter(dep => dep.vulnerabilities && dep.vulnerabilities.length > 0)
+            const directOutdated = directDeps.filter(dep => dep.latest_used > outdatedThreshold)
+            const directOutDatedPercent = directDeps.length == 0 ? 0 : directOutdated.length / directDeps.length * 100
+            const indirectOutdated = indirectDeps.filter(dep => dep.latest_used > outdatedThreshold)
+            const indirectOutDatedPercent = indirectDeps.length == 0 ? 0 : indirectOutdated.length / indirectDeps.length * 100
+            const directVulnerable = directDeps.filter(dep => dep.vulnerabilities && dep.vulnerabilities.length > 0)
+            const indirectVulnerable = indirectDeps.filter(dep => dep.vulnerabilities && dep.vulnerabilities.length > 0)
 
-                const outOfSupportThreshold = 24
-                const directOutOfSupport = directDeps.filter(dep => dep.now_latest > outOfSupportThreshold)
-                const indirectOutOfSupport = indirectDeps.filter(dep => dep.now_latest > outOfSupportThreshold)
+            const outOfSupportThreshold = 24
+            const directOutOfSupport = directDeps.filter(dep => dep.now_latest > outOfSupportThreshold)
+            const indirectOutOfSupport = indirectDeps.filter(dep => dep.now_latest > outOfSupportThreshold)
 
-                return csvRow([
-                    proj.path, proj.name, directDeps.length, indirectDeps.length,
-                    directOutdated.length, directOutDatedPercent, indirectOutdated.length,
-                    indirectOutDatedPercent, directVulnerable.length, indirectVulnerable.length,
-                    directOutOfSupport.length, indirectOutOfSupport.length,
-                ])
-            }).join('\n'))
-        })
+            return csvRow([
+                proj.path, proj.name, directDeps.length, indirectDeps.length,
+                directOutdated.length, directOutDatedPercent, indirectOutdated.length,
+                indirectOutDatedPercent, directVulnerable.length, indirectVulnerable.length,
+                directOutOfSupport.length, indirectOutOfSupport.length,
+            ])
+        }).join('\n'))
+        csv.end()
     }
 
     if (preflight) {
