@@ -1,6 +1,6 @@
 import * as pep440 from '@renovatebot/pep440'
 import * as gemVersion from '@renovatebot/ruby-semver'
-import semver from 'semver'
+import semver, {SemVer} from 'semver'
 import {ComparatorFamily} from './ecosystems'
 
 /**
@@ -148,10 +148,28 @@ function withFallback(valid: (v: string) => boolean, compare: (a: string, b: str
     }
 }
 
-export const compareSemver: VersionComparator = withFallback(
-    v => semver.valid(v, {loose: true}) !== null,
-    (a, b) => semver.compare(a, b, {loose: true})
-)
+/**
+ * Parsed once per distinct string. Ordering a registry's version list sorts a few hundred strings
+ * with this comparator, for thousands of components; parsing both operands on every comparison —
+ * which is what `semver.compare` does — was the largest CPU cost of building the export model.
+ */
+const parsedSemver = new Map<string, SemVer | null>()
+
+function semverOf(version: string): SemVer | null {
+    let parsed = parsedSemver.get(version)
+    if (parsed === undefined) {
+        parsed = semver.parse(version, {loose: true})
+        parsedSemver.set(version, parsed)
+    }
+    return parsed
+}
+
+export const compareSemver: VersionComparator = (a, b) => {
+    const left = semverOf(a)
+    const right = semverOf(b)
+    if (!left || !right) return compareGeneric(a, b)
+    return sign(left.compare(right))
+}
 
 export const comparePep440: VersionComparator = withFallback(
     v => !!pep440.valid(v),
