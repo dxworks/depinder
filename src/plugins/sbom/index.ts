@@ -125,21 +125,23 @@ function sbomPluginFor(name: string, purlType: string, source: Plugin): Plugin {
     }
 }
 
-export const sbomJava = sbomPluginFor('sbom-java', 'maven', java)
-export const sbomNpm = sbomPluginFor('sbom-npm', 'npm', javascript)
-export const sbomRuby = sbomPluginFor('sbom-ruby', 'gem', ruby)
-export const sbomPython = sbomPluginFor('sbom-python', 'pypi', python)
-export const sbomPhp = sbomPluginFor('sbom-php', 'composer', php)
-export const sbomDotnet = sbomPluginFor('sbom-dotnet', 'nuget', dotnet)
-
-export const sbomPlugins: Plugin[] = [
-    sbomJava,
-    sbomNpm,
-    sbomRuby,
-    sbomPython,
-    sbomPhp,
-    sbomDotnet,
+/**
+ * The ecosystems the SBOM route covers, and the native plugin each one borrows from. This is the
+ * single place the (plugin name, purl type, registrar) correspondence is written down — every
+ * lookup below reads it rather than restating it.
+ */
+const SBOM_ECOSYSTEMS: readonly {name: string, purlType: string, source: Plugin}[] = [
+    {name: 'sbom-java', purlType: 'maven', source: java},
+    {name: 'sbom-npm', purlType: 'npm', source: javascript},
+    {name: 'sbom-ruby', purlType: 'gem', source: ruby},
+    {name: 'sbom-python', purlType: 'pypi', source: python},
+    {name: 'sbom-php', purlType: 'composer', source: php},
+    {name: 'sbom-dotnet', purlType: 'nuget', source: dotnet},
 ]
+
+export const sbomPlugins: Plugin[] = SBOM_ECOSYSTEMS.map(it => sbomPluginFor(it.name, it.purlType, it.source))
+
+export const [sbomJava, sbomNpm, sbomRuby, sbomPython, sbomPhp, sbomDotnet] = sbomPlugins
 
 /**
  * The SBOM files a given plugin selection would scan.
@@ -161,6 +163,28 @@ export function sbomFilesFor(plugins: Plugin[], files: string[]): string[] {
 export function purlTypeOfPlugin(plugin: Plugin): string | undefined {
     if (!sbomPlugins.includes(plugin)) return undefined
     return plugin.aliases?.find(it => it.startsWith('sbom-'))?.slice('sbom-'.length)
+}
+
+/**
+ * The purl type a NATIVE plugin's components carry — `java` -> `maven`. The SBOM ecosystem table
+ * already pairs the two, so reading it back beats a second table that could drift out of step.
+ */
+export function purlTypeOfEcosystem(ecosystem: string): string | undefined {
+    return SBOM_ECOSYSTEMS.find(it => (it.source.ecosystem ?? it.source.name) === ecosystem)?.purlType
+}
+
+/**
+ * The SBOM plugins that can say anything about these purl types.
+ *
+ * `export-blackduck` selects its own plugins from the SBOMs it was given, so that a user pointing
+ * at a folder of SBOMs never has to work out which `sbom-*` plugins their ecosystems correspond to.
+ */
+export function sbomPluginsForPurlTypes(purlTypes: Iterable<string>): Plugin[] {
+    const wanted = new Set([...purlTypes].map(it => it.trim().toLowerCase()))
+    return sbomPlugins.filter(it => {
+        const purlType = purlTypeOfPlugin(it)
+        return !!purlType && wanted.has(purlType)
+    })
 }
 
 /** Exposed for tests, which need each parse to start from a clean slate. */
