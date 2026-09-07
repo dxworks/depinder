@@ -89,7 +89,9 @@ export function profileLines(): string[] {
     for (const [phase, ms] of phases) {
         lines.push(`  ${(ms / 1000).toFixed(1).padStart(8)}s  ${phase}`)
     }
+    // Phases overlap (plugins run side by side), so the sum is a cost, not a duration.
     lines.push(`  ${(totalMs / 1000).toFixed(1).padStart(8)}s  (sum of phases)`)
+    lines.push(`  ${process.uptime().toFixed(1).padStart(8)}s  (wall clock since start)`)
     for (const [counter, n] of [...counters].sort()) {
         lines.push(`  ${String(n).padStart(9)}  ${counter}`)
     }

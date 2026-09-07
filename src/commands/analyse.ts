@@ -296,24 +296,32 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
             Promise.all(sbomFilesToParse(selectedPlugins, sbomFiles).map(file => scanSbomFileOnce(file))))
     }
 
-    const analysed: AnalysisResult[] = []
+    const cache: Cache = useCache ? chooseCacheOption() : noCache
+    const misses: MissCache = useCache ? missCache : noMissCache
+    await timePhase('cache:load', async () => {
+        await cache.load()
+        misses.load()
+    })
+    const checkpoint = () => timePhase('cache:write', async () => {
+        await cache.write()
+        misses.write()
+    })
+    let lastCheckpoint = Date.now()
+    const checkpointIfDue = async () => {
+        if (Date.now() - lastCheckpoint < CACHE_CHECKPOINT_MS) return
+        lastCheckpoint = Date.now()
+        await checkpoint()
+    }
+    const progress = new MultiBar({}, Presets.shades_grey)
 
-    for (const plugin of selectedPlugins) {
+    // The plugins run side by side. Each talks to its own registry, so six at once put no more
+    // than REGISTRY_CONCURRENCY requests on any one of them, and a registry that stalls — Maven
+    // Central's search API, for one — no longer holds the others up.
+    const results = await Promise.all(selectedPlugins.map(async (plugin): Promise<AnalysisResult | undefined> => {
         log.info(`Plugin ${plugin.name} starting`)
 
-        const cache: Cache = useCache ? chooseCacheOption() : noCache
-        const misses: MissCache = useCache ? missCache : noMissCache
-        await timePhase('cache:load', async () => {
-            await cache.load()
-            misses.load()
-        })
-        const checkpoint = () => timePhase('cache:write', async () => {
-            await cache.write()
-            misses.write()
-        })
         const refreshedLibs = [] as string[]
         const inFlight = new Map<string, Promise<LibraryInfo>>()
-        let lastCheckpoint = Date.now()
 
         const files = allFiles
             .filter(it => plugin.extractor.filter ? plugin.extractor.filter(it) : true)
@@ -323,9 +331,7 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
 
         const projects: DepinderProject[] = await timePhase(`parse:${plugin.name}`, () => extractProjects(plugin, files))
 
-        const multiProgressBar = new MultiBar({}, Presets.shades_grey)
-
-        const projectsBar = multiProgressBar.create(projects.length, 0, {name: 'Projects', state: 'Analysing'})
+        const projectsBar = progress.create(projects.length, 0, {name: 'Projects', state: 'Analysing'})
 
 
         const enrich = startPhase(`enrich:${plugin.name}`)
@@ -333,7 +339,7 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
             log.info(`Plugin ${plugin.name} analyzing project ${project.name}@${project.version}`)
             const dependencies = Object.values(project.dependencies)
             const filteredDependencies = dependencies.filter(it => !blacklistedGlobs.some(glob => minimatch(it.name, glob)))
-            const depProgressBar = multiProgressBar.create(filteredDependencies.length, 0, {
+            const depProgressBar = progress.create(filteredDependencies.length, 0, {
                 name: 'Deps',
                 state: 'Analysing deps',
             })
@@ -379,10 +385,7 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
                                 }
                                 await cache.set(cacheKey, fetched)
                                 if (options.refresh) refreshedLibs.push(dep.name)
-                                if (Date.now() - lastCheckpoint > CACHE_CHECKPOINT_MS) {
-                                    lastCheckpoint = Date.now()
-                                    await checkpoint()
-                                }
+                                await checkpointIfDue()
                                 return fetched
                             })()
                             inFlight.set(cacheKey, fetch)
@@ -419,10 +422,6 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         enrich.end()
         projectsBar.stop()
 
-        multiProgressBar.stop()
-
-        await checkpoint()
-
         const csv = startPhase(`csv:${plugin.name}`)
 
         const allLibsInfo = projects.flatMap(proj => Object.values(proj.dependencies).map(dep => dep.libraryInfo))
@@ -440,9 +439,6 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-libs.csv`), header + projects.flatMap(proj =>
             Object.values(proj.dependencies).map(dep => convertDepToRow(proj, dep))).join('\n'))
 
-
-        const purlType = purlTypeOfPlugin(plugin) ?? purlTypeOfEcosystem(ecosystemOf(plugin))
-        if (purlType) analysed.push({purlType, projects})
 
         const projectStatsHeader = 'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct Out of Support, Indirect Out of Support\n'
         fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-project-stats.csv`), projectStatsHeader + projects.map(proj => {
@@ -486,7 +482,13 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
             ])
         }).join('\n'))
         csv.end()
-    }
+
+        const purlType = purlTypeOfPlugin(plugin) ?? purlTypeOfEcosystem(ecosystemOf(plugin))
+        return purlType ? {purlType, projects} : undefined
+    }))
+    progress.stop()
+    await checkpoint()
+    const analysed = results.filter((it): it is AnalysisResult => it !== undefined)
 
     if (preflight) {
         // Repeated here because the preflight banner is thousands of log lines back by now, and
