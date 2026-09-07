@@ -2,7 +2,7 @@ import {Command} from 'commander'
 import fs from 'fs'
 import path from 'path'
 import {getPluginsFromNames} from '../plugins'
-import {purlTypeOfPlugin, sbomFilesFor} from '../plugins/sbom'
+import {purlTypeOfEcosystem, purlTypeOfPlugin, sbomFilesFor} from '../plugins/sbom'
 import {
     preflightScanners,
     scannerPreflightMessages,
@@ -36,7 +36,9 @@ import {ecosystemsInSboms} from '../vuln-sources/github/scan'
 import {refreshEcosystems} from '../vuln-sources/github/download'
 import {DEFAULT_MAX_AGE_HOURS} from '../vuln-sources/github/cache'
 import {DEFAULT_TOKEN_FILE} from '../vuln-sources/github/tokens'
-import {SECURITY_CSV_FILE, SECURITY_CSV_HEADERS, SecurityRow, securityRowsForProjects} from '../vuln-sources/security-csv'
+import {AnalysedEcosystem, buildModel} from '../blackduck/model'
+import {writeSecurityCsv} from '../blackduck/export'
+import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
@@ -86,20 +88,6 @@ function extractLicenses(dep: DepinderDependency) {
     return dep.libraryInfo?.licenses?.map(it => {
         if (typeof it === 'string') return it.substring(0, 100); else return JSON.stringify(it)
     })
-}
-
-/**
- * RFC 4180: a cell containing a comma, a quote or a newline must be quoted, and embedded quotes
- * doubled. Versions carry commas in the wild — Maven range strings such as `[4.1,4.2000)` — and an
- * unquoted one splits into two cells, shifting every column after it for that row.
- */
-function csvCell(value: unknown): string {
-    const text = value === undefined || value === null ? '' : String(value)
-    return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
-}
-
-export function csvRow(cells: unknown[]): string {
-    return cells.map(csvCell).join(',')
 }
 
 export function convertDepToRow(proj: DepinderProject, dep: DepinderDependency): string {
@@ -219,7 +207,29 @@ async function retrieveWithRetry(plugin: Plugin, name: string): Promise<LibraryI
     }
 }
 
+/**
+ * What one plugin's pass produced: the purl type its components carry, and the projects it
+ * enriched. `export-blackduck` builds its whole model out of this, which is what keeps the two
+ * commands from growing two copies of the analysis.
+ */
+export type AnalysisResult = AnalysedEcosystem
+
 export async function analyseFiles(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
+    const resultFolder = path.resolve(process.cwd(), options.results || 'results')
+    const analysed = await runAnalysis(folders, options, useCache)
+
+    // One security CSV for the whole run, not one per plugin: a finding is identified by
+    // (component, advisory), and which depinder plugin happened to enrich the component is not
+    // part of that identity. It is written by the Black Duck writer, so `analyse` and
+    // `export-blackduck` cannot disagree about its columns — and `export-blackduck` writes it
+    // itself, from a model that also knows the project name, which is why it is here rather than
+    // inside `runAnalysis`.
+    const written = writeSecurityCsv(buildModel(path.basename(resultFolder), analysed, []), resultFolder)
+    log.info(`${written.rows} security finding row(s) written to ${written.file}`)
+}
+
+/** `analyse`, plus the enriched projects, so a caller can write its own reports from them. */
+export async function runAnalysis(folders: string[], options: AnalyseOptions, useCache = true): Promise<AnalysisResult[]> {
     const resultFolder = options.results || 'results'
     if (!fs.existsSync(path.resolve(process.cwd(), resultFolder))) {
         fs.mkdirSync(path.resolve(process.cwd(), resultFolder), {recursive: true})
@@ -261,7 +271,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
         }
     }
 
-    const securityRows: SecurityRow[] = []
+    const analysed: AnalysisResult[] = []
 
     for (const plugin of selectedPlugins) {
         log.info(`Plugin ${plugin.name} starting`)
@@ -375,7 +385,8 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
             Object.values(proj.dependencies).map(dep => convertDepToRow(proj, dep))).join('\n'))
 
 
-        securityRows.push(...securityRowsForProjects(projects, purlTypeOfPlugin(plugin) ?? ecosystemOf(plugin)))
+        const purlType = purlTypeOfPlugin(plugin) ?? purlTypeOfEcosystem(ecosystemOf(plugin))
+        if (purlType) analysed.push({purlType, projects})
 
         const projectStatsHeader = 'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct Out of Support, Indirect Out of Support\n'
         fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-project-stats.csv`), projectStatsHeader + projects.map(proj => {
@@ -420,13 +431,6 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
         }).join('\n'))
     }
 
-    // One security CSV for the whole run, not one per plugin: a finding is identified by
-    // (component, advisory, project), and which depinder plugin happened to enrich the component
-    // is not part of that identity.
-    fs.writeFileSync(path.resolve(process.cwd(), resultFolder, SECURITY_CSV_FILE),
-        [csvRow([...SECURITY_CSV_HEADERS]), ...securityRows.map(row => csvRow(SECURITY_CSV_HEADERS.map(it => row[it])))].join('\n'))
-    log.info(`${securityRows.length} security finding row(s) written to ${SECURITY_CSV_FILE}`)
-
     if (preflight) {
         // Repeated here because the preflight banner is thousands of log lines back by now, and
         // because a CSV is only readable next to the matcher and DB build that produced it.
@@ -442,6 +446,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
 
     log.info(`Results are written to ${path.resolve(process.cwd(), resultFolder)}`)
     log.info('Done')
+    return analysed
 }
 
 interface DependencyInfo extends DepinderDependency {

@@ -6,6 +6,7 @@ import {updateCommand} from './commands/update'
 import {extractFrameworkVersionsCommand} from './commands/extractFrameworkVersion'
 import {transformBlackDuckReportsCommand} from './commands/transformBlackDuckReports'
 import {githubAdvisoriesCommand} from './commands/githubAdvisories'
+import {exportBlackduckCommand} from './commands/exportBlackduck'
 
 export const mainCommand = new Command()
     .name('depinder')
@@ -17,3 +18,4 @@ export const mainCommand = new Command()
     .addCommand(extractFrameworkVersionsCommand)
     .addCommand(transformBlackDuckReportsCommand)
     .addCommand(githubAdvisoriesCommand)
+    .addCommand(exportBlackduckCommand)

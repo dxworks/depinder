@@ -1,5 +1,6 @@
 import {parse} from 'csv-parse/sync'
-import {convertDepToRow, csvRow} from '../src/commands/analyse'
+import {convertDepToRow} from '../src/commands/analyse'
+import {csvRow} from '../src/utils/csv'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
 import {LibraryInfo} from '../src/extension-points/registrar'
 
