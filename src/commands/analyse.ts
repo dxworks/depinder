@@ -2,7 +2,7 @@ import {Command} from 'commander'
 import fs from 'fs'
 import path from 'path'
 import {getPluginsFromNames} from '../plugins'
-import {sbomFilesFor} from '../plugins/sbom'
+import {purlTypeOfPlugin, sbomFilesFor} from '../plugins/sbom'
 import {
     preflightScanners,
     scannerPreflightMessages,
@@ -26,6 +26,17 @@ import {walkDir} from '../utils/utils'
 import {blacklistedGlobs} from '../utils/blacklist'
 import minimatch from 'minimatch'
 import {mongoCache} from '../cache/mongo-cache'
+import {
+    DEFAULT_VULN_SOURCE,
+    describeVulnSources,
+    parseVulnSources,
+    setVulnSources,
+} from '../vuln-sources/selection'
+import {ecosystemsInSboms} from '../vuln-sources/github/scan'
+import {refreshEcosystems} from '../vuln-sources/github/download'
+import {DEFAULT_MAX_AGE_HOURS} from '../vuln-sources/github/cache'
+import {DEFAULT_TOKEN_FILE} from '../vuln-sources/github/tokens'
+import {SECURITY_CSV_FILE, SECURITY_CSV_HEADERS, SecurityRow, securityRowsForProjects} from '../vuln-sources/security-csv'
 import {log} from '../utils/logging'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
@@ -37,6 +48,11 @@ export interface AnalyseOptions {
     plugins?: string[]
     results: string
     refresh: boolean
+    /** Comma-separated: trivy, grype, github, all. Defaults to today's behaviour, trivy+grype. */
+    vulnSource?: string
+    githubTokenFile?: string
+    /** Hours before a cached ecosystem's advisories are re-downloaded. */
+    githubMaxAge?: string
 }
 
 /** A factory rather than a single instance, so tests can parse arguments from a clean slate. */
@@ -51,6 +67,15 @@ export function createAnalyseCommand(): Command {
         .option('-r, --results <folder>', 'The results folder', 'results')
         .option('--refresh', 'Refresh the cache', false)
         .option('-p, --plugins <plugins...>', 'A list of plugins')
+        .option('--vuln-source <sources>',
+            'Vulnerability sources for the SBOM route: a comma-separated list of trivy, grype, github, all',
+            DEFAULT_VULN_SOURCE)
+        .option('--github-token-file <file>',
+            'Dotenv-style file holding GH_TOKEN_1, GH_TOKEN_2, ... for --vuln-source github',
+            DEFAULT_TOKEN_FILE)
+        .option('--github-max-age <hours>',
+            'Re-download a cached ecosystem\'s GitHub advisories when they are older than this',
+            String(DEFAULT_MAX_AGE_HOURS))
         .action(analyseFiles)
 }
 
@@ -210,10 +235,33 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
     // front, and never abort: a run without scanners is degraded, not invalid.
     const sbomFiles = sbomFilesFor(selectedPlugins, allFiles)
     const hasGithubToken = !!process.env.GH_TOKEN
-    const preflight = sbomFiles.length > 0 ? await preflightScanners() : undefined
+    const sources = parseVulnSources(options.vulnSource ?? DEFAULT_VULN_SOURCE)
+    setVulnSources(sources)
+    if (sbomFiles.length > 0) log.info(`Vulnerability sources: ${describeVulnSources(sources)}`)
+
+    const runsLocalScanners = sources.trivy || sources.grype
+    const preflight = sbomFiles.length > 0 && runsLocalScanners ? await preflightScanners() : undefined
     if (preflight) {
         for (const message of scannerPreflightMessages(preflight, hasGithubToken)) log[message.level](message.text)
     }
+
+    // The GitHub cache is refreshed before any parsing, and only for the ecosystems these SBOMs
+    // actually contain — a Ruby project never downloads npm's 7,000 advisories. A refresh failure
+    // is a warning: whatever is already cached still matches.
+    if (sbomFiles.length > 0 && sources.github) {
+        const ecosystems = ecosystemsInSboms(sbomFiles)
+        log.info(`GitHub advisory ecosystems in these SBOMs: ${ecosystems.join(', ') || 'none'}`)
+        try {
+            const report = await refreshEcosystems(ecosystems, Number(options.githubMaxAge ?? DEFAULT_MAX_AGE_HOURS), {
+                tokenFile: options.githubTokenFile,
+            })
+            if (!report) log.info('GitHub advisory cache is up to date; nothing to download')
+        } catch (e: any) {
+            log.warn(`GitHub advisory refresh skipped: ${e?.message ?? e}`)
+        }
+    }
+
+    const securityRows: SecurityRow[] = []
 
     for (const plugin of selectedPlugins) {
         log.info(`Plugin ${plugin.name} starting`)
@@ -327,6 +375,8 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
             Object.values(proj.dependencies).map(dep => convertDepToRow(proj, dep))).join('\n'))
 
 
+        securityRows.push(...securityRowsForProjects(projects, purlTypeOfPlugin(plugin) ?? ecosystemOf(plugin)))
+
         const projectStatsHeader = 'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct Out of Support, Indirect Out of Support\n'
         fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-project-stats.csv`), projectStatsHeader + projects.map(proj => {
             const enhancedDeps: DependencyInfo[] = Object.values(proj.dependencies).map(dep => {
@@ -369,6 +419,13 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
             ])
         }).join('\n'))
     }
+
+    // One security CSV for the whole run, not one per plugin: a finding is identified by
+    // (component, advisory, project), and which depinder plugin happened to enrich the component
+    // is not part of that identity.
+    fs.writeFileSync(path.resolve(process.cwd(), resultFolder, SECURITY_CSV_FILE),
+        [csvRow([...SECURITY_CSV_HEADERS]), ...securityRows.map(row => csvRow(SECURITY_CSV_HEADERS.map(it => row[it])))].join('\n'))
+    log.info(`${securityRows.length} security finding row(s) written to ${SECURITY_CSV_FILE}`)
 
     if (preflight) {
         // Repeated here because the preflight banner is thousands of log lines back by now, and

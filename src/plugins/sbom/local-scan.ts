@@ -4,6 +4,7 @@ import path from 'path'
 import {promisify} from 'util'
 import {Vulnerability} from '../../extension-points/vulnerability-checker'
 import {parsePurl} from './cyclonedx'
+import {vulnSources} from '../../vuln-sources/selection'
 import {log} from '../../utils/logging'
 
 /**
@@ -52,7 +53,8 @@ export interface TrivyReport {
             PrimaryURL?: string
             References?: string[]
             PublishedDate?: string
-            CVSS?: { [source: string]: { V3Score?: number, V2Score?: number } }
+            CweIDs?: string[]
+            CVSS?: { [source: string]: { V3Score?: number, V2Score?: number, V3Vector?: string, V2Vector?: string } }
         }[]
     }[]
 }
@@ -65,7 +67,7 @@ export interface GrypeReport {
             description?: string
             dataSource?: string
             urls?: string[]
-            cvss?: { version?: string, metrics?: { baseScore?: number } }[]
+            cvss?: { version?: string, vector?: string, metrics?: { baseScore?: number } }[]
             fix?: { versions?: string[] }
         }
         relatedVulnerabilities?: {
@@ -142,6 +144,10 @@ interface RawFinding {
     firstPatchedVersion?: string
     /** The exact installed version the scanner matched — the range fallback. */
     installedVersion?: string
+    source: string
+    cvssVector?: string
+    cvssVersion?: string
+    cweIds?: string[]
 }
 
 // ---------------------------------------------------------------------------
@@ -156,10 +162,17 @@ export function trivyFindings(report: TrivyReport): RawFinding[] {
             const {keys, dedupKey} = packageKeys(vuln.PkgIdentifier?.PURL, vuln.PkgName, vuln.InstalledVersion)
             if (keys.length === 0) continue
 
+            // Trivy reports one CVSS block per scoring source (nvd, redhat, ghsa); take the
+            // highest base score and the vector that came with it, so score and vector agree.
             let score: number | undefined
+            let cvssVector: string | undefined
+            let cvssVersion: string | undefined
             for (const entry of Object.values(vuln.CVSS ?? {})) {
-                const s = entry.V3Score ?? entry.V2Score
-                if (s !== undefined && (score === undefined || s > score)) score = s
+                const candidate = entry.V3Score ?? entry.V2Score
+                if (candidate === undefined || (score !== undefined && candidate <= score)) continue
+                score = candidate
+                cvssVector = entry.V3Score !== undefined ? entry.V3Vector : entry.V2Vector
+                cvssVersion = entry.V3Score !== undefined ? '3.1' : '2.0'
             }
 
             const timestamp = vuln.PublishedDate ? Date.parse(vuln.PublishedDate) : NaN
@@ -177,6 +190,10 @@ export function trivyFindings(report: TrivyReport): RawFinding[] {
                 // Trivy reports no vulnerable range against an SBOM, only the fix version.
                 firstPatchedVersion: vuln.FixedVersion?.split(',')[0]?.trim() || undefined,
                 installedVersion: vuln.InstalledVersion,
+                source: 'trivy',
+                cvssVector,
+                cvssVersion,
+                cweIds: vuln.CweIDs,
             })
         }
     }
@@ -197,8 +214,9 @@ export function grypeFindings(report: GrypeReport): RawFinding[] {
 
         // Prefer a CVSS v3 base score, fall back to any base score.
         const cvss = vuln.cvss ?? []
-        const score = cvss.find(c => c.version?.startsWith('3'))?.metrics?.baseScore
-            ?? cvss.find(c => c.metrics?.baseScore !== undefined)?.metrics?.baseScore
+        const chosenCvss = cvss.find(c => c.version?.startsWith('3') && c.metrics?.baseScore !== undefined)
+            ?? cvss.find(c => c.metrics?.baseScore !== undefined)
+        const score = chosenCvss?.metrics?.baseScore
 
         // Grype GHSA records often have an empty description; the related CVE record has one.
         const description = vuln.description || related.find(r => r.description)?.description
@@ -223,6 +241,9 @@ export function grypeFindings(report: GrypeReport): RawFinding[] {
             vulnerableRange: constraints[0],
             firstPatchedVersion: vuln.fix?.versions?.[0],
             installedVersion: artifact?.version,
+            source: 'grype',
+            cvssVector: chosenCvss?.vector,
+            cvssVersion: chosenCvss?.version,
         })
     }
     return findings
@@ -283,6 +304,12 @@ export function buildVulnerabilityIndex(trivy: TrivyReport | undefined, grype: G
         existing.summary = existing.summary || finding.summary
         existing.permalink = existing.permalink || finding.permalink
         existing.firstPatchedVersion = existing.firstPatchedVersion || finding.firstPatchedVersion
+        if (!existing.source.split(',').includes(finding.source)) existing.source += `,${finding.source}`
+        if (finding.cvssVector && (preferIncoming.score || !existing.cvssVector)) {
+            existing.cvssVector = finding.cvssVector
+            existing.cvssVersion = finding.cvssVersion
+        }
+        if (finding.cweIds?.length && !existing.cweIds?.length) existing.cweIds = finding.cweIds
     }
 
     if (trivy) {
@@ -307,6 +334,10 @@ export function buildVulnerabilityIndex(trivy: TrivyReport | undefined, grype: G
             // as "not vulnerable" downstream — pin it to that version.
             vulnerableRange: f.vulnerableRange ?? (f.installedVersion ? `=${f.installedVersion}` : undefined),
             firstPatchedVersion: f.firstPatchedVersion,
+            source: f.source,
+            cvssVector: f.cvssVector,
+            cvssVersion: f.cvssVersion,
+            cweIds: f.cweIds,
         }
         for (const key of f.packageKeys) {
             const list = index.get(key)
@@ -628,12 +659,14 @@ async function scanFile(sbomFile: string): Promise<LocalScanResult> {
     // Preflight already established which binaries exist; do not re-discover it per file.
     const preflight = await preflightScanners()
 
-    // The two scanners are independent — run them in parallel.
+    // The two scanners are independent — run them in parallel. A scanner the run did not select
+    // (`--vuln-source`) is not started at all, so `github` alone costs no subprocess.
+    const selected = vulnSources()
     const [trivyJson, grypeJson] = await Promise.all([
-        preflight.trivy.installed
+        selected.trivy && preflight.trivy.installed
             ? runScanner('trivy', preflight.trivy.bin, ['sbom', '--format', 'json', sbomFile], sbomFile)
             : Promise.resolve(undefined),
-        preflight.grype.installed
+        selected.grype && preflight.grype.installed
             ? runScanner('grype', preflight.grype.bin, [`sbom:${sbomFile}`, '-o', 'json'], sbomFile)
             : Promise.resolve(undefined),
     ])
@@ -651,7 +684,9 @@ async function scanFile(sbomFile: string): Promise<LocalScanResult> {
     scannedFiles.set(sbomFile, record)
 
     if (!trivy && !grype) {
-        log.warn(`No local vulnerability scanner available for ${path.basename(sbomFile)} — vulnerability columns will be empty`)
+        if (selected.trivy || selected.grype) {
+            log.warn(`No local vulnerability scanner available for ${path.basename(sbomFile)}`)
+        }
         return {available: false, index: new Map()}
     }
 

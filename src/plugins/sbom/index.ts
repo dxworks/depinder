@@ -4,6 +4,9 @@ import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../e
 import {Plugin} from '../../extension-points/plugin'
 import {parseCycloneDxFile} from './cyclonedx'
 import {scanSbomFileOnce} from './local-scan'
+import {githubScanSbomFileOnce} from '../../vuln-sources/github/scan'
+import {mergeVulnerabilityIndexes} from '../../vuln-sources/merge'
+import {vulnSources} from '../../vuln-sources/selection'
 import {java} from '../java'
 import {javascript} from '../javascript'
 import {ruby} from '../ruby'
@@ -78,17 +81,24 @@ function createParser(purlType: string): Parser {
                 throw new Error(`No ${purlType} project at index ${index} in ${context.lockFile}`)
             }
 
-            // Local vulnerability scan of the SBOM (Trivy + Grype), once per file per process.
-            // The scanners matched the exact version recorded in the SBOM, so these findings are
-            // final: `exactVersionVulnerabilities` is what tells analyse.ts not to range-filter
-            // them. When no scanner is available the flag stays unset and the GHSA path runs
-            // exactly as it does for a native plugin. `projectsOf` memoises projects by reference,
-            // so the flag sticks for the process — correct here, since it is a property of the
-            // file, not of the caller.
+            // Vulnerability scan of the SBOM, once per file per process. Which sources run is
+            // the run's `--vuln-source` selection: Trivy and Grype shell out to a local binary,
+            // `github` matches against the downloaded advisory cache. All of them matched the
+            // exact version recorded in the SBOM, so these findings are final:
+            // `exactVersionVulnerabilities` is what tells analyse.ts not to range-filter them.
+            // When no source produced anything the flag stays unset and the per-package GHSA
+            // GraphQL path runs exactly as it does for a native plugin. `projectsOf` memoises
+            // projects by reference, so the flag sticks for the process — correct here, since it
+            // is a property of the file, not of the caller.
             const scan = await scanSbomFileOnce(sbomFile)
-            if (scan.available) {
+            const github = vulnSources().github
+                ? githubScanSbomFileOnce(sbomFile)
+                : {available: false, index: new Map()}
+            const findings = mergeVulnerabilityIndexes(new Map(scan.index), github.index)
+
+            if (scan.available || github.available) {
                 for (const dep of Object.values(project.dependencies)) {
-                    dep.vulnerabilities = scan.index.get(dep.id) ?? []
+                    dep.vulnerabilities = findings.get(dep.id) ?? []
                 }
                 project.exactVersionVulnerabilities = true
             }
@@ -141,6 +151,16 @@ export const sbomPlugins: Plugin[] = [
 export function sbomFilesFor(plugins: Plugin[], files: string[]): string[] {
     if (!plugins.some(plugin => sbomPlugins.includes(plugin))) return []
     return files.filter(file => SBOM_GLOBS.some(glob => minimatch(file, glob, {matchBase: true})))
+}
+
+/**
+ * The purl type an SBOM plugin filters on — `sbom-npm` -> `npm`. The alias is where that type is
+ * already recorded, so reading it back beats a second table that could drift out of step. Returns
+ * undefined for a native plugin, which has no single purl type.
+ */
+export function purlTypeOfPlugin(plugin: Plugin): string | undefined {
+    if (!sbomPlugins.includes(plugin)) return undefined
+    return plugin.aliases?.find(it => it.startsWith('sbom-'))?.slice('sbom-'.length)
 }
 
 /** Exposed for tests, which need each parse to start from a clean slate. */
