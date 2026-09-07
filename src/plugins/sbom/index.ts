@@ -174,14 +174,20 @@ export function sbomFilesFor(plugins: Plugin[], files: string[]): string[] {
 }
 
 /**
- * The SBOM files at least one of the selected sbom plugins will actually parse. A file whose
- * ecosystems none of them covers yields no project and is never scanned by the parser either, so
- * scanning it up front would only add a file to the provenance record.
+ * The SBOM files at least one of the selected sbom plugins will actually parse, in the order the
+ * parsers would first reach them: plugin by plugin, file by file. A file whose ecosystems none of
+ * them covers yields no project and is never scanned by the parser either, so scanning it up
+ * front would only add a file to the provenance record.
  */
 export function sbomFilesToParse(plugins: Plugin[], files: string[]): string[] {
-    const selected = plugins.filter(plugin => sbomPlugins.includes(plugin))
-    return sbomFilesFor(plugins, files)
-        .filter(file => selected.some(plugin => plugin.extractor.createContexts([file]).length > 0))
+    const candidates = sbomFilesFor(plugins, files)
+    const ordered = new Set<string>()
+    for (const plugin of plugins.filter(it => sbomPlugins.includes(it))) {
+        for (const file of candidates) {
+            if (plugin.extractor.createContexts([file]).length > 0) ordered.add(file)
+        }
+    }
+    return [...ordered]
 }
 
 /**

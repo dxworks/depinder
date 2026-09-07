@@ -658,6 +658,11 @@ async function scanFile(sbomFile: string): Promise<LocalScanResult> {
         return {available: false, index: new Map()}
     }
 
+    // Registered before the scanners run, so the provenance record lists files in the order they
+    // were asked for — the same order whether the files are scanned one after another or at once.
+    const record: ScannedFileRecord = {file: sbomFile, trivy: 'skipped', grype: 'skipped', findingEntries: 0, packageKeys: 0}
+    scannedFiles.set(sbomFile, record)
+
     // Preflight already established which binaries exist; do not re-discover it per file.
     const preflight = await preflightScanners()
 
@@ -676,14 +681,8 @@ async function scanFile(sbomFile: string): Promise<LocalScanResult> {
     const trivy = parseReport<TrivyReport>('trivy', trivyJson)
     const grype = parseReport<GrypeReport>('grype', grypeJson)
 
-    const record: ScannedFileRecord = {
-        file: sbomFile,
-        trivy: trivy ? 'ok' : 'skipped',
-        grype: grype ? 'ok' : 'skipped',
-        findingEntries: 0,
-        packageKeys: 0,
-    }
-    scannedFiles.set(sbomFile, record)
+    record.trivy = trivy ? 'ok' : 'skipped'
+    record.grype = grype ? 'ok' : 'skipped'
 
     if (!trivy && !grype) {
         if (selected.trivy || selected.grype) {
