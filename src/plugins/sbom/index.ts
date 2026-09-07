@@ -1,7 +1,9 @@
 import path from 'path'
 import minimatch from 'minimatch'
 import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
-import {Plugin} from '../../extension-points/plugin'
+import {ecosystemOf, Plugin} from '../../extension-points/plugin'
+import {Registrar} from '../../extension-points/registrar'
+import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
 import {parseCycloneDxFile} from './cyclonedx'
 import {scanSbomFileOnce} from './local-scan'
 import {githubScanSbomFileOnce} from '../../vuln-sources/github/scan'
@@ -13,6 +15,8 @@ import {ruby} from '../ruby'
 import {python} from '../python'
 import {php} from '../php'
 import {dotnet} from '../dotnet'
+import {goChecker, goRegistrar} from '../go/registrar'
+import {cratesRegistrar, rustChecker} from '../rust/registrar'
 
 /**
  * CycloneDX SBOM plugins.
@@ -21,7 +25,8 @@ import {dotnet} from '../dotnet'
  * depinder Plugin has exactly one registrar and one advisory ecosystem. So rather than one `sbom`
  * plugin, we register one per ecosystem: each reads the same SBOM files, filters to its own purl
  * type, and reuses the registrar and vulnerability checker of the corresponding native plugin. No
- * registry code is duplicated.
+ * registry code is duplicated. Go and Rust have no native plugin to borrow from — depinder never
+ * parsed go.sum or Cargo.lock — so their registrars exist for the SBOM route alone.
  *
  * Files are matched by suffix so that both tools' outputs are picked up:
  *   <project>.cdx.json        (Syft)
@@ -107,41 +112,54 @@ function createParser(purlType: string): Parser {
     }
 }
 
-/**
- * Builds an SBOM plugin for one ecosystem, borrowing the registrar and checker from the native
- * plugin that already knows how to talk to that registry.
- */
-function sbomPluginFor(name: string, purlType: string, source: Plugin): Plugin {
+/** One ecosystem of the SBOM route: which purl type it filters on and where it enriches from. */
+interface SbomEcosystem {
+    name: string
+    purlType: string
+    /**
+     * The cache namespace. The native plugin's own, where one exists: same registrar, same library
+     * names, so the enrichment cache must not be fetched twice.
+     */
+    ecosystem: string
+    registrar: Registrar
+    checker?: VulnerabilityChecker
+}
+
+/** An ecosystem that borrows registrar, checker and cache namespace from a native plugin. */
+function borrowing(name: string, purlType: string, source: Plugin): SbomEcosystem {
+    return {name, purlType, ecosystem: ecosystemOf(source), registrar: source.registrar, checker: source.checker}
+}
+
+function sbomPluginFor({name, purlType, ecosystem, registrar, checker}: SbomEcosystem): Plugin {
     return {
         name,
         aliases: [`sbom-${purlType}`],
-        // Share the native plugin's cache namespace: same registrar, same library names, so the
-        // enrichment cache must not be fetched twice.
-        ecosystem: source.ecosystem ?? source.name,
+        ecosystem,
         extractor: createExtractor(purlType),
         parser: createParser(purlType),
-        registrar: source.registrar,
-        checker: source.checker,
+        registrar,
+        checker,
     }
 }
 
 /**
- * The ecosystems the SBOM route covers, and the native plugin each one borrows from. This is the
- * single place the (plugin name, purl type, registrar) correspondence is written down — every
- * lookup below reads it rather than restating it.
+ * The ecosystems the SBOM route covers. This is the single place the (plugin name, purl type,
+ * registrar) correspondence is written down — every lookup below reads it rather than restating it.
  */
-const SBOM_ECOSYSTEMS: readonly {name: string, purlType: string, source: Plugin}[] = [
-    {name: 'sbom-java', purlType: 'maven', source: java},
-    {name: 'sbom-npm', purlType: 'npm', source: javascript},
-    {name: 'sbom-ruby', purlType: 'gem', source: ruby},
-    {name: 'sbom-python', purlType: 'pypi', source: python},
-    {name: 'sbom-php', purlType: 'composer', source: php},
-    {name: 'sbom-dotnet', purlType: 'nuget', source: dotnet},
+const SBOM_ECOSYSTEMS: readonly SbomEcosystem[] = [
+    borrowing('sbom-java', 'maven', java),
+    borrowing('sbom-npm', 'npm', javascript),
+    borrowing('sbom-ruby', 'gem', ruby),
+    borrowing('sbom-python', 'pypi', python),
+    borrowing('sbom-php', 'composer', php),
+    borrowing('sbom-dotnet', 'nuget', dotnet),
+    {name: 'sbom-go', purlType: 'golang', ecosystem: 'go', registrar: goRegistrar, checker: goChecker},
+    {name: 'sbom-rust', purlType: 'cargo', ecosystem: 'rust', registrar: cratesRegistrar, checker: rustChecker},
 ]
 
-export const sbomPlugins: Plugin[] = SBOM_ECOSYSTEMS.map(it => sbomPluginFor(it.name, it.purlType, it.source))
+export const sbomPlugins: Plugin[] = SBOM_ECOSYSTEMS.map(sbomPluginFor)
 
-export const [sbomJava, sbomNpm, sbomRuby, sbomPython, sbomPhp, sbomDotnet] = sbomPlugins
+export const [sbomJava, sbomNpm, sbomRuby, sbomPython, sbomPhp, sbomDotnet, sbomGo, sbomRust] = sbomPlugins
 
 /**
  * The SBOM files a given plugin selection would scan.
@@ -170,7 +188,7 @@ export function purlTypeOfPlugin(plugin: Plugin): string | undefined {
  * already pairs the two, so reading it back beats a second table that could drift out of step.
  */
 export function purlTypeOfEcosystem(ecosystem: string): string | undefined {
-    return SBOM_ECOSYSTEMS.find(it => (it.source.ecosystem ?? it.source.name) === ecosystem)?.purlType
+    return SBOM_ECOSYSTEMS.find(it => it.ecosystem === ecosystem)?.purlType
 }
 
 /**

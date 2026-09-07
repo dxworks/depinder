@@ -70,9 +70,10 @@ describe('choosing plugins from the SBOMs themselves', () => {
     })
 
     it('selects exactly the sbom plugins those ecosystems need', () => {
-        // golang has no sbom-* plugin, so it selects nothing rather than failing the run.
         expect(sbomPluginsForPurlTypes(['gem', 'npm', 'golang']).map(it => it.name).sort())
-            .toEqual(['sbom-npm', 'sbom-ruby'])
+            .toEqual(['sbom-go', 'sbom-npm', 'sbom-ruby'])
+        // A purl type no sbom-* plugin covers selects nothing rather than failing the run.
+        expect(sbomPluginsForPurlTypes(['hex'])).toEqual([])
         expect(sbomPluginsForPurlTypes([])).toEqual([])
     })
 
