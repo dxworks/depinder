@@ -9,7 +9,7 @@ import {
     readBomGraph,
 } from '../plugins/sbom/cyclonedx'
 import {log} from '../utils/logging'
-import {originForPurlType} from './origins'
+import {originFor} from './origins'
 
 /**
  * The `Path` column of `_dependencies_sources.csv`: where in the dependency graph a component was
@@ -102,10 +102,10 @@ function projectPaths(graph: BomGraph, node: ProjectNode, repo: string, purlType
     const projectPath = node.module ? `${repo}/${node.module}` : repo
     const anchors = new Set(node.anchorRefs)
     // Trivy's node is the manifest; a Syft component knows the manifest it was read from.
-    const tagOf = (ref: string) =>
+    const tagOf = (ref: string, target: ParsedPurl) =>
         packageManagerTag(node.path)
         ?? packageManagerTag(locationOf(graph.byRef.get(ref) ?? {'bom-ref': ref}))
-        ?? originForPurlType(purlType).name
+        ?? originFor(purlType, target.name).name
 
     const results: SbomPath[] = []
     const seen = new Set<string>()
@@ -117,7 +117,7 @@ function projectPaths(graph: BomGraph, node: ProjectNode, repo: string, purlType
             .map(coordinatesOf)
             .filter((it): it is ParsedPurl => !!it)
         if (segments.length === 0) return
-        const rendered = `${projectPath}/-${tagOf(chain[chain.length - 1])}/`
+        const rendered = `${projectPath}/-${tagOf(chain[chain.length - 1], target)}/`
             + segments.map(it => `${it.name}/${it.version}`).join('/')
         // Syft lists a package once per location it was seen in; one path per package is enough.
         const key = `${target.name}|${target.version}|${rendered}`

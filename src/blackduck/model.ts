@@ -2,7 +2,7 @@ import {DepinderDependency, DepinderProject} from '../extension-points/extract'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {ecosystemForPurlType} from '../vuln-sources/github/ecosystems'
 import {comparatorFor, VersionComparator} from '../vuln-sources/github/versions'
-import {Origin, originForPurlType, originId} from './origins'
+import {Origin, originFor, originId} from './origins'
 import {SbomPath} from './paths'
 
 /**
@@ -116,9 +116,9 @@ export function buildModel(
     const matchTypes = new Map<string, Set<'Direct' | 'Transitive'>>()
 
     for (const {purlType, projects} of ecosystems) {
-        const origin = originForPurlType(purlType)
         for (const project of projects) {
             for (const dependency of Object.values(project.dependencies)) {
+                const origin = originFor(purlType, dependency.name)
                 const id = originId(origin, dependency.name, dependency.version)
 
                 const seen = matchTypes.get(id) ?? new Set<'Direct' | 'Transitive'>()

@@ -93,8 +93,8 @@ than guessed.
 |---|---|---|
 | `1Component name` / `Component name` | SBOM purl | The registry name. Black Duck's is a Knowledge Base *display* name (`Action Mailer` for `actionmailer`), so the two never match — join on the origin id instead |
 | `Component version name` | SBOM purl | verbatim |
-| `Component Version Origin Id` | SBOM purl | `name/version` for npmjs, rubygems, pypi, nuget, crates; `name:version` for maven, packagist, github — read off the real export, not guessed |
-| `Origin name` | purl type | `npm`→`npmjs`, `gem`→`rubygems`, `composer`→`packagist`, `cargo`→`crates`, `golang`→`github`, else the purl type; unmapped → `unknown` |
+| `Component Version Origin Id` | SBOM purl | `name/version` for npmjs, rubygems, pypi, nuget, crates; `name:version` for maven, packagist — read off the real export, not guessed. Go: `owner/repo:version` under `github`, `go.googlesource.com/<name>#version` under `long_tail`, a pseudo-version written as its 12-character commit (Black Duck holds the full hash) |
+| `Origin name` | purl type | `npm`→`npmjs`, `gem`→`rubygems`, `composer`→`packagist`, `cargo`→`crates`, else the purl type; unmapped → `unknown`. Go modules go by host: `github.com/…`→`github`, `golang.org/x/…`→`long_tail`, any other host → `unknown` (Black Duck resolves those to a GitHub repo through its Knowledge Base, which an SBOM does not carry) |
 | `License names` | registrar, else the SBOM | SPDX id mapped to Black Duck's display name (`MIT` → `MIT License`); an unmapped id is written as-is so it stays visible. Black Duck collapses `MIT-0` into `MIT License`; we keep the distinct name |
 | `License families` | the same table | `PERMISSIVE` / `WEAK_RECIPROCAL` / `RECIPROCAL` / `RESTRICTED_PROPRIETARY` / `UNKNOWN` |
 | `Match type` | `requestedBy` | `Direct` / `Transitive` / `Direct,Transitive` — the rule `<plugin>-libs.csv` already uses, made three-valued |

@@ -4,7 +4,7 @@ import path from 'path'
 import {BLACKDUCK_FILES, writeBlackDuckExport, writeSecurityCsv} from '../src/blackduck/export'
 import {licenseColumns} from '../src/blackduck/licenses'
 import {AnalysedEcosystem, buildModel} from '../src/blackduck/model'
-import {componentLink, originForPurlType, originId} from '../src/blackduck/origins'
+import {componentLink, goPseudoVersionCommit, originFor, originId} from '../src/blackduck/origins'
 import {packageManagerTag, sbomPaths} from '../src/blackduck/paths'
 import {upgradeGuidance} from '../src/blackduck/upgrade'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
@@ -69,30 +69,61 @@ function ecosystem(...dependencies: DepinderDependency[]): AnalysedEcosystem {
 }
 
 describe('origins', () => {
+    const origin = (purlType: string, name = 'x') => originFor(purlType, name)
+
     it('uses Black Duck\'s registry names, not the purl types', () => {
-        expect(originForPurlType('npm').name).toBe('npmjs')
-        expect(originForPurlType('gem').name).toBe('rubygems')
-        expect(originForPurlType('composer').name).toBe('packagist')
-        expect(originForPurlType('cargo').name).toBe('crates')
-        expect(originForPurlType('conan').name).toBe('unknown')
+        expect(origin('npm').name).toBe('npmjs')
+        expect(origin('gem').name).toBe('rubygems')
+        expect(origin('composer').name).toBe('packagist')
+        expect(origin('cargo').name).toBe('crates')
+        expect(origin('conan').name).toBe('unknown')
     })
 
-    // Read off the real export: the slash origins and the colon origins are different families,
-    // and using the wrong one makes every row look like a row Black Duck does not have.
+    // Read off the real export: name/version for the registries, name:version for maven and
+    // packagist (the slash in `monolog/monolog` is part of the name).
     it('separates the version with the character that origin uses', () => {
-        expect(originId(originForPurlType('npm'), '@babel/core', '7.0.0')).toBe('@babel/core/7.0.0')
-        expect(originId(originForPurlType('gem'), 'actionmailer', '8.1.3.1')).toBe('actionmailer/8.1.3.1')
-        expect(originId(originForPurlType('maven'), 'commons-logging:commons-logging', '1.2'))
+        expect(originId(origin('npm'), '@babel/core', '7.0.0')).toBe('@babel/core/7.0.0')
+        expect(originId(origin('gem'), 'actionmailer', '8.1.3.1')).toBe('actionmailer/8.1.3.1')
+        expect(originId(origin('maven'), 'commons-logging:commons-logging', '1.2'))
             .toBe('commons-logging:commons-logging:1.2')
-        expect(originId(originForPurlType('composer'), 'monolog/monolog', '3.9.0')).toBe('monolog/monolog:3.9.0')
+        expect(originId(origin('composer'), 'monolog/monolog', '3.9.0')).toBe('monolog/monolog:3.9.0')
+        expect(originId(origin('cargo'), 'aho-corasick', '1.1.2')).toBe('aho-corasick/1.1.2')
+    })
+
+    // Go modules are filed by host: github.com under `github` as owner/repo (major suffix and
+    // subpath dropped), golang.org/x under `long_tail` as the go.googlesource.com mirror, and any
+    // other host under `unknown`, since the repo behind a vanity import is Knowledge Base data.
+    it('files a Go module under the origin Black Duck uses for its host', () => {
+        const semver = 'github.com/Masterminds/semver/v3'
+        expect(origin('golang', semver).name).toBe('github')
+        expect(originId(origin('golang', semver), semver, 'v3.4.0')).toBe('Masterminds/semver:v3.4.0')
+        const sys = 'golang.org/x/sys'
+        expect(origin('golang', sys).name).toBe('long_tail')
+        expect(originId(origin('golang', sys), sys, 'v0.47.0')).toBe('go.googlesource.com/sys#v0.47.0')
+        const fallback = 'golang.org/x/crypto/x509roots/fallback'
+        expect(originId(origin('golang', fallback), fallback, 'v0.0.0-20260709184058-243e02a382f8'))
+            .toBe('go.googlesource.com/crypto#243e02a382f8')
+        const zap = 'go.uber.org/zap'
+        expect(origin('golang', zap).name).toBe('unknown')
+        expect(originId(origin('golang', zap), zap, 'v1.28.0')).toBe('go.uber.org/zap:v1.28.0')
+    })
+
+    it('writes a pseudo-version as the commit it names, in all three shapes', () => {
+        expect(goPseudoVersionCommit('v0.0.0-20210328193216-ff5ff6dc229b')).toBe('ff5ff6dc229b')
+        expect(goPseudoVersionCommit('v1.1.8-0.20240110162603-74a5dd331745')).toBe('74a5dd331745')
+        expect(goPseudoVersionCommit('v2.0.0-pre.0.20230729083705-37449abec8cc')).toBe('37449abec8cc')
+        expect(goPseudoVersionCommit('v1.5.4')).toBe('v1.5.4')
+        expect(goPseudoVersionCommit('v1.2.3-beta.1')).toBe('v1.2.3-beta.1')
     })
 
     it('prefers the registrar\'s homepage and falls back to the registry page', () => {
-        expect(componentLink(originForPurlType('npm'), 'qs', '6.10.2', 'https://example.test'))
+        expect(componentLink(origin('npm'), 'qs', '6.10.2', 'https://example.test'))
             .toBe('https://example.test')
-        expect(componentLink(originForPurlType('gem'), 'rails', '7.1.0'))
+        expect(componentLink(origin('gem'), 'rails', '7.1.0'))
             .toBe('https://rubygems.org/gems/rails/versions/7.1.0')
-        expect(componentLink(originForPurlType('maven'), 'g:a', '1.0')).toBe('')
+        expect(componentLink(origin('maven'), 'g:a', '1.0')).toBe('')
+        expect(componentLink(origin('golang', 'github.com/beorn7/perks'), 'github.com/beorn7/perks', 'v1.0.1'))
+            .toBe('https://github.com/beorn7/perks')
     })
 })
 
