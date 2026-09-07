@@ -1,4 +1,4 @@
-import { extractProjectInfo, verifyProjectPath, ProjectPathInfo } from '../src/utils/projectMapping';
+import { createPathMappings, extractProjectInfo, verifyProjectPath } from '../src/utils/projectMapping';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -33,6 +33,16 @@ describe('Project Mapping', () => {
     it('should extract project path from npm paths with version number segments', () => {
       const result = extractProjectInfo('@lib/my-client/1.2.3/my-client/test/-npm/@testing-library/jest-dom/5.17.0/@adobe/css-tools/4.4.0', 'npmjs');
       expect(result.projectPath).toBe('my-client/test');
+    });
+
+    it('should extract project path from npm paths with v-prefixed version number segments', () => {
+      const result = extractProjectInfo('distribution/v3.0.0/web-repo/apps/legacy-web/-npm/jv/8.1.1', 'npmjs');
+      expect(result.projectPath).toBe('web-repo/apps/legacy-web');
+    });
+
+    it('should extract project path from paths with wildcard version number segments', () => {
+      const result = extractProjectInfo('Example.Product.App/3.3.*/Example.Product.App/Example.Installer/-nuget/Newtonsoft.Json/13.0.3', 'nuget');
+      expect(result.projectPath).toBe('Example.Product.App/Example.Installer');
     });
 
     it('should extract project path from npm paths with GA version suffix', () => {
@@ -75,9 +85,42 @@ describe('Project Mapping', () => {
       expect(result.projectPath).toBe('chronos2-license-app');
     });
 
+    it.each(['1.0', '1.0-SNAPSHOT'])(
+      'extracts project path after two-part Maven version %s',
+      version => {
+        const result = extractProjectInfo(
+          `com.example:demo:${version}:sample-suite/demo-app:-maven/org.example:sample-library:0.10.1`,
+          'maven'
+        );
+
+        expect(result.projectPath).toBe('sample-suite/demo-app');
+      }
+    );
+
     it('should extract project path from Maven paths with pom.xml', () => {
       const result = extractProjectInfo('xlmapp/pom.xml/-maven/org.apache.logging.log4j:log4j-core:2.7', 'maven');
       expect(result.projectPath).toBe('xlmapp');
+    });
+
+    it.each(['build.gradle', 'build.gradle.kts'])(
+      'removes Gradle build file %s from project path',
+      buildFile => {
+        const result = extractProjectInfo(
+          `sample-repository/api/${buildFile}/-gradle/org.example:sample-library:2.0`,
+          'maven'
+        );
+
+        expect(result.projectPath).toBe('sample-repository/api');
+      }
+    );
+
+    it('keeps a custom Gradle script in project path', () => {
+      const result = extractProjectInfo(
+        'sample-repository/api/custom.gradle/-gradle/org.example:sample-library:2.0',
+        'maven'
+      );
+
+      expect(result.projectPath).toBe('sample-repository/api/custom.gradle');
     });
 
     it('should extract project path from .NET paths', () => {
@@ -134,7 +177,7 @@ describe('Project Mapping', () => {
       jest.clearAllMocks();
     });
 
-    it('should return projectPathExists=true when path exists', () => {
+    it('marks an existing full path as exact', () => {
       // Mock fs.existsSync to return true
       (fs.existsSync as jest.Mock).mockReturnValue(true);
       
@@ -142,11 +185,11 @@ describe('Project Mapping', () => {
       
       expect(result.projectPath).toBe('some/project/path');
       expect(result.verifiedPath).toBe('some/project/path');
-      expect(result.projectPathExists).toBe(true);
+      expect(result.verifiedPathMethod).toBe('exact');
       expect(fs.existsSync).toHaveBeenCalled();
     });
 
-    it('should return projectPathExists=false when path does not exist', () => {
+    it('marks a path as none when verification fails', () => {
       // Mock fs.existsSync to return false
       (fs.existsSync as jest.Mock).mockReturnValue(false);
       
@@ -154,7 +197,7 @@ describe('Project Mapping', () => {
       
       expect(result.projectPath).toBe('some/project/path');
       expect(result.verifiedPath).toBe('');
-      expect(result.projectPathExists).toBe(false);
+      expect(result.verifiedPathMethod).toBe('none');
       expect(fs.existsSync).toHaveBeenCalled();
     });
 
@@ -175,7 +218,7 @@ describe('Project Mapping', () => {
       
       expect(result.projectPath).toBe('API/project/path');
       expect(result.verifiedPath).toBe('project/path');
-      expect(result.projectPathExists).toBe(false);
+      expect(result.verifiedPathMethod).toBe('drop-first-segment');
 
       expect(fs.existsSync).toHaveBeenCalledTimes(2);
       expect(fs.existsSync).toHaveBeenCalledWith(expectedOriginal);
@@ -187,7 +230,7 @@ describe('Project Mapping', () => {
       
       expect(result.projectPath).toBe('');
       expect(result.verifiedPath).toBe('');
-      expect(result.projectPathExists).toBe(false);
+      expect(result.verifiedPathMethod).toBe('none');
       expect(fs.existsSync).not.toHaveBeenCalled();
     });
 
@@ -196,7 +239,7 @@ describe('Project Mapping', () => {
       
       expect(result.projectPath).toBe('some/project/path');
       expect(result.verifiedPath).toBe('');
-      expect(result.projectPathExists).toBe(false);
+      expect(result.verifiedPathMethod).toBe('not-checked');
       expect(fs.existsSync).not.toHaveBeenCalled();
     });
   });
@@ -215,16 +258,69 @@ describe('Project Mapping', () => {
       
       expect(result.projectPath).toBe('my-project');
       expect(result.verifiedPath).toBe('my-project');
-      expect(result.projectPathExists).toBe(true);
+      expect(result.verifiedPathMethod).toBe('exact');
       expect(fs.existsSync).toHaveBeenCalled();
     });
 
-    it('should set projectPathExists to undefined when basePath is not provided', () => {
+    it('uses an existing parent when a missing Maven path ends with its artifact name', () => {
+      const expectedParent = path.normalize('/base/path/sample-repo/services');
+      (fs.existsSync as jest.Mock).mockImplementation((pathArg: string) => pathArg === expectedParent);
+
+      const result = extractProjectInfo(
+        'org.example:sample-service:1.0:sample-repo/services/sample-service:-maven/org.example:sample-library:2.0',
+        'maven',
+        '/base/path'
+      );
+
+      expect(result).toEqual({
+        projectPath: 'sample-repo/services/sample-service',
+        verifiedPath: 'sample-repo/services',
+        verifiedPathMethod: 'maven-artifact-parent'
+      });
+    });
+
+    it('does not use a parent when Maven artifact name differs from the last path segment', () => {
+      const existingParent = path.normalize('/base/path/sample-repo/services');
+      (fs.existsSync as jest.Mock).mockImplementation((pathArg: string) => pathArg === existingParent);
+
+      const result = extractProjectInfo(
+        'org.example:different-service:1.0:sample-repo/services/sample-service:-maven/org.example:sample-library:2.0',
+        'maven',
+        '/base/path'
+      );
+
+      expect(result.verifiedPath).toBe('');
+      expect(result.verifiedPathMethod).toBe('none');
+    });
+
+    it('uses an explicit mapping before an inferred Maven parent', () => {
+      const expectedParent = path.normalize('/base/path/sample-repo/services');
+      const expectedMapping = path.normalize('/base/path/overrides/sample-service');
+      (fs.existsSync as jest.Mock).mockImplementation(
+        (pathArg: string) => pathArg === expectedParent || pathArg === expectedMapping
+      );
+      const mappings = createPathMappings([{
+        extractedPath: 'sample-repo/services/sample-service',
+        actualPath: 'overrides/sample-service'
+      }]);
+
+      const result = extractProjectInfo(
+        'org.example:sample-service:1.0:sample-repo/services/sample-service:-maven/org.example:sample-library:2.0',
+        'maven',
+        '/base/path',
+        mappings
+      );
+
+      expect(result.verifiedPath).toBe('overrides/sample-service');
+      expect(result.verifiedPathMethod).toBe('mapping');
+    });
+
+    it('marks verification as not checked when basePath is not provided', () => {
       const result = extractProjectInfo('my-project/-npm/react/17.0.2', 'npmjs');
       
       expect(result.projectPath).toBe('my-project');
       expect(result.verifiedPath).toBe('');
-      expect(result.projectPathExists).toBeUndefined();
+      expect(result.verifiedPathMethod).toBe('not-checked');
       expect(fs.existsSync).not.toHaveBeenCalled();
     });
   });

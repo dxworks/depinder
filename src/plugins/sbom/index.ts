@@ -1,5 +1,5 @@
 import path from 'path'
-import minimatch from 'minimatch'
+import {minimatch} from 'minimatch'
 import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
 import {ecosystemOf, Plugin} from '../../extension-points/plugin'
 import {Registrar} from '../../extension-points/registrar'

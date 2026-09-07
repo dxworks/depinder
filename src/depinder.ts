@@ -7,11 +7,12 @@ import {extractFrameworkVersionsCommand} from './commands/extractFrameworkVersio
 import {transformBlackDuckReportsCommand} from './commands/transformBlackDuckReports'
 import {githubAdvisoriesCommand} from './commands/githubAdvisories'
 import {exportBlackduckCommand} from './commands/exportBlackduck'
+import {addCategoriesToBlackDuckReportsCommand} from './commands/addCategoriesToBlackDuckReports'
 
 export const mainCommand = new Command()
     .name('depinder')
     .description(_package.description)
-    .version(_package.version, '-v, -version, --version, -V')
+    .version(_package.version, '-v, --version')
     .addCommand(analyseCommand)
     .addCommand(updateCommand)
     .addCommand(cacheCommand)
@@ -19,3 +20,4 @@ export const mainCommand = new Command()
     .addCommand(transformBlackDuckReportsCommand)
     .addCommand(githubAdvisoriesCommand)
     .addCommand(exportBlackduckCommand)
+    .addCommand(addCategoriesToBlackDuckReportsCommand)

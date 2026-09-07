@@ -26,7 +26,7 @@ import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {MultiBar, Presets} from 'cli-progress'
 import {walkDir} from '../utils/utils'
 import {blacklistedGlobs} from '../utils/blacklist'
-import minimatch from 'minimatch'
+import { minimatch } from 'minimatch'
 import {mongoCache} from '../cache/mongo-cache'
 import {
     DEFAULT_VULN_SOURCE,
@@ -73,7 +73,7 @@ export function createAnalyseCommand(): Command {
         // folder, and `--plugins` never reached getPluginsFromNames.
         .option('-r, --results <folder>', 'The results folder', 'results')
         .option('--refresh', 'Refresh the cache', false)
-        .option('-p, --plugins <plugins...>', 'A list of plugins')
+        .option('-p, --plugins [plugins...]', 'A list of plugins')
         .option('--vuln-source <sources>',
             'Vulnerability sources for the SBOM route: a comma-separated list of trivy, grype, github, all',
             DEFAULT_VULN_SOURCE)

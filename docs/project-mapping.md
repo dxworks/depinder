@@ -28,7 +28,7 @@ The project mapping feature uses a unified algorithm to extract project paths fr
    - Everything before the end delimiter is potentially part of the project path
 
 3. **Process file segments**:
-   - If the last segment before the end delimiter is a file (e.g., `.csproj`, `pom.xml`), remove it
+   - If the last segment before the end delimiter is a project file (e.g., `.csproj`, `pom.xml`, `build.gradle`, `build.gradle.kts`), remove it
 
 4. **Handle version segments**:
    - If the last segment before the end delimiter is a version (e.g., `1.0.0`, `unspecified`), remove it
@@ -74,17 +74,29 @@ After extracting the project path, the system verifies its existence on the file
 1. **Check original path**:
    - Join the base path with the extracted project path
    - Check if this path exists on the filesystem
-   - If it exists, set `verifiedPath` to the project path and `projectPathExists` to `true`
+   - If it exists, set `verifiedPath` to the project path and `verifiedPathMethod` to `exact`
 
 2. **Check mapped path** (if original doesn't exist):
    - If path mappings are provided and contain a mapping for the project path
    - Join the base path with the mapped path
    - Check if this path exists on the filesystem
-   - If it exists, set `verifiedPath` to the mapped path (but keep `projectPathExists` as `false`)
+   - If it exists, set `verifiedPath` to the mapped path and `verifiedPathMethod` to `mapping`
 
-3. **Handle non-existent paths**:
-   - If neither the original nor mapped path exists, set `verifiedPath` to an empty string
-   - The `projectPathExists` flag always reflects whether the original path exists
+3. **Check a Maven artifact suffix** (if the original path does not exist and no mapping applies):
+   - Read the Maven artifact name from the Black Duck path prefix
+   - If the last project path segment equals the artifact name, remove that segment
+   - If the remaining parent path exists, set `verifiedPath` to that parent path and `verifiedPathMethod` to `maven-artifact-parent`
+   - This works at any path depth and does not apply to non-Maven paths or name mismatches
+
+4. **Check without the first segment**:
+   - Remove the first project path segment
+   - If the remaining path exists, set `verifiedPath` to that path and `verifiedPathMethod` to `drop-first-segment`
+
+5. **Handle non-existent paths**:
+   - If no candidate path exists, set `verifiedPath` to an empty string and `verifiedPathMethod` to `none`
+   - If no base path is supplied, set `verifiedPathMethod` to `not-checked`
+
+The `VerifiedPathMethod` column uses these values: `exact`, `mapping`, `maven-artifact-parent`, `drop-first-segment`, `none`, and `not-checked`.
 
 ## Path Mapping Configuration
 

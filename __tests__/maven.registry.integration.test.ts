@@ -5,6 +5,6 @@ describe('test all Maven registries access', () => {
 
     runOnlyLocally('access Maven Central Registry', async () => {
         const result = await new MavenCentralRegistrar().retrieve('com.fasterxml.jackson.core:jackson-databind')
-        console.log(result)
+        // console.log(result)
     }, 1000000)
 })

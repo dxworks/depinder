@@ -1,7 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { parseStringPromise } from 'xml2js';
+import { XMLParser } from 'fast-xml-parser';
 import { Command } from 'commander';
+import { stringify } from 'csv-stringify/sync';
 
 interface FrameworkVersionPerProject {
     programmingLanguage: string;
@@ -19,23 +20,21 @@ async function extractFrameworkVersions(rootPath: string, outputPath: string) {
     await fs.writeFile(outputPath, csvContent, 'utf-8');
 }
 
-function convertToCSV(data: FrameworkVersionPerProject[]): string {
+export function convertToCSV(data: FrameworkVersionPerProject[]): string {
     const headers = ['programmingLanguage', 'frameworkVersion', 'projectFile', 'component', 'group', 'notes'];
-    const csvRows = data.map(item =>
-        [
+    const rows = data.map(item => [
             item.programmingLanguage,
             item.frameworkVersion,
             item.projectFile,
             item.component,
             item.group,
             item.notes || ''
-        ].map(value => `${value}`).join(',')
-    );
+        ]);
 
-    return [headers.join(','), ...csvRows].join('\n');
+    return stringify([headers, ...rows]);
 }
 
-async function extract(rootPath: string): Promise<FrameworkVersionPerProject[]> {
+export async function extract(rootPath: string): Promise<FrameworkVersionPerProject[]> {
     const results: FrameworkVersionPerProject[] = [];
     const dotNetProjectFiles = await findFiles(rootPath, /.*\.(csproj|vbproj|fsproj)$/);
 
@@ -44,6 +43,12 @@ async function extract(rootPath: string): Promise<FrameworkVersionPerProject[]> 
         let targetFramework = await extractTargetFramework(projectFile);
         const relativePath = path.relative(rootPath, projectFile);
         const component = getComponent(relativePath);
+
+        if (!targetFramework) {
+            const propsResult = await extractTargetFrameworkFromProps(rootPath, projectFile);
+            targetFramework = propsResult.targetFramework;
+            notes = propsResult.propsFilePath;
+        }
 
         if (targetFramework.startsWith('$')) {
             const { parameterValue, propsFilePath } = await getParameterFromProps(rootPath, projectFile, targetFramework);
@@ -146,7 +151,7 @@ async function extractJavaVersionFromGradle(gradleFilePath: string): Promise<str
 async function extractJavaVersionFromMaven(pomFilePath: string): Promise<string> {
     try {
         const xmlData = await fs.readFile(pomFilePath, 'utf-8');
-        const result = await parseXml(xmlData);
+        const result = parseXml(xmlData);
 
         if (!result || !result.project) {
             console.error('Invalid POM structure');
@@ -154,24 +159,25 @@ async function extractJavaVersionFromMaven(pomFilePath: string): Promise<string>
         }
 
         // Extract properties if they exist
-        const properties = result.project.properties?.[0];
+        const properties = result.project.properties;
         if (properties) {
             if (properties['java.version']) {
-                return properties['java.version'][0];
+                return String(properties['java.version']);
             }
             if (properties['maven.compiler.source']) {
-                return properties['maven.compiler.source'][0];
+                return String(properties['maven.compiler.source']);
             }
         }
 
         // Check maven-compiler-plugin configuration
-        const build = result.project.build?.[0];
+        const build = result.project.build;
         if (build && build.plugins) {
-            for (const plugin of build.plugins) {
-                if (plugin.artifactId?.[0] === 'maven-compiler-plugin' && plugin.configuration?.[0]) {
-                    const config = plugin.configuration[0];
+            const plugins = Array.isArray(build.plugins.plugin) ? build.plugins.plugin : [build.plugins.plugin];
+            for (const plugin of plugins) {
+                if (plugin?.artifactId === 'maven-compiler-plugin' && plugin.configuration) {
+                    const config = plugin.configuration;
                     if (config['source']) {
-                        return config['source'][0];
+                        return String(config['source']);
                     }
                 }
             }
@@ -184,60 +190,114 @@ async function extractJavaVersionFromMaven(pomFilePath: string): Promise<string>
     }
 }
 
-async function parseXml(xmlData: string) {
+function parseXml(xmlData: string) {
     // Remove multi-line comments from the entire file
     const withoutComments = xmlData.replace(/\/\*[\s\S]*?\*\//g, '');
 
     // Remove empty lines and whitespace from the beginning of the file only
     const trimmedXml = withoutComments.replace(/^\s*[\r\n]+/, '');
 
-    return await parseStringPromise(trimmedXml);
+    const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@_',
+    });
+    return parser.parse(trimmedXml);
 }
 
-async function extractTargetFramework(projectFile: string): Promise<string> {
+export async function extractTargetFramework(projectFile: string): Promise<string> {
     try {
         const content = await fs.readFile(projectFile, 'utf-8');
-        const xml = await parseXml(content);
+        const xml = parseXml(content);
         const frameworkTags = ['TargetFramework', 'TargetFrameworks', 'TargetFrameworkVersion'];
 
-        const propertyGroups = xml?.Project?.PropertyGroup || [];
+        const propertyGroupData = xml?.Project?.PropertyGroup;
+        const propertyGroups = Array.isArray(propertyGroupData) ? propertyGroupData : (propertyGroupData ? [propertyGroupData] : []);
 
+        const targetFrameworks: string[] = [];
         for (const group of propertyGroups) {
             for (const tag of frameworkTags) {
                 if (group[tag]) {
-                    return group[tag][0];
+                    targetFrameworks.push(...getXmlValues(group[tag]));
                 }
             }
         }
-        return '';
+        return targetFrameworks.join(' | ');
     } catch (error) {
         console.error(`Error extracting target framework from ${projectFile}:`, error);
         return '';
     }
 }
 
+async function extractTargetFrameworkFromProps(rootPath: string, projectFile: string): Promise<{ targetFramework: string; propsFilePath: string }> {
+    const result = await findInParentProps(rootPath, projectFile, async propsFilePath => {
+        const targetFramework = await extractTargetFramework(propsFilePath);
+        return targetFramework || undefined;
+    });
+
+    return result
+        ? { targetFramework: result.value, propsFilePath: result.propsFilePath }
+        : { targetFramework: '', propsFilePath: '' };
+}
+
 async function getParameterFromProps(rootPath: string, filePath: string, parameterName: string) {
-    let currentDirectory = path.dirname(filePath);
-    while (currentDirectory && currentDirectory !== rootPath) {
-        const propsFiles = await findFiles(currentDirectory, /\.props$/);
-        if (propsFiles.length > 0) {
-            const propsFilePath = propsFiles[0];
-            const parameterValue = await extractParameterValueFromProps(propsFilePath, parameterName);
-            if (parameterValue) {
-                return { parameterValue, propsFilePath };
-            }
-        }
-        currentDirectory = path.dirname(currentDirectory);
+    const result = await findInParentProps(rootPath, filePath, propsFilePath =>
+        extractParameterValueFromProps(propsFilePath, parameterName)
+    );
+
+    if (result) {
+        return { parameterValue: result.value, propsFilePath: result.propsFilePath };
     }
     throw new Error(`No .props file found from '${filePath}' up to '${rootPath}'.`);
+}
+
+async function findInParentProps<T>(rootPath: string, projectFile: string, findValue: (propsFilePath: string) => Promise<T | undefined>): Promise<{ value: T; propsFilePath: string } | undefined> {
+    const rootDirectory = path.resolve(rootPath);
+    let currentDirectory = path.dirname(projectFile);
+
+    while (currentDirectory) {
+        const entries = await fs.readdir(currentDirectory, { withFileTypes: true });
+        const propsFiles = entries
+            .filter(entry => entry.isFile() && entry.name.endsWith('.props'))
+            .map(entry => path.join(currentDirectory, entry.name))
+            .sort();
+
+        for (const propsFilePath of propsFiles) {
+            const value = await findValue(propsFilePath);
+            if (value) {
+                return { value, propsFilePath };
+            }
+        }
+
+        if (currentDirectory === rootDirectory) break;
+        const parentDirectory = path.dirname(currentDirectory);
+        if (parentDirectory === currentDirectory) break;
+        currentDirectory = parentDirectory;
+    }
+    return undefined;
+}
+
+function getXmlValues(value: unknown): string[] {
+    if (Array.isArray(value)) {
+        return value.flatMap(getXmlValues);
+    }
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return [String(value)];
+    }
+    if (value && typeof value === 'object' && '#text' in value) {
+        return getXmlValues(value['#text']);
+    }
+    return [];
 }
 
 async function extractParameterValueFromProps(propsFilePath: string, parameterName: string): Promise<string> {
     try {
         const content = await fs.readFile(propsFilePath, 'utf-8');
-        const xml = await parseXml(content);
+        const xml = parseXml(content);
         const cleanParameterName = parameterName.replace(/[\$()]/g, '');
-        return xml?.Project?.PropertyGroup?.[0]?.[cleanParameterName]?.[0] || '';
+        const propertyGroupData = xml?.Project?.PropertyGroup;
+        const propertyGroup = Array.isArray(propertyGroupData) ? propertyGroupData[0] : propertyGroupData;
+        const value = propertyGroup?.[cleanParameterName];
+        return value ? String(value) : '';
     } catch {
         return '';
     }
