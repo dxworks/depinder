@@ -8,6 +8,7 @@ import {sbomPluginsForPurlTypes} from '../plugins/sbom'
 import {parsePurl} from '../plugins/sbom/cyclonedx'
 import {walkDir} from '../utils/utils'
 import {log} from '../utils/logging'
+import {logProfile, timePhaseSync} from '../utils/profile'
 import {DEFAULT_MAX_AGE_HOURS} from '../vuln-sources/github/cache'
 import {DEFAULT_TOKEN_FILE} from '../vuln-sources/github/tokens'
 import {DEFAULT_VULN_SOURCE} from '../vuln-sources/selection'
@@ -52,6 +53,7 @@ export function createExportBlackduckCommand(): Command {
         .option('--github-max-age <hours>',
             'Re-download a cached ecosystem\'s GitHub advisories when they are older than this',
             String(DEFAULT_MAX_AGE_HOURS))
+        .option('--profile', 'Print a phase timing and request count summary at the end', false)
         .action(exportBlackduck)
 }
 
@@ -112,13 +114,14 @@ export async function exportBlackduck(folders: string[], options: ExportBlackduc
 
     const projectName = options.projectName ?? defaultProjectName(sbomFiles, folders)
     const exportedTypes = new Set(analysed.map(it => it.purlType))
-    const paths: SbomPath[] = sbomFiles.flatMap(file =>
-        sbomPaths(file, projectName, exportedTypes))
+    const paths: SbomPath[] = timePhaseSync('blackduck:paths', () => sbomFiles.flatMap(file =>
+        sbomPaths(file, projectName, exportedTypes)))
 
-    const model = buildModel(projectName, analysed, paths)
+    const model = timePhaseSync('blackduck:model', () => buildModel(projectName, analysed, paths))
     const resultFolder = path.resolve(process.cwd(), options.results || 'results')
-    for (const {file, rows} of writeBlackDuckExport(model, resultFolder)) {
+    for (const {file, rows} of timePhaseSync('blackduck:csv', () => writeBlackDuckExport(model, resultFolder))) {
         log.info(`${String(rows).padStart(6)} row(s) -> ${file}`)
     }
     log.info(`Black Duck-shaped export written to ${resultFolder}`)
+    logProfile()
 }

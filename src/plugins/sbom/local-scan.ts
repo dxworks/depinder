@@ -6,6 +6,7 @@ import {Vulnerability} from '../../extension-points/vulnerability-checker'
 import {parsePurl} from './cyclonedx'
 import {vulnSources} from '../../vuln-sources/selection'
 import {log} from '../../utils/logging'
+import {timePhase} from '../../utils/profile'
 
 /**
  * Local vulnerability scanning of SBOM files with Trivy and Grype.
@@ -618,7 +619,8 @@ export async function writeScanProvenance(resultFolder: string, hasGithubToken: 
 async function runScanner(tool: string, bin: string, args: string[], sbomFile: string): Promise<string | undefined> {
     const started = Date.now()
     try {
-        const {stdout} = await execFileAsync(bin, args, {maxBuffer: MAX_SCANNER_OUTPUT_BYTES})
+        const {stdout} = await timePhase(`scan:${tool}`, () =>
+            execFileAsync(bin, args, {maxBuffer: MAX_SCANNER_OUTPUT_BYTES}))
         log.info(`${tool} scan of ${path.basename(sbomFile)} done in ${((Date.now() - started) / 1000).toFixed(1)}s`)
         return stdout
     } catch (e: any) {

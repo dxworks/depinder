@@ -7,6 +7,7 @@ import {defaultCacheDir, readEcosystem, readManifest} from './cache'
 import {ecosystemForPurlType} from './ecosystems'
 import {AdvisoryIndex, buildAdvisoryIndex, matchComponent} from './match'
 import {log} from '../../utils/logging'
+import {timePhaseSync} from '../../utils/profile'
 
 /**
  * Scanning a CycloneDX SBOM against the cached GitHub advisories.
@@ -131,7 +132,7 @@ export function githubScanSbomFileOnce(sbomFile: string, cacheDir: string = defa
     const key = `${cacheDir}|${path.resolve(sbomFile)}`
     let result = scanCache.get(key)
     if (!result) {
-        result = scanFile(path.resolve(sbomFile), cacheDir)
+        result = timePhaseSync('scan:github', () => scanFile(path.resolve(sbomFile), cacheDir))
         scanCache.set(key, result)
     }
     return result
