@@ -3,7 +3,6 @@ import fs from 'fs'
 import path from 'path'
 import {writeBlackDuckExport} from '../blackduck/export'
 import {buildModel} from '../blackduck/model'
-import {originForPurlType} from '../blackduck/origins'
 import {sbomPaths, SbomPath} from '../blackduck/paths'
 import {sbomPluginsForPurlTypes} from '../plugins/sbom'
 import {parsePurl} from '../plugins/sbom/cyclonedx'
@@ -114,7 +113,7 @@ export async function exportBlackduck(folders: string[], options: ExportBlackduc
     const projectName = options.projectName ?? defaultProjectName(sbomFiles, folders)
     const exportedTypes = new Set(analysed.map(it => it.purlType))
     const paths: SbomPath[] = sbomFiles.flatMap(file =>
-        sbomPaths(file, projectName, exportedTypes, type => originForPurlType(type).name))
+        sbomPaths(file, projectName, exportedTypes))
 
     const model = buildModel(projectName, analysed, paths)
     const resultFolder = path.resolve(process.cwd(), options.results || 'results')

@@ -107,7 +107,7 @@ than guessed.
 | `Commit Activity`, `Commits in Past 12 Months`, `Contributors in Past 12 Months`, `Open Hub URL` / `OpenHubURL` | — | **empty, not derivable** — Open Hub data |
 | `Has License Conflicts` | — | Constant `false`; we run no licence-conflict analysis |
 | `Component Link` | registrar homepage, else registry | The registrar's `homepageUrl`, falling back to a registry page URL built from the coordinates (maven has none we can derive) |
-| `Path` | SBOM `dependsOn` | `<project>/-<origin>/<name>/<version>/…` — see *Dependency paths* below |
+| `Path` | SBOM `dependsOn` | `<project>/-<package manager>/<name>/<version>/…` — see *Dependency paths* below |
 | `ProjectPath` | — | The project name, plus `/<module>` when the SBOM names its modules |
 | `ProjectPathExists`, `VerifiedPath` | — | **empty** — Black Duck leaves them empty too |
 | `Vulnerability id` | findings | `GHSA-… (CVE-…)` when both are known, else the single id — Black Duck's `BDSA-… (CVE-…)` shape. We have no BDSA numbers |
@@ -126,17 +126,31 @@ than guessed.
 
 ### Dependency paths
 
-`Path` is walked from the SBOM's own `dependencies[].dependsOn` edges, starting at each Trivy
-`application` node. One row is emitted per (component, immediate parent) — the shortest route to
-that parent, extended by the component — so a package pulled in by two parents appears twice.
-Enumerating every distinct route would be exponential, and Black Duck plainly does not do it either
-(11,418 path rows against 9,037 components in the reference export).
+`Path` is walked from the SBOM's own `dependencies[].dependsOn` edges, from the same project nodes
+the parser builds projects from, so `Direct` in `_dependencies.csv` and a one-segment path here are
+the same statement. Black Duck writes **one row per (component, project)** — the shortest chain
+from the manifest to the component (1,122 rows for ruby-mastodon's 1,239 components) — and so do
+we: a package pulled in by two parents appears once, under whichever reaches it soonest.
 
-**Syft SBOMs carry no chains.** Syft emits no project node and, outside the maven reconstruction,
-no `dependsOn` edges at all — its root is a `file` node that depends on nothing. Every component is
-therefore emitted with a one-hop, root-level path. That is a real loss of information relative to a
-Trivy SBOM, not a modelling choice; it shows up as `_dependencies_sources.csv` having exactly as
-many rows as `_dependencies.csv`.
+The tag after the project is the **package manager whose manifest was walked**, in Black Duck's
+spelling: `-yarn`, `-npm` and `-pnpm` for the three JavaScript lockfiles, `-rubygems`, `-maven`,
+`-gradle`, `-packagist`, `-cargo`, `-go_mod`, `-nuget`, `-uv`, `-pip`. It is read off the manifest's
+basename — Trivy names its `application` node after the manifest, Syft records each component's
+`syft:location:0:path` — and falls back to the origin name when neither tool recorded one.
+
+**What is direct.** Black Duck marks a package Direct when the project's manifest declares it.
+Trivy's lockfile parsers do not carry the manifest: for yarn.lock they mark direct whatever no other
+package depends on, which on ruby-mastodon makes 25 declared packages Transitive and 18 packages of
+the `streaming` workspace Direct. Syft copies yarn berry's `0.0.0-use.local` workspace entries into
+the SBOM, and a workspace's `dependsOn` edges are exactly its package.json — so when an SBOM carries
+workspace nodes, those edges define Direct and the chains start from them; otherwise the lockfile
+root's edges do, as before. For `pom.xml`, `go.mod` and `Cargo.lock`, Trivy nests the project's own
+artifact under the manifest node; the walk is re-rooted on it and it never appears as a segment.
+
+**Syft SBOMs carry chains only where they carry edges** — yarn workspaces and the maven module
+reconstruction. Everything else (gems, Go modules, composer packages, and whatever no workspace
+reaches) is emitted at the root level with a one-hop path. That is a real loss of information
+relative to a Trivy SBOM, not a modelling choice.
 
 ### Upgrade guidance
 

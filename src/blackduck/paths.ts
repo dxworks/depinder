@@ -1,30 +1,36 @@
-import fs from 'fs'
 import path from 'path'
-import {CycloneDxBom, CycloneDxComponent, parsePurl} from '../plugins/sbom/cyclonedx'
+import {
+    BomGraph,
+    findProjectNodes,
+    locationOf,
+    ParsedPurl,
+    parsePurl,
+    ProjectNode,
+    readBomGraph,
+} from '../plugins/sbom/cyclonedx'
 import {log} from '../utils/logging'
+import {originForPurlType} from './origins'
 
 /**
  * The `Path` column of `_dependencies_sources.csv`: where in the dependency graph a component was
  * reached from.
  *
- * Black Duck writes one row per (component, path) — 11,418 rows against 9,037 components in the
- * reference export — so a component pulled in by two different parents appears twice, with the
- * two chains that reached it. The chain is read off the SBOM's own `dependencies[].dependsOn`
- * edges, which is the only place this information exists: the depinder dependency model records
- * `requestedBy` but not the route back to the root.
+ * Black Duck writes ONE row per (component, project) — the shortest chain from the project's
+ * manifest to the component, 1,122 rows for ruby-mastodon's 1,239 components — so a component
+ * pulled in by two parents appears once, under whichever parent reaches it soonest. The chain is
+ * read off the SBOM's own `dependencies[].dependsOn` edges, which is the only place this
+ * information exists: the depinder dependency model records `requestedBy` but not the route back
+ * to the root.
  *
- * Two decisions are worth stating, because neither is forced by the data:
+ * The walk starts from the same project nodes the parser builds projects from (`findProjectNodes`),
+ * with the same self-anchors: a project's own artifact is not a segment of its own paths, and a
+ * one-segment path here means exactly what `Direct` means in `_dependencies.csv`.
  *
- *  - *Which* paths. Enumerating every distinct root-to-component route is exponential in a real
- *    graph (npm graphs have millions), and Black Duck plainly does not do it either. So one row
- *    is emitted per (component, immediate parent): the shortest route to that parent, extended by
- *    the component. That is bounded by the edge count, is stable under re-runs, and reproduces
- *    the property the column exists for — "which of my dependencies brought this in".
- *
- *  - Syft SBOMs. Syft emits no project node and, outside the maven reconstruction, no dependency
- *    edges either: its root is a `file` node that depends on nothing. There is no chain to walk,
- *    so every component is emitted at the root level with a one-hop path. This is a real loss of
- *    information relative to a Trivy SBOM, not a modelling choice — see the README.
+ * Syft SBOMs carry chains only where they carry edges — yarn workspaces (see
+ * `YARN_WORKSPACE_VERSION`) and the maven reconstruction. Everything a workspace does not reach,
+ * and every component of an ecosystem Syft records flat, is emitted at the root level with a
+ * one-hop path. That is a real loss of information relative to a Trivy SBOM, not a modelling
+ * choice — see the README.
  */
 
 export interface SbomPath {
@@ -32,37 +38,46 @@ export interface SbomPath {
     name: string
     version: string
     purlType: string
-    /** `<repo>/-<origin>/<name>/<version>/…` — the chain, as Black Duck writes it. */
+    /** `<repo>/-<package manager>/<name>/<version>/…` — the chain, as Black Duck writes it. */
     path: string
     /** `<repo>`, or `<repo>/<module>` when the SBOM names its modules. */
     projectPath: string
     matchType: 'Direct' | 'Transitive'
 }
 
-/** A project anchor in the SBOM: Trivy's `application` nodes, or the BOM root for Syft. */
-interface Anchor {
-    ref: string
-    /** The module label, empty for a single-project SBOM. */
-    module: string
+/**
+ * Black Duck tags every path with the package manager whose manifest it walked — `-yarn`, not
+ * `-npmjs` — so the same registry appears under three tags in one export (`-yarn`, `-npm`,
+ * `-pnpm`). The tag is read off the manifest's basename, which both tools record: Trivy names its
+ * application node after the manifest, Syft records each component's `syft:location:0:path`.
+ * Every tag below was read off the reference export, except `poetry`, which follows the pattern.
+ */
+const PACKAGE_MANAGER_TAGS: readonly [RegExp, string][] = [
+    [/^yarn\.lock$/, 'yarn'],
+    [/^package(-lock)?\.json$/, 'npm'],
+    [/^pnpm-lock\.yaml$/, 'pnpm'],
+    [/^(Gemfile(\.lock)?|.*\.gemspec)$/, 'rubygems'],
+    [/^pom\.xml$/, 'maven'],
+    [/^(build\.gradle(\.kts)?|gradle\.lockfile)$/, 'gradle'],
+    [/^composer\.(json|lock)$/, 'packagist'],
+    [/^Cargo\.(toml|lock)$/, 'cargo'],
+    [/^go\.(mod|sum)$/, 'go_mod'],
+    [/^(packages\.lock\.json|.*\.(csproj|fsproj|vbproj|deps\.json))$/, 'nuget'],
+    [/^uv\.lock$/, 'uv'],
+    [/^poetry\.lock$/, 'poetry'],
+    [/^(requirements.*\.txt|Pipfile(\.lock)?)$/, 'pip'],
+]
+
+export function packageManagerTag(manifest: string | undefined): string | undefined {
+    if (!manifest) return undefined
+    const base = path.basename(manifest)
+    return PACKAGE_MANAGER_TAGS.find(([pattern]) => pattern.test(base))?.[1]
 }
 
-function anchorsOf(bom: CycloneDxBom, byRef: Map<string, CycloneDxComponent>, edges: Map<string, string[]>): Anchor[] {
-    const rootRef = bom.metadata?.component?.['bom-ref'] ?? ''
-    const applications = (edges.get(rootRef) ?? [])
-        .map(ref => byRef.get(ref))
-        .filter((it): it is CycloneDxComponent => !!it && it.type === 'application' && !it.purl)
-    if (applications.length === 0) return [{ref: rootRef, module: ''}]
-    return applications.map(it => ({
-        ref: it['bom-ref'],
-        // `neo4j/pom.xml` -> `neo4j`; a manifest at the top level contributes no module segment.
-        module: path.dirname(it.name ?? '.') === '.' ? '' : path.dirname(it.name ?? '.'),
-    }))
-}
-
-/** The shortest chain of components from an anchor to every ref reachable from it. */
-function shortestChains(anchorRef: string, edges: Map<string, string[]>): Map<string, string[]> {
-    const chains = new Map<string, string[]>([[anchorRef, []]])
-    const queue = [anchorRef]
+/** The shortest chain of refs from `start` to every ref reachable from it (`start` itself: `[]`). */
+function shortestChains(start: string, edges: Map<string, string[]>): Map<string, string[]> {
+    const chains = new Map<string, string[]>([[start, []]])
+    const queue = [start]
     while (queue.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const current = queue.shift()!
@@ -77,77 +92,79 @@ function shortestChains(anchorRef: string, edges: Map<string, string[]>): Map<st
     return chains
 }
 
+/** The paths of one project, for one ecosystem. */
+function projectPaths(graph: BomGraph, node: ProjectNode, repo: string, purlType: string): SbomPath[] {
+    const coordinatesOf = (ref: string): ParsedPurl | undefined => {
+        const purl = graph.byRef.get(ref)?.purl
+        const parsed = purl ? parsePurl(purl) : undefined
+        return parsed && parsed.type === purlType ? parsed : undefined
+    }
+    const projectPath = node.module ? `${repo}/${node.module}` : repo
+    const anchors = new Set(node.anchorRefs)
+    // Trivy's node is the manifest; a Syft component knows the manifest it was read from.
+    const tagOf = (ref: string) =>
+        packageManagerTag(node.path)
+        ?? packageManagerTag(locationOf(graph.byRef.get(ref) ?? {'bom-ref': ref}))
+        ?? originForPurlType(purlType).name
+
+    const results: SbomPath[] = []
+    const seen = new Set<string>()
+    const emit = (chain: string[]) => {
+        const target = coordinatesOf(chain[chain.length - 1])
+        if (!target) return
+        const segments = chain
+            .filter(ref => !anchors.has(ref))
+            .map(coordinatesOf)
+            .filter((it): it is ParsedPurl => !!it)
+        if (segments.length === 0) return
+        const rendered = `${projectPath}/-${tagOf(chain[chain.length - 1])}/`
+            + segments.map(it => `${it.name}/${it.version}`).join('/')
+        // Syft lists a package once per location it was seen in; one path per package is enough.
+        const key = `${target.name}|${target.version}|${rendered}`
+        if (seen.has(key)) return
+        seen.add(key)
+        results.push({
+            name: target.name,
+            version: target.version,
+            purlType,
+            path: rendered,
+            projectPath,
+            matchType: segments.length === 1 ? 'Direct' : 'Transitive',
+        })
+    }
+
+    // A Trivy project is walked from its manifest node; a Syft one from each workspace it holds.
+    const starts = node.allComponents ? node.anchorRefs : [node.ref]
+    const reached = new Set<string>()
+    for (const start of starts) {
+        for (const [ref, chain] of shortestChains(start, graph.edges)) {
+            if (ref === start) continue
+            reached.add(ref)
+            emit(chain)
+        }
+    }
+
+    // Syft's flat shape: whatever no workspace reaches sits at the root level.
+    if (node.allComponents) {
+        for (const ref of graph.byRef.keys()) {
+            if (!reached.has(ref) && !anchors.has(ref)) emit([ref])
+        }
+    }
+    return results
+}
+
 /**
- * Every (component, path) pair in one SBOM, restricted to the purl types being exported.
- *
- * `repo` is the label the chain starts from — the project name, which is what Black Duck puts
- * first — and `originOf` supplies the `-<origin>` segment that follows it.
+ * Every (component, path) pair in one SBOM, restricted to the purl types being exported. `repo`
+ * is the label the chain starts from — the project name, which is what Black Duck puts first.
  */
-export function sbomPaths(
-    sbomFile: string,
-    repo: string,
-    purlTypes: Set<string>,
-    originOf: (purlType: string) => string
-): SbomPath[] {
-    let bom: CycloneDxBom
+export function sbomPaths(sbomFile: string, repo: string, purlTypes: Set<string>): SbomPath[] {
+    let graph: BomGraph
     try {
-        bom = JSON.parse(fs.readFileSync(sbomFile, 'utf8')) as CycloneDxBom
+        graph = readBomGraph(sbomFile)
     } catch (e: any) {
         log.warn(`Could not read ${path.basename(sbomFile)} for dependency paths: ${e?.message ?? e}`)
         return []
     }
-
-    const byRef = new Map<string, CycloneDxComponent>((bom.components ?? []).map(it => [it['bom-ref'], it]))
-    const edges = new Map<string, string[]>()
-    for (const entry of bom.dependencies ?? []) {
-        if (entry.dependsOn?.length) edges.set(entry.ref, entry.dependsOn)
-    }
-
-    const coordinatesOf = (ref: string) => {
-        const purl = byRef.get(ref)?.purl
-        const parsed = purl ? parsePurl(purl) : undefined
-        return parsed && purlTypes.has(parsed.type) ? parsed : undefined
-    }
-
-    const results: SbomPath[] = []
-    const seen = new Set<string>()
-
-    for (const anchor of anchorsOf(bom, byRef, edges)) {
-        const projectPath = anchor.module ? `${repo}/${anchor.module}` : repo
-        const chains = shortestChains(anchor.ref, edges)
-
-        const emit = (parentRef: string, childRef: string) => {
-            const target = coordinatesOf(childRef)
-            if (!target) return
-            const chain = [...(chains.get(parentRef) ?? []), childRef]
-            const segments = chain.map(coordinatesOf).filter((it): it is NonNullable<typeof it> => !!it)
-            if (segments.length === 0) return
-            const rendered = `${projectPath}/-${originOf(target.type)}/`
-                + segments.map(it => `${it.name}/${it.version}`).join('/')
-            const key = `${target.type}|${target.name}|${target.version}|${rendered}`
-            if (seen.has(key)) return
-            seen.add(key)
-            results.push({
-                name: target.name,
-                version: target.version,
-                purlType: target.type,
-                path: rendered,
-                projectPath,
-                matchType: parentRef === anchor.ref ? 'Direct' : 'Transitive',
-            })
-        }
-
-        if (chains.size > 1) {
-            // Every edge whose source this anchor can reach, so a component pulled in by two
-            // parents is reported under both.
-            for (const [source, targets] of edges) {
-                if (!chains.has(source)) continue
-                for (const target of targets) emit(source, target)
-            }
-        } else {
-            // Syft's shape: no edges out of the root. Every component sits at the root level.
-            for (const ref of byRef.keys()) emit(anchor.ref, ref)
-        }
-    }
-    return results
+    return [...purlTypes].flatMap(purlType =>
+        findProjectNodes(graph, sbomFile, purlType).flatMap(node => projectPaths(graph, node, repo, purlType)))
 }

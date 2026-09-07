@@ -5,7 +5,7 @@ import {BLACKDUCK_FILES, writeBlackDuckExport, writeSecurityCsv} from '../src/bl
 import {licenseColumns} from '../src/blackduck/licenses'
 import {AnalysedEcosystem, buildModel} from '../src/blackduck/model'
 import {componentLink, originForPurlType, originId} from '../src/blackduck/origins'
-import {sbomPaths} from '../src/blackduck/paths'
+import {packageManagerTag, sbomPaths} from '../src/blackduck/paths'
 import {upgradeGuidance} from '../src/blackduck/upgrade'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
 import {Vulnerability} from '../src/extension-points/vulnerability-checker'
@@ -170,13 +170,12 @@ describe('dependency paths', () => {
         fs.writeFileSync(file, JSON.stringify(bom))
         return file
     }
-    const origin = (type: string) => originForPurlType(type).name
 
-    it('walks dependsOn from a Trivy application node', () => {
+    it('walks dependsOn from a Trivy application node, tagged with its package manager', () => {
         const file = write({
             metadata: {component: {'bom-ref': 'root'}},
             components: [
-                {'bom-ref': 'app', type: 'application', name: 'package.json'},
+                {'bom-ref': 'app', type: 'application', name: 'yarn.lock'},
                 {'bom-ref': 'a', purl: 'pkg:npm/express@4.18.0'},
                 {'bom-ref': 'b', purl: 'pkg:npm/qs@6.10.2'},
             ],
@@ -186,20 +185,20 @@ describe('dependency paths', () => {
                 {ref: 'a', dependsOn: ['b']},
             ],
         })
-        const paths = sbomPaths(file, 'demo', new Set(['npm']), origin)
-        expect(paths).toEqual([
+        expect(sbomPaths(file, 'demo', new Set(['npm']))).toEqual([
             {name: 'express', version: '4.18.0', purlType: 'npm', projectPath: 'demo',
-                matchType: 'Direct', path: 'demo/-npmjs/express/4.18.0'},
+                matchType: 'Direct', path: 'demo/-yarn/express/4.18.0'},
             {name: 'qs', version: '6.10.2', purlType: 'npm', projectPath: 'demo',
-                matchType: 'Transitive', path: 'demo/-npmjs/express/4.18.0/qs/6.10.2'},
+                matchType: 'Transitive', path: 'demo/-yarn/express/4.18.0/qs/6.10.2'},
         ])
     })
 
-    it('reports a component pulled in by two parents under both of them', () => {
+    // Black Duck writes one path per component: the shortest chain, not every chain.
+    it('reports a component pulled in by two parents once, by its shortest chain', () => {
         const file = write({
             metadata: {component: {'bom-ref': 'root'}},
             components: [
-                {'bom-ref': 'app', type: 'application', name: 'package.json'},
+                {'bom-ref': 'app', type: 'application', name: 'package-lock.json'},
                 {'bom-ref': 'a', purl: 'pkg:npm/express@4.18.0'},
                 {'bom-ref': 'b', purl: 'pkg:npm/body-parser@1.20.0'},
                 {'bom-ref': 'c', purl: 'pkg:npm/qs@6.10.2'},
@@ -207,28 +206,96 @@ describe('dependency paths', () => {
             dependencies: [
                 {ref: 'root', dependsOn: ['app']},
                 {ref: 'app', dependsOn: ['a', 'b']},
-                {ref: 'a', dependsOn: ['c']},
+                {ref: 'a', dependsOn: ['b']},
                 {ref: 'b', dependsOn: ['c']},
             ],
         })
-        const qs = sbomPaths(file, 'demo', new Set(['npm']), origin).filter(it => it.name === 'qs')
-        expect(qs.map(it => it.path).sort()).toEqual([
-            'demo/-npmjs/body-parser/1.20.0/qs/6.10.2',
-            'demo/-npmjs/express/4.18.0/qs/6.10.2',
+        const qs = sbomPaths(file, 'demo', new Set(['npm'])).filter(it => it.name === 'qs')
+        expect(qs.map(it => it.path)).toEqual(['demo/-npm/body-parser/1.20.0/qs/6.10.2'])
+    })
+
+    it('starts a self-anchored manifest below its own artifact, which is never a segment', () => {
+        const file = write({
+            metadata: {component: {'bom-ref': 'root'}},
+            components: [
+                {'bom-ref': 'app', type: 'application', name: 'go.mod'},
+                {'bom-ref': 'main', purl: 'pkg:golang/github.com/caddyserver/caddy/v2'},
+                {'bom-ref': 'a', purl: 'pkg:golang/github.com/caddyserver/certmagic@v0.25.4'},
+            ],
+            dependencies: [
+                {ref: 'root', dependsOn: ['app']},
+                {ref: 'app', dependsOn: ['main']},
+                {ref: 'main', dependsOn: ['a']},
+            ],
+        })
+        expect(sbomPaths(file, 'go-caddy', new Set(['golang']))).toEqual([
+            {name: 'github.com/caddyserver/certmagic', version: 'v0.25.4', purlType: 'golang', projectPath: 'go-caddy',
+                matchType: 'Direct', path: 'go-caddy/-go_mod/github.com/caddyserver/certmagic/v0.25.4'},
         ])
     })
 
-    // Syft emits no project node and no edges, so there is no chain to walk and every component
-    // is reported at the root. Losing the chain is Syft's, not ours.
-    it('emits root-level paths for a Syft SBOM with no dependency edges', () => {
+    it('names the module in the project path for a manifest below the top level', () => {
+        const file = write({
+            metadata: {component: {'bom-ref': 'root'}},
+            components: [
+                {'bom-ref': 'app', type: 'application', name: 'fuzz/Cargo.lock'},
+                {'bom-ref': 'crate', purl: 'pkg:cargo/fuzz@0.0.1'},
+                {'bom-ref': 'a', purl: 'pkg:cargo/libfuzzer-sys@0.4.7'},
+            ],
+            dependencies: [
+                {ref: 'root', dependsOn: ['app']},
+                {ref: 'app', dependsOn: ['crate']},
+                {ref: 'crate', dependsOn: ['a']},
+            ],
+        })
+        expect(sbomPaths(file, 'rust-ripgrep', new Set(['cargo']))[0]).toMatchObject({
+            projectPath: 'rust-ripgrep/fuzz', path: 'rust-ripgrep/fuzz/-cargo/libfuzzer-sys/0.4.7',
+        })
+    })
+
+    // Syft emits no project node; a yarn workspace node is the one place it carries a chain's
+    // start. What no workspace reaches is reported at the root, tagged by its own manifest.
+    it('walks a Syft SBOM from its yarn workspaces and reports the rest at the root level', () => {
+        const at = (manifest: string) => [{name: 'syft:location:0:path', value: manifest}]
+        const file = write({
+            metadata: {component: {'bom-ref': 'root', type: 'file'}},
+            components: [
+                {'bom-ref': 'ws', name: '@mastodon/mastodon', version: '0.0.0-use.local',
+                    purl: 'pkg:npm/%40mastodon/mastodon@0.0.0-use.local', properties: at('/yarn.lock')},
+                {'bom-ref': 'a', purl: 'pkg:npm/vite@7.3.1', properties: at('/yarn.lock')},
+                {'bom-ref': 'b', purl: 'pkg:npm/rollup@4.60.1', properties: at('/yarn.lock')},
+                {'bom-ref': 'c', purl: 'pkg:npm/cacheable@2.3.4', properties: at('/yarn.lock')},
+                {'bom-ref': 'g', purl: 'pkg:gem/nokogiri@1.13.8', properties: at('/Gemfile.lock')},
+            ],
+            dependencies: [{ref: 'ws', dependsOn: ['a']}, {ref: 'a', dependsOn: ['b']}],
+        })
+        expect(sbomPaths(file, 'demo', new Set(['npm', 'gem'])).map(it => [it.matchType, it.path])).toEqual([
+            ['Direct', 'demo/-yarn/vite/7.3.1'],
+            ['Transitive', 'demo/-yarn/vite/7.3.1/rollup/4.60.1'],
+            ['Direct', 'demo/-yarn/cacheable/2.3.4'],
+            ['Direct', 'demo/-rubygems/nokogiri/1.13.8'],
+        ])
+    })
+
+    it('falls back to the origin name when neither tool recorded a manifest', () => {
         const file = write({
             metadata: {component: {'bom-ref': 'root', type: 'file'}},
             components: [{'bom-ref': 'a', purl: 'pkg:gem/nokogiri@1.13.8'}],
         })
-        expect(sbomPaths(file, 'demo', new Set(['gem']), origin)).toEqual([
-            {name: 'nokogiri', version: '1.13.8', purlType: 'gem', projectPath: 'demo',
-                matchType: 'Direct', path: 'demo/-rubygems/nokogiri/1.13.8'},
-        ])
+        expect(sbomPaths(file, 'demo', new Set(['gem']))[0].path).toBe('demo/-rubygems/nokogiri/1.13.8')
+    })
+
+    it('tags a path by the manifest\'s package manager, as Black Duck does', () => {
+        expect(packageManagerTag('yarn.lock')).toBe('yarn')
+        expect(packageManagerTag('streaming/package-lock.json')).toBe('npm')
+        expect(packageManagerTag('pnpm-lock.yaml')).toBe('pnpm')
+        expect(packageManagerTag('/Gemfile.lock')).toBe('rubygems')
+        expect(packageManagerTag('neo4j/pom.xml')).toBe('maven')
+        expect(packageManagerTag('gradle.lockfile')).toBe('gradle')
+        expect(packageManagerTag('composer.lock')).toBe('packagist')
+        expect(packageManagerTag('src/Web/Web.csproj')).toBe('nuget')
+        expect(packageManagerTag('uv.lock')).toBe('uv')
+        expect(packageManagerTag('unknown.lock')).toBeUndefined()
     })
 })
 
