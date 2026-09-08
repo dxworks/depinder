@@ -37,6 +37,11 @@ export const jsonCache: Cache = {
         }
         return libMap.has(key)
     },
+    // Serialising the whole map is the only way this cache becomes durable, so the mid-run
+    // checkpoint and the end-of-run teardown are the same operation here.
+    flush() {
+        this.write()
+    },
     write() {
         // Serialising a large cache (70 MB for a few thousand npm packuments) blocks the event
         // loop for a second or more, so it is only done when there is something new to save.

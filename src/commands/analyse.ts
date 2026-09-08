@@ -302,8 +302,12 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         await cache.load()
         misses.load()
     })
+    // Mid-run durability only: `cache.write()` is also the teardown step (the Mongo cache closes
+    // its connection there), so a checkpoint that called it would leave every later lookup in the
+    // run talking to a disconnected client — and those failures are swallowed per dependency, so
+    // the run would still finish and write CSVs with the enrichment silently missing.
     const checkpoint = () => timePhase('cache:write', async () => {
-        await cache.write()
+        await cache.flush?.()
         misses.write()
     })
     let lastCheckpoint = Date.now()
@@ -487,7 +491,11 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         return purlType ? {purlType, projects} : undefined
     }))
     progress.stop()
-    await checkpoint()
+    // The teardown write: flushes anything still pending and releases the cache's resources.
+    await timePhase('cache:write', async () => {
+        await cache.write()
+        misses.write()
+    })
     const analysed = results.filter((it): it is AnalysisResult => it !== undefined)
 
     if (preflight) {

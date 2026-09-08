@@ -69,6 +69,14 @@ export const mongoCache: Cache = {
             })
         }
     },
+    /**
+     * Nothing to do: every `set` is an awaited upsert, so the cache is already durable. The
+     * mid-run checkpoint must NOT fall back to `write` here — that closes the connection, and
+     * every lookup for the rest of the run would then fail against a disconnected mongoose.
+     */
+    async flush() {
+        // Intentionally empty; see the comment above.
+    },
     async write() {
         if (mongoose.connection.readyState === 1) {
             await mongoose.disconnect()
