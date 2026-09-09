@@ -5,6 +5,8 @@ import {cacheCommand} from './commands/cache'
 import {updateCommand} from './commands/update'
 import {extractFrameworkVersionsCommand} from './commands/extractFrameworkVersion'
 import {transformBlackDuckReportsCommand} from './commands/transformBlackDuckReports'
+import {githubAdvisoriesCommand} from './commands/githubAdvisories'
+import {exportBlackduckCommand} from './commands/exportBlackduck'
 import {addCategoriesToBlackDuckReportsCommand} from './commands/addCategoriesToBlackDuckReports'
 
 export const mainCommand = new Command()
@@ -16,4 +18,6 @@ export const mainCommand = new Command()
     .addCommand(cacheCommand)
     .addCommand(extractFrameworkVersionsCommand)
     .addCommand(transformBlackDuckReportsCommand)
+    .addCommand(githubAdvisoriesCommand)
+    .addCommand(exportBlackduckCommand)
     .addCommand(addCategoriesToBlackDuckReportsCommand)

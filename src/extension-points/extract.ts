@@ -35,6 +35,21 @@ export interface DepinderProject {
     dependencies: {
         [dependencyId: string]: DepinderDependency
     }
+
+    /**
+     * Set by a parser that has already resolved vulnerabilities for the EXACT installed version of
+     * every dependency in this project — e.g. a local Trivy/Grype scan of the SBOM the project was
+     * parsed from.
+     *
+     * When true, each dependency's `vulnerabilities` array is final: `analyse` must neither
+     * overwrite it nor apply the semver-range filter, which exists only for the library-level
+     * advisory data on `LibraryInfo.vulnerabilities`. A dependency with no findings carries `[]`,
+     * not `undefined` — absence is a result, not a gap.
+     *
+     * When false or absent, no dependency carries vulnerabilities and `analyse` fills them from
+     * `LibraryInfo.vulnerabilities`, range-filtered to each dependency's version.
+     */
+    exactVersionVulnerabilities?: boolean
 }
 
 export interface DepinderDependency {

@@ -6,7 +6,7 @@ import moment, {Moment} from 'moment'
 import {getPluginsFromNames} from '../plugins'
 import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
 import {Presets, SingleBar} from 'cli-progress'
-import {Plugin} from '../extension-points/plugin'
+import {ecosystemOf, Plugin} from '../extension-points/plugin'
 import {log} from '../utils/logging'
 
 export const updateCommand = new Command()
@@ -41,7 +41,7 @@ export async function updateLibs(updated_before: string, plugins: string[]): Pro
 
     const selectedPlugins = getPluginsFromNames(plugins)
 
-    const idsToUpdate = ids.filter(id => selectedPlugins.some(plugin => id.startsWith(`${plugin.name}:`)))
+    const idsToUpdate = ids.filter(id => selectedPlugins.some(plugin => id.startsWith(`${ecosystemOf(plugin)}:`)))
     if (idsToUpdate.length > 0) {
         log.info(`Updating ${idsToUpdate.length} of ${ids.length} libraries...`)
         await updateLibrariesAndLogProcess(idsToUpdate, selectedPlugins)
@@ -65,12 +65,20 @@ async function getLibraryIdsToUpdate(lastUpdateMoment: Moment): Promise<string[]
 }
 
 async function updateLibrariesFor(selectedPlugins: Plugin[], idsToUpdate: string[], progressBar: SingleBar) {
+    // One plugin per ecosystem: plugins sharing an ecosystem (java / sbom-java) share cache ids,
+    // so iterating all of them would refresh every id once per plugin claiming that prefix.
+    const byEcosystem = new Map<string, Plugin>()
     for (const plugin of selectedPlugins) {
-        const libsToUpdate = idsToUpdate.filter(id => id.startsWith(`${plugin.name}:`))
+        if (!byEcosystem.has(ecosystemOf(plugin))) byEcosystem.set(ecosystemOf(plugin), plugin)
+    }
+
+    for (const plugin of byEcosystem.values()) {
+        const ecosystem = ecosystemOf(plugin)
+        const libsToUpdate = idsToUpdate.filter(id => id.startsWith(`${ecosystem}:`))
 
         if (libsToUpdate.length > 0) {
             for (const id of libsToUpdate) {
-                const libraryName = id.substring(plugin.name.length + 1)
+                const libraryName = id.substring(ecosystem.length + 1)
                 try {
                     const lib = await plugin.registrar.retrieve(libraryName)
                     if (plugin.checker?.githubSecurityAdvisoryEcosystem) {

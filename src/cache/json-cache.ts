@@ -16,6 +16,8 @@ function loadCache(): Map<string, LibraryInfo> {
 }
 
 let libMap: Map<string, LibraryInfo>
+/** True once an entry was set that the file does not hold yet; `write` is a no-op otherwise. */
+let dirty = false
 export const jsonCache: Cache = {
     get(key: string): LibraryInfo | undefined {
         if (!libMap) {
@@ -27,6 +29,7 @@ export const jsonCache: Cache = {
             this.load()
         }
         libMap.set(key, value)
+        dirty = true
     },
     has(key: string): boolean {
         if (!libMap) {
@@ -34,10 +37,22 @@ export const jsonCache: Cache = {
         }
         return libMap.has(key)
     },
+    // Serialising the whole map is the only way this cache becomes durable, so the mid-run
+    // checkpoint and the end-of-run teardown are the same operation here.
+    flush() {
+        this.write()
+    },
     write() {
-        fs.writeFileSync(path.resolve(process.cwd(), 'cache', 'libs.json'), JSON.stringify(Object.fromEntries(libMap)))
+        // Serialising a large cache (70 MB for a few thousand npm packuments) blocks the event
+        // loop for a second or more, so it is only done when there is something new to save.
+        if (!dirty) return
+        fs.writeFileSync(path.resolve(process.cwd(), 'cache', CACHE_FILE_NAME), JSON.stringify(Object.fromEntries(libMap)))
+        dirty = false
     },
     load() {
+        // The in-memory map is authoritative once loaded: this process is the only writer, and
+        // every plugin in a run calls load(), so re-reading the file would just repeat the parse.
+        if (libMap) return
         libMap = loadCache()
     },
 }
