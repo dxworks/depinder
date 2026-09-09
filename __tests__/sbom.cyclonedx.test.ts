@@ -212,6 +212,42 @@ describe('parseCycloneDxFile — Syft shape (no project nodes)', () => {
             .toEqual(['side-channel@1.1.0'])
     })
 
+    /**
+     * Regression: the single-project path used to be the SBOM file's own absolute location on the
+     * analysing machine, which reached the `Project Path` column of every emitted CSV (1716 rows
+     * in one measured export) and could not be joined against the Trivy route's repo-relative
+     * manifest paths. It is now the shallowest `syft:location:0:path` of the ecosystem.
+     */
+    it('reports a repo-relative manifest path, never the SBOM file\'s own location', () => {
+        const bom = {
+            metadata: {component: {'bom-ref': 'r', type: 'file', name: '/Users/analyst/repo'}},
+            components: [
+                // The nested lockfile holds MORE packages; the repo-root one is still the project.
+                {
+                    'bom-ref': 'n1', name: 'left-pad', version: '1.3.0',
+                    purl: 'pkg:npm/left-pad@1.3.0', properties: loc('/tools/benchmarks/package-lock.json'),
+                },
+                {
+                    'bom-ref': 'n2', name: 'ms', version: '2.1.3',
+                    purl: 'pkg:npm/ms@2.1.3', properties: loc('/tools/benchmarks/package-lock.json'),
+                },
+                {
+                    'bom-ref': 'n3', name: 'debug', version: '4.3.4',
+                    purl: 'pkg:npm/debug@4.3.4', properties: loc('/package-lock.json'),
+                },
+            ],
+            dependencies: [],
+        }
+        const file = writeBom('rel.cdx.json', bom)
+        expect(parseCycloneDxFile(file, 'npm')[0].path).toBe('package-lock.json')
+        expect(parseCycloneDxFile(file, 'npm')[0].path).not.toContain(file)
+    })
+
+    it('falls back to the SBOM name when no component carries a location', () => {
+        // syftBom's components have no syft:location property at all.
+        expect(parseCycloneDxFile(writeBom('noloc.cdx.json', syftBom), 'maven')[0].path).toBe('noloc')
+    })
+
     it('inverts dependsOn into requestedBy', () => {
         const deps = parseCycloneDxFile(writeBom('c.cdx.json', syftBom), 'maven')[0].dependencies
         expect(deps['org.slf4j:slf4j-api@1.7.35'].requestedBy)
@@ -316,12 +352,12 @@ describe('parseCycloneDxFile — Syft maven monorepo (per-module reconstruction)
         expect(projects.map(p => p.name).sort()).toEqual(['moduleA', 'moduleB', 's1'])
         const a = projects.find(p => p.name === 'moduleA')!
         expect(a.version).toBe('0.13.0') // the anchor's version, not the SBOM root's
-        expect(a.path).toBe('/moduleA/pom.xml')
+        expect(a.path).toBe('moduleA/pom.xml') // repo-relative, exactly as the Trivy route reports it
     })
 
     it('names the root-pom module after the SBOM file, mirroring the Trivy convention', () => {
         const projects = parseCycloneDxFile(writeBom('s2.cdx.json', syftMonorepoBom), 'maven')
-        const root = projects.find(p => p.path === '/pom.xml')!
+        const root = projects.find(p => p.path === 'pom.xml')!
         expect(root.name).toBe('s2')
     })
 
@@ -332,7 +368,7 @@ describe('parseCycloneDxFile — Syft maven monorepo (per-module reconstruction)
         expect(Object.keys(a.dependencies).sort())
             .toEqual(['com.google.code.gson:gson@2.8.9', 'com.google.guava:guava@14.0.1'])
         // ...and conversely the root project holds only what its own anchor reaches.
-        const root = projects.find(p => p.path === '/pom.xml')!
+        const root = projects.find(p => p.path === 'pom.xml')!
         expect(Object.keys(root.dependencies).sort())
             .toEqual(['org.slf4j:slf4j-api@1.7.35', 'org.slf4j:slf4j-reload4j@1.7.35'])
     })
@@ -414,6 +450,68 @@ describe('parseCycloneDxFile — Syft maven monorepo (per-module reconstruction)
         const projects = parseCycloneDxFile(writeBom('s9.cdx.json', bom), 'maven')
         expect(projects.map(p => p.name).sort()).toEqual(['a', 'b'])
         expect(projects.find(p => p.name === 'b')!.dependencies).toEqual({})
+    })
+
+    /**
+     * Regression, measured on the real spring-petclinic Syft SBOM: with a SINGLE pom group the
+     * bootstrap is meaningless — every groupId occurring once in that one group ties at score 1
+     * (89 of them did) — and taking the first tie made an arbitrary third-party package the
+     * project anchor (org.hdrhistogram), so the exported project was 5 of 709 maven components.
+     * The anchor is instead the group's one component that no dependsOn edge targets.
+     */
+    it('anchors a single-module repo on the component nothing depends on, not on a tied groupId', () => {
+        const bom = {
+            metadata: {component: {'bom-ref': 'r', type: 'file', name: '/abs/path/to/repo'}},
+            components: [
+                // Deliberately NOT first, so a fix that relies on component order cannot pass.
+                {
+                    'bom-ref': 'dep-hdr', name: 'HdrHistogram', version: '2.2.2',
+                    purl: 'pkg:maven/org.hdrhistogram/HdrHistogram@2.2.2', properties: loc('/pom.xml'),
+                },
+                {
+                    'bom-ref': 'anchor', name: 'spring-petclinic', version: '4.0.0-SNAPSHOT',
+                    purl: 'pkg:maven/org.springframework.samples/spring-petclinic@4.0.0-SNAPSHOT',
+                    properties: loc('/pom.xml'),
+                },
+                {
+                    'bom-ref': 'dep-micrometer', name: 'micrometer-core', version: '1.14.2',
+                    purl: 'pkg:maven/io.micrometer/micrometer-core@1.14.2', properties: loc('/pom.xml'),
+                },
+            ],
+            dependencies: [
+                {ref: 'anchor', dependsOn: ['dep-micrometer']},
+                {ref: 'dep-micrometer', dependsOn: ['dep-hdr']},
+            ],
+        }
+        const projects = parseCycloneDxFile(writeBom('sm1.cdx.json', bom), 'maven')
+        expect(projects).toHaveLength(1)
+        expect(projects[0].version).toBe('4.0.0-SNAPSHOT') // the project's, not HdrHistogram's
+        expect(projects[0].path).toBe('pom.xml')
+        expect(Object.keys(projects[0].dependencies).sort())
+            .toEqual(['io.micrometer:micrometer-core@1.14.2', 'org.hdrhistogram:HdrHistogram@2.2.2'])
+    })
+
+    it('leaves a group anchorless when several components are untargeted, rather than guessing', () => {
+        const bom = {
+            metadata: {component: {'bom-ref': 'r', type: 'file', name: '/abs/path/to/repo'}},
+            components: [
+                {
+                    'bom-ref': 'a', name: 'a', version: '1.0.0',
+                    purl: 'pkg:maven/org.one/a@1.0.0', properties: loc('/pom.xml'),
+                },
+                {
+                    'bom-ref': 'b', name: 'b', version: '2.0.0',
+                    purl: 'pkg:maven/org.two/b@2.0.0', properties: loc('/pom.xml'),
+                },
+            ],
+            dependencies: [],
+        }
+        // Two tied groupIds and two untargeted components: no anchor is knowable, so the SBOM
+        // falls back to the single-project shape instead of crowning one of them.
+        const projects = parseCycloneDxFile(writeBom('sm2.cdx.json', bom), 'maven')
+        expect(projects).toHaveLength(1)
+        expect(projects[0].name).toBe('sm2')
+        expect(Object.keys(projects[0].dependencies).sort()).toEqual(['org.one:a@1.0.0', 'org.two:b@2.0.0'])
     })
 
     it('handles pom paths without a leading slash the same way', () => {

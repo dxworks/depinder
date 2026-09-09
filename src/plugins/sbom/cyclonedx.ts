@@ -226,6 +226,43 @@ function selfAnchorsOf(applicationRef: string, manifest: string, edges: Map<stri
     return children.filter(child => children.length === 1 || (edges.get(child)?.length ?? 0) > 0)
 }
 
+/**
+ * The manifest a single-project Syft SBOM should be reported under, repo-relative.
+ *
+ * Trivy names each project after its manifest's path inside the repo (`package-lock.json`,
+ * `tools/benchmarks/package-lock.json`, `pom.xml`), and that path is what the CSV `Project Path`
+ * column carries. A Syft SBOM has no project node, so the path was taken from the only string at
+ * hand — the SBOM file's own location on the analysing machine. That leaks an absolute path of a
+ * machine the reader has never seen into user-facing CSVs, and makes Syft and Trivy rows
+ * un-joinable on `Project Path`.
+ *
+ * Syft does record the manifest, per component, as `syft:location:0:path`. The project's manifest
+ * is the SHALLOWEST such location of this ecosystem, ties broken by component count and then
+ * lexicographically: the repo-root lockfile, not whichever nested one happens to hold more
+ * packages (on Nest `/tools/benchmarks/package-lock.json` has 156 components against the root's
+ * 129). Returns undefined only when no component of the ecosystem carries a location.
+ */
+function manifestPathOf(bom: CycloneDxBom, purlType: string): string | undefined {
+    const counts = new Map<string, number>()
+    for (const component of bom.components ?? []) {
+        if (parseComponentPurl(component)?.type !== purlType) continue
+        const location = locationOf(component)?.replace(/^\//, '')
+        if (location) counts.set(location, (counts.get(location) ?? 0) + 1)
+    }
+    let best: string | undefined
+    let bestDepth = 0
+    let bestCount = 0
+    for (const [location, n] of [...counts].sort((a, b) => a[0].localeCompare(b[0]))) {
+        const depth = location.split('/').length
+        if (!best || depth < bestDepth || (depth === bestDepth && n > bestCount)) {
+            best = location
+            bestDepth = depth
+            bestCount = n
+        }
+    }
+    return best
+}
+
 /** Syft's yarn-berry workspace nodes of this ecosystem, when the SBOM carries any. */
 function workspaceAnchorsOf(bom: CycloneDxBom, edges: Map<string, string[]>, purlType: string): string[] {
     return (bom.components ?? [])
@@ -248,9 +285,15 @@ function workspaceAnchorsOf(bom: CycloneDxBom, edges: Map<string, string[]>, pur
  *     appears once per pom, while shared third-party groups (org.slf4j, ...) repeat within groups.
  *     Degenerate purls are skipped: when Syft cannot resolve a groupId it emits
  *     `pkg:maven/<name>/<name>@v` (namespace equal to the artifact name), which says nothing.
+ *     The bootstrap only counts when ONE groupId holds the top score; a tie means there is no
+ *     monorepo groupId to be had (a single-module repo has one group, so every groupId occurring
+ *     once in it ties) and step 3 falls back to the per-group root rule.
  *  3. In each group the anchor is the unique component whose groupId is the monorepo groupId.
  *     Defensive tie-breaks if several match: prefer one that is the target of no dependsOn edge,
- *     then one carrying the modal candidate version across groups.
+ *     then one carrying the modal candidate version across groups, then lowest bom-ref.
+ *     If the group has no such component, the anchor is the group's single component that no
+ *     dependsOn edge targets — the project's own artifact, which is how a single-module repo is
+ *     anchored at all.
  *
  * Membership is deliberately NOT the location group: Syft dedups components repo-wide, so a
  * component's location is merely where it was first seen. The module's dependency set is the
@@ -297,6 +340,11 @@ function findSyftMavenModules(
     if (pomGroups.size === 0) return undefined
 
     // 2. Bootstrap the monorepo groupId: +1 per group where the groupId occurs exactly once.
+    //    Only a groupId that holds the top score ALONE is trusted. With a single pom group every
+    //    third-party groupId that appears once ties at 1 (89 of them on spring-petclinic), and
+    //    taking the first such tie made an arbitrary dependency the project anchor — the exported
+    //    project was then only what that dependency reaches. Ambiguity means "no monorepo groupId"
+    //    and the per-group root rule below takes over.
     const score = new Map<string, number>()
     for (const group of pomGroups.values()) {
         const occurrences = new Map<string, number>()
@@ -308,15 +356,20 @@ function findSyftMavenModules(
             if (n === 1) score.set(groupId, (score.get(groupId) ?? 0) + 1)
         }
     }
-    let monoGroupId: string | undefined
     let bestScore = 0
-    for (const [groupId, n] of score) {
+    let bestCount = 0
+    let bestGroupId: string | undefined
+    // Sorted so the winner never depends on Map insertion order, which is JSON component order.
+    for (const [groupId, n] of [...score].sort((a, b) => a[0].localeCompare(b[0]))) {
         if (n > bestScore) {
             bestScore = n
-            monoGroupId = groupId
+            bestCount = 1
+            bestGroupId = groupId
+        } else if (n === bestScore) {
+            bestCount++
         }
     }
-    if (!monoGroupId) return undefined
+    const monoGroupId = bestCount === 1 ? bestGroupId : undefined
 
     // Tie-break inputs: refs that are the target of any dependsOn edge, and the modal version
     // among anchor candidates across all groups.
@@ -342,7 +395,18 @@ function findSyftMavenModules(
     // 3. Pick each group's anchor and derive the project from it.
     const nodes: ProjectNode[] = []
     for (const [pomPath, group] of pomGroups) {
-        let anchors = group.filter(c => c.groupId === monoGroupId)
+        let anchors = monoGroupId ? group.filter(c => c.groupId === monoGroupId) : []
+        if (anchors.length === 0) {
+            // No in-monorepo artifact (or no monorepo groupId at all): the project's own artifact
+            // is the one nothing in the BOM depends on. On a single-module repo that is exact —
+            // spring-petclinic's /pom.xml group has 492 maven components and exactly one such
+            // component, pkg:maven/org.springframework.samples/spring-petclinic. It cannot be the
+            // primary rule: in a monorepo the module artifacts ARE depended on by sibling modules
+            // (20 of Zeppelin's 67 groups have no untargeted component), which is what the groupId
+            // bootstrap is for. Ambiguity here leaves the group anchorless, as before.
+            const untargeted = group.filter(c => !c.degenerate && !edgeTargets.has(c.ref))
+            if (untargeted.length === 1) anchors = untargeted
+        }
         if (anchors.length > 1) {
             const rootLike = anchors.filter(c => !edgeTargets.has(c.ref))
             if (rootLike.length > 0) anchors = rootLike
@@ -352,14 +416,16 @@ function findSyftMavenModules(
             if (modal.length > 0) anchors = modal
         }
         if (anchors.length === 0) continue // a pom group with no in-monorepo artifact is not a module
-        const anchor = anchors[0]
+        // Last resort, so that an unresolved tie is at least reproducible run to run.
+        const anchor = [...anchors].sort((a, b) => a.ref.localeCompare(b.ref))[0]
 
         // The Syft anchor IS the project node: the walk starts from it.
+        const manifestPath = pomPath.replace(/^\//, '')
         nodes.push({
             ref: anchor.ref,
-            ...moduleNames(pomPath.replace(/^\//, ''), sbomFile),
+            ...moduleNames(manifestPath, sbomFile),
             version: anchor.version,
-            path: pomPath,
+            path: manifestPath,
             allComponents: false,
             anchorRefs: [anchor.ref],
         })
@@ -419,7 +485,8 @@ export function findProjectNodes({bom, byRef, edges}: BomGraph, sbomFile: string
         module: '',
         name: projectNameOf(sbomFile),
         version: bom.metadata?.component?.version ?? 'unknown',
-        path: sbomFile,
+        // Never `sbomFile`: that is an absolute path on the analysing machine. See manifestPathOf.
+        path: manifestPathOf(bom, purlType) ?? projectNameOf(sbomFile),
         allComponents: true,
         anchorRefs: workspaceAnchorsOf(bom, edges, purlType),
     }]
