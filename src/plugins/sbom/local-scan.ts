@@ -322,12 +322,11 @@ export function buildVulnerabilityIndex(trivy: TrivyReport | undefined, grype: G
 // ---------------------------------------------------------------------------
 
 /**
- * The reference scanner pair, pinned by documentation — see DECISIONS.md D-16.
+ * The reference scanner pair these results were calibrated against.
  *
- * Nothing here vendors or downloads a binary: depinder runs on machines we control, so the pin is
- * a convention that the code VERIFIES and RECORDS rather than enforces. A mismatch is a warning,
- * never a failure — an intentional upgrade must not block a run. When you deliberately move to a
- * new pair, re-measure, update these constants AND the table in D-16, and note what moved.
+ * Nothing here vendors or downloads a binary: the pin is a convention that the code VERIFIES and
+ * RECORDS rather than enforces. A mismatch is a warning, never a failure — an intentional upgrade
+ * must not block a run.
  */
 export const PINNED_SCANNER_VERSIONS: {readonly trivy: string, readonly grype: string} = {
     trivy: '0.72.0',
@@ -473,9 +472,9 @@ export function scannerPreflightMessages(preflight: ScannerPreflight, hasGithubT
         if (status.versionMatchesPin) continue
         messages.push({
             level: 'warn',
-            text: `${status.tool} ${status.version ?? '(version unreadable)'} differs from the pinned reference `
-                + `version ${status.pinnedVersion} (DECISIONS.md D-16) — counts are not directly comparable with `
-                + 'earlier runs. If the change is intentional, re-measure and update D-16.',
+            text: `${status.tool} ${status.version ?? '(version unreadable)'} differs from the reference `
+                + `version ${status.pinnedVersion} these results were calibrated against — vulnerability counts `
+                + `depend on the scanner version and its DB build date, both recorded in ${PROVENANCE_FILE}.`,
         })
     }
 
@@ -555,15 +554,14 @@ export const PROVENANCE_FILE = 'sbom-scan-provenance.json'
 /**
  * Records how the vulnerability numbers in the CSVs were produced.
  *
- * A count without its matcher and DB build date is untraceable: two runs a week apart can disagree
- * by tens of percent for entirely legitimate reasons, and without this file that is indistinguishable
- * from a regression (DECISIONS.md D-16). One file per run, not a column per row.
+ * A count without its matcher and DB build date is untraceable: both scanners auto-update their
+ * vulnerability databases, so the same SBOM can legitimately yield different counts a week later.
+ * One file per run, not a column per row.
  */
 export async function writeScanProvenance(resultFolder: string, hasGithubToken: boolean): Promise<string> {
     const preflight = await preflightScanners()
     const provenance = {
         generatedAt: new Date().toISOString(),
-        decision: 'DECISIONS.md D-16 — scanner versions pinned by documentation, verified at runtime, recorded here',
         pinnedVersions: PINNED_SCANNER_VERSIONS,
         scanners: {
             trivy: preflight.trivy,

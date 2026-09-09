@@ -30,7 +30,7 @@ enriches them with a local Trivy+Grype vulnerability scan of the same SBOM file.
   - `buildVulnerabilityIndex` (function) — unions and dedupes both tools' findings by (package key,
     canonical vuln id), merging fields by which tool is more reliable for that field, keyed for
     `DepinderDependency.id` lookup :246
-  - `PINNED_SCANNER_VERSIONS` (const) — the reference trivy/grype versions per DECISIONS.md D-16 :332
+  - `PINNED_SCANNER_VERSIONS` (const) — the reference trivy/grype versions :332
   - `ScannerName`, `ScannerStatus`, `ScannerPreflight`, `PreflightMessage` (type/interface) — probe
     result shapes :337-364
   - `preflightScanners` (function) — probes trivy+grype binaries and DBs once per process, never

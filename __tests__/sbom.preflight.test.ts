@@ -21,7 +21,7 @@ import {java} from '../src/plugins/java'
  * whether it detected something. Scanners are stubbed with shell scripts — no real binaries.
  *
  * Version/DB payloads mirror real `trivy --version --format json`, `grype version -o json` and
- * `grype db status -o json` output measured against the pinned pair (DECISIONS.md D-16).
+ * `grype db status -o json` output measured against the pinned pair.
  */
 
 let tmpDir: string
@@ -211,8 +211,8 @@ describe('preflight messages', () => {
         expect(preflight.trivy.versionMatchesPin).toBe(false)
         expect(preflight.grype.versionMatchesPin).toBe(true)
         expect(warnings).toHaveLength(1)
-        expect(warnings[0].text).toContain(`trivy 0.99.9 differs from the pinned reference version ${PINNED_SCANNER_VERSIONS.trivy}`)
-        expect(warnings[0].text).toContain('D-16')
+        expect(warnings[0].text).toContain(`trivy 0.99.9 differs from the reference version ${PINNED_SCANNER_VERSIONS.trivy}`)
+        expect(warnings[0].text).toContain(PROVENANCE_FILE)
     })
 })
 
