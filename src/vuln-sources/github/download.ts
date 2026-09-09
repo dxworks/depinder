@@ -2,7 +2,7 @@ import {GithubAdvisory} from './advisory'
 import {AdvisoryClient, HttpFetch} from './client'
 import {defaultCacheDir, DEFAULT_MAX_AGE_HOURS, staleEcosystems, writeEcosystem} from './cache'
 import {GithubEcosystem, resolveEcosystems} from './ecosystems'
-import {loadTokens, MAX_CONCURRENCY, TokenPool, TokenUsage} from './tokens'
+import {DEFAULT_TOKEN_FILE, loadTokens, MAX_CONCURRENCY, TokenPool, TokenUsage} from './tokens'
 import {log} from '../../utils/logging'
 
 /**
@@ -59,7 +59,7 @@ export async function downloadEcosystems(
     options: DownloadOptions = {}
 ): Promise<DownloadReport> {
     const cacheDir = options.cacheDir ?? defaultCacheDir()
-    const tokenFile = options.tokenFile ?? '.github-tokens'
+    const tokenFile = options.tokenFile ?? DEFAULT_TOKEN_FILE
     const tokens = loadTokens(tokenFile)
     if (tokens.length === 0) throw new NoTokensError(tokenFile)
 

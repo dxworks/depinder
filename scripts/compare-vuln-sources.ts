@@ -6,6 +6,9 @@
  *
  *     npx ts-node -T scripts/compare-vuln-sources.ts
  *
+ * `DEPINDER_COMPARISON_DIR` is the comparison workspace holding `inputs/voyager/sboms` and
+ * `results`; it defaults to the current directory.
+ *
  * (`-T` transpiles without type-checking, because this file sits outside the `src` rootDir the
  * project's tsconfig declares.)
  *
@@ -46,8 +49,9 @@ import {readEcosystem} from '../src/vuln-sources/github/cache'
 
 const execFileAsync = promisify(execFile)
 
-const SBOM_DIR = '/Users/alex/Work/Endava/BD-trivy-syft-comparison/inputs/voyager/sboms'
-const RESULTS_DIR = '/Users/alex/Work/Endava/BD-trivy-syft-comparison/results'
+const COMPARISON_DIR = path.resolve(process.env.DEPINDER_COMPARISON_DIR ?? '.')
+const SBOM_DIR = path.join(COMPARISON_DIR, 'inputs/voyager/sboms')
+const RESULTS_DIR = path.join(COMPARISON_DIR, 'results')
 const CACHE_DIR = path.resolve(process.cwd(), 'cache')
 
 const PROJECTS = [

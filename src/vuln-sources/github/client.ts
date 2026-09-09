@@ -128,18 +128,42 @@ export class AdvisoryClient {
         throw new Error(`Giving up on ${url} after ${this.maxAttempts} attempts — ${lastError}`)
     }
 
-    /** Every reviewed advisory for one ecosystem, page by page. */
+    /**
+     * Every reviewed advisory for one ecosystem, page by page.
+     *
+     * The `next` URL comes back verbatim from the server, and `getPage` attaches a token to
+     * whatever URL it is given, so each one is pinned to `baseUrl`'s origin first: a
+     * TLS-terminating proxy that rewrote a `Link` header would otherwise be handed the PAT.
+     */
     async* pages(ecosystem: string): AsyncGenerator<AdvisoryPage> {
         let url: string | undefined = this.firstPageUrl(ecosystem)
         while (url) {
             const page: AdvisoryPage = await this.getPage(url)
             yield page
+            if (page.nextUrl) this.assertSameOrigin(page.nextUrl)
             url = page.nextUrl
+        }
+    }
+
+    /** Throws unless `url` is on the same origin as `baseUrl`, so no token can leave that host. */
+    private assertSameOrigin(url: string): void {
+        const expected = new URL(this.baseUrl).origin
+        let origin: string
+        try {
+            origin = new URL(url).origin
+        } catch {
+            throw new Error(`Refusing to follow next page ${url} — not a valid URL`)
+        }
+        if (origin !== expected) {
+            throw new Error(`Refusing to follow next page ${url} — origin ${origin} is not ${expected}`)
         }
     }
 }
 
-/** The only place a real socket is opened. Follows no redirects; the API does not issue any. */
+/**
+ * The only place a real socket is opened. HTTP 3xx are not followed (the API issues none), and
+ * pagination is pinned to `baseUrl`'s origin, so a request never carries a token off that host.
+ */
 export const nodeHttpsFetch: HttpFetch = (url, headers) => new Promise((resolve, reject) => {
     const request = https.get(url, {headers}, response => {
         const chunks: Buffer[] = []

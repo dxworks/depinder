@@ -9,6 +9,9 @@
  * project's tsconfig declares. Defaults are the mastodon folders under the comparison repo, so it
  * can also be run with no arguments at all.)
  *
+ * `DEPINDER_COMPARISON_DIR` is the comparison workspace those defaults hang off — the one holding
+ * `exports/`, `inputs/blackduck/` and `results/`; it defaults to the current directory.
+ *
  * Method. Everything joins on `Component Version Origin Id` and on nothing else. Black Duck's
  * `Component name` is a Knowledge Base DISPLAY name — `Action Mailer` for the gem `actionmailer`,
  * `BurntSushi/regex-automata` for the crate `regex-automata` — so joining on it would score most
@@ -26,12 +29,13 @@
 import fs from 'fs'
 import path from 'path'
 
+const COMPARISON_DIR = path.resolve(process.env.DEPINDER_COMPARISON_DIR ?? '.')
 const DEFAULT_OURS = [
-    {label: 'trivy', dir: '/Users/alex/Work/Endava/BD-trivy-syft-comparison/exports/ruby-mastodon-trivy'},
-    {label: 'syft', dir: '/Users/alex/Work/Endava/BD-trivy-syft-comparison/exports/ruby-mastodon-syft'},
+    {label: 'trivy', dir: path.join(COMPARISON_DIR, 'exports/ruby-mastodon-trivy')},
+    {label: 'syft', dir: path.join(COMPARISON_DIR, 'exports/ruby-mastodon-syft')},
 ]
-const DEFAULT_THEIRS = '/Users/alex/Work/Endava/BD-trivy-syft-comparison/inputs/blackduck/ruby-mastodon/export'
-const DEFAULT_OUTPUT = '/Users/alex/Work/Endava/BD-trivy-syft-comparison/results/blackduck-export-diff.md'
+const DEFAULT_THEIRS = path.join(COMPARISON_DIR, 'inputs/blackduck/ruby-mastodon/export')
+const DEFAULT_OUTPUT = path.join(COMPARISON_DIR, 'results/blackduck-export-diff.md')
 
 // ---------------------------------------------------------------------------
 // A minimal RFC 4180 reader. Quoted cells hold commas and newlines; `""` is one quote.

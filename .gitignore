@@ -73,6 +73,9 @@ web_modules/
 .env
 .env.test
 
+# GitHub advisory tokens — a dotenv-style file of live PATs, never commit it
+.github-tokens*
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
