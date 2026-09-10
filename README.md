@@ -64,7 +64,8 @@ before its rate-limit window is exhausted rather than after. The cache lives in
 ## Black Duck-shaped exports
 
 `export-blackduck` turns a folder of CycloneDX SBOMs into the five CSVs a Black Duck project
-version exports, with Black Duck's exact column headers, so the two can be diffed side by side.
+version exports, with Black Duck's exact column headers, so the two can be diffed side by side,
+plus one file Black Duck has no counterpart for: `_dependency_edges.csv`, the dependency graph.
 
 ```shell
 depinder export-blackduck <sbom-folder...> -r <out> \
@@ -73,13 +74,14 @@ depinder export-blackduck <sbom-folder...> -r <out> \
 
 It runs the same analysis `analyse` runs — dependency tree, registry licences and versions,
 vulnerabilities from the selected sources — and writes the normal depinder CSVs into the same
-folder, then the five Black Duck files on top. You do not name plugins: the ecosystems present in
+folder, then the Black Duck files on top. You do not name plugins: the ecosystems present in
 the SBOMs select the `sbom-*` plugins for you.
 
 | File | One row per | Notes |
 |---|---|---|
 | `_dependencies.csv` | (component, version, origin) | The first header really is `1Component name` — Black Duck's own spelling, reproduced verbatim so a diff lines up |
 | `_dependencies_sources.csv` | (component, path) | The dependency chain, walked from the SBOM's `dependsOn` edges |
+| `_dependency_edges.csv` | (parent, child) | **Not a Black Duck file.** `Path` keeps one chain per component, as Black Duck does, so a component with three parents keeps one; this is every edge, with each component's depth. Columns: `Repo, Tree, Ecosystem, Parent Origin Id, Child Origin Id, Child Depth`. A `Tree` is `<repo>/<module>/-<package manager>`; a component nothing pulls in has parent `(root)` and depth 1 |
 | `_upgrade_guidance.csv` | component with ≥ 1 finding | Short/long term recommended versions |
 | `_vulnerability_details.csv` | (component, advisory) | |
 | `security.csv` | (component, advisory) | The same rows plus Black Duck's internal ids, triage fields and CISA block, all empty for us. `analyse` writes this one file too, through the same serialiser |

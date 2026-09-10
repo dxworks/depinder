@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import {writeBlackDuckExport} from '../blackduck/export'
 import {buildModel} from '../blackduck/model'
-import {sbomPaths, SbomPath} from '../blackduck/paths'
+import {SbomEdge, SbomPath, sbomTree} from '../blackduck/paths'
 import {sbomPluginsForPurlTypes} from '../plugins/sbom'
 import {parsePurl} from '../plugins/sbom/cyclonedx'
 import {walkDir} from '../utils/utils'
@@ -82,14 +82,19 @@ export function purlTypesIn(sbomFiles: string[]): Set<string> {
 }
 
 /**
- * The project name, which becomes the `Project path` column and the first segment of every
- * dependency path. Defaults to the SBOMs' shared basename — `ruby-mastodon` for both
- * `ruby-mastodon.cdx.json` and `ruby-mastodon.trivy.cdx.json` — falling back to the folder name
- * when a run spans several projects.
+ * The repo a single SBOM describes: its basename, minus the extractor suffix — `ruby-mastodon` for
+ * both `ruby-mastodon.cdx.json` and `ruby-mastodon.trivy.cdx.json`.
+ */
+export function repoNameOf(sbomFile: string): string {
+    return path.basename(sbomFile).replace(/\.(trivy\.)?cdx\.json$/, '')
+}
+
+/**
+ * The export's root label, which becomes the `Project path` column. Defaults to the SBOMs' shared
+ * repo name, falling back to the folder name when a run spans several repos.
  */
 export function defaultProjectName(sbomFiles: string[], folders: string[]): string {
-    const names = new Set(sbomFiles.map(it =>
-        path.basename(it).replace(/\.(trivy\.)?cdx\.json$/, '')))
+    const names = new Set(sbomFiles.map(repoNameOf))
     if (names.size === 1) return [...names][0]
     return path.basename(path.resolve(folders[0] ?? '.'))
 }
@@ -114,10 +119,15 @@ export async function exportBlackduck(folders: string[], options: ExportBlackduc
 
     const projectName = options.projectName ?? defaultProjectName(sbomFiles, folders)
     const exportedTypes = new Set(analysed.map(it => it.purlType))
-    const paths: SbomPath[] = timePhaseSync('blackduck:paths', () => sbomFiles.flatMap(file =>
-        sbomPaths(file, projectName, exportedTypes)))
+    // One folder can hold several repos' SBOMs, and the repo a path belongs to is the SBOM's own
+    // name, not the run's label — so each file contributes its paths under its own repo. An
+    // explicit --project-name still overrides, for a run that really is a single project.
+    const trees = timePhaseSync('blackduck:paths', () => sbomFiles.map(file =>
+        sbomTree(file, options.projectName ?? repoNameOf(file), exportedTypes)))
+    const paths: SbomPath[] = trees.flatMap(it => it.paths)
+    const edges: SbomEdge[] = trees.flatMap(it => it.edges)
 
-    const model = timePhaseSync('blackduck:model', () => buildModel(projectName, analysed, paths))
+    const model = timePhaseSync('blackduck:model', () => buildModel(projectName, analysed, paths, edges))
     const resultFolder = path.resolve(process.cwd(), options.results || 'results')
     for (const {file, rows} of timePhaseSync('blackduck:csv', () => writeBlackDuckExport(model, resultFolder))) {
         log.info(`${String(rows).padStart(6)} row(s) -> ${file}`)

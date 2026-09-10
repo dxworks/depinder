@@ -5,7 +5,7 @@ import {BLACKDUCK_FILES, writeBlackDuckExport, writeSecurityCsv} from '../src/bl
 import {licenseColumns} from '../src/blackduck/licenses'
 import {AnalysedEcosystem, buildModel} from '../src/blackduck/model'
 import {componentLink, goPseudoVersionCommit, originFor, originId} from '../src/blackduck/origins'
-import {packageManagerTag, sbomPaths} from '../src/blackduck/paths'
+import {packageManagerTag, sbomPaths, sbomTree} from '../src/blackduck/paths'
 import {upgradeGuidance} from '../src/blackduck/upgrade'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
 import {Vulnerability} from '../src/extension-points/vulnerability-checker'
@@ -351,6 +351,57 @@ describe('dependency paths', () => {
         ])
     })
 
+    // Syft's `metadata.component` is a `file` and never appears in `dependencies[]`, so outside
+    // yarn there is no anchor to walk from. The chains are still there; the entry point is every
+    // ref nothing points at. Before this was handled, every npm/pnpm/nuget/pypi/cargo component
+    // came out one-hop and `Direct`.
+    it('walks a Syft SBOM with no workspace anchor from the refs nothing points at', () => {
+        const at = (manifest: string) => [{name: 'syft:location:0:path', value: manifest}]
+        const file = write({
+            metadata: {component: {'bom-ref': 'root', type: 'file'}},
+            components: [
+                {'bom-ref': 'a', purl: 'pkg:npm/supertest@7.2.2', properties: at('/package-lock.json')},
+                {'bom-ref': 'b', purl: 'pkg:npm/superagent@10.2.3', properties: at('/package-lock.json')},
+                {'bom-ref': 'c', purl: 'pkg:npm/formidable@3.5.4', properties: at('/package-lock.json')},
+                {'bom-ref': 'd', purl: 'pkg:npm/dezalgo@1.0.4', properties: at('/package-lock.json')},
+            ],
+            dependencies: [
+                {ref: 'a', dependsOn: ['b']},
+                {ref: 'b', dependsOn: ['c']},
+                {ref: 'c', dependsOn: ['d']},
+            ],
+        })
+        expect(sbomPaths(file, 'js-npm-nest', new Set(['npm'])).map(it => [it.matchType, it.path])).toEqual([
+            ['Direct', 'js-npm-nest/-npm/supertest/7.2.2'],
+            ['Transitive', 'js-npm-nest/-npm/supertest/7.2.2/superagent/10.2.3'],
+            ['Transitive', 'js-npm-nest/-npm/supertest/7.2.2/superagent/10.2.3/formidable/3.5.4'],
+            ['Transitive', 'js-npm-nest/-npm/supertest/7.2.2/superagent/10.2.3/formidable/3.5.4/dezalgo/1.0.4'],
+        ])
+    })
+
+    it('writes the graph as edges, with each component\'s depth and no chain to lose it in', () => {
+        const at = (manifest: string) => [{name: 'syft:location:0:path', value: manifest}]
+        const sbom = write({
+            metadata: {component: {'bom-ref': 'root', type: 'file'}},
+            components: [
+                {'bom-ref': 'a', purl: 'pkg:npm/supertest@7.2.2', properties: at('/package-lock.json')},
+                {'bom-ref': 'b', purl: 'pkg:npm/superagent@10.2.3', properties: at('/package-lock.json')},
+                {'bom-ref': 'c', purl: 'pkg:npm/formidable@3.5.4', properties: at('/package-lock.json')},
+            ],
+            // formidable has two parents: the chain keeps one of them, the edge table both.
+            dependencies: [{ref: 'a', dependsOn: ['b', 'c']}, {ref: 'b', dependsOn: ['c']}],
+        })
+        const {paths, edges} = sbomTree(sbom, 'js-npm-nest', new Set(['npm']))
+        expect(paths.filter(it => it.name === 'formidable')).toHaveLength(1)
+        expect(edges.map(it => [it.parent, it.child, it.depth])).toEqual([
+            ['(root)', 'supertest/7.2.2', 1],
+            ['supertest/7.2.2', 'superagent/10.2.3', 2],
+            ['supertest/7.2.2', 'formidable/3.5.4', 2],
+            ['superagent/10.2.3', 'formidable/3.5.4', 2],
+        ])
+        expect(edges.every(it => it.repo === 'js-npm-nest' && it.tree === 'js-npm-nest/-npm')).toBe(true)
+    })
+
     it('falls back to the origin name when neither tool recorded a manifest', () => {
         const file = write({
             metadata: {component: {'bom-ref': 'root', type: 'file'}},
@@ -382,7 +433,7 @@ describe('the written files', () => {
         folder = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder-bd-'))
     })
 
-    it('writes all five files', () => {
+    it('writes all six files', () => {
         const model = buildModel('demo', [ecosystem(dependency())], [])
         const written = writeBlackDuckExport(model, folder)
         expect(written.map(it => it.file)).toEqual([...BLACKDUCK_FILES])

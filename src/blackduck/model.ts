@@ -3,7 +3,7 @@ import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {ecosystemForPurlType} from '../vuln-sources/github/ecosystems'
 import {comparatorFor, VersionComparator} from '../vuln-sources/github/versions'
 import {Origin, originFor, originId} from './origins'
-import {SbomPath} from './paths'
+import {SbomEdge, SbomPath} from './paths'
 
 /**
  * The one in-memory model every Black Duck-shaped CSV is written from.
@@ -62,6 +62,7 @@ export interface BlackDuckModel {
     components: ExportComponent[]
     findings: ExportFinding[]
     paths: SbomPath[]
+    edges: SbomEdge[]
 }
 
 /** One plugin's contribution to the model: the purl type it filtered on and what it enriched. */
@@ -110,7 +111,8 @@ function sameFinding(a: Vulnerability, b: Vulnerability): boolean {
 export function buildModel(
     projectName: string,
     ecosystems: AnalysedEcosystem[],
-    paths: SbomPath[]
+    paths: SbomPath[],
+    edges: SbomEdge[] = []
 ): BlackDuckModel {
     const components = new Map<string, ExportComponent>()
     const matchTypes = new Map<string, Set<'Direct' | 'Transitive'>>()
@@ -148,7 +150,7 @@ export function buildModel(
     const findings = ordered.flatMap(component =>
         component.vulnerabilities.map(vulnerability => ({component, vulnerability})))
 
-    return {projectName, components: ordered, findings, paths}
+    return {projectName, components: ordered, findings, paths, edges}
 }
 
 function toComponent(origin: Origin, purlType: string, id: string, dependency: DepinderDependency): ExportComponent {

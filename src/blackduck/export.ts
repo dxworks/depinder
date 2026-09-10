@@ -22,6 +22,7 @@ import {upgradeGuidance} from './upgrade'
 
 const DEPENDENCIES_FILE = '_dependencies.csv'
 const DEPENDENCIES_SOURCES_FILE = '_dependencies_sources.csv'
+const DEPENDENCY_EDGES_FILE = '_dependency_edges.csv'
 const UPGRADE_GUIDANCE_FILE = '_upgrade_guidance.csv'
 const VULNERABILITY_DETAILS_FILE = '_vulnerability_details.csv'
 const SECURITY_FILE = 'security.csv'
@@ -43,6 +44,16 @@ const DEPENDENCIES_SOURCES_HEADERS = [
     'Medium Vulnerability Count', 'Low Vulnerability Count', 'Total Vulnerability Count',
     'Critical and High Vulnerability Count', 'Operational Risk', 'Release Date', 'Newer Versions',
     'OpenHubURL',
+] as const
+
+/**
+ * Not a Black Duck file — Black Duck has no such export. `_dependencies_sources.csv` keeps one
+ * `Path` per component, the way Black Duck does, which is a chain and not the graph: a component
+ * with three parents keeps one of them. This is the graph, so a tree can be compared against
+ * ground truth edge for edge rather than package for package.
+ */
+const DEPENDENCY_EDGES_HEADERS = [
+    'Repo', 'Tree', 'Ecosystem', 'Parent Origin Id', 'Child Origin Id', 'Child Depth',
 ] as const
 
 const UPGRADE_GUIDANCE_HEADERS = [
@@ -249,6 +260,17 @@ function dependencySourceRows(model: BlackDuckModel): NamedRow[] {
     return rows
 }
 
+function dependencyEdgeRows(model: BlackDuckModel): NamedRow[] {
+    return model.edges.map(edge => ({
+        'Repo': edge.repo,
+        'Tree': edge.tree,
+        'Ecosystem': edge.purlType,
+        'Parent Origin Id': edge.parent,
+        'Child Origin Id': edge.child,
+        'Child Depth': String(edge.depth),
+    }))
+}
+
 function upgradeGuidanceRows(model: BlackDuckModel): NamedRow[] {
     return upgradeGuidance(model.components).map(({component, shortTerm, longTerm}) => {
         // Zero by construction — a recommendation is only made when every finding is cleared —
@@ -348,11 +370,12 @@ function write(resultFolder: string, file: string, headers: readonly string[], r
     return {file, rows: rows.length}
 }
 
-/** Writes all five files into `resultFolder` and reports what went where. */
+/** Writes all six files into `resultFolder` and reports what went where. */
 export function writeBlackDuckExport(model: BlackDuckModel, resultFolder: string): WrittenFile[] {
     return [
         write(resultFolder, DEPENDENCIES_FILE, DEPENDENCIES_HEADERS, dependencyRows(model)),
         write(resultFolder, DEPENDENCIES_SOURCES_FILE, DEPENDENCIES_SOURCES_HEADERS, dependencySourceRows(model)),
+        write(resultFolder, DEPENDENCY_EDGES_FILE, DEPENDENCY_EDGES_HEADERS, dependencyEdgeRows(model)),
         write(resultFolder, UPGRADE_GUIDANCE_FILE, UPGRADE_GUIDANCE_HEADERS, upgradeGuidanceRows(model)),
         write(resultFolder, VULNERABILITY_DETAILS_FILE, VULNERABILITY_DETAILS_HEADERS,
             model.findings.map(it => findingRow(model, it))),
@@ -373,6 +396,7 @@ export function writeSecurityCsv(model: BlackDuckModel, resultFolder: string): W
 export const BLACKDUCK_FILES = [
     DEPENDENCIES_FILE,
     DEPENDENCIES_SOURCES_FILE,
+    DEPENDENCY_EDGES_FILE,
     UPGRADE_GUIDANCE_FILE,
     VULNERABILITY_DETAILS_FILE,
     SECURITY_FILE,
