@@ -239,6 +239,14 @@ function treeEdges(
 
 /** The paths and edges of one project, for one ecosystem. */
 function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType: string): {paths: SbomPath[], edges: SbomEdge[]} {
+    if (node.scopeRefs) {
+        const scope = new Set(node.scopeRefs)
+        graph = {...graph,
+            byRef: new Map([...graph.byRef].filter(([ref]) => scope.has(ref))),
+            edges: new Map([...graph.edges].filter(([ref]) => scope.has(ref))
+                .map(([ref, children]) => [ref, children.filter(child => scope.has(child))])),
+        }
+    }
     const coordinatesOf = (ref: string): ParsedPurl | undefined => {
         const purl = graph.byRef.get(ref)?.purl
         const parsed = purl ? parsePurl(purl) : undefined
