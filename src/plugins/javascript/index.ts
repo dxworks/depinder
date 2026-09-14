@@ -244,6 +244,10 @@ export async function retrieveFromNpm(libraryName: string): Promise<LibraryInfo>
         issuesUrl: [],
         licenses: [response.license],
         reposUrl: [],
+        // `Component Link`. The packument's own `homepage` is what Black Duck holds: on 150 sampled
+        // components it agreed 55% exactly and 68% ignoring scheme, `www.` and `#readme`, where
+        // `repository` agreed on 19%/53% and the npm package page on none of 6,694 rows.
+        homepageUrl: response.homepage,
         keywords: response.keywords,
     }
 }

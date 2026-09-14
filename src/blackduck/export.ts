@@ -2,7 +2,8 @@ import fs from 'fs'
 import path from 'path'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {csvDocument, NamedRow} from '../utils/csv'
-import {licenseColumns} from './licenses'
+import {licenseColumns, licenseRisk} from './licenses'
+import {operationalRisk} from './risk'
 import {BlackDuckModel, ExportComponent, ExportFinding} from './model'
 import {componentLink, originId} from './origins'
 import {upgradeGuidance} from './upgrade'
@@ -191,7 +192,11 @@ function isoDate(timestamp: number | undefined): string {
     return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10)
 }
 
-/** `_vulnerability_details.csv` names the same distinction as `_dependencies.csv`, in more words. */
+/**
+ * The vulnerability files carry one value, not the three-valued column: Black Duck's own
+ * `security_*.csv` only ever says `Direct Dependency` or `Transitive Dependency`, so a component
+ * reached both ways is reported here as direct.
+ */
 function dependencyMatchType(component: ExportComponent): string {
     return component.matchType.startsWith('Direct') ? 'Direct Dependency' : 'Transitive Dependency'
 }
@@ -211,9 +216,9 @@ function dependencyRows(model: BlackDuckModel): NamedRow[] {
             'License families': families,
             'Match type': component.matchType,
             'Usage': USAGE,
-            'Operational Risk': '',
+            'Operational Risk': operationalRisk(component.releaseDate, component.newerVersions),
             'Origin name': component.origin.name,
-            'License Risk': '',
+            'License Risk': licenseRisk(component.licenses),
             ...countCells(severityCounts(component.vulnerabilities)),
             'Release Date': component.releaseDate,
             'Newer Versions': component.newerVersions,
@@ -221,7 +226,7 @@ function dependencyRows(model: BlackDuckModel): NamedRow[] {
             'Commits in Past 12 Months': '',
             'Contributors in Past 12 Months': '',
             'Has License Conflicts': 'false',
-            'Component Link': componentLink(component.origin, component.name, component.version, component.homepageUrl),
+            'Component Link': componentLink(component.origin, component.name, component.homepageUrl),
             'Open Hub URL': '',
         }
     })
@@ -249,9 +254,9 @@ function dependencySourceRows(model: BlackDuckModel): NamedRow[] {
             'Origin name': component.origin.name,
             'License names': names,
             'License families': families,
-            'License Risk': '',
+            'License Risk': licenseRisk(component.licenses),
             ...countCells(severityCounts(component.vulnerabilities)),
-            'Operational Risk': '',
+            'Operational Risk': operationalRisk(component.releaseDate, component.newerVersions),
             'Release Date': component.releaseDate,
             'Newer Versions': component.newerVersions,
             'OpenHubURL': '',

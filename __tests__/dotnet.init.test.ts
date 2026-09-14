@@ -17,3 +17,26 @@ describe('default test', () => {
         expect(dotnet.extractor.files.some(it => minimatch('demo/test/test.vbproj.json', it, {matchBase: true}))).toBeFalsy()
     })
 })
+
+describe('paged registration index', () => {
+    const entry = (version: string, projectUrl?: string) => ({
+        catalogEntry: {id: 'Big', version, published: `2020-01-0${version}T00:00:00Z`, projectUrl},
+    })
+
+    it('follows a page that only links its versions', async () => {
+        const registrar = new NugetRegistrar()
+        const axios = require('axios')
+        const spy = jest.spyOn(axios, 'get').mockImplementation(async (url: any) => ({
+            data: url === 'https://example/page2' ? {items: [entry('2', 'https://big.example')]} : {},
+        }))
+        try {
+            const index = {items: [{items: [entry('1')]}, {'@id': 'https://example/page2', count: 1}]}
+            const info = registrar.parseData(await registrar.inlinePages(index))
+            expect(info.versions.map(it => it.version)).toEqual(['2', '1'])
+            expect(info.homepageUrl).toBe('https://big.example')
+            expect(spy).toHaveBeenCalledWith('https://example/page2')
+        } finally {
+            spy.mockRestore()
+        }
+    })
+})

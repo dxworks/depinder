@@ -42,7 +42,7 @@ export interface SbomPath {
     path: string
     /** `<repo>`, or `<repo>/<module>` when the SBOM names its modules. */
     projectPath: string
-    matchType: 'Direct' | 'Transitive'
+    matchType: 'Direct Dependency' | 'Transitive Dependency'
 }
 
 /**
@@ -282,7 +282,7 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
             purlType,
             path: rendered,
             projectPath,
-            matchType: segments.length === 1 ? 'Direct' : 'Transitive',
+            matchType: segments.length === 1 ? 'Direct Dependency' : 'Transitive Dependency',
         })
     }
 

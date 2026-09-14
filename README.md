@@ -99,10 +99,10 @@ than guessed.
 | `Origin name` | purl type | `npm`→`npmjs`, `gem`→`rubygems`, `composer`→`packagist`, `cargo`→`crates`, else the purl type; unmapped → `unknown`. Go modules go by host: `github.com/…`→`github`, `golang.org/x/…`→`long_tail`, any other host → `unknown` (Black Duck resolves those to a GitHub repo through its Knowledge Base, which an SBOM does not carry) |
 | `License names` | registrar, else the SBOM | SPDX id mapped to Black Duck's display name (`MIT` → `MIT License`); an unmapped id is written as-is so it stays visible. Black Duck collapses `MIT-0` into `MIT License`; we keep the distinct name |
 | `License families` | the same table | `PERMISSIVE` / `WEAK_RECIPROCAL` / `RECIPROCAL` / `RESTRICTED_PROPRIETARY` / `UNKNOWN` |
-| `Match type` | `requestedBy` | `Direct` / `Transitive` / `Direct,Transitive` — the rule `<plugin>-libs.csv` already uses, made three-valued |
+| `Match type` | `requestedBy` | `Direct Dependency` / `Transitive Dependency` / `Direct Dependency,Transitive Dependency` — the rule `<plugin>-libs.csv` already uses, made three-valued, in Black Duck's own wording so the column compares without a translation step |
 | `Usage` | — | Constant `DYNAMICALLY_LINKED`, which is what Black Duck writes for every row of a dependency scan |
-| `Operational Risk` | — | **empty, not derivable** — Black Duck's own risk model |
-| `License Risk` | — | **empty, not derivable** — same |
+| `Operational Risk` | `Release Date` + `Newer Versions` | `OK` / `LOW` / `MEDIUM` / `HIGH`, **approximated** — see *The two risk columns* below. Empty when either input is missing |
+| `License Risk` | `License names` | `OK` / `MEDIUM` / `HIGH` from the licence family, with `OR` read as a choice and `AND` as a conjunction — see below |
 | `Total` / `Critical and High` / `Critical` / `High` / `Medium` / `Low Vulnerability Count` | findings | Counted from the merged findings. Black Duck leaves a per-severity cell blank when it is 0; we always write the number |
 | `Release Date` | registrar | ISO `YYYY-MM-DD`. Black Duck's cell carries a leading TAB; we do not reproduce it |
 | `Newer Versions` | registrar | Registry versions ordered above the installed one, using the ecosystem's comparator. Empty when no registrar answered |
@@ -121,7 +121,7 @@ than guessed.
 | `Workaround available` | — | **empty, not derivable** |
 | `Exploit available` | — | **empty** — CISA KEV is not wired up, so this is unknown rather than `false` |
 | `CVSS Version` | CVSS vector prefix | `CVSS 3.x` / `CVSS 4` (Black Duck's spellings) / `CVSS 2.x` for a prefix-less v2 vector |
-| `Match type` (vulnerability files) | `requestedBy` | `Direct Dependency` / `Transitive Dependency` — Black Duck's wording in these files |
+| `Match type` (vulnerability files) | `requestedBy` | `Direct Dependency` / `Transitive Dependency` — the same words, but two-valued: Black Duck's own `security_*.csv` never writes the combined value, so a component reached both ways is reported here as direct |
 | `Remediation status` | — | Constant `New`; we hold no triage state |
 | `Vulnerability tags`, `Reachable`, `Status justification`, remediation dates, all `CISA *` | — | **empty, not derivable** |
 | `Short/Long Term Recommended *` | registry versions + fixed versions | See *Upgrade guidance* below |
@@ -145,10 +145,34 @@ spelling: `-yarn`, `-npm` and `-pnpm` for the three JavaScript lockfiles, `-ruby
 basename — Trivy names its `application` node after the manifest, Syft records each component's
 `syft:location:0:path` — and falls back to the origin name when neither tool recorded one.
 
+**The two risk columns.** Neither is a port of Black Duck's model, which is not published. Both are
+rules inferred from a reference export's own 8,384 rows, and both are checked back against it.
+
+`License Risk` is a function of the licence family — `PERMISSIVE` → `OK`, `WEAK_RECIPROCAL` and
+`RESTRICTED_PROPRIETARY` → `MEDIUM`, `RECIPROCAL` and `UNKNOWN` → `HIGH`. What the families column
+cannot tell you is what to do with several of them at once, because it flattens the expression and
+drops the operator. The operator is the whole answer, and the reference export proves it: `(BSD
+2-clause "Simplified" License OR Ruby License)` is `OK` while `(BSD 2-clause "Simplified" License AND
+Ruby License)` is `MEDIUM` — the same two licences. `OR` is a choice, so the risk is the lowest
+branch; `AND` is a conjunction, so it is the highest. Measured against the reference export: **91.1 %**
+of shared rows agree, and **99.3 %** of the rows where we identified the licence at all. The gap is
+one thing only — 699 rows we report as `UNKNOWN` and Black Duck does not, which is a licence-coverage
+problem showing up in the risk column rather than a fault in the rule.
+
+`Operational Risk` is the one to read with care. Black Duck answers it from two places. When it has
+Open Hub telemetry it uses it, and can call a component `HIGH` even on the newest version — 399 of
+the 403 rows that are `HIGH` with zero newer versions carry Open Hub data, while 1,577 of the 1,586
+that are `OK` carry none. Open Hub is Black Duck's own and we have no equivalent. When it has no
+telemetry it falls back to how stale the resolved version is, and that is what we reproduce: newest
+version → `OK`, otherwise under two years → `LOW`, under four → `MEDIUM`, past that → `HIGH`. The
+result splits exactly along that line — **85.3 %** agreement on components with no Open Hub data,
+**46.3 %** on the ones that have it, **75.7 %** overall. A row that differs is a row where Black Duck
+knows something we do not, not a row to go and fix.
+
 **What is direct.** Black Duck marks a package Direct when the project's manifest declares it.
 Trivy's lockfile parsers do not carry the manifest: for yarn.lock they mark direct whatever no other
-package depends on, which on ruby-mastodon makes 25 declared packages Transitive and 18 packages of
-the `streaming` workspace Direct. Syft copies yarn berry's `0.0.0-use.local` workspace entries into
+package depends on, which on ruby-mastodon makes 25 declared packages Transitive Dependency and 18
+packages of the `streaming` workspace Direct Dependency. Syft copies yarn berry's `0.0.0-use.local` workspace entries into
 the SBOM, and a workspace's `dependsOn` edges are exactly its package.json — so when an SBOM carries
 workspace nodes, those edges define Direct and the chains start from them; otherwise the lockfile
 root's edges do, as before. For `pom.xml`, `go.mod` and `Cargo.lock`, Trivy nests the project's own
@@ -194,6 +218,27 @@ npx ts-node -T scripts/diff-blackduck-export.ts
 
 Both scripts default to the paths of the local comparison checkout; pass
 `<ours> <theirs> [<output>]` to point the diff elsewhere.
+
+**Recomputing a finished export.** A change to a derivation can be applied to a run that is already
+on disk, without re-running `export-blackduck`. That matters because a rerun would put today's trivy
+and grype databases against yesterday's SBOMs and quietly turn one run into a different one, which
+makes it no longer comparable with the Black Duck export it is paired with.
+
+```bash
+node scripts/recompute-derived-columns.cjs <cache-dir> <export-dir> [--as-of YYYY-MM-DD]
+```
+
+It rewrites `License names`, `License families`, `License Risk` and `Operational Risk` in
+`_dependencies.csv` and `_dependencies_sources.csv` and touches nothing else — no scanners, no
+registries, no network. The derivations are imported from `dist/`, so the script cannot drift from
+the exporter. `--as-of` is the date staleness is measured from and defaults to the export's own
+mtime, so rerunning it on an archived run reproduces the same answer instead of drifting with the
+calendar.
+
+One deliberate asymmetry: the licence is corrected from the cache only when the resolved version
+declares one the licence table can read. The exporter also reads the SBOM, which this script does
+not have, so a cell it cannot improve on is left exactly as it is rather than overwritten with
+something worse.
 
 ## Preprocess data
 If you want to run `Depinder` on a project that has not been processed by `Depminer` before, 

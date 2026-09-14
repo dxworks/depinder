@@ -76,7 +76,11 @@ export async function retrieveFromGoProxy(module: string): Promise<LibraryInfo> 
             licenses: [],
         })),
         licenses: [],
-        homepageUrl: latest?.Origin?.URL || `https://pkg.go.dev/${module}`,
+        // Only what the module proxy actually reports. A synthesised `pkg.go.dev` page is a
+        // registry page, not a project homepage, and it outranked the correct
+        // `https://github.com/<owner>/<repo>` fallback in `componentLink` for every module whose
+        // origin the proxy did not report.
+        homepageUrl: latest?.Origin?.URL || '',
         reposUrl: latest?.Origin?.URL ? [latest.Origin.URL] : [],
         keywords: [],
     }

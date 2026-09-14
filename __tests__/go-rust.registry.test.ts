@@ -73,7 +73,10 @@ describe('the Go module proxy registrar', () => {
 
         expect(info.versions.map(it => it.version)).toEqual(['v0.0.0-20210328193216-ff5ff6dc229b'])
         expect(info.versions[0].latest).toBe(true)
-        expect(info.homepageUrl).toBe('https://pkg.go.dev/github.com/aryann/difflib')
+        // Nothing, not a synthesised pkg.go.dev page. That page is where the module is *published*;
+        // `Component Link` asks where the project lives, and for a github.com module the export
+        // derives the repository itself. A synthesised homepage here outranked that derivation.
+        expect(info.homepageUrl).toBe('')
     })
 
     it('fails loudly for a module the proxy does not know, so the cache never stores a blank', async () => {
@@ -112,6 +115,19 @@ describe('the crates.io registrar', () => {
         expect(info.versions[0].licenses).toEqual(['Unlicense OR MIT'])
         expect(info.licenses).toEqual(['Unlicense OR MIT'])
         expect(info.homepageUrl).toBe('https://github.com/BurntSushi/aho-corasick')
+    })
+
+    it('takes the repository over the homepage, which for a crate is usually the docs site', () => {
+        // The one registrar that reverses the usual order. Cargo's `homepage` is where the crate
+        // documents itself; Black Duck's project link is the repository, and preferring it agreed
+        // with Black Duck on 44% of the sampled crates against 37% for `homepage`.
+        respondWith({'/crates/serde': {body: JSON.stringify({
+            ...crate,
+            crate: {...crate.crate, name: 'serde', homepage: 'https://serde.rs', repository: 'https://github.com/serde-rs/serde'},
+        })}})
+
+        return retrieveFromCratesIo('serde').then(info =>
+            expect(info.homepageUrl).toBe('https://github.com/serde-rs/serde'))
     })
 
     it('identifies itself, which crates.io requires of every client', async () => {

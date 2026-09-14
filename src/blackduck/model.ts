@@ -4,6 +4,7 @@ import {ecosystemForPurlType} from '../vuln-sources/github/ecosystems'
 import {comparatorFor, VersionComparator} from '../vuln-sources/github/versions'
 import {Origin, originFor, originId} from './origins'
 import {SbomEdge, SbomPath} from './paths'
+import {hasKnownLicense} from './licenses'
 
 /**
  * The one in-memory model every Black Duck-shaped CSV is written from.
@@ -19,7 +20,14 @@ import {SbomEdge, SbomPath} from './paths'
  * name (`Action Mailer` for the gem `actionmailer`) and never matches a registry name.
  */
 
-export type MatchType = 'Direct' | 'Transitive' | 'Direct,Transitive'
+/**
+ * Black Duck's own wording, character for character, so the column can be compared across the two
+ * exports without a translation step on either side. `_vulnerability_details.csv` and
+ * `security.csv` already used these words; `_dependencies.csv` and `_dependencies_sources.csv`
+ * used the bare `Direct` / `Transitive`, which made every shared row differ on this column alone.
+ */
+export type MatchType =
+    'Direct Dependency' | 'Transitive Dependency' | 'Direct Dependency,Transitive Dependency'
 
 export interface ExportComponent {
     name: string
@@ -74,7 +82,7 @@ export interface AnalysedEcosystem {
 /**
  * Direct or transitive, by the same rule `<plugin>-libs.csv` uses, but three-valued as Black Duck
  * reports it: a component reached both straight from the project and through another dependency
- * is `Direct,Transitive`.
+ * is `Direct Dependency,Transitive Dependency`.
  */
 function matchTypesOf(project: DepinderProject, dependency: DepinderDependency): Set<'Direct' | 'Transitive'> {
     const projectId = `${project.name}@${project.version}`
@@ -88,8 +96,22 @@ function matchTypesOf(project: DepinderProject, dependency: DepinderDependency):
 }
 
 function renderMatchType(types: Set<'Direct' | 'Transitive'>): MatchType {
-    if (types.has('Direct') && types.has('Transitive')) return 'Direct,Transitive'
-    return types.has('Direct') ? 'Direct' : 'Transitive'
+    if (types.has('Direct') && types.has('Transitive')) return 'Direct Dependency,Transitive Dependency'
+    return types.has('Direct') ? 'Direct Dependency' : 'Transitive Dependency'
+}
+
+/**
+ * The version's licence wins, unless it is unreadable and the library's is not.
+ *
+ * The version-level field is the specific answer and the one Black Duck agrees with: on the rows
+ * where the two disagree it sides with the version 88 times to 3. But some registries put a
+ * shorthand there (`MIT/Apache-2.0`, `Apache-2`) where the library-level field holds the clean SPDX
+ * id, and reporting an id nothing can map is worse than reporting the package's licence.
+ */
+function preferredLicenses(versionLicenses: string[], libraryLicenses: string[]): string[] {
+    if (versionLicenses.length === 0) return libraryLicenses
+    if (hasKnownLicense(versionLicenses) || !hasKnownLicense(libraryLicenses)) return versionLicenses
+    return libraryLicenses
 }
 
 function isoDate(timestamp: number | undefined): string {
@@ -159,9 +181,12 @@ function toComponent(origin: Origin, purlType: string, id: string, dependency: D
     const current = versions.find(it => it.version === dependency.version.trim())
     const compare = comparatorForPurlType(purlType)
 
-    // Library-level `licenses` is the field every registrar fills; the per-version list is
-    // optional and left empty by some, so it is the fallback rather than the source.
-    const licenses = (library?.licenses ?? []).filter((it): it is string => typeof it === 'string' && !!it)
+    // The licence of the version we resolved, not the licence of the package. A package that
+    // relicensed mid-life carries both: `@cdxgen/cdxgen-plugins-bin` is Apache-2.0 up to 2.1.x and
+    // MIT from 3.x, and the library-level field reports only the current one. Taking it would
+    // relicense every older version in the report. The library-level list stays as the fallback,
+    // because some registrars fill only that one.
+    const libraryLicenses = (library?.licenses ?? []).filter((it): it is string => typeof it === 'string' && !!it)
     const versionLicenses = ([] as (string | string[] | undefined)[])
         .concat(current?.licenses)
         .flatMap(it => (Array.isArray(it) ? it : [it]))
@@ -173,8 +198,8 @@ function toComponent(origin: Origin, purlType: string, id: string, dependency: D
         purlType,
         origin,
         originId: id,
-        matchType: 'Transitive',
-        licenses: licenses.length > 0 ? licenses : versionLicenses,
+        matchType: 'Transitive Dependency',
+        licenses: preferredLicenses(versionLicenses, libraryLicenses),
         releaseDate: isoDate(current?.timestamp),
         // Empty rather than 0 when no registrar answered: "we do not know" and "you are current"
         // are different statements, and Black Duck's column distinguishes them too.
