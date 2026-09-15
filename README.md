@@ -63,7 +63,7 @@ before its rate-limit window is exhausted rather than after. The cache lives in
 
 ## Black Duck-shaped exports
 
-`export-blackduck` turns a folder of CycloneDX SBOMs into the five CSVs a Black Duck project
+`export-blackduck` turns a folder of CycloneDX SBOMs into the four CSVs a Black Duck project
 version exports, with Black Duck's exact column headers, so the two can be diffed side by side,
 plus one file Black Duck has no counterpart for: `_dependency_edges.csv`, the dependency graph.
 
@@ -83,8 +83,8 @@ the SBOMs select the `sbom-*` plugins for you.
 | `_dependencies_sources.csv` | (component, path) | The dependency chain, walked from the SBOM's `dependsOn` edges |
 | `_dependency_edges.csv` | (parent, child) | **Not a Black Duck file.** `Path` keeps one chain per component, as Black Duck does, so a component with three parents keeps one; this is every edge, with each component's depth. Columns: `Repo, Tree, Ecosystem, Parent Origin Id, Child Origin Id, Child Depth`. A `Tree` is `<repo>/<module>/-<package manager>`; a component nothing pulls in has parent `(root)` and depth 1 |
 | `_upgrade_guidance.csv` | component with ≥ 1 finding | Short/long term recommended versions |
-| `_vulnerability_details.csv` | (component, advisory) | |
-| `security.csv` | (component, advisory) | The same rows plus Black Duck's internal ids, triage fields and CISA block, all empty for us. `analyse` writes this one file too, through the same serialiser |
+| `security.csv` | (component, advisory) | Black Duck's `security_*.csv` header byte for byte; its internal ids, triage fields and CISA block are empty for us. `analyse` writes this one file too, through the same serialiser |
+| `_vulnerability_findings.json` | component with ≥ 1 finding | **Not a Black Duck file.** The findings as the exporter saw them, fix versions per line included — what no CSV carries |
 
 ### Column mapping
 
@@ -114,8 +114,12 @@ than guessed.
 | `ProjectPathExists`, `VerifiedPath` | — | **empty** — Black Duck leaves them empty too |
 | `Vulnerability id` | findings | `GHSA-… (CVE-…)` when both are known, else the single id — Black Duck's `BDSA-… (CVE-…)` shape. We have no BDSA numbers |
 | `Vulnerability source` | finding origin | `GHSA` (advisory cache), `TRIVY`, `GRYPE`. A finding two sources agree on reports the advisory database, since that is the one that names it |
-| `Description`, `Published on`, `Base score`, `URL`, `Security Risk` | findings | verbatim from the source |
-| `Updated on`, `Exploitability`, `Impact`, `Overall score` | — | **empty, not derivable** — Black Duck's own scoring breakdown |
+| `Description`, `Security Risk` | findings | verbatim from the source |
+| `Published on` | findings | Black Duck's own date shape, `7/24/26` (unpadded, two-digit year, UTC). `Release Date` in `_dependencies.csv` stays ISO because Black Duck writes ISO there |
+| `Base score` | findings | GHSA's score first — the catalogue our ids are named after, CVSS 4 nowadays — then NVD's (on grype it sits on the related CVE record, not the GHSA one), then the highest of any other source. Black Duck's column is NVD's CVSS 3.x, so the two differ wherever GHSA rescored; that is a chosen difference, not a normalisation gap |
+| `Exploitability`, `Impact` | CVSS 3.x vector | The CVSS 3.1 sub-scores (specification §7.1), rounded to one decimal as Black Duck prints them. Empty for a CVSS 4 or 2 vector, which have no such split |
+| `URL` | findings | The NVD page, `https://nvd.nist.gov/vuln/detail/<CVE>`, whenever a CVE is known — Black Duck links there whatever the catalogue. Without a CVE, the scanner's own page |
+| `Updated on`, `Overall score` | — | **empty, not derivable** — Black Duck's own scoring and re-publication dates |
 | `CWE Ids` | findings | Black Duck's list syntax, `[CWE-400, CWE-834]` |
 | `Solution available` | findings | `true` when the source named a fixed version |
 | `Workaround available` | — | **empty, not derivable** |
@@ -185,60 +189,21 @@ relative to a Trivy SBOM, not a modelling choice.
 
 ### Upgrade guidance
 
-Short term is the lowest registry version at or above the installed one that clears every finding;
-long term is the highest version that clears every finding. "Clears" is deliberately conservative:
-a finding is cleared only when its source **named a first patched version** and the candidate is at
-or above it. A component carrying a finding with no named fix gets an empty recommendation — which
-is what Black Duck does for the same case. No network call is made; the version list is the one the
-analysis already fetched.
+Short term is the **newest stable version on the installed line** (same major) that clears every
+fixable finding — every patch available without a breaking change; when that line has no clean
+version, the lowest clean version above the installed one. Long term is the newest stable version
+overall that clears every fixable finding. Both rules were read off a Black Duck export against our
+own registry lists (127 of 136 testable short-term cells, 148 of 153 long-term ones; the rest are
+versions published after Black Duck's Knowledge Base snapshot).
 
-### Reproducing the comparison
-
-```shell
-# (a) Download the GitHub advisories these SBOMs need (needs tokens in .github-tokens)
-depinder github-advisories download --sbom /path/to/sboms
-depinder github-advisories status
-
-# (b) Score the three vulnerability sources against each other over the reference corpus
-npx ts-node -T scripts/compare-vuln-sources.ts
-#   -> <comparison>/results/vuln-source-comparison.{md,json}
-
-# (c) Export, once per SBOM producer
-depinder export-blackduck /path/to/mastodon-trivy \
-    -r <comparison>/exports/ruby-mastodon-trivy \
-    --vuln-source trivy,grype,github --project-name ruby-mastodon
-depinder export-blackduck /path/to/mastodon-syft \
-    -r <comparison>/exports/ruby-mastodon-syft \
-    --vuln-source trivy,grype,github --project-name ruby-mastodon
-
-# (d) Diff our export against the real Black Duck one
-npx ts-node -T scripts/diff-blackduck-export.ts
-#   -> <comparison>/results/blackduck-export-diff.md
-```
-
-Both scripts default to the paths of the local comparison checkout; pass
-`<ours> <theirs> [<output>]` to point the diff elsewhere.
-
-**Recomputing a finished export.** A change to a derivation can be applied to a run that is already
-on disk, without re-running `export-blackduck`. That matters because a rerun would put today's trivy
-and grype databases against yesterday's SBOMs and quietly turn one run into a different one, which
-makes it no longer comparable with the Black Duck export it is paired with.
-
-```bash
-node scripts/recompute-derived-columns.cjs <cache-dir> <export-dir> [--as-of YYYY-MM-DD]
-```
-
-It rewrites `License names`, `License families`, `License Risk` and `Operational Risk` in
-`_dependencies.csv` and `_dependencies_sources.csv` and touches nothing else — no scanners, no
-registries, no network. The derivations are imported from `dist/`, so the script cannot drift from
-the exporter. `--as-of` is the date staleness is measured from and defaults to the export's own
-mtime, so rerunning it on an archived run reproduces the same answer instead of drifting with the
-calendar.
-
-One deliberate asymmetry: the licence is corrected from the cache only when the resolved version
-declares one the licence table can read. The exporter also reads the SBOM, which this script does
-not have, so a cell it cannot improve on is left exactly as it is rather than overwritten with
-something worse.
+A source names one fix per maintained line (Trivy: `2.15.0, 2.12.2`, newest first) and all of them
+are read: a candidate is fixed by the fix of *its* line, so `2.12.5` is clean and `2.13.0` is not.
+A finding with no named fix cannot be cleared by any version; it is left out of the choice and
+counted in the recommendation's remaining-vulnerability columns instead. A component whose findings
+are *all* unfixed gets an empty recommendation — which is what Black Duck does for the same case.
+Pre-releases are recommended only when nothing stable clears the findings. No network call is made;
+the version list is the one the analysis already fetched, so an empty list (a registry that did not
+answer) means an empty recommendation.
 
 ## Preprocess data
 If you want to run `Depinder` on a project that has not been processed by `Depminer` before, 
@@ -274,35 +239,33 @@ The following commands can be used either as standalone, or with the `dxw` prefi
 
 ### Cache command
 
-To check if the MongoDB cache is running:
+Registry answers are cached in one of two places: a **SQLite database global to the machine**,
+`~/.dxw/depinder/cache/depinder.sqlite`, through Node's own `node:sqlite` (no native addon), or
+MongoDB when its container is running.
+
 ```shell
-depinder cache
+depinder cache               # where the SQLite cache is and what it holds; is Mongo running?
+depinder cache import <dir>  # pull a libs.json / misses.json folder into it
+depinder cache init          # write the MongoDB docker-compose files to ~/.dxw/depinder/cache/
+depinder cache up            # start MongoDB (alias: start)
+depinder cache down          # stop it (alias: stop)
 ```
 
-To initalise the Redis cache:
-```shell
-depinder cache init
-```
-
-To start the MongoDB cache:
-```shell
-depinder cache start
-```
-
-To stop the MongoDB cache:
-```shell
-depinder cache stop
-```
-
-To see what is available in the cache, please visit the [Mongo Express Dashboard](http://localhost:8002/).
+To see what is in MongoDB, visit the [Mongo Express Dashboard](http://localhost:8002/).
 
 ### The library cache
 
-Without MongoDB, registry answers are kept in `cache/libs.json` under the working directory, so
-a second run over the same libraries makes no registry calls. Lookups that *failed* are kept too,
-in `cache/misses.json`, for 24 hours: a library a registry cannot find — or a registry that does
-not answer — would otherwise be asked again on every run, and a failed lookup is the slowest kind.
-`--refresh` bypasses both. A rate-limited (429) lookup is never remembered as a miss.
+Without MongoDB, registry answers are kept in the `libs` table of the SQLite database, so a second
+run over the same libraries — from any working directory — makes no registry calls. Lookups that
+*failed* are kept too, in `misses`, for 24 hours: a library a registry cannot find — or a registry
+that does not answer — would otherwise be asked again on every run, and a failed lookup is the
+slowest kind. `--refresh` bypasses both. A rate-limited (429) lookup is never remembered as a miss.
+Every row is committed as it is written, so the 60-second checkpoint costs nothing; the previous
+`cache/libs.json` (94 MB on the twelve-repository run) was serialised whole at every one.
+
+`DEPINDER_CACHE_DB=<file>` points a run at another database. The previous per-directory layout
+(`cache/libs.json`, `misses.json`) is not read by a run any more;
+`depinder cache import cache` copies it into the database, keeping rows already there.
 
 Add `--profile` to `analyse` or `export-blackduck` to get, at the end of the run, the wall-clock
 of each phase (parse, scans, registry enrichment, CSV writing), the cache hit/miss counts and the

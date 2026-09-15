@@ -15,8 +15,8 @@ import {GithubAdvisory} from './advisory'
  * has no reason to re-read 7,000 npm advisories, and the manifest is what lets the analysis decide
  * that without opening the files.
  *
- * `<cache-dir>` defaults to `<cwd>/cache`, the same directory `json-cache.ts` keeps `libs.json` in,
- * so a project has exactly one cache location.
+ * `<cache-dir>` defaults to `<cwd>/cache`. The registry cache itself no longer lives there — it is
+ * the SQLite database in `~/.dxw/depinder/cache/` — but the advisories stay per project, as before.
  */
 
 export const CACHE_SUBDIR = 'github-advisories'

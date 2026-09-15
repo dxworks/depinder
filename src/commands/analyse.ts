@@ -20,7 +20,7 @@ import moment from 'moment'
 import {ecosystemOf, Plugin} from '../extension-points/plugin'
 import {Cache, noCache} from '../cache/cache'
 import {getMongoDockerContainerStatus} from './cache'
-import {jsonCache} from '../cache/json-cache'
+import {sqliteCache} from '../cache/sqlite-cache'
 import {MISS_TTL_HOURS, missCache, MissCache, noMissCache} from '../cache/misses'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {MultiBar, Presets} from 'cli-progress'
@@ -179,8 +179,8 @@ function licenseOf(lib: LibraryInfo): string {
 function chooseCacheOption(): Cache {
 
     if (getMongoDockerContainerStatus() != 'running') {
-        log.warn('Mongo cache is not running, using in-memory cache')
-        return jsonCache
+        log.info('Mongo cache is not running, using the local SQLite cache')
+        return sqliteCache
     }
     log.info('Mongo cache is up and running, using Mongo cache')
     return mongoCache

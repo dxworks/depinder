@@ -1,62 +1,77 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {MISS_TTL_HOURS, missCache, resetMissCache} from '../src/cache/misses'
+import {MISS_TTL_HOURS, missCache} from '../src/cache/misses'
+import {openCacheDb, resetSharedCacheDb} from '../src/cache/sqlite-cache'
 
 describe('the negative cache', () => {
-    let cwd: string
     let tmp: string
+    let dbFile: string
 
     beforeEach(() => {
-        cwd = process.cwd()
         tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder-misses-'))
-        process.chdir(tmp)
-        resetMissCache()
+        dbFile = path.join(tmp, 'cache', 'depinder.sqlite')
+        process.env.DEPINDER_CACHE_DB = dbFile
+        resetSharedCacheDb()
     })
 
     afterEach(() => {
-        process.chdir(cwd)
+        resetSharedCacheDb()
+        delete process.env.DEPINDER_CACHE_DB
         fs.rmSync(tmp, {recursive: true, force: true})
-        resetMissCache()
     })
 
-    it('starts empty when there is no file, and does not create one until something is recorded', () => {
+    it('starts empty', () => {
         missCache.load()
         expect(missCache.has('npm:left-pad')).toBe(false)
-        missCache.write()
-        expect(fs.existsSync(path.join(tmp, 'cache', 'misses.json'))).toBe(false)
     })
 
-    it('remembers a miss across a reload, and forgets it after the TTL', () => {
+    it('remembers a miss across a reopen, and forgets it after the TTL', () => {
         missCache.set('maven:com.example:gone')
-        missCache.write()
-        resetMissCache()
+        resetSharedCacheDb()
 
         expect(missCache.has('maven:com.example:gone')).toBe(true)
         expect(missCache.has('maven:com.example:other')).toBe(false)
 
-        const file = path.join(tmp, 'cache', 'misses.json')
+        resetSharedCacheDb()
+        const db = openCacheDb(dbFile)
         const stale = Date.now() - (MISS_TTL_HOURS + 1) * 60 * 60 * 1000
-        fs.writeFileSync(file, JSON.stringify({'maven:com.example:gone': stale}))
-        resetMissCache()
+        db.setMiss('maven:com.example:gone', stale)
+        db.close()
         expect(missCache.has('maven:com.example:gone')).toBe(false)
     })
 
-    it('drops expired entries when it writes, so the file does not grow forever', () => {
-        const file = path.join(tmp, 'cache', 'misses.json')
-        fs.mkdirSync(path.dirname(file), {recursive: true})
+    it('drops expired entries when it writes, so the table does not grow forever', () => {
         const stale = Date.now() - (MISS_TTL_HOURS + 1) * 60 * 60 * 1000
-        fs.writeFileSync(file, JSON.stringify({'npm:old': stale}))
+        const db = openCacheDb(dbFile)
+        db.setMiss('npm:old', stale)
+        db.close()
 
         missCache.set('npm:new')
         missCache.write()
-        expect(Object.keys(JSON.parse(fs.readFileSync(file, 'utf8')))).toEqual(['npm:new'])
+        resetSharedCacheDb()
+        const after = openCacheDb(dbFile)
+        expect(after.missKeys()).toEqual(['npm:new'])
+        after.close()
     })
 
-    it('treats an unreadable file as empty rather than failing the run', () => {
-        const file = path.join(tmp, 'cache', 'misses.json')
-        fs.mkdirSync(path.dirname(file), {recursive: true})
-        fs.writeFileSync(file, 'not json')
+    it('imports a legacy misses.json once, when the database is created next to it', () => {
+        const legacy = path.join(tmp, 'cache', 'misses.json')
+        fs.mkdirSync(path.dirname(legacy), {recursive: true})
+        const stale = Date.now() - (MISS_TTL_HOURS + 1) * 60 * 60 * 1000
+        fs.writeFileSync(legacy, JSON.stringify({'npm:old': stale, 'npm:recent': Date.now(), 'npm:bad': 'x'}))
+
+        expect(missCache.has('npm:recent')).toBe(true)
+        expect(missCache.has('npm:old')).toBe(false)
+        expect(missCache.has('npm:bad')).toBe(false)
+        // The file is an input, never a target.
+        expect(fs.existsSync(legacy)).toBe(true)
+    })
+
+    it('treats an unreadable legacy file as empty rather than failing the run', () => {
+        const legacy = path.join(tmp, 'cache', 'misses.json')
+        fs.mkdirSync(path.dirname(legacy), {recursive: true})
+        fs.writeFileSync(legacy, 'not json')
         expect(missCache.has('anything')).toBe(false)
     })
 })
