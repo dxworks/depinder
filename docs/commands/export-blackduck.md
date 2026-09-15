@@ -15,7 +15,7 @@ output, in the same folder.
 | `--target <folder>` | The scanned repositories, one per SBOM name; gives `Path` Black Duck's project prefix and drops own code from the chain | off |
 | `--refresh` | Ignore the cache | off |
 | `--vuln-source <sources>` | `trivy`, `grype`, `github`, `all` | `trivy,grype` |
-| `--github-token-file <file>` | Tokens for `github` | `.github-tokens` |
+| `--github-token-file <file>` | Tokens for `github`, relative to the working directory; `GH_TOKEN` from the environment when absent | `.github-tokens` |
 | `--github-max-age <hours>` | Advisory cache freshness | `24` |
 | `--profile` | Timings and request counts | off |
 
