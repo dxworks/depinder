@@ -4,7 +4,8 @@
 depinder export-blackduck <sbom-folders...> [options]
 ```
 
-Runs the [`analyse`](analyse.md) SBOM route and writes the Black Duck-shaped files on top.
+Runs the [`analyse`](analyse.md) SBOM route and writes the Black Duck-shaped files on top of its
+output, in the same folder.
 
 | Option | Meaning | Default |
 |---|---|---|
@@ -28,7 +29,8 @@ Runs the [`analyse`](analyse.md) SBOM route and writes the Black Duck-shaped fil
 | `security.csv` | `security_*.csv` |
 | `_dependency_edges.csv` | none — every edge of the graph |
 | `_vulnerability_findings.json` | none — the findings as the exporter saw them, fix versions included |
-| `_graph_rebuild.json` | none — inputs and hashes the paths were built from |
+| `sbom-<eco>-libs.csv`, `sbom-<eco>-licenses.csv`, `sbom-<eco>-project-stats.csv` | none — the [`analyse`](analyse.md#output) triple, one per ecosystem in the SBOMs |
+| `sbom-scan-provenance.json` | none — which scanners ran, at which version |
 
 Columns and derivations: [Black Duck Export](../blackduck-export.md).
 
