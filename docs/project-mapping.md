@@ -10,9 +10,8 @@ The project mapping feature extracts project paths from dependency paths in Blac
 2. [Technology-Specific Patterns](#technology-specific-patterns)
 3. [Path Verification](#path-verification)
 4. [Path Mapping Configuration](#path-mapping-configuration)
-5. [API Reference](#api-reference)
-6. [Examples](#examples)
-7. [Troubleshooting](#troubleshooting)
+5. [Examples](#examples)
+6. [Troubleshooting](#troubleshooting)
 
 ## Path Extraction Process
 

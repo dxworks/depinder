@@ -1,0 +1,13 @@
+/* Header always shows the site name, in bold, instead of swapping to the page title on scroll. */
+.md-header__topic:first-child {
+  font-weight: 700;
+}
+.md-header__title--active .md-header__topic:first-child {
+  opacity: 1;
+  transform: none;
+  pointer-events: initial;
+  z-index: 1;
+}
+.md-header__topic + .md-header__topic {
+  display: none;
+}
