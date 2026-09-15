@@ -1,12 +1,13 @@
 name: Deploy Docs
 
-# Docs source lives on `main` (docs/ + mkdocs.yml), edited in normal PRs.
-# On a docs change, build the site and deploy it straight to GitHub Pages as an
-# artifact — no gh-pages branch, no force-push.
+# Docs source lives in docs/ + mkdocs.yml, edited in normal PRs. On a docs change on
+# `main` or `dev`, build the site and deploy it straight to GitHub Pages as an artifact —
+# no gh-pages branch, no force-push. Both branches publish to the same site, so the last
+# push wins; `dev` is where the docs move, `main` catches up on release.
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
