@@ -37,7 +37,19 @@ depinder export-blackduck /path/to/sboms -r results --vuln-source trivy,grype,gi
 ```
 
 Same analysis, plus the [Black Duck files](blackduck-export.md). The `github` source needs a
-local advisory cache first:
+GitHub token, read from the directory you run the command in: `GH_TOKEN` in the environment,
+or a `.github-tokens` file next to you (`--github-token-file` to point elsewhere):
+
+```bash
+export GH_TOKEN=ghp_...
+# or
+echo 'GH_TOKEN_1=ghp_...' > .github-tokens
+```
+
+With a token, the run downloads the advisories for the ecosystems in the SBOMs by itself, into
+`cache/github-advisories/` under the working directory, and reuses them for 24 hours
+(`--github-max-age`). Without one, the refresh is skipped with a warning and `github` contributes
+nothing. To fill the cache ahead of time, or to run offline later:
 
 ```bash
 depinder github-advisories download --sbom /path/to/sboms

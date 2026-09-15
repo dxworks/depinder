@@ -11,7 +11,7 @@ depinder analyse [folders...] [options]
 | `-p, --plugins [plugins...]` | Restrict to these plugins, by name or [alias](../index.md#ecosystems) | all |
 | `--refresh` | Ignore the cache | off |
 | `--vuln-source <sources>` | `trivy`, `grype`, `github`, `all`, comma-separated. SBOM route only | `trivy,grype` |
-| `--github-token-file <file>` | Tokens for `github` | `.github-tokens` |
+| `--github-token-file <file>` | Tokens for `github`, relative to the working directory; `GH_TOKEN` from the environment when absent | `.github-tokens` |
 | `--github-max-age <hours>` | Re-download advisories older than this | `24` |
 | `--profile` | Phase timings, cache hits, requests per host | off |
 

@@ -35,7 +35,7 @@ No configuration file: command-line options, environment variables, and a few fi
 |---|---|
 | `trivy` | `trivy` on `PATH` or `TRIVY_BIN` |
 | `grype` | `grype` on `PATH` or `GRYPE_BIN` |
-| `github` | `depinder github-advisories download` |
+| `github` | A token: `GH_TOKEN` in the environment or `.github-tokens` in the working directory. The advisories download on the run, or ahead of it with [`github-advisories download`](commands/github-advisories.md) |
 
 ## Native route prep
 

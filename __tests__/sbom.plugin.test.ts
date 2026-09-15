@@ -49,11 +49,15 @@ const trivyReport = {
 
 /**
  * A stub binary that prints `report` and, if given, appends a line to `counterFile` per SCAN.
+ * Version probes and the one-off database refresh (`trivy image --download-db-only`, `grype db
+ * update`) are not scans, so they are not counted.
  * The preflight probe invokes the same binary with `--version`, which must not count as a scan.
  */
 function stubScanner(name: string, report: unknown, counterFile?: string): string {
     const file = path.join(tmpDir, name)
-    const count = counterFile ? `[ "$1" = --version ] || [ "$1" = version ] || echo x >> ${counterFile}\n` : ''
+    const count = counterFile
+        ? `[ "$1" = --version ] || [ "$1" = version ] || [ "$1" = image ] || [ "$1" = db ] || echo x >> ${counterFile}\n`
+        : ''
     fs.writeFileSync(file, `#!/bin/sh\n${count}cat <<'EOF'\n${JSON.stringify(report)}\nEOF\n`)
     fs.chmodSync(file, 0o755)
     return file

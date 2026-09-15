@@ -99,7 +99,8 @@ The `github` source needs no binary, only [`github-advisories download`](command
 
 !!! note
     Trivy and Grype update their own databases. Two runs on different days can find different
-    vulnerabilities for the same SBOM.
+    vulnerabilities for the same SBOM. Depinder refreshes both once, before the first scan, so a
+    folder of SBOMs scanned at once never has a dozen processes downloading the same database.
 
 ## From source
 
