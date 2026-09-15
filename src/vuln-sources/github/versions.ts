@@ -192,3 +192,24 @@ const COMPARATORS: {readonly [family in ComparatorFamily]: VersionComparator} = 
 export function comparatorFor(family: ComparatorFamily): VersionComparator {
     return COMPARATORS[family]
 }
+
+/**
+ * Qualifiers that mark a version nobody should be *recommended*: the ones every comparator
+ * orders below the release, plus the npm dist-tag words (`next`, `canary`, `nightly`) that the
+ * generic comparator, following Maven, files as unknown and therefore *above* the release.
+ */
+const PRERELEASE_QUALIFIERS = new Set([
+    'alpha', 'beta', 'milestone', 'rc', 'snapshot',
+    'next', 'canary', 'nightly', 'insiders', 'experimental', 'unstable',
+])
+
+/** `8.0.0-rc.6`, `22.2.0-next.7`, `1.0-SNAPSHOT`, `4.0.0-preview1` are pre-releases; `1.0-sp1` is not. */
+export function isPrerelease(version: string): boolean {
+    return tokenizeVersion(version).some(it => it.kind === 'str' && PRERELEASE_QUALIFIERS.has(it.value))
+}
+
+/** The first numeric segment — the line a version belongs to (`v0.33.0` -> 0, `2.22.2` -> 2). */
+export function majorOf(version: string): number | undefined {
+    const first = tokenizeVersion(version)[0]
+    return first?.kind === 'num' ? first.value : undefined
+}

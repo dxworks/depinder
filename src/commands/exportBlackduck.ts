@@ -33,6 +33,7 @@ import {AnalyseOptions, runAnalysis} from './analyse'
 
 export interface ExportBlackduckOptions extends AnalyseOptions {
     projectName?: string
+    target?: string
 }
 
 export function createExportBlackduckCommand(): Command {
@@ -44,6 +45,9 @@ export function createExportBlackduckCommand(): Command {
         .option('--refresh', 'Refresh the cache', false)
         .option('--project-name <name>',
             'The name to write in the Project path column and at the head of every dependency path')
+        .option('--target <folder>',
+            'The folder holding the scanned repositories, one per SBOM name; their manifests give Path '
+            + 'its Black Duck project prefix and drop the repository\'s own code from the chain')
         .option('--vuln-source <sources>',
             'A comma-separated list of trivy, grype, github, all',
             DEFAULT_VULN_SOURCE)
@@ -122,8 +126,10 @@ export async function exportBlackduck(folders: string[], options: ExportBlackduc
     // One folder can hold several repos' SBOMs, and the repo a path belongs to is the SBOM's own
     // name, not the run's label — so each file contributes its paths under its own repo. An
     // explicit --project-name still overrides, for a run that really is a single project.
+    // The repository a SBOM was scanned from sits under --target by the SBOM's own name.
+    const repoDirOf = (file: string) => options.target ? path.join(options.target, repoNameOf(file)) : undefined
     const trees = timePhaseSync('blackduck:paths', () => sbomFiles.map(file =>
-        sbomTree(file, options.projectName ?? repoNameOf(file), exportedTypes)))
+        sbomTree(file, options.projectName ?? repoNameOf(file), exportedTypes, {repoDir: repoDirOf(file)})))
     const paths: SbomPath[] = trees.flatMap(it => it.paths)
     const edges: SbomEdge[] = trees.flatMap(it => it.edges)
 

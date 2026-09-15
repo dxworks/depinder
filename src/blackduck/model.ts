@@ -4,6 +4,7 @@ import {ecosystemForPurlType} from '../vuln-sources/github/ecosystems'
 import {comparatorFor, VersionComparator} from '../vuln-sources/github/versions'
 import {Origin, originFor, originId} from './origins'
 import {SbomEdge, SbomPath} from './paths'
+import {newerVersionCounts} from './versions'
 import {hasKnownLicense} from './licenses'
 
 /**
@@ -22,8 +23,7 @@ import {hasKnownLicense} from './licenses'
 
 /**
  * Black Duck's own wording, character for character, so the column can be compared across the two
- * exports without a translation step on either side. `_vulnerability_details.csv` and
- * `security.csv` already used these words; `_dependencies.csv` and `_dependencies_sources.csv`
+ * exports without a translation step on either side. `security.csv` already used these words; `_dependencies.csv` and `_dependencies_sources.csv`
  * used the bare `Direct` / `Transitive`, which made every shared row differ on this column alone.
  */
 export type MatchType =
@@ -41,7 +41,10 @@ export interface ExportComponent {
     /** ISO `YYYY-MM-DD`, from the registry's timestamp for this exact version. */
     releaseDate: string
     /** Registry versions ordered above this one. Empty when no registrar answered. */
+    /** Versions released after this one -- Black Duck's count, see `newerVersionCounts`. */
     newerVersions: string
+    /** Versions numbered above this one -- the upgrade count, written beside Black Duck's. */
+    newerVersionsSemver: string
     homepageUrl?: string
     vulnerabilities: Vulnerability[]
     /** Every version the registrar knows, ordered — the input to upgrade guidance. */
@@ -180,6 +183,7 @@ function toComponent(origin: Origin, purlType: string, id: string, dependency: D
     const versions = library?.versions ?? []
     const current = versions.find(it => it.version === dependency.version.trim())
     const compare = comparatorForPurlType(purlType)
+    const newer = newerVersionCounts(versions, dependency.version, compare)
 
     // The licence of the version we resolved, not the licence of the package. A package that
     // relicensed mid-life carries both: `@cdxgen/cdxgen-plugins-bin` is Apache-2.0 up to 2.1.x and
@@ -201,11 +205,8 @@ function toComponent(origin: Origin, purlType: string, id: string, dependency: D
         matchType: 'Transitive Dependency',
         licenses: preferredLicenses(versionLicenses, libraryLicenses),
         releaseDate: isoDate(current?.timestamp),
-        // Empty rather than 0 when no registrar answered: "we do not know" and "you are current"
-        // are different statements, and Black Duck's column distinguishes them too.
-        newerVersions: versions.length === 0
-            ? ''
-            : String(versions.filter(it => compare(it.version, dependency.version) > 0).length),
+        newerVersions: newer.byDate,
+        newerVersionsSemver: newer.bySemver,
         homepageUrl: library?.homepageUrl || undefined,
         vulnerabilities: [...(dependency.vulnerabilities ?? [])],
         registryVersions: versions.map(it => it.version).sort(compare),

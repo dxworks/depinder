@@ -111,8 +111,18 @@ const checker: VulnerabilityChecker = {
     getPURL: (lib, ver) => `pkg:nuget/${lib.replace('@', '%40')}@${ver}`,
 }
 
+/**
+ * Registration hive `semver2`, not `semver1`. The two hives serve the same index shape, but
+ * `semver1` filters out every version that is SemVer 2.0.0 — a build-metadata suffix, a dotted
+ * prerelease label — or that depends on one, and that filter is not a fringe case: it hid 68 of
+ * 109 `Microsoft.Bcl.AsyncInterfaces` versions, and on a twelve-repository run left 288 components
+ * with no release date because the very version the project used was not in the list. `semver2`
+ * is a superset of `semver1`, so nothing is gained by falling back from one to the other.
+ */
+export const NUGET_REGISTRATION_URL = 'https://api.nuget.org/v3/registration5-gz-semver2'
+
 export class NugetRegistrar extends AbstractRegistrar {
-    protected baseURL = 'https://api.nuget.org/v3/registration5-gz-semver1'
+    protected baseURL = NUGET_REGISTRATION_URL
 
     async retrieveFromRegistry(libraryName: string): Promise<LibraryInfo> {
         const response = await axios.get(`${this.baseURL}/${libraryName.toLowerCase()}/index.json`)
@@ -160,11 +170,7 @@ export class NugetRegistrar extends AbstractRegistrar {
     }
 }
 
-class NugetRegistrarSemver2 extends NugetRegistrar {
-    protected baseURL = 'https://api.nuget.org/v3/registration5-gz-semver2'
-}
-
-export const registrar: Registrar = new NugetRegistrar(new NugetRegistrarSemver2(new LibrariesIORegistrar('nuget')))
+export const registrar: Registrar = new NugetRegistrar(new LibrariesIORegistrar('nuget'))
 
 export const dotnet: Plugin = {
     name: 'dotnet',

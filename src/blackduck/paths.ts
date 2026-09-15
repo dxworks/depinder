@@ -9,6 +9,7 @@ import {
     readBomGraph,
 } from '../plugins/sbom/cyclonedx'
 import {log} from '../utils/logging'
+import {blackDuckPrefix, manifestOfTree, ownCodeMatcher, readRepoManifests, RepoManifests} from './manifests'
 import {originFor, pathSegment} from './origins'
 
 /**
@@ -38,7 +39,12 @@ export interface SbomPath {
     name: string
     version: string
     purlType: string
-    /** `<repo>/-<package manager>/<name>/<version>/…` — the chain, as Black Duck writes it (`<name>:<version>` where the origin id uses a colon). */
+    /**
+     * `<repo>/-<package manager>/<name>/<version>/…` — the chain, as Black Duck writes it
+     * (`<name>:<version>` where the origin id uses a colon). With the scanned repository on disk
+     * (`--target`) the prefix is Black Duck's project prefix, `<name>/<version>/<repo>/…`; see
+     * `blackDuckPrefix`.
+     */
     path: string
     /** `<repo>`, or `<repo>/<module>` when the SBOM names its modules. */
     projectPath: string
@@ -237,8 +243,18 @@ function treeEdges(
     return edges
 }
 
-/** The paths and edges of one project, for one ecosystem. */
-function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType: string): {paths: SbomPath[], edges: SbomEdge[]} {
+/**
+ * The paths and edges of one project, for one ecosystem.
+ *
+ * With `manifests` — the scanned repository read off disk — two things change in `Path` only,
+ * never in the edges: the chain drops the repository's own code (a workspace member, the uv
+ * project, the Cargo crate) the way it already drops the anchors, because Black Duck files each
+ * of those as a project of its own and starts the chain after it; and the prefix becomes Black
+ * Duck's `<name>/<version>/<dir>` where the tree's manifest declares a name. The edge table keeps
+ * the graph as the SBOM records it; the own-code rule for edges is the viewer's, applied from the
+ * ground truth to every source alike.
+ */
+function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType: string, manifests?: RepoManifests): {paths: SbomPath[], edges: SbomEdge[]} {
     if (node.scopeRefs) {
         const scope = new Set(node.scopeRefs)
         graph = {...graph,
@@ -254,23 +270,30 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
     }
     const projectPath = node.module ? `${repo}/${node.module}` : repo
     const anchors = new Set(node.anchorRefs)
+    const ownCode = ownCodeMatcher(manifests, node.module, purlType)
+    // The project's own artifacts: the anchors the SBOM marks, and what the repository's manifests declare.
+    const isOwn = (ref: string) => anchors.has(ref) || ownCode(coordinatesOf(ref))
     // Trivy's node is the manifest; a Syft component knows the manifest it was read from.
     const tagOf = (ref: string, target: ParsedPurl) =>
         packageManagerTag(node.path)
         ?? packageManagerTag(locationOf(graph.byRef.get(ref) ?? {'bom-ref': ref}))
         ?? originFor(purlType, target.name).name
+    const prefixOf = (tag: string) => blackDuckPrefix(tag, projectPath, manifestOfTree(manifests, node.module, tag))
 
     const results: SbomPath[] = []
     const seen = new Set<string>()
     const emit = (chain: string[]) => {
-        const target = coordinatesOf(chain[chain.length - 1])
-        if (!target) return
+        const last = chain[chain.length - 1]
+        const target = coordinatesOf(last)
+        // Own code is a project, not a component: Black Duck has no row for it.
+        if (!target || isOwn(last)) return
         const segments = chain
-            .filter(ref => !anchors.has(ref))
+            .filter(ref => !isOwn(ref))
             .map(coordinatesOf)
             .filter((it): it is ParsedPurl => !!it)
         if (segments.length === 0) return
-        const rendered = `${projectPath}/-${tagOf(chain[chain.length - 1], target)}/`
+        const tag = tagOf(last, target)
+        const rendered = `${prefixOf(tag)}-${tag}/`
             + segments.map(it => pathSegment(originFor(purlType, it.name), it.name, it.version)).join('/')
         // Syft lists a package once per location it was seen in; one path per package is enough.
         const key = `${target.name}|${target.version}|${rendered}`
@@ -304,7 +327,7 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
     // root level with a one-hop path.
     if (node.allComponents) {
         for (const ref of graph.byRef.keys()) {
-            if (!reached.has(ref) && !anchors.has(ref)) emit([ref])
+            if (!reached.has(ref) && !isOwn(ref)) emit([ref])
         }
     }
 
@@ -330,9 +353,10 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
 /**
  * Every (component, path) pair and every parent-child edge in one SBOM, restricted to the purl
  * types being exported. `repo` is the label the chain starts from — the project name, which is
- * what Black Duck puts first.
+ * what Black Duck puts first. `repoDir`, when given, is the scanned repository on disk: its
+ * manifests supply Black Duck's project prefix and the own-code rule (see `manifests.ts`).
  */
-export function sbomTree(sbomFile: string, repo: string, purlTypes: Set<string>): {paths: SbomPath[], edges: SbomEdge[]} {
+export function sbomTree(sbomFile: string, repo: string, purlTypes: Set<string>, options: {repoDir?: string} = {}): {paths: SbomPath[], edges: SbomEdge[]} {
     let graph: BomGraph
     try {
         graph = readBomGraph(sbomFile)
@@ -340,12 +364,14 @@ export function sbomTree(sbomFile: string, repo: string, purlTypes: Set<string>)
         log.warn(`Could not read ${path.basename(sbomFile)} for dependency paths: ${e?.message ?? e}`)
         return {paths: [], edges: []}
     }
+    const manifests = options.repoDir ? readRepoManifests(options.repoDir) : undefined
+    if (options.repoDir && !manifests) log.warn(`${options.repoDir} is not a directory; paths of ${path.basename(sbomFile)} get no project prefix`)
     const trees = [...purlTypes].flatMap(purlType =>
-        findProjectNodes(graph, sbomFile, purlType).map(node => projectTree(graph, node, repo, purlType)))
+        findProjectNodes(graph, sbomFile, purlType).map(node => projectTree(graph, node, repo, purlType, manifests)))
     return {paths: trees.flatMap(it => it.paths), edges: trees.flatMap(it => it.edges)}
 }
 
 /** Just the chains, for a caller that only writes the `Path` column. */
-export function sbomPaths(sbomFile: string, repo: string, purlTypes: Set<string>): SbomPath[] {
-    return sbomTree(sbomFile, repo, purlTypes).paths
+export function sbomPaths(sbomFile: string, repo: string, purlTypes: Set<string>, options: {repoDir?: string} = {}): SbomPath[] {
+    return sbomTree(sbomFile, repo, purlTypes, options).paths
 }

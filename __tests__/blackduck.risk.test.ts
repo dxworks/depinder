@@ -96,34 +96,72 @@ describe('License Risk read off a written cell', () => {
 describe('Operational Risk', () => {
     const asOf = new Date('2026-09-10T00:00:00Z')
 
+    // Boundaries, in days before asOf: 2024-09-10 is 730 days (under 2 x 365.25), 2024-09-09 is
+    // 731; 2022-09-11 is 1,460 days (under 4 x 365.25), 2022-09-10 is exactly 1,461 (= 4 years).
+    const justUnder2y = '2024-09-10'
+    const exactly2y = '2024-09-09'
+    const justUnder4y = '2022-09-11'
+    const exactly4y = '2022-09-10'
+
     it('is OK on the newest version, however old that version is', () => {
         expect(operationalRisk('2026-08-01', '0', asOf)).toBe('OK')
         expect(operationalRisk('2015-01-01', '0', asOf)).toBe('OK')
     })
 
-    it('grades a version you are behind on by how stale it is', () => {
+    it('is still OK one version behind, however old that version is', () => {
+        expect(operationalRisk('2026-08-01', '1', asOf)).toBe('OK')
+        expect(operationalRisk('2015-01-01', '1', asOf)).toBe('OK')
+    })
+
+    it('starts grading at two newer versions, and caps two at MEDIUM', () => {
+        expect(operationalRisk('2026-01-01', '2', asOf)).toBe('LOW')
+        expect(operationalRisk('2024-01-01', '2', asOf)).toBe('LOW')       // 2 to 4 years is still LOW here
+        expect(operationalRisk('2020-01-01', '2', asOf)).toBe('MEDIUM')    // never HIGH
+        expect(operationalRisk('2010-01-01', '2', asOf)).toBe('MEDIUM')
+    })
+
+    it('puts the only threshold for two newer versions at four years', () => {
+        expect(operationalRisk(justUnder2y, '2', asOf)).toBe('LOW')
+        expect(operationalRisk(exactly2y, '2', asOf)).toBe('LOW')
+        expect(operationalRisk(justUnder4y, '2', asOf)).toBe('LOW')
+        expect(operationalRisk(exactly4y, '2', asOf)).toBe('MEDIUM')
+    })
+
+    it('grades three or more newer versions by how stale the resolved one is', () => {
         expect(operationalRisk('2026-01-01', '3', asOf)).toBe('LOW')       // under 2 years
         expect(operationalRisk('2024-01-01', '3', asOf)).toBe('MEDIUM')    // 2 to 4 years
         expect(operationalRisk('2020-01-01', '3', asOf)).toBe('HIGH')      // over 4 years
+        expect(operationalRisk('2020-01-01', '40', asOf)).toBe('HIGH')
     })
 
-    it('puts the thresholds at two and four years', () => {
-        expect(operationalRisk('2024-09-11', '1', asOf)).toBe('LOW')
-        expect(operationalRisk('2024-09-09', '1', asOf)).toBe('MEDIUM')
-        expect(operationalRisk('2022-09-11', '1', asOf)).toBe('MEDIUM')
-        expect(operationalRisk('2022-09-09', '1', asOf)).toBe('HIGH')
+    it('puts the thresholds for three or more newer versions at two and four years', () => {
+        expect(operationalRisk(justUnder2y, '3', asOf)).toBe('LOW')
+        expect(operationalRisk(exactly2y, '3', asOf)).toBe('MEDIUM')
+        expect(operationalRisk(justUnder4y, '3', asOf)).toBe('MEDIUM')
+        expect(operationalRisk(exactly4y, '3', asOf)).toBe('HIGH')
+    })
+
+    it('changes verdict between one and two, and between two and three, newer versions', () => {
+        expect(operationalRisk('2020-01-01', '1', asOf)).toBe('OK')
+        expect(operationalRisk('2020-01-01', '2', asOf)).toBe('MEDIUM')
+        expect(operationalRisk('2020-01-01', '3', asOf)).toBe('HIGH')
+        expect(operationalRisk('2024-01-01', '1', asOf)).toBe('OK')
+        expect(operationalRisk('2024-01-01', '2', asOf)).toBe('LOW')
+        expect(operationalRisk('2024-01-01', '3', asOf)).toBe('MEDIUM')
     })
 
     /** An empty cell is "we do not know", which is not the same statement as `OK`. */
     it('says nothing when it has nothing to say', () => {
         expect(operationalRisk('2024-01-01', '')).toBe('')
+        expect(operationalRisk('', '2', asOf)).toBe('')
         expect(operationalRisk('', '3', asOf)).toBe('')
         expect(operationalRisk('not a date', '3', asOf)).toBe('')
         expect(operationalRisk('2024-01-01', 'many', asOf)).toBe('')
     })
 
-    it('still answers OK with no release date, because zero newer versions is enough', () => {
+    it('still answers OK with no release date, because at most one newer version is enough', () => {
         expect(operationalRisk('', '0', asOf)).toBe('OK')
+        expect(operationalRisk('', '1', asOf)).toBe('OK')
     })
 })
 
@@ -147,7 +185,7 @@ describe('reading a licence however it is written', () => {
     })
 
     it('reads its own written cells back', () => {
-        // What `recompute-derived-columns` has to work from: a finished export, not SPDX ids.
+        // What a finished export holds: Black Duck display names, not SPDX ids.
         expect(names(['MIT License'])).toBe('MIT License')
         expect(names(['(MIT License OR Apache License 2.0)'])).toBe('(MIT License OR Apache License 2.0)')
         expect(licenseRiskFromNames('(MIT License OR Apache License 2.0)')).toBe('OK')
