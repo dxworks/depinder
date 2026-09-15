@@ -678,10 +678,67 @@ async function runScanner(tool: string, bin: string, args: string[], sbomFile: s
     } catch (e: any) {
         const reason = e?.code === 'ENOENT'
             ? `binary '${bin}' not found (set ${tool.toUpperCase()}_BIN or add it to PATH)`
-            : `${e?.message ?? e}`.split('\n')[0]
+            : scannerFailureReason(e)
         log.warn(`${tool} scan of ${path.basename(sbomFile)} skipped: ${reason}`)
         return undefined
     }
+}
+
+/**
+ * Why a scanner call failed, in one line, with the scanner's own last word kept.
+ *
+ * `execFile` rejects with `Command failed: trivy sbom --format json <file>` on its first line and
+ * the child's stderr under it. Reporting only that first line named the command and never the
+ * reason — an expired database the scanner could not re-download reads exactly like a corrupt
+ * SBOM. The last stderr line that mentions a failure is the one the scanner meant as its verdict.
+ */
+export function scannerFailureReason(e: any): string {
+    const head = `${e?.message ?? e}`.split('\n')[0]
+    const lines = `${e?.stderr ?? ''}`.split('\n').map((it: string) => it.trim()).filter(Boolean)
+    const detail = [...lines].reverse().find((it: string) => /error|fatal|failed|denied/i.test(it))
+        ?? lines[lines.length - 1]
+    return detail ? `${head} \u2014 ${detail}` : head
+}
+
+let warmPromise: Promise<void> | undefined
+
+/**
+ * Refreshes each scanner's vulnerability database once, before the first scan reads it.
+ *
+ * Both scanners update their DB lazily, inside the scan. With every SBOM scanned at once, an
+ * expired DB meant a dozen child processes fetching the same archive simultaneously and all of
+ * them failing: the run finished with empty vulnerability columns and one `Command failed` line
+ * per file. Every scan awaits this single promise instead, so at most one download happens. A
+ * current DB makes it a no-op — `trivy image --download-db-only` and `grype db update` both
+ * return in milliseconds when there is nothing to fetch.
+ */
+export function warmScannerDatabases(): Promise<void> {
+    if (!warmPromise) {
+        warmPromise = (async () => {
+            const preflight = await preflightScanners()
+            const selected = vulnSources()
+            const jobs: {tool: 'trivy' | 'grype', status: ScannerStatus, args: string[]}[] = [
+                {tool: 'trivy', status: preflight.trivy, args: ['image', '--download-db-only']},
+                {tool: 'grype', status: preflight.grype, args: ['db', 'update']},
+            ]
+            // The two databases are unrelated, so the tools refresh side by side; the race this
+            // fixes is several processes of the SAME tool fetching the SAME archive.
+            await Promise.all(jobs.filter(it => it.status.installed && selected[it.tool]).map(async ({tool, status, args}) => {
+                const started = Date.now()
+                try {
+                    await timePhase(`db:${tool}`, () =>
+                        execFileAsync(status.bin, args, {maxBuffer: MAX_SCANNER_OUTPUT_BYTES}))
+                    const elapsed = (Date.now() - started) / 1000
+                    // Worth a line only when it actually fetched something; a no-op stays silent.
+                    if (elapsed > 2) log.info(`${tool} vulnerability DB refreshed in ${elapsed.toFixed(1)}s`)
+                } catch (e: any) {
+                    log.warn(`${tool} vulnerability DB refresh failed: ${scannerFailureReason(e)}`)
+                    log.warn(`  ${tool} scans continue against whatever database is already on disk`)
+                }
+            }))
+        })()
+    }
+    return warmPromise
 }
 
 function parseReport<T>(tool: string, json: string | undefined): T | undefined {
@@ -721,6 +778,10 @@ async function scanFile(sbomFile: string): Promise<LocalScanResult> {
     // The two scanners are independent — run them in parallel. A scanner the run did not select
     // (`--vuln-source`) is not started at all, so `github` alone costs no subprocess.
     const selected = vulnSources()
+
+    // One database refresh for the whole run, awaited by every file — see warmScannerDatabases.
+    await warmScannerDatabases()
+
     const [trivyJson, grypeJson] = await Promise.all([
         selected.trivy && preflight.trivy.installed
             ? runScanner('trivy', preflight.trivy.bin, ['sbom', '--format', 'json', sbomFile], sbomFile)
@@ -771,4 +832,5 @@ export function clearLocalScanCache(): void {
     scanCache.clear()
     scannedFiles.clear()
     preflightPromise = undefined
+    warmPromise = undefined
 }

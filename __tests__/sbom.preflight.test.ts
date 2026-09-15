@@ -8,10 +8,12 @@ import {
     clearLocalScanCache,
     preflightScanners,
     scanSbomFileOnce,
+    scannerFailureReason,
     scannerPreflightMessages,
     scannerSummaryLine,
     writeScanProvenance,
 } from '../src/plugins/sbom/local-scan'
+import {log} from '../src/utils/logging'
 import {sbomFilesFor, sbomJava} from '../src/plugins/sbom'
 import {java} from '../src/plugins/java'
 
@@ -261,5 +263,83 @@ describe('sbomFilesFor', () => {
 
     it('is empty when no sbom plugin is selected, so a native run never preflights scanners', () => {
         expect(sbomFilesFor([java], ['/x/zeppelin.cdx.json'])).toEqual([])
+    })
+})
+
+
+/**
+ * The database refresh and the failure message, which are what a stale DB actually costs.
+ *
+ * Measured 2026-09-15: twelve SBOMs scanned at once against a day-old Trivy DB produced twelve
+ * `Command failed: trivy sbom --format json <file>` warnings and empty vulnerability columns.
+ * Every process had tried to download the same archive, and the one line the user saw named the
+ * command but not the reason. Both halves are covered here.
+ */
+describe('scanner database refresh', () => {
+    /** A trivy stub that records every invocation and fails the scan the way a broken DB does. */
+    function stubTrivyRecording(name: string, callLog: string, scanFails: boolean): string {
+        const file = path.join(tmpDir, name)
+        fs.writeFileSync(file, `#!/bin/sh
+echo "$@" >> ${callLog}
+if [ "$1" = "--version" ]; then
+  cat <<'EOF'
+${trivyVersionJson(PINNED_SCANNER_VERSIONS.trivy)}
+EOF
+  exit 0
+fi
+if [ "$1" = "image" ]; then exit 0; fi
+${scanFails
+        ? `echo "FATAL\tinit error: DB error: failed to download vulnerability DB" 1>&2
+exit 1`
+        : `cat <<'EOF'
+${JSON.stringify(trivyReport)}
+EOF
+exit 0`}
+`)
+        fs.chmodSync(file, 0o755)
+        return file
+    }
+
+    it('downloads the database once for the whole run, however many files are scanned at once', async () => {
+        const callLog = path.join(tmpDir, 'calls-once.txt')
+        fs.writeFileSync(callLog, '')
+        process.env.TRIVY_BIN = stubTrivyRecording('trivy-recording.sh', callLog, false)
+        process.env.GRYPE_BIN = missing('grype')
+
+        const second = path.join(tmpDir, 'q.cdx.json')
+        fs.writeFileSync(second, JSON.stringify({metadata: {}, components: [], dependencies: []}))
+        await Promise.all([scanSbomFileOnce(sbomFile), scanSbomFileOnce(second)])
+
+        const calls = fs.readFileSync(callLog, 'utf8').split('\n').filter(Boolean)
+        expect(calls.filter(it => it.startsWith('image --download-db-only'))).toHaveLength(1)
+        // Both files were still scanned — the refresh gates the scans, it does not replace them.
+        expect(calls.filter(it => it.startsWith('sbom --format json'))).toHaveLength(2)
+    })
+
+    it('keeps the scanner\'s own reason in the warning when a scan fails', async () => {
+        const callLog = path.join(tmpDir, 'calls-failing.txt')
+        fs.writeFileSync(callLog, '')
+        process.env.TRIVY_BIN = stubTrivyRecording('trivy-failing.sh', callLog, true)
+        process.env.GRYPE_BIN = missing('grype')
+        const warn = jest.spyOn(log, 'warn').mockImplementation(() => log)
+
+        try {
+            const result = await scanSbomFileOnce(sbomFile)
+            expect(result.available).toBe(false)
+            const skipped = warn.mock.calls.map(it => String(it[0])).find(it => it.includes('scan of p.cdx.json skipped'))
+            expect(skipped).toContain('Command failed')
+            expect(skipped).toContain('failed to download vulnerability DB')
+        } finally {
+            warn.mockRestore()
+        }
+    })
+
+    it('reads the last failing stderr line, not the scanner\'s progress chatter', () => {
+        const reason = scannerFailureReason({
+            message: 'Command failed: trivy sbom --format json /x/p.cdx.json\nFATAL\tinit error',
+            stderr: 'INFO\tNeed to update DB\nINFO\tDownloading vulnerability DB...\nFATAL\tinit error: DB error: failed to download\n',
+        })
+
+        expect(reason).toBe('Command failed: trivy sbom --format json /x/p.cdx.json \u2014 FATAL\tinit error: DB error: failed to download')
     })
 })
