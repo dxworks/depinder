@@ -241,9 +241,15 @@ function calculateVulnerabilityCounts(component: ComponentRecord): Vulnerability
 }
 
 /**
- * Extracts a single origin name from a potentially comma-separated list
+ * Collapses a potentially comma-separated origin-name list to its distinct values.
+ *
+ * A single component can legitimately be matched in more than one ecosystem when the Black Duck
+ * project version spans several package managers (e.g. the same name on `npmjs` and `packagist`).
+ * That is data, not an error, so the distinct origins are preserved joined by `;` rather than
+ * aborting the whole transform.
+ *
  * @param originName Origin name string that might contain multiple comma-separated values
- * @returns A single origin name if all values are the same, otherwise throws an exception
+ * @returns The single origin name, or the distinct origins joined by `;`
  */
 function getSingleOriginName(originName: string): string {
     if (!originName) {
@@ -252,18 +258,7 @@ function getSingleOriginName(originName: string): string {
 
     const origins = originName.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0);
 
-    if (origins.length === 0) {
-        return '';
-    }
-
-    const firstOrigin = origins[0];
-    const allSame = origins.every(origin => origin === firstOrigin);
-
-    if (!allSame) {
-        throw new Error(`Multiple different origin names found: ${originName}`);
-    }
-
-    return firstOrigin;
+    return [...new Set(origins)].join(';');
 }
 
 /**

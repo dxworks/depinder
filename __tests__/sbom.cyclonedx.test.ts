@@ -240,7 +240,11 @@ describe('parseCycloneDxFile — Syft shape (no project nodes)', () => {
         }
         const file = writeBom('rel.cdx.json', bom)
         expect(parseCycloneDxFile(file, 'npm')[0].path).toBe('package-lock.json')
-        expect(parseCycloneDxFile(file, 'npm')[0].path).not.toContain(file)
+        const projects = parseCycloneDxFile(file, 'npm')
+        expect(projects[0].path).not.toContain(file)
+        expect(projects.map(p => p.path)).toEqual(['package-lock.json', 'tools/benchmarks/package-lock.json'])
+        expect(Object.keys(projects[0].dependencies)).toEqual(['debug@4.3.4'])
+        expect(Object.keys(projects[1].dependencies).sort()).toEqual(['left-pad@1.3.0', 'ms@2.1.3'])
     })
 
     it('falls back to the SBOM name when no component carries a location', () => {

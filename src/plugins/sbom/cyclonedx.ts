@@ -166,6 +166,8 @@ function toSemVer(version: string): SemVer | null {
  * and a one-segment `Path` in `_dependencies_sources.csv` can never disagree.
  */
 export interface ProjectNode {
+    /** Exact refs attributed by saved component locations; never the entire repository. */
+    scopeRefs?: string[]
     ref: string
     /** The module directory (`neo4j` for `neo4j/pom.xml`); empty for a top-level manifest. */
     module: string
@@ -479,6 +481,33 @@ export function findProjectNodes({bom, byRef, edges}: BomGraph, sbomFile: string
         if (modules) return modules
     }
 
+    // Saved Syft locations define manifest boundaries, including multiple locations per ref.
+    const located = new Map<string, Set<string>>()
+    for (const component of bom.components ?? []) {
+        if (parseComponentPurl(component)?.type !== purlType) continue
+        const locations = (component.properties ?? [])
+            .filter(p => /^syft:location:\d+:path$/.test(p.name))
+            .map(p => p.value.replace(/^\//, ''))
+        for (const location of locations) {
+            if (!/^(package(-lock)?\.json|yarn\.lock|pnpm-lock\.yaml|uv\.lock|poetry\.lock|Gemfile(\.lock)?|composer\.(json|lock)|Cargo\.(toml|lock)|go\.(mod|sum)|gradle\.lockfile|build\.gradle(\.kts)?|packages\.lock\.json|.*\.(deps\.json|csproj)|requirements.*\.txt)$/.test(path.basename(location))) continue
+            const refs = located.get(location) ?? new Set<string>()
+            refs.add(component['bom-ref'])
+            located.set(location, refs)
+        }
+    }
+    if (located.size) {
+        const anchors = workspaceAnchorsOf(bom, edges, purlType)
+        return [...located].sort(([a], [b]) => a.split('/').length - b.split('/').length || a.localeCompare(b)).map(([location, refs]) => ({
+            ref: rootRef ?? '',
+            ...moduleNames(location, sbomFile),
+            path: location,
+            version: bom.metadata?.component?.version ?? 'unknown',
+            allComponents: true,
+            scopeRefs: [...refs],
+            anchorRefs: anchors.filter(ref => refs.has(ref)),
+        }))
+    }
+
     // Syft shape, no reconstructable modules: one project for the entire SBOM.
     return [{
         ref: rootRef ?? '',
@@ -528,7 +557,7 @@ export function parseCycloneDxFile(sbomFile: string, purlType: string): Depinder
 
     for (const node of projectNodes) {
         const projectId = `${node.name}@${node.version}`
-        const inScope = node.allComponents
+        const inScope = node.scopeRefs ? new Set(node.scopeRefs) : node.allComponents
             ? new Set(byRef.keys())
             : reachableFrom(node.ref, edges)
 

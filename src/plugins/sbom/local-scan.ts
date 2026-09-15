@@ -55,7 +55,7 @@ export interface TrivyReport {
             References?: string[]
             PublishedDate?: string
             CweIDs?: string[]
-            CVSS?: { [source: string]: { V3Score?: number, V2Score?: number, V3Vector?: string, V2Vector?: string } }
+            CVSS?: { [source: string]: { V40Score?: number, V3Score?: number, V2Score?: number, V40Vector?: string, V3Vector?: string, V2Vector?: string } }
         }[]
     }[]
 }
@@ -68,7 +68,7 @@ export interface GrypeReport {
             description?: string
             dataSource?: string
             urls?: string[]
-            cvss?: { version?: string, vector?: string, metrics?: { baseScore?: number } }[]
+            cvss?: { source?: string, version?: string, vector?: string, metrics?: { baseScore?: number } }[]
             fix?: { versions?: string[] }
         }
         relatedVulnerabilities?: {
@@ -76,6 +76,7 @@ export interface GrypeReport {
             description?: string
             dataSource?: string
             urls?: string[]
+            cvss?: { source?: string, version?: string, vector?: string, metrics?: { baseScore?: number } }[]
         }[]
         matchDetails?: { found?: { versionConstraint?: string } }[]
         artifact?: { name?: string, version?: string, purl?: string }
@@ -143,6 +144,7 @@ interface RawFinding {
     references: string[]
     vulnerableRange?: string
     firstPatchedVersion?: string
+    patchedVersions?: string[]
     /** The exact installed version the scanner matched — the range fallback. */
     installedVersion?: string
     source: string
@@ -155,6 +157,51 @@ interface RawFinding {
 // Per-tool parsers (pure, unit-testable)
 // ---------------------------------------------------------------------------
 
+/** `2.15.0, 2.12.2` -> `['2.15.0', '2.12.2']`; empty and blank cells give `undefined`. */
+function fixedVersions(cell: string | undefined): string[] | undefined {
+    const versions = (cell ?? '').split(',').map(it => it.trim()).filter(Boolean)
+    return versions.length > 0 ? versions : undefined
+}
+
+type TrivyCvss = NonNullable<NonNullable<NonNullable<TrivyReport['Results']>[number]['Vulnerabilities']>[number]['CVSS']>
+
+interface ChosenCvss {
+    score?: number
+    cvssVector?: string
+    cvssVersion?: string
+}
+
+/**
+ * Trivy reports one CVSS block per scoring source (`ghsa`, `nvd`, `redhat`, …). GHSA's block wins
+ * — it is the catalogue that knows the package, and the one our ids are named after — then NVD's,
+ * then whatever else scores highest. Within a block the newest CVSS wins: `V40Score` (trivy 0.6x+;
+ * older reports put a `CVSS:4.0` vector under `V3Vector`), then `V3Score`, then `V2Score`. Score
+ * and vector always come from the same block, so they agree.
+ */
+export function trivyCvss(cvss: TrivyCvss | undefined): ChosenCvss {
+    const entries = Object.entries(cvss ?? {})
+    const fromBlock = (entry: TrivyCvss[string]): ChosenCvss | undefined => {
+        if (entry.V40Score !== undefined) return {score: entry.V40Score, cvssVector: entry.V40Vector, cvssVersion: '4.0'}
+        if (entry.V3Score !== undefined) {
+            return {score: entry.V3Score, cvssVector: entry.V3Vector,
+                cvssVersion: entry.V3Vector?.startsWith('CVSS:4') ? '4.0' : entry.V3Vector?.startsWith('CVSS:3.0') ? '3.0' : '3.1'}
+        }
+        if (entry.V2Score !== undefined) return {score: entry.V2Score, cvssVector: entry.V2Vector, cvssVersion: '2.0'}
+        return undefined
+    }
+    for (const preferred of ['ghsa', 'nvd']) {
+        const block = entries.find(([source]) => source.toLowerCase() === preferred)?.[1]
+        const chosen = block && fromBlock(block)
+        if (chosen) return chosen
+    }
+    let chosen: ChosenCvss = {}
+    for (const [, entry] of entries) {
+        const candidate = fromBlock(entry)
+        if (candidate?.score !== undefined && (chosen.score === undefined || candidate.score > chosen.score)) chosen = candidate
+    }
+    return chosen
+}
+
 export function trivyFindings(report: TrivyReport): RawFinding[] {
     const findings: RawFinding[] = []
     for (const result of report.Results ?? []) {
@@ -163,18 +210,7 @@ export function trivyFindings(report: TrivyReport): RawFinding[] {
             const {keys, dedupKey} = packageKeys(vuln.PkgIdentifier?.PURL, vuln.PkgName, vuln.InstalledVersion)
             if (keys.length === 0) continue
 
-            // Trivy reports one CVSS block per scoring source (nvd, redhat, ghsa); take the
-            // highest base score and the vector that came with it, so score and vector agree.
-            let score: number | undefined
-            let cvssVector: string | undefined
-            let cvssVersion: string | undefined
-            for (const entry of Object.values(vuln.CVSS ?? {})) {
-                const candidate = entry.V3Score ?? entry.V2Score
-                if (candidate === undefined || (score !== undefined && candidate <= score)) continue
-                score = candidate
-                cvssVector = entry.V3Score !== undefined ? entry.V3Vector : entry.V2Vector
-                cvssVersion = entry.V3Score !== undefined ? '3.1' : '2.0'
-            }
+            const {score, cvssVector, cvssVersion} = trivyCvss(vuln.CVSS)
 
             const timestamp = vuln.PublishedDate ? Date.parse(vuln.PublishedDate) : NaN
             findings.push({
@@ -188,8 +224,10 @@ export function trivyFindings(report: TrivyReport): RawFinding[] {
                 timestamp: Number.isNaN(timestamp) ? undefined : timestamp,
                 permalink: vuln.PrimaryURL,
                 references: vuln.References ?? [],
-                // Trivy reports no vulnerable range against an SBOM, only the fix version.
+                // Trivy reports no vulnerable range against an SBOM, only the fix versions — one
+                // per maintained line, highest first (`2.15.0, 2.12.2`). All of them are kept.
                 firstPatchedVersion: vuln.FixedVersion?.split(',')[0]?.trim() || undefined,
+                patchedVersions: fixedVersions(vuln.FixedVersion),
                 installedVersion: vuln.InstalledVersion,
                 source: 'trivy',
                 cvssVector,
@@ -213,10 +251,21 @@ export function grypeFindings(report: GrypeReport): RawFinding[] {
         const related = match.relatedVulnerabilities ?? []
         const ids = [vuln.id, ...related.map(r => r.id).filter((id): id is string => !!id)]
 
-        // Prefer a CVSS v3 base score, fall back to any base score.
-        const cvss = vuln.cvss ?? []
-        const chosenCvss = cvss.find(c => c.version?.startsWith('3') && c.metrics?.baseScore !== undefined)
-            ?? cvss.find(c => c.metrics?.baseScore !== undefined)
+        // GHSA's own score first (the GHSA record's block, or an entry sourced from GitHub), then
+        // NVD's — which sits on the related CVE record, not on the GHSA one — then any score.
+        type GrypeCvss = {source?: string, version?: string, vector?: string, metrics?: {baseScore?: number}}
+        const scored = (list: GrypeCvss[] | undefined) => (list ?? []).filter(c => c.metrics?.baseScore !== undefined)
+        const own = scored(vuln.cvss)
+        const all = [...own, ...related.flatMap(r => scored(r.cvss))]
+        const isGithub = (c: GrypeCvss) => (c.source ?? '').toLowerCase().includes('github')
+        const isNvd = (c: GrypeCvss) => (c.source ?? '').toLowerCase().includes('nvd')
+        // Within a group, the newest CVSS version wins (4.0 over 3.1 over 2.0), as on the trivy side.
+        const newest = (list: GrypeCvss[]): GrypeCvss | undefined =>
+            [...list].sort((a, b) => parseFloat(b.version ?? '0') - parseFloat(a.version ?? '0'))[0]
+        const chosenCvss = newest(all.filter(isGithub))
+            ?? (vuln.id.toUpperCase().startsWith('GHSA-') ? newest(own) : undefined)
+            ?? newest(all.filter(isNvd))
+            ?? newest(all)
         const score = chosenCvss?.metrics?.baseScore
 
         // Grype GHSA records often have an empty description; the related CVE record has one.
@@ -241,6 +290,7 @@ export function grypeFindings(report: GrypeReport): RawFinding[] {
             ],
             vulnerableRange: constraints[0],
             firstPatchedVersion: vuln.fix?.versions?.[0],
+            patchedVersions: vuln.fix?.versions?.filter(Boolean),
             installedVersion: artifact?.version,
             source: 'grype',
             cvssVector: chosenCvss?.vector,
@@ -305,6 +355,9 @@ export function buildVulnerabilityIndex(trivy: TrivyReport | undefined, grype: G
         existing.summary = existing.summary || finding.summary
         existing.permalink = existing.permalink || finding.permalink
         existing.firstPatchedVersion = existing.firstPatchedVersion || finding.firstPatchedVersion
+        for (const fixed of finding.patchedVersions ?? []) {
+            if (!existing.patchedVersions?.includes(fixed)) existing.patchedVersions = [...(existing.patchedVersions ?? []), fixed]
+        }
         if (!existing.source.split(',').includes(finding.source)) existing.source += `,${finding.source}`
         if (finding.cvssVector && (preferIncoming.score || !existing.cvssVector)) {
             existing.cvssVector = finding.cvssVector
@@ -335,6 +388,7 @@ export function buildVulnerabilityIndex(trivy: TrivyReport | undefined, grype: G
             // as "not vulnerable" downstream — pin it to that version.
             vulnerableRange: f.vulnerableRange ?? (f.installedVersion ? `=${f.installedVersion}` : undefined),
             firstPatchedVersion: f.firstPatchedVersion,
+            patchedVersions: f.patchedVersions?.length ? f.patchedVersions : undefined,
             source: f.source,
             cvssVector: f.cvssVector,
             cvssVersion: f.cvssVersion,

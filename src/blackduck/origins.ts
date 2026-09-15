@@ -34,9 +34,9 @@ export interface Origin {
     purlType: string
     /** The separator between the component name and its version in `Component Version Origin Id`. */
     versionSeparator: '/' | ':' | '#'
-    /** A registry page for the component, `{name}` and `{version}` substituted. Absent where the
-     *  registry has no stable per-version URL we can derive from the coordinates alone. */
-    componentLink?: string
+    /** Where the project lives, when the origin id itself already names it. Only Go modules
+     *  served from GitHub qualify: there the module path *is* the repository. */
+    projectLink?: (name: string) => string
     /** For an ecosystem Black Duck files by host rather than by registry: which component names
      *  this origin takes. Absent means every component of the purl type. */
     claims?: (name: string) => boolean
@@ -61,15 +61,16 @@ export function goPseudoVersionCommit(version: string): string {
 }
 
 export const ORIGINS: readonly Origin[] = [
-    {name: 'npmjs', purlType: 'npm', versionSeparator: '/', componentLink: 'https://www.npmjs.com/package/{name}/v/{version}'},
-    {name: 'rubygems', purlType: 'gem', versionSeparator: '/', componentLink: 'https://rubygems.org/gems/{name}/versions/{version}'},
-    {name: 'pypi', purlType: 'pypi', versionSeparator: '/', componentLink: 'https://pypi.org/project/{name}/{version}/'},
-    {name: 'nuget', purlType: 'nuget', versionSeparator: '/', componentLink: 'https://www.nuget.org/packages/{name}/{version}'},
-    {name: 'crates', purlType: 'cargo', versionSeparator: '/', componentLink: 'https://crates.io/crates/{name}/{version}'},
+    {name: 'npmjs', purlType: 'npm', versionSeparator: '/'},
+    {name: 'rubygems', purlType: 'gem', versionSeparator: '/'},
+    {name: 'pypi', purlType: 'pypi', versionSeparator: '/'},
+    {name: 'nuget', purlType: 'nuget', versionSeparator: '/'},
+    {name: 'crates', purlType: 'cargo', versionSeparator: '/'},
     {name: 'maven', purlType: 'maven', versionSeparator: ':'},
-    {name: 'packagist', purlType: 'composer', versionSeparator: ':', componentLink: 'https://packagist.org/packages/{name}#{version}'},
+    {name: 'packagist', purlType: 'composer', versionSeparator: ':'},
     {
-        name: 'github', purlType: 'golang', versionSeparator: ':', componentLink: 'https://github.com/{name}',
+        name: 'github', purlType: 'golang', versionSeparator: ':',
+        projectLink: name => `https://github.com/${GO_GITHUB_MODULE.exec(name)?.[1] ?? name}`,
         claims: name => GO_GITHUB_MODULE.test(name),
         idName: name => GO_GITHUB_MODULE.exec(name)?.[1] ?? name,
         idVersion: goPseudoVersionCommit,
@@ -108,13 +109,40 @@ export function pathSegment(origin: Origin, name: string, version: string): stri
 }
 
 /**
- * `Component Link`. The registrar's own homepage is preferred — it is what Black Duck fills the
- * column with — and the registry page is the fallback for the components no registrar reached.
+ * `Component Link`: where the *project* lives — not where this version is published.
+ *
+ * Black Duck fills the column from its Knowledge Base's project entity, which is why the value is
+ * the same on every version of a component (0 of the 5,900 components in the reference export
+ * carry two different links) and why it sits beside `Open Hub URL`, `Commit Activity` and
+ * `Contributors in Past 12 Months` — all project facts, none of them version facts. The version is
+ * deliberately not a parameter here.
+ *
+ * What the registrar read off the registry is the only input. Where the registry declares no
+ * project URL, Black Duck writes nothing rather than falling back to the package's page — of 150
+ * sampled npm components, every one of the 147 with a `homepage` had a Black Duck link and none of
+ * them was empty — so a registry page is not a safe fallback: it is a different answer to a
+ * different question, and it disagreed with Black Duck on 8,198 of 8,198 rows.
  */
-export function componentLink(origin: Origin, name: string, version: string, homepage?: string): string {
-    if (homepage) return homepage
-    if (!origin.componentLink) return ''
-    return origin.componentLink
-        .replace('{name}', encodeURIComponent(origin.idName?.(name) ?? name).replaceAll('%2F', '/').replaceAll('%40', '@'))
-        .replace('{version}', encodeURIComponent(version))
+export function componentLink(origin: Origin, name: string, homepage?: string): string {
+    return canonicalProjectUrl(homepage) || origin.projectLink?.(name) || ''
+}
+
+/**
+ * A project URL as a browser would open it.
+ *
+ * Registries hand back clone URLs as readily as web URLs — `git+https://<url>.git`, `git://<url>`,
+ * `git@github.com:owner/repo.git` — and Black Duck holds the web form of the same page. Nothing is
+ * invented here: a URL that is not http(s) after unwrapping (`mailto:`, a bare path, a private
+ * host) is dropped, because a link that cannot be opened is worse than an empty cell.
+ */
+export function canonicalProjectUrl(url?: string): string {
+    const raw = (url ?? '').trim()
+    if (!raw) return ''
+    const unwrapped = raw
+        .replace(/^git\+/, '')
+        .replace(/^git@([^:/]+):/, 'https://$1/')
+        .replace(/^(?:git|ssh|git\+ssh):\/\//, 'https://')
+        .replace(/^(https?:\/\/)[^/@]*@/, '$1')
+        .replace(/\.git(?=$|[#?])/, '')
+    return /^https?:\/\//i.test(unwrapped) ? unwrapped : ''
 }

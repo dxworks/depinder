@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import {writeBlackDuckExport} from '../blackduck/export'
 import {buildModel} from '../blackduck/model'
-import {sbomPaths, SbomPath} from '../blackduck/paths'
+import {SbomEdge, SbomPath, sbomTree} from '../blackduck/paths'
 import {sbomPluginsForPurlTypes} from '../plugins/sbom'
 import {parsePurl} from '../plugins/sbom/cyclonedx'
 import {walkDir} from '../utils/utils'
@@ -33,6 +33,7 @@ import {AnalyseOptions, runAnalysis} from './analyse'
 
 export interface ExportBlackduckOptions extends AnalyseOptions {
     projectName?: string
+    target?: string
 }
 
 export function createExportBlackduckCommand(): Command {
@@ -44,6 +45,9 @@ export function createExportBlackduckCommand(): Command {
         .option('--refresh', 'Refresh the cache', false)
         .option('--project-name <name>',
             'The name to write in the Project path column and at the head of every dependency path')
+        .option('--target <folder>',
+            'The folder holding the scanned repositories, one per SBOM name; their manifests give Path '
+            + 'its Black Duck project prefix and drop the repository\'s own code from the chain')
         .option('--vuln-source <sources>',
             'A comma-separated list of trivy, grype, github, all',
             DEFAULT_VULN_SOURCE)
@@ -82,14 +86,19 @@ export function purlTypesIn(sbomFiles: string[]): Set<string> {
 }
 
 /**
- * The project name, which becomes the `Project path` column and the first segment of every
- * dependency path. Defaults to the SBOMs' shared basename — `ruby-mastodon` for both
- * `ruby-mastodon.cdx.json` and `ruby-mastodon.trivy.cdx.json` — falling back to the folder name
- * when a run spans several projects.
+ * The repo a single SBOM describes: its basename, minus the extractor suffix — `ruby-mastodon` for
+ * both `ruby-mastodon.cdx.json` and `ruby-mastodon.trivy.cdx.json`.
+ */
+export function repoNameOf(sbomFile: string): string {
+    return path.basename(sbomFile).replace(/\.(trivy\.)?cdx\.json$/, '')
+}
+
+/**
+ * The export's root label, which becomes the `Project path` column. Defaults to the SBOMs' shared
+ * repo name, falling back to the folder name when a run spans several repos.
  */
 export function defaultProjectName(sbomFiles: string[], folders: string[]): string {
-    const names = new Set(sbomFiles.map(it =>
-        path.basename(it).replace(/\.(trivy\.)?cdx\.json$/, '')))
+    const names = new Set(sbomFiles.map(repoNameOf))
     if (names.size === 1) return [...names][0]
     return path.basename(path.resolve(folders[0] ?? '.'))
 }
@@ -114,10 +123,17 @@ export async function exportBlackduck(folders: string[], options: ExportBlackduc
 
     const projectName = options.projectName ?? defaultProjectName(sbomFiles, folders)
     const exportedTypes = new Set(analysed.map(it => it.purlType))
-    const paths: SbomPath[] = timePhaseSync('blackduck:paths', () => sbomFiles.flatMap(file =>
-        sbomPaths(file, projectName, exportedTypes)))
+    // One folder can hold several repos' SBOMs, and the repo a path belongs to is the SBOM's own
+    // name, not the run's label — so each file contributes its paths under its own repo. An
+    // explicit --project-name still overrides, for a run that really is a single project.
+    // The repository a SBOM was scanned from sits under --target by the SBOM's own name.
+    const repoDirOf = (file: string) => options.target ? path.join(options.target, repoNameOf(file)) : undefined
+    const trees = timePhaseSync('blackduck:paths', () => sbomFiles.map(file =>
+        sbomTree(file, options.projectName ?? repoNameOf(file), exportedTypes, {repoDir: repoDirOf(file)})))
+    const paths: SbomPath[] = trees.flatMap(it => it.paths)
+    const edges: SbomEdge[] = trees.flatMap(it => it.edges)
 
-    const model = timePhaseSync('blackduck:model', () => buildModel(projectName, analysed, paths))
+    const model = timePhaseSync('blackduck:model', () => buildModel(projectName, analysed, paths, edges))
     const resultFolder = path.resolve(process.cwd(), options.results || 'results')
     for (const {file, rows} of timePhaseSync('blackduck:csv', () => writeBlackDuckExport(model, resultFolder))) {
         log.info(`${String(rows).padStart(6)} row(s) -> ${file}`)

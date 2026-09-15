@@ -1,33 +1,50 @@
-# Dxworks depinder
+# Depinder
 
-This project wa
+**Depinder** reads a project's dependencies and reports licences, newer versions and known
+vulnerabilities. It runs as `depinder` on the command line, or as a `dxw` plugin.
 
-## Installation
+| Route | Input | Produced by |
+|---|---|---|
+| **SBOM** (recommended) | CycloneDX files, `*.cdx.json` | [DepMiner](https://dxworks.org/depminer/) — Syft and Trivy, offline |
+| **Native** | Manifests and lockfiles on disk | The project itself |
 
-Use `npm` to install
+The SBOM route is where the recent work is: the dependency graph, upgrade guidance, three
+vulnerability sources, and the [Black Duck export](blackduck-export.md).
 
-```bash
-npm i -g @dxworks/depinder
-```
+## Where to go next
 
-## Usage
+<div class="grid cards" markdown>
 
-```shell
-dx-depinder
-```
+- :material-download: **[Installing](install.md)** — the CLI and the two scanners.
+- :material-rocket-launch: **[Quick Start](quickstart.md)** — SBOMs in, CSVs out.
+- :material-console: **[Commands](commands/index.md)** — every command, with its options.
+- :material-file-table: **[Black Duck Export](blackduck-export.md)** — the files and every column.
+- :material-tune: **[Configuration](configuration.md)** — tokens, cache, environment.
 
-or
+</div>
 
-```shell
-dxw depinder
-```
+## Output
 
-## Contributing
+Per ecosystem found, three CSVs named after the plugin (`npm`, `ruby`, `java`, `python`, `php`,
+`dotnet`, or `sbom-<eco>`):
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+- `<plugin>-libs.csv` — one row per (project, library, version)
+- `<plugin>-licenses.csv` — licences seen, with counts
+- `<plugin>-project-stats.csv` — per project: dependency, outdated and vulnerable counts
 
-Please make sure to update tests as appropriate.
+Plus `security.csv`, one row per (component, advisory), in Black Duck's column shape.
 
-## License
+## Ecosystems
 
-[Apache-2.0](https://choosealicense.com/licenses/apache)
+| Plugin | Aliases | Native input | SBOM plugin |
+|---|---|---|---|
+| `npm` | `js`, `javascript`, `node`, `nodejs`, `yarn` | `package-lock.json` / `yarn.lock` / `pnpm-lock.yaml` | `sbom-npm` |
+| `ruby` | `gem` | `Gemfile.lock` | `sbom-ruby` |
+| `java` | `maven`, `gradle` | `pom.xml` / `build.gradle` + `deptree.txt` | `sbom-java` |
+| `python` | `pip`, `pipenv`, `poetry` | `requirements.txt`, `Pipfile.lock`, `poetry.lock` | `sbom-python` |
+| `php` | `composer` | `composer.lock` | `sbom-php` |
+| `dotnet` | `.net`, `c#`, `csharp`, `nuget` | `*.csproj` + `packages.lock.json` | `sbom-dotnet` |
+| — | — | — | `sbom-go`, `sbom-rust` |
+
+Registry lookups are cached in `~/.dxw/depinder/cache/depinder.sqlite`, shared by every run on the
+machine. When the optional [MongoDB cache](commands/cache.md) is running, it is used instead.

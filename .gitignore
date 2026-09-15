@@ -124,7 +124,7 @@ dist
 
 # custom
 results
-cache
+# root-level runtime cache only - src/cache/ is source and must stay trackable
+/cache/
 results-*
-./cache
 /.blacklist

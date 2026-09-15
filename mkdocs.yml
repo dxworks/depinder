@@ -1,4 +1,18 @@
-site_name: DxWorks depinder
+site_name: Depinder
+site_description: >-
+  Depinder — dependency analysis for CycloneDX SBOMs and native manifests: licences, newer
+  versions, vulnerabilities, and Black Duck-shaped CSV exports.
+
+# The published location (GitHub Pages via the org's dxworks.org domain). Required for a
+# populated sitemap.xml, canonical links, and Material's navigation.instant — all of which
+# are silently skipped when it is unset.
+site_url: https://dxworks.org/depinder/
+
+repo_url: https://github.com/dxworks/depinder
+repo_name: dxworks/depinder
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; DxWorks
 
 theme:
   name: material
@@ -7,53 +21,67 @@ theme:
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
-    - navigation.expand
+    - navigation.top
     - navigation.indexes
+    - content.action.edit
+    - content.code.copy
+    - content.tabs.link
     - search.suggest
     - search.highlight
-    - toc.integrate
-
   palette:
-    # Toggle light mode
+    # Light mode
     - scheme: default
-      primary: indigo
-      accent: indigo
+      media: "(prefers-color-scheme: light)"
+      primary: teal
+      accent: teal
       toggle:
-        icon: material/weather-sunny
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      media: "(prefers-color-scheme: dark)"
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/toggle-switch
         name: Switch to light mode
 
-    # Toggle dark mode
-    - scheme: slate
-      primary: indigo
-      accent: indigo
-      toggle:
-        icon: material/weather-night
-        name: Switch to dark mode
-
 plugins:
-  - search:
-      prebuild_index: true
+  - search
 
 markdown_extensions:
   - toc:
       permalink: true
-      toc_depth: 10
+  - tables
   - attr_list
+  - md_in_html
   - admonition
   - pymdownx.details
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
 extra_css:
-  - stylesheets/styles.css
+  - stylesheets/extra.css
 
 extra:
   generator: false
 
-use_directory_urls: false
-
 nav:
-  - Home: 'index.md'
-
+  - Home: index.md
+  - Installing: install.md
+  - Quick Start: quickstart.md
+  - Commands:
+      - commands/index.md
+      - analyse: commands/analyse.md
+      - export-blackduck: commands/export-blackduck.md
+      - github-advisories: commands/github-advisories.md
+      - cache & update: commands/cache.md
+      - Black Duck report tools: commands/blackduck-reports.md
+      - Project mapping: project-mapping.md
+      - extractFrameworkVersion: commands/extract-framework-version.md
+  - Black Duck Export: blackduck-export.md
+  - Configuration: configuration.md

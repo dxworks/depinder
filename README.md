@@ -63,8 +63,9 @@ before its rate-limit window is exhausted rather than after. The cache lives in
 
 ## Black Duck-shaped exports
 
-`export-blackduck` turns a folder of CycloneDX SBOMs into the five CSVs a Black Duck project
-version exports, with Black Duck's exact column headers, so the two can be diffed side by side.
+`export-blackduck` turns a folder of CycloneDX SBOMs into the four CSVs a Black Duck project
+version exports, with Black Duck's exact column headers, so the two can be diffed side by side,
+plus one file Black Duck has no counterpart for: `_dependency_edges.csv`, the dependency graph.
 
 ```shell
 depinder export-blackduck <sbom-folder...> -r <out> \
@@ -73,16 +74,17 @@ depinder export-blackduck <sbom-folder...> -r <out> \
 
 It runs the same analysis `analyse` runs — dependency tree, registry licences and versions,
 vulnerabilities from the selected sources — and writes the normal depinder CSVs into the same
-folder, then the five Black Duck files on top. You do not name plugins: the ecosystems present in
+folder, then the Black Duck files on top. You do not name plugins: the ecosystems present in
 the SBOMs select the `sbom-*` plugins for you.
 
 | File | One row per | Notes |
 |---|---|---|
 | `_dependencies.csv` | (component, version, origin) | The first header really is `1Component name` — Black Duck's own spelling, reproduced verbatim so a diff lines up |
 | `_dependencies_sources.csv` | (component, path) | The dependency chain, walked from the SBOM's `dependsOn` edges |
+| `_dependency_edges.csv` | (parent, child) | **Not a Black Duck file.** `Path` keeps one chain per component, as Black Duck does, so a component with three parents keeps one; this is every edge, with each component's depth. Columns: `Repo, Tree, Ecosystem, Parent Origin Id, Child Origin Id, Child Depth`. A `Tree` is `<repo>/<module>/-<package manager>`; a component nothing pulls in has parent `(root)` and depth 1 |
 | `_upgrade_guidance.csv` | component with ≥ 1 finding | Short/long term recommended versions |
-| `_vulnerability_details.csv` | (component, advisory) | |
-| `security.csv` | (component, advisory) | The same rows plus Black Duck's internal ids, triage fields and CISA block, all empty for us. `analyse` writes this one file too, through the same serialiser |
+| `security.csv` | (component, advisory) | Black Duck's `security_*.csv` header byte for byte; its internal ids, triage fields and CISA block are empty for us. `analyse` writes this one file too, through the same serialiser |
+| `_vulnerability_findings.json` | component with ≥ 1 finding | **Not a Black Duck file.** The findings as the exporter saw them, fix versions per line included — what no CSV carries |
 
 ### Column mapping
 
@@ -97,10 +99,10 @@ than guessed.
 | `Origin name` | purl type | `npm`→`npmjs`, `gem`→`rubygems`, `composer`→`packagist`, `cargo`→`crates`, else the purl type; unmapped → `unknown`. Go modules go by host: `github.com/…`→`github`, `golang.org/x/…`→`long_tail`, any other host → `unknown` (Black Duck resolves those to a GitHub repo through its Knowledge Base, which an SBOM does not carry) |
 | `License names` | registrar, else the SBOM | SPDX id mapped to Black Duck's display name (`MIT` → `MIT License`); an unmapped id is written as-is so it stays visible. Black Duck collapses `MIT-0` into `MIT License`; we keep the distinct name |
 | `License families` | the same table | `PERMISSIVE` / `WEAK_RECIPROCAL` / `RECIPROCAL` / `RESTRICTED_PROPRIETARY` / `UNKNOWN` |
-| `Match type` | `requestedBy` | `Direct` / `Transitive` / `Direct,Transitive` — the rule `<plugin>-libs.csv` already uses, made three-valued |
+| `Match type` | `requestedBy` | `Direct Dependency` / `Transitive Dependency` / `Direct Dependency,Transitive Dependency` — the rule `<plugin>-libs.csv` already uses, made three-valued, in Black Duck's own wording so the column compares without a translation step |
 | `Usage` | — | Constant `DYNAMICALLY_LINKED`, which is what Black Duck writes for every row of a dependency scan |
-| `Operational Risk` | — | **empty, not derivable** — Black Duck's own risk model |
-| `License Risk` | — | **empty, not derivable** — same |
+| `Operational Risk` | `Release Date` + `Newer Versions` | `OK` / `LOW` / `MEDIUM` / `HIGH`, **approximated** — see *The two risk columns* below. Empty when either input is missing |
+| `License Risk` | `License names` | `OK` / `MEDIUM` / `HIGH` from the licence family, with `OR` read as a choice and `AND` as a conjunction — see below |
 | `Total` / `Critical and High` / `Critical` / `High` / `Medium` / `Low Vulnerability Count` | findings | Counted from the merged findings. Black Duck leaves a per-severity cell blank when it is 0; we always write the number |
 | `Release Date` | registrar | ISO `YYYY-MM-DD`. Black Duck's cell carries a leading TAB; we do not reproduce it |
 | `Newer Versions` | registrar | Registry versions ordered above the installed one, using the ecosystem's comparator. Empty when no registrar answered |
@@ -112,14 +114,18 @@ than guessed.
 | `ProjectPathExists`, `VerifiedPath` | — | **empty** — Black Duck leaves them empty too |
 | `Vulnerability id` | findings | `GHSA-… (CVE-…)` when both are known, else the single id — Black Duck's `BDSA-… (CVE-…)` shape. We have no BDSA numbers |
 | `Vulnerability source` | finding origin | `GHSA` (advisory cache), `TRIVY`, `GRYPE`. A finding two sources agree on reports the advisory database, since that is the one that names it |
-| `Description`, `Published on`, `Base score`, `URL`, `Security Risk` | findings | verbatim from the source |
-| `Updated on`, `Exploitability`, `Impact`, `Overall score` | — | **empty, not derivable** — Black Duck's own scoring breakdown |
+| `Description`, `Security Risk` | findings | verbatim from the source |
+| `Published on` | findings | Black Duck's own date shape, `7/24/26` (unpadded, two-digit year, UTC). `Release Date` in `_dependencies.csv` stays ISO because Black Duck writes ISO there |
+| `Base score` | findings | GHSA's score first — the catalogue our ids are named after, CVSS 4 nowadays — then NVD's (on grype it sits on the related CVE record, not the GHSA one), then the highest of any other source. Black Duck's column is NVD's CVSS 3.x, so the two differ wherever GHSA rescored; that is a chosen difference, not a normalisation gap |
+| `Exploitability`, `Impact` | CVSS 3.x vector | The CVSS 3.1 sub-scores (specification §7.1), rounded to one decimal as Black Duck prints them. Empty for a CVSS 4 or 2 vector, which have no such split |
+| `URL` | findings | The NVD page, `https://nvd.nist.gov/vuln/detail/<CVE>`, whenever a CVE is known — Black Duck links there whatever the catalogue. Without a CVE, the scanner's own page |
+| `Updated on`, `Overall score` | — | **empty, not derivable** — Black Duck's own scoring and re-publication dates |
 | `CWE Ids` | findings | Black Duck's list syntax, `[CWE-400, CWE-834]` |
 | `Solution available` | findings | `true` when the source named a fixed version |
 | `Workaround available` | — | **empty, not derivable** |
 | `Exploit available` | — | **empty** — CISA KEV is not wired up, so this is unknown rather than `false` |
 | `CVSS Version` | CVSS vector prefix | `CVSS 3.x` / `CVSS 4` (Black Duck's spellings) / `CVSS 2.x` for a prefix-less v2 vector |
-| `Match type` (vulnerability files) | `requestedBy` | `Direct Dependency` / `Transitive Dependency` — Black Duck's wording in these files |
+| `Match type` (vulnerability files) | `requestedBy` | `Direct Dependency` / `Transitive Dependency` — the same words, but two-valued: Black Duck's own `security_*.csv` never writes the combined value, so a component reached both ways is reported here as direct |
 | `Remediation status` | — | Constant `New`; we hold no triage state |
 | `Vulnerability tags`, `Reachable`, `Status justification`, remediation dates, all `CISA *` | — | **empty, not derivable** |
 | `Short/Long Term Recommended *` | registry versions + fixed versions | See *Upgrade guidance* below |
@@ -143,10 +149,34 @@ spelling: `-yarn`, `-npm` and `-pnpm` for the three JavaScript lockfiles, `-ruby
 basename — Trivy names its `application` node after the manifest, Syft records each component's
 `syft:location:0:path` — and falls back to the origin name when neither tool recorded one.
 
+**The two risk columns.** Neither is a port of Black Duck's model, which is not published. Both are
+rules inferred from a reference export's own 8,384 rows, and both are checked back against it.
+
+`License Risk` is a function of the licence family — `PERMISSIVE` → `OK`, `WEAK_RECIPROCAL` and
+`RESTRICTED_PROPRIETARY` → `MEDIUM`, `RECIPROCAL` and `UNKNOWN` → `HIGH`. What the families column
+cannot tell you is what to do with several of them at once, because it flattens the expression and
+drops the operator. The operator is the whole answer, and the reference export proves it: `(BSD
+2-clause "Simplified" License OR Ruby License)` is `OK` while `(BSD 2-clause "Simplified" License AND
+Ruby License)` is `MEDIUM` — the same two licences. `OR` is a choice, so the risk is the lowest
+branch; `AND` is a conjunction, so it is the highest. Measured against the reference export: **91.1 %**
+of shared rows agree, and **99.3 %** of the rows where we identified the licence at all. The gap is
+one thing only — 699 rows we report as `UNKNOWN` and Black Duck does not, which is a licence-coverage
+problem showing up in the risk column rather than a fault in the rule.
+
+`Operational Risk` is the one to read with care. Black Duck answers it from two places. When it has
+Open Hub telemetry it uses it, and can call a component `HIGH` even on the newest version — 399 of
+the 403 rows that are `HIGH` with zero newer versions carry Open Hub data, while 1,577 of the 1,586
+that are `OK` carry none. Open Hub is Black Duck's own and we have no equivalent. When it has no
+telemetry it falls back to how stale the resolved version is, and that is what we reproduce: newest
+version → `OK`, otherwise under two years → `LOW`, under four → `MEDIUM`, past that → `HIGH`. The
+result splits exactly along that line — **85.3 %** agreement on components with no Open Hub data,
+**46.3 %** on the ones that have it, **75.7 %** overall. A row that differs is a row where Black Duck
+knows something we do not, not a row to go and fix.
+
 **What is direct.** Black Duck marks a package Direct when the project's manifest declares it.
 Trivy's lockfile parsers do not carry the manifest: for yarn.lock they mark direct whatever no other
-package depends on, which on ruby-mastodon makes 25 declared packages Transitive and 18 packages of
-the `streaming` workspace Direct. Syft copies yarn berry's `0.0.0-use.local` workspace entries into
+package depends on, which on ruby-mastodon makes 25 declared packages Transitive Dependency and 18
+packages of the `streaming` workspace Direct Dependency. Syft copies yarn berry's `0.0.0-use.local` workspace entries into
 the SBOM, and a workspace's `dependsOn` edges are exactly its package.json — so when an SBOM carries
 workspace nodes, those edges define Direct and the chains start from them; otherwise the lockfile
 root's edges do, as before. For `pom.xml`, `go.mod` and `Cargo.lock`, Trivy nests the project's own
@@ -159,39 +189,21 @@ relative to a Trivy SBOM, not a modelling choice.
 
 ### Upgrade guidance
 
-Short term is the lowest registry version at or above the installed one that clears every finding;
-long term is the highest version that clears every finding. "Clears" is deliberately conservative:
-a finding is cleared only when its source **named a first patched version** and the candidate is at
-or above it. A component carrying a finding with no named fix gets an empty recommendation — which
-is what Black Duck does for the same case. No network call is made; the version list is the one the
-analysis already fetched.
+Short term is the **newest stable version on the installed line** (same major) that clears every
+fixable finding — every patch available without a breaking change; when that line has no clean
+version, the lowest clean version above the installed one. Long term is the newest stable version
+overall that clears every fixable finding. Both rules were read off a Black Duck export against our
+own registry lists (127 of 136 testable short-term cells, 148 of 153 long-term ones; the rest are
+versions published after Black Duck's Knowledge Base snapshot).
 
-### Reproducing the comparison
-
-```shell
-# (a) Download the GitHub advisories these SBOMs need (needs tokens in .github-tokens)
-depinder github-advisories download --sbom /path/to/sboms
-depinder github-advisories status
-
-# (b) Score the three vulnerability sources against each other over the reference corpus
-npx ts-node -T scripts/compare-vuln-sources.ts
-#   -> <comparison>/results/vuln-source-comparison.{md,json}
-
-# (c) Export, once per SBOM producer
-depinder export-blackduck /path/to/mastodon-trivy \
-    -r <comparison>/exports/ruby-mastodon-trivy \
-    --vuln-source trivy,grype,github --project-name ruby-mastodon
-depinder export-blackduck /path/to/mastodon-syft \
-    -r <comparison>/exports/ruby-mastodon-syft \
-    --vuln-source trivy,grype,github --project-name ruby-mastodon
-
-# (d) Diff our export against the real Black Duck one
-npx ts-node -T scripts/diff-blackduck-export.ts
-#   -> <comparison>/results/blackduck-export-diff.md
-```
-
-Both scripts default to the paths of the local comparison checkout; pass
-`<ours> <theirs> [<output>]` to point the diff elsewhere.
+A source names one fix per maintained line (Trivy: `2.15.0, 2.12.2`, newest first) and all of them
+are read: a candidate is fixed by the fix of *its* line, so `2.12.5` is clean and `2.13.0` is not.
+A finding with no named fix cannot be cleared by any version; it is left out of the choice and
+counted in the recommendation's remaining-vulnerability columns instead. A component whose findings
+are *all* unfixed gets an empty recommendation — which is what Black Duck does for the same case.
+Pre-releases are recommended only when nothing stable clears the findings. No network call is made;
+the version list is the one the analysis already fetched, so an empty list (a registry that did not
+answer) means an empty recommendation.
 
 ## Preprocess data
 If you want to run `Depinder` on a project that has not been processed by `Depminer` before, 
@@ -227,35 +239,33 @@ The following commands can be used either as standalone, or with the `dxw` prefi
 
 ### Cache command
 
-To check if the MongoDB cache is running:
+Registry answers are cached in one of two places: a **SQLite database global to the machine**,
+`~/.dxw/depinder/cache/depinder.sqlite`, through Node's own `node:sqlite` (no native addon), or
+MongoDB when its container is running.
+
 ```shell
-depinder cache
+depinder cache               # where the SQLite cache is and what it holds; is Mongo running?
+depinder cache import <dir>  # pull a libs.json / misses.json folder into it
+depinder cache init          # write the MongoDB docker-compose files to ~/.dxw/depinder/cache/
+depinder cache up            # start MongoDB (alias: start)
+depinder cache down          # stop it (alias: stop)
 ```
 
-To initalise the Redis cache:
-```shell
-depinder cache init
-```
-
-To start the MongoDB cache:
-```shell
-depinder cache start
-```
-
-To stop the MongoDB cache:
-```shell
-depinder cache stop
-```
-
-To see what is available in the cache, please visit the [Mongo Express Dashboard](http://localhost:8002/).
+To see what is in MongoDB, visit the [Mongo Express Dashboard](http://localhost:8002/).
 
 ### The library cache
 
-Without MongoDB, registry answers are kept in `cache/libs.json` under the working directory, so
-a second run over the same libraries makes no registry calls. Lookups that *failed* are kept too,
-in `cache/misses.json`, for 24 hours: a library a registry cannot find — or a registry that does
-not answer — would otherwise be asked again on every run, and a failed lookup is the slowest kind.
-`--refresh` bypasses both. A rate-limited (429) lookup is never remembered as a miss.
+Without MongoDB, registry answers are kept in the `libs` table of the SQLite database, so a second
+run over the same libraries — from any working directory — makes no registry calls. Lookups that
+*failed* are kept too, in `misses`, for 24 hours: a library a registry cannot find — or a registry
+that does not answer — would otherwise be asked again on every run, and a failed lookup is the
+slowest kind. `--refresh` bypasses both. A rate-limited (429) lookup is never remembered as a miss.
+Every row is committed as it is written, so the 60-second checkpoint costs nothing; the previous
+`cache/libs.json` (94 MB on the twelve-repository run) was serialised whole at every one.
+
+`DEPINDER_CACHE_DB=<file>` points a run at another database. The previous per-directory layout
+(`cache/libs.json`, `misses.json`) is not read by a run any more;
+`depinder cache import cache` copies it into the database, keeping rows already there.
 
 Add `--profile` to `analyse` or `export-blackduck` to get, at the end of the run, the wall-clock
 of each phase (parse, scans, registry enrichment, CSV writing), the cache hit/miss counts and the

@@ -125,6 +125,13 @@ export class PackagistRegistrar extends AbstractRegistrar {
             issuesUrl: [],
             licenses: [...new Set(Object.values(response.versions).flatMap((it: any) => it.license).filter((it: any) => it != null))],
             reposUrl: [],
+            // `Component Link`. Packagist is the one registry where Black Duck holds the source
+            // repository rather than the declared homepage: on 70 sampled components `source.url`
+            // agreed 40% of the time and composer's own `homepage` only 4%. The `.git` suffix is
+            // stripped by `canonicalProjectUrl` at export, not here.
+            homepageUrl: (Object.values(response.versions)
+                .find((it: any) => it.version === latestVersion) as any)?.source?.url
+                || (Object.values(response.versions).map((it: any) => it.source?.url).find((it: any) => it) ?? ''),
             keywords: [],
         }
     }
