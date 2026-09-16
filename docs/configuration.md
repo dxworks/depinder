@@ -64,6 +64,9 @@ still fetching, one the registry does not have, or anything at all when the serv
 falls back to the per-package registrars, so a run is never worse than one without it. `--refresh`
 still ignores the local cache, but takes its fresh facts from the resolver first.
 
+The resolver serves registry facts only. GitHub advisories are still fetched per library, on the
+same terms as without it: once per newly cached library, and only with `GH_TOKEN` set.
+
 ## Native route prep
 
 === "Maven"

@@ -5,10 +5,14 @@ import {LibraryInfo} from '../src/extension-points/registrar'
 import {Plugin} from '../src/extension-points/plugin'
 import {PackageRecord, ResolvedEntry} from '../src/resolver/client'
 import {ResolverConfig} from '../src/resolver/config'
+import {getVulnerabilitiesFromGithub} from '../src/utils/vulnerabilities'
 
 // The blacklist is read from `./.blacklist` at import time, so the only way to exercise the filter
 // is to stand in for that file.
 jest.mock('../src/utils/blacklist', () => ({blacklistedGlobs: ['@internal/*']}))
+jest.mock('../src/utils/vulnerabilities', () => ({getVulnerabilitiesFromGithub: jest.fn(async () => [])}))
+
+const advisories = getVulnerabilitiesFromGithub as jest.Mock
 
 /**
  * Phase 2 of `analyse`: one question for the whole run, and an answer that lands in the local cache
@@ -39,19 +43,22 @@ function project(name: string, deps: DepinderDependency[]): DepinderProject {
     return {name, version: '1.0.0', path: `/repo/${name}`, dependencies: Object.fromEntries(deps.map(it => [it.id, it]))}
 }
 
-function plugin(name: string, ecosystem: string, purlType: string): Plugin {
+function plugin(name: string, ecosystem: string, purlType: string, advisoryEcosystem?: string): Plugin {
     return {
         name,
         ecosystem,
         extractor: {files: [], createContexts: () => []},
         registrar: {retrieve: () => { throw new Error('the registrar must not be called in phase 2') }},
-        checker: {getPURL: (lib, ver) => `pkg:${purlType}/${lib.replace(':', '/').replace('@', '%40')}@${ver}`},
+        checker: {
+            githubSecurityAdvisoryEcosystem: advisoryEcosystem,
+            getPURL: (lib, ver) => `pkg:${purlType}/${lib.replace(':', '/').replace('@', '%40')}@${ver}`,
+        },
     }
 }
 
-const maven = plugin('java', 'java', 'maven')
-const sbomMaven = {...plugin('sbom-java', 'java', 'maven')}
-const npm = plugin('javascript', 'npm', 'npm')
+const maven = plugin('java', 'java', 'maven', 'MAVEN')
+const sbomMaven = {...plugin('sbom-java', 'java', 'maven', 'MAVEN')}
+const npm = plugin('javascript', 'npm', 'npm', 'NPM')
 
 const record = (type: string, namespace: string | null, name: string): PackageRecord => ({
     type, namespace, name,
@@ -109,6 +116,18 @@ describe('assignPurls', () => {
 })
 
 describe('the bulk resolve phase', () => {
+    const savedToken = process.env.GH_TOKEN
+
+    beforeEach(() => {
+        advisories.mockClear()
+        advisories.mockImplementation(async () => [])
+        delete process.env.GH_TOKEN
+    })
+    afterEach(() => {
+        if (savedToken === undefined) delete process.env.GH_TOKEN
+        else process.env.GH_TOKEN = savedToken
+    })
+
     it('writes what the resolver answered under the cache key phase 3 reads', async () => {
         const cache = fakeCache()
         const projects: PluginProjects[] = [{plugin: maven, projects: [project('app', [dep('com.google.guava:guava', '32.1.2-jre')])]}]
@@ -238,6 +257,98 @@ describe('the bulk resolve phase', () => {
 
         expect(server.resolve).not.toHaveBeenCalled()
         expect(outcome).toEqual({written: new Set(), requested: 0, resolved: 0})
+    })
+
+    /**
+     * A resolved package is a cache hit in phase 3, and a cache hit has never fetched advisories —
+     * so without this the bulk phase would empty the vulnerability columns for everything the
+     * resolver answered on a cold native run. Parity with the registrar path, at the same cost:
+     * one GraphQL call per cache key, which is what that cold run pays today.
+     */
+    describe('the GitHub advisory lookup', () => {
+        const twoEcosystems = (): PluginProjects[] => {
+            const projects: PluginProjects[] = [
+                {plugin: maven, projects: [project('app', [dep('com.google.guava:guava', '32.1.2-jre')])]},
+                {plugin: npm, projects: [project('web', [dep('left-pad', '1.0.0')])]},
+            ]
+            assignPurls(projects)
+            return projects
+        }
+        const server = () => answering({
+            'pkg:maven/com.google.guava/guava@32.1.2-jre': record('maven', 'com.google.guava', 'guava'),
+            'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+        })
+
+        it('runs once per cache key, with that plugin\'s ecosystem and the library name', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            advisories.mockImplementation(async (_ecosystem: string, name: string) => [
+                {severity: 'HIGH', description: `${name} is vulnerable`, permalink: 'https://example/1'},
+            ])
+            const cache = fakeCache()
+
+            await bulkResolve(config, twoEcosystems(), cache, {}, server().resolve)
+
+            expect(advisories).toHaveBeenCalledTimes(2)
+            expect(advisories.mock.calls).toEqual(expect.arrayContaining([
+                ['MAVEN', 'com.google.guava:guava'],
+                ['NPM', 'left-pad'],
+            ]))
+            expect(cache.entries.get('java:com.google.guava:guava')?.vulnerabilities)
+                .toEqual([{severity: 'HIGH', description: 'com.google.guava:guava is vulnerable', permalink: 'https://example/1'}])
+            expect(cache.entries.get('npm:left-pad')?.vulnerabilities).toHaveLength(1)
+        })
+
+        it('is not called at all without a token', async () => {
+            const cache = fakeCache()
+
+            await bulkResolve(config, twoEcosystems(), cache, {}, server().resolve)
+
+            expect(advisories).not.toHaveBeenCalled()
+            expect(cache.entries.get('java:com.google.guava:guava')?.vulnerabilities).toBeUndefined()
+            expect(cache.entries.size).toBe(2)
+        })
+
+        it('is not called for a plugin with no advisory ecosystem', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            const rust = plugin('rust', 'rust', 'cargo')
+            const projects: PluginProjects[] = [{plugin: rust, projects: [project('app', [dep('serde', '1.0.0')])]}]
+            assignPurls(projects)
+            const cache = fakeCache()
+
+            await bulkResolve(config, projects, cache, {}, answering({'pkg:cargo/serde@1.0.0': record('cargo', null, 'serde')}).resolve)
+
+            expect(advisories).not.toHaveBeenCalled()
+            expect(cache.entries.has('rust:serde')).toBe(true)
+        })
+
+        it('runs once for a purl two plugins share, because they share the cache key', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            const guava = 'com.google.guava:guava'
+            const projects: PluginProjects[] = [
+                {plugin: maven, projects: [project('app', [dep(guava, '32.1.2-jre')])]},
+                {plugin: sbomMaven, projects: [project('sbom', [dep(guava, '32.1.2-jre')])]},
+            ]
+            assignPurls(projects)
+            const cache = fakeCache()
+
+            await bulkResolve(config, projects, cache, {}, answering({
+                'pkg:maven/com.google.guava/guava@32.1.2-jre': record('maven', 'com.google.guava', 'guava'),
+            }).resolve)
+
+            expect(advisories).toHaveBeenCalledTimes(1)
+        })
+
+        it('keeps the registry data when the lookup fails', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            advisories.mockImplementation(async () => { throw new Error('401 Bad credentials') })
+            const cache = fakeCache()
+
+            const outcome = await bulkResolve(config, twoEcosystems(), cache, {}, server().resolve)
+
+            expect(outcome.written.size).toBe(2)
+            expect(cache.entries.get('npm:left-pad')?.versions).toHaveLength(2)
+            expect(cache.entries.get('npm:left-pad')?.vulnerabilities).toBeUndefined()
+        })
     })
 
     it('survives a resolver that answered nothing, leaving the cache untouched', async () => {

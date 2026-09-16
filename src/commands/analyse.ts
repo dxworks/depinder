@@ -44,7 +44,7 @@ import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
 import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/profile'
 import {ResolverConfig, ResolverOptions, resolverConfig} from '../resolver/config'
-import {resetResolverClient, resolvePurls} from '../resolver/client'
+import {PackageRecord, resetResolverClient, resolvePurls} from '../resolver/client'
 import {toLibraryInfo} from '../resolver/adapter'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
@@ -336,17 +336,47 @@ export async function bulkResolve(
 
     const answers = await resolve(config, wanted, log)
     let resolved = 0
+    const writes: {cacheKey: string, plugin: Plugin, pkg: PackageRecord}[] = []
     for (const [purl, answer] of answers) {
         if (answer.status !== 'resolved' || !answer.package) continue
         resolved++
-        const lib = toLibraryInfo(answer.package)
         for (const {plugin, dep} of byPurl.get(purl) ?? []) {
             const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
             if (written.has(cacheKey)) continue
             written.add(cacheKey)
-            await cache.set(cacheKey, lib)
+            writes.push({cacheKey, plugin, pkg: answer.package})
         }
     }
+
+    // The advisory lookup the registrar path does, on the same terms, because a resolved package
+    // is a cache hit in phase 3 and a cache hit has never fetched advisories. Without it a cold
+    // native run with GH_TOKEN would write entries with no vulnerabilities and empty the
+    // vulnerability columns for everything the resolver answered. It is one GraphQL call per cache
+    // key — exactly what the same cold run costs today — eight at a time, and a failure keeps the
+    // registry data rather than discarding it. The resolver serves registry facts only; GHSA is
+    // still depinder's to ask for.
+    //
+    // Each key gets its own LibraryInfo: two plugins can share a purl and not an advisory
+    // ecosystem, so they must not share one object to write vulnerabilities into.
+    let nextWrite = 0
+    await Promise.all(Array.from(
+        {length: Math.min(REGISTRY_CONCURRENCY, writes.length)},
+        async () => {
+            while (nextWrite < writes.length) {
+                const {cacheKey, plugin, pkg} = writes[nextWrite++]
+                const lib = toLibraryInfo(pkg)
+                const advisoryEcosystem = plugin.checker?.githubSecurityAdvisoryEcosystem
+                if (advisoryEcosystem && process.env.GH_TOKEN) {
+                    try {
+                        lib.vulnerabilities = await getVulnerabilitiesFromGithub(advisoryEcosystem, lib.name)
+                    } catch (e: any) {
+                        log.warn(`Vulnerability lookup failed for ${lib.name}: ${e.message ?? e}`)
+                    }
+                }
+                await cache.set(cacheKey, lib)
+            }
+        }
+    ))
     count('resolver:cache-write', written.size)
     log.info(`Resolver filled ${written.size} cache entries from ${resolved} of ${wanted.length} requested package(s)`)
     return {written, requested: wanted.length, resolved}
