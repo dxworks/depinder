@@ -13,7 +13,12 @@ import {ResolverConfig} from './config'
  * down, unauthorised or slow degrades the run to exactly today's behaviour.
  */
 
-export type ResolveStatus = 'resolved' | 'not_found' | 'pending' | 'invalid'
+/**
+ * `error` is the server's fifth status: it could not read the registry after three tries. Like
+ * `not_found` and `invalid` it carries no package, so it falls through to the registrar chain —
+ * but it has to be counted, or the summary line silently loses purls.
+ */
+export type ResolveStatus = 'resolved' | 'not_found' | 'pending' | 'invalid' | 'error'
 
 export interface ResolvedVersionRecord {
     version: string
@@ -249,11 +254,14 @@ export async function resolvePurls(
     const stillPending = tally(entries, 'pending')
     const notFound = tally(entries, 'not_found')
     const invalid = tally(entries, 'invalid')
+    const errored = tally(entries, 'error')
     count('resolver:resolved', resolved)
     count('resolver:pending', stillPending)
     count('resolver:not-found', notFound)
+    count('resolver:error', errored)
     log.info(`Resolver answered for ${purls.length} purl(s): ${resolved} resolved, ${stillPending} pending, `
         + `${notFound} not found${invalid ? `, ${invalid} invalid` : ''}`
+        + `${errored ? `, ${errored} error` : ''}`
         + `${entries.size < purls.length ? `, ${purls.length - entries.size} unanswered` : ''}`)
     return entries
 }
