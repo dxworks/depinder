@@ -57,6 +57,12 @@ export function createExportBlackduckCommand(): Command {
         .option('--github-max-age <hours>',
             'Re-download a cached ecosystem\'s GitHub advisories when they are older than this',
             String(DEFAULT_MAX_AGE_HOURS))
+        // Re-declared rather than inherited: this command owns its option list, and `runAnalysis`
+        // reads the resolver settings off the options object it is handed.
+        .option('--resolver-url <url>',
+            'Base URL of a depinder resolver service that answers purls in bulk; '
+            + 'DEPINDER_RESOLVER_URL when unset, and DEPINDER_RESOLVER_TOKEN must be set with it')
+        .option('--no-resolver', 'Do not call the bulk resolver even when one is configured')
         .option('--profile', 'Print a phase timing and request count summary at the end', false)
         .action(exportBlackduck)
 }

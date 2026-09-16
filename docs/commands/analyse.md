@@ -13,6 +13,8 @@ depinder analyse [folders...] [options]
 | `--vuln-source <sources>` | `trivy`, `grype`, `github`, `all`, comma-separated. SBOM route only | `trivy,grype` |
 | `--github-token-file <file>` | Tokens for `github`, relative to the working directory; `GH_TOKEN` from the environment when absent | `.github-tokens` |
 | `--github-max-age <hours>` | Re-download advisories older than this | `24` |
+| `--resolver-url <url>` | A [bulk purl resolver](../configuration.md#bulk-resolver) to ask before the registries; needs `DEPINDER_RESOLVER_TOKEN` | `DEPINDER_RESOLVER_URL` |
+| `--no-resolver` | Skip the bulk resolver even when one is configured | off |
 | `--profile` | Phase timings, cache hits, requests per host | off |
 
 ## Output
@@ -51,3 +53,7 @@ depinder analyse [folders...] [options]
 
 Registry answers go to `~/.dxw/depinder/cache/depinder.sqlite`; failed lookups too, for 24 hours.
 `--refresh` bypasses both. See [cache](cache.md).
+
+With a [bulk resolver](../configuration.md#bulk-resolver) configured, every purl this run needs is
+asked for in one call after parsing and before enrichment, and what comes back fills that same
+cache. Anything it cannot answer goes to the registries as usual.

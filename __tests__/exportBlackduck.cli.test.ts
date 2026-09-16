@@ -49,6 +49,15 @@ describe('the export-blackduck command line', () => {
         expect(options.projectName).toBe('mastodon')
         expect(options.githubTokenFile).toBe('f')
     })
+
+    // The options are handed straight to `runAnalysis`, so the resolver flags have to be declared
+    // here too or this command could never use a resolver a plain `analyse` run would.
+    it('carries the bulk resolver flags that runAnalysis reads', async () => {
+        const {options} = await parseArgs('/sboms', '--resolver-url', 'https://resolver.example')
+        expect(options.resolverUrl).toBe('https://resolver.example')
+        expect(options.resolver).toBe(true)
+        expect((await parseArgs('/sboms', '--no-resolver')).options.resolver).toBe(false)
+    })
 })
 
 describe('choosing plugins from the SBOMs themselves', () => {

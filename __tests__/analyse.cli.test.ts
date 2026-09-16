@@ -64,4 +64,29 @@ describe('the analyse command line', () => {
         expect(options.results).toBe('out')
         expect(options.plugins).toEqual(['java'])
     })
+
+    describe('the bulk resolver flags', () => {
+        it('takes a resolver url, and leaves it out of the folders', async () => {
+            const {folders, options} = await parseArgs('/repo', '--resolver-url', 'https://resolver.example')
+            expect(options.resolverUrl).toBe('https://resolver.example')
+            expect(folders).toEqual(['/repo'])
+        })
+
+        // No default: an unset flag must fall through to DEPINDER_RESOLVER_URL, and a default here
+        // would shadow it.
+        it('leaves the url undefined when not given', async () => {
+            expect((await parseArgs('/repo')).options.resolverUrl).toBeUndefined()
+        })
+
+        it('reads --no-resolver as resolver: false, and defaults it to true', async () => {
+            expect((await parseArgs('/repo', '--no-resolver')).options.resolver).toBe(false)
+            expect((await parseArgs('/repo')).options.resolver).toBe(true)
+        })
+
+        it('accepts --no-resolver together with a url, so a configured run can opt out once', async () => {
+            const {options} = await parseArgs('/repo', '--resolver-url', 'https://resolver.example', '--no-resolver')
+            expect(options.resolverUrl).toBe('https://resolver.example')
+            expect(options.resolver).toBe(false)
+        })
+    })
 })
