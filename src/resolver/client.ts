@@ -27,13 +27,24 @@ export interface ResolvedVersionRecord {
     found: boolean
 }
 
-export interface PackageVersionRecord {
-    version: string
-    released_at: string | null
-    licenses: string[]
-    prerelease: boolean
-    yanked: boolean
-}
+/** `flags` bit 0: the version is a prerelease. Nothing downstream reads it yet. */
+export const VERSION_FLAG_PRERELEASE = 1
+/** `flags` bit 1: the registry withdrew the version. `toLibraryInfo` drops those. */
+export const VERSION_FLAG_YANKED = 2
+
+/**
+ * One version, as the wire carries it: a tuple rather than an object, because a package ships
+ * every version it ever had (~137 on average) and the field names were most of the bytes.
+ *
+ * `released_at` is Unix epoch SECONDS, or `null` when the registry has no date. `flags` is a bit
+ * set (see the constants above). The optional fourth element is this version's own license list,
+ * present ONLY when it differs from the package-level `licenses` — a three-element tuple means
+ * "same as the package", and an explicit `[]` means "this version has none although the package
+ * does". `toLibraryInfo` expands both back into the `LibraryInfo` shape downstream already reads.
+ */
+export type CompactVersion =
+    | [version: string, releasedAt: number | null, flags: number]
+    | [version: string, releasedAt: number | null, flags: number, licenses: string[]]
 
 export interface PackageRecord {
     type: string
@@ -45,7 +56,8 @@ export interface PackageRecord {
     licenses: string[]
     latest: {version: string, released_at: string | null} | null
     latest_prerelease: {version: string, released_at: string | null} | null
-    versions: PackageVersionRecord[]
+    /** Every version the registry has, never a subset, ordered released_at asc (nulls first). */
+    versions: CompactVersion[]
     /** Freshness: the feed cursor time (feed mode) or the last successful poll (poll mode). */
     as_of: string | null
     source: string

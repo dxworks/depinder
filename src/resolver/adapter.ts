@@ -1,5 +1,5 @@
 import {LibraryInfo} from '../extension-points/registrar'
-import {PackageRecord} from './client'
+import {PackageRecord, VERSION_FLAG_YANKED} from './client'
 
 /**
  * A resolver `PackageRecord` in the shape the rest of depinder already speaks, `LibraryInfo`.
@@ -27,25 +27,33 @@ export function registryNameOf(pkg: PackageRecord): string {
 /**
  * Epoch milliseconds, `NaN` when the registry has no date for a version — the same thing the Go
  * and Rust registrars produce (`Date.parse(...Time ?? '')`), so the CSV columns treat a dateless
- * version identically whichever source filled it.
+ * version identically whichever source filled it. The wire carries epoch seconds, so the only
+ * difference from the old ISO-string shape is that a timestamp is now second-precise.
  */
-function timestampOf(releasedAt: string | null | undefined): number {
-    return Date.parse(releasedAt ?? '')
+function timestampOf(releasedAt: number | null): number {
+    return releasedAt === null ? NaN : releasedAt * 1000
 }
 
 export function toLibraryInfo(pkg: PackageRecord): LibraryInfo {
+    // A three-element tuple means "this version's licenses are the package's licenses"; the
+    // server only spends the bytes on a fourth element when the two differ, an explicit `[]`
+    // included. Expanding here is what keeps `licenseOf` and `toComponent` seeing what they saw
+    // when every version carried its own copy.
+    const packageLicenses = pkg.licenses ?? []
     return {
         name: registryNameOf(pkg),
         description: pkg.description ?? '',
         // A yanked version is one the registry itself says not to use, so it is not a version
         // anyone could upgrade to. Same exclusion the crates.io registrar already makes.
-        versions: (pkg.versions ?? []).filter(it => !it.yanked).map(it => ({
-            version: it.version,
-            timestamp: timestampOf(it.released_at),
-            latest: !!pkg.latest && it.version === pkg.latest.version,
-            licenses: it.licenses ?? [],
-        })),
-        licenses: pkg.licenses ?? [],
+        versions: (pkg.versions ?? [])
+            .filter(([, , flags]) => (flags & VERSION_FLAG_YANKED) === 0)
+            .map(([version, releasedAt, , licenses]) => ({
+                version,
+                timestamp: timestampOf(releasedAt),
+                latest: !!pkg.latest && version === pkg.latest.version,
+                licenses: licenses ?? packageLicenses,
+            })),
+        licenses: packageLicenses,
         homepageUrl: pkg.homepage_url ?? '',
         reposUrl: pkg.repo_url ? [pkg.repo_url] : [],
         // The resolver serves registry facts only; advisories stay with the GitHub lookup in

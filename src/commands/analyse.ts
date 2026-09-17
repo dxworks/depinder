@@ -122,6 +122,7 @@ export function convertDepToRow(proj: DepinderProject, dep: DepinderDependency):
     ])
 }
 
+// FLOW 1b — one plugin's parse: the extractor groups the files it claims, the parser turns each group into a DepinderProject.
 async function extractProjects(plugin: Plugin, files: string[]) {
     const projects = [] as DepinderProject[]
 
@@ -173,7 +174,7 @@ export function resolveVulnerabilities(project: DepinderProject, dep: DepinderDe
  * the maven registrar sets `licenses: []` on every version — so grouping on it alone reported
  * everything as unknown. Fall back to the per-version list for registrars that only fill that.
  */
-function licenseOf(lib: LibraryInfo): string {
+export function licenseOf(lib: LibraryInfo): string {
     const license = lib.licenses?.find(it => typeof it === 'string' && it)
         ?? lib.versions.flatMap(it => it.licenses).find(it => typeof it === 'string' && it)
     if (!license || typeof license !== 'string')
@@ -300,6 +301,7 @@ export async function bulkResolve(
     options: {refresh?: boolean} = {},
     resolve: typeof resolvePurls = resolvePurls
 ): Promise<BulkResolveOutcome> {
+    // FLOW 2a — every purl in the run, deduped, with the (plugin, dep) pairs that own it.
     const byPurl = new Map<string, {plugin: Plugin, dep: DepinderDependency}[]>()
     for (const {plugin, projects} of pluginProjects) {
         for (const project of projects) {
@@ -315,6 +317,7 @@ export async function bulkResolve(
         }
     }
 
+    // FLOW 2b — drop the purls the local cache already covers; what is left is the ask list.
     const written = new Set<string>()
     const wanted: string[] = []
     for (const [purl, entries] of byPurl) {
@@ -334,7 +337,9 @@ export async function bulkResolve(
         return {written, requested: 0, resolved: 0}
     }
 
+    // FLOW 2c — THE SERVER CALL: resolver/client.ts POSTs these purls to <resolver-url>/resolve, in chunks.
     const answers = await resolve(config, wanted, log)
+    // FLOW 2d — each resolved answer → one cache write per (ecosystem, library) key it belongs to.
     let resolved = 0
     const writes: {cacheKey: string, plugin: Plugin, pkg: PackageRecord}[] = []
     for (const [purl, answer] of answers) {
@@ -358,6 +363,7 @@ export async function bulkResolve(
     //
     // Each key gets its own LibraryInfo: two plugins can share a purl and not an advisory
     // ecosystem, so they must not share one object to write vulnerabilities into.
+    // FLOW 2e — GHSA advisories per key, then cache.set: the server returns registry facts only.
     let nextWrite = 0
     await Promise.all(Array.from(
         {length: Math.min(REGISTRY_CONCURRENCY, writes.length)},
@@ -405,6 +411,8 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         fs.mkdirSync(path.resolve(process.cwd(), resultFolder), {recursive: true})
         log.info('Creating results dir')
     }
+    // ══ READ FROM HERE: this function is the whole run, phase 1 → 3, in order ══
+    // FLOW 1a — input: every file under the folders given on the command line, then the plugins that claim them.
     const allFiles = folders.flatMap(it => walkDir(it))
 
     const selectedPlugins = getPluginsFromNames(options.plugins)
@@ -480,6 +488,7 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
     }
     const progress = new MultiBar({}, Presets.shades_grey)
 
+    // FLOW 1 — parse (see extractProjects above): files → DepinderProject[] per plugin. Nothing leaves the machine yet.
     // Phase 1 — parse. Still one pass per plugin, side by side as before; what changed is that
     // every plugin finishes parsing before any enrichment starts, because a bulk question is only
     // worth asking once it can cover the whole run.
@@ -497,9 +506,11 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
             return {plugin, projects}
         }))
 
+    // FLOW 1b — assignPurls (see above): name every dep the way the server expects. Still no network.
     // Phase 1b — the purl for every dependency, from the checker that already knew how to spell it.
     const named = assignPurls(pluginProjects)
 
+    // FLOW 2 — bulkResolve (see above): ONE server call for the whole run; it only fills the cache.
     // Phase 2 — the bulk resolver, when one is configured. It fills the local cache; it never
     // touches the dependencies, so nothing below can tell where an entry came from.
     const bulkWritten = resolver
@@ -510,6 +521,7 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         : new Set<string>()
     if (bulkWritten.size > 0) await checkpointIfDue()
 
+    // FLOW 3 — enrich: per dep, cache → miss cache → registrar. Whatever phase 2 wrote is a plain cache hit here.
     // Phase 3 — enrichment, unchanged. The plugins run side by side. Each talks to its own
     // registry, so six at once put no more than REGISTRY_CONCURRENCY requests on any one of them,
     // and a registry that stalls — Maven Central's search API, for one — no longer holds the
@@ -612,6 +624,7 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         enrich.end()
         projectsBar.stop()
 
+        // ══ STOP HERE: everything below is CSV/report writing, untouched by this PR ══
         const csv = startPhase(`csv:${plugin.name}`)
 
         const allLibsInfo = projects.flatMap(proj => Object.values(proj.dependencies).map(dep => dep.libraryInfo))

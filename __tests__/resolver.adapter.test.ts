@@ -1,11 +1,23 @@
-import {PackageRecord} from '../src/resolver/client'
+import {CompactVersion, PackageRecord} from '../src/resolver/client'
 import {registryNameOf, toLibraryInfo} from '../src/resolver/adapter'
+import {LibraryInfo} from '../src/extension-points/registrar'
+import {newerVersionCounts} from '../src/blackduck/versions'
+import {comparatorForPurlType} from '../src/blackduck/model'
+import {licenseOf} from '../src/commands/analyse'
 
 /**
  * The resolver speaks purls and Postgres rows; everything downstream of `analyse` — the cache, the
  * CSV writers, `update` — speaks `LibraryInfo`. This is the one place that translates, so a field
  * dropped here is a column silently emptied in every report.
+ *
+ * Since the compact wire shape (`[version, released_at, flags]`, with an optional fourth element
+ * for licenses that differ from the package's) the translation also has to *expand*: a package
+ * ships every version it ever had, and the field names were most of the bytes. The expansion is
+ * only allowed to be a transport detail — see the parity tests at the bottom.
  */
+
+/** The wire carries epoch seconds, not ISO strings. */
+const at = (iso: string): number => Math.floor(Date.parse(iso) / 1000)
 
 const record = (overrides: Partial<PackageRecord>): PackageRecord => ({
     type: 'npm',
@@ -18,8 +30,8 @@ const record = (overrides: Partial<PackageRecord>): PackageRecord => ({
     latest: {version: '1.3.0', released_at: '2018-01-01T00:00:00Z'},
     latest_prerelease: null,
     versions: [
-        {version: '1.2.0', released_at: '2017-01-01T00:00:00Z', licenses: ['MIT'], prerelease: false, yanked: false},
-        {version: '1.3.0', released_at: '2018-01-01T00:00:00Z', licenses: ['MIT'], prerelease: false, yanked: false},
+        ['1.2.0', at('2017-01-01T00:00:00Z'), 0],
+        ['1.3.0', at('2018-01-01T00:00:00Z'), 0],
     ],
     as_of: '2026-09-16T10:00:00Z',
     source: 'npm',
@@ -59,20 +71,77 @@ describe('the resolver package record adapter', () => {
     it('leaves yanked versions out, as the crates.io registrar already does', () => {
         const info = toLibraryInfo(record({
             versions: [
-                {version: '1.2.0', released_at: '2017-01-01T00:00:00Z', licenses: [], prerelease: false, yanked: false},
-                {version: '1.2.1', released_at: '2017-02-01T00:00:00Z', licenses: [], prerelease: false, yanked: true},
+                ['1.2.0', at('2017-01-01T00:00:00Z'), 0],
+                ['1.2.1', at('2017-02-01T00:00:00Z'), 2],
             ],
         }))
         expect(info.versions.map(it => it.version)).toEqual(['1.2.0'])
     })
 
+    it('reads the flag bits one at a time: prerelease kept, yanked dropped, both dropped', () => {
+        // Bit 0 is prerelease and bit 1 is yanked, so 3 is both. `LibraryInfo` has nowhere to put
+        // "prerelease", and the registrars that produce it do not mark one either, so a
+        // prerelease is carried like any other version — but a withdrawn one is not a version
+        // anybody could upgrade to, whether or not it is also a prerelease.
+        const info = toLibraryInfo(record({
+            versions: [
+                ['1.0.0', at('2020-01-01T00:00:00Z'), 0],
+                ['2.0.0-rc.1', at('2021-01-01T00:00:00Z'), 1],
+                ['1.0.1', at('2021-02-01T00:00:00Z'), 2],
+                ['2.0.0-rc.2', at('2021-03-01T00:00:00Z'), 3],
+            ],
+        }))
+        expect(info.versions.map(it => it.version)).toEqual(['1.0.0', '2.0.0-rc.1'])
+    })
+
+    it('expands a three-element tuple to the package-level licenses', () => {
+        // The server ships a fourth element only when a version differs from its package, so the
+        // common case — every version under one license — arrives with no license data at all.
+        const info = toLibraryInfo(record({
+            licenses: ['MIT'],
+            versions: [['1.2.0', at('2017-01-01T00:00:00Z'), 0]],
+        }))
+        expect(info.versions[0].licenses).toEqual(['MIT'])
+        expect(info.licenses).toEqual(['MIT'])
+    })
+
+    it('takes a four-element tuple verbatim, including an explicit empty list', () => {
+        // `[]` on a version whose package has a license is a fact, not an absence: the version
+        // genuinely declares none. It must not be read as "same as the package".
+        const info = toLibraryInfo(record({
+            licenses: ['MIT'],
+            versions: [
+                ['1.2.0', at('2017-01-01T00:00:00Z'), 0, []],
+                ['1.3.0', at('2018-01-01T00:00:00Z'), 0, ['Apache-2.0']],
+            ],
+        }))
+        expect(info.versions.map(it => it.licenses)).toEqual([[], ['Apache-2.0']])
+    })
+
+    it('expands to the package list even when the package has none', () => {
+        const info = toLibraryInfo(record({
+            licenses: [],
+            versions: [['1.2.0', at('2017-01-01T00:00:00Z'), 0]],
+        }))
+        expect(info.versions[0].licenses).toEqual([])
+    })
+
     it('carries a version with no release date as an unparseable timestamp, not as epoch zero', () => {
         // `Date.parse('')` is what the Go registrar produces for a version the proxy has no time
-        // for, and `moment(NaN)` formats as "Invalid date" — a blank cell, not January 1970.
+        // for, and `moment(NaN)` formats as "Invalid date" — a blank cell, not January 1970. A
+        // `null` on the wire has to land in the same place, and emphatically not on 1970-01-01.
         const info = toLibraryInfo(record({
-            versions: [{version: '1.2.0', released_at: null, licenses: [], prerelease: false, yanked: false}],
+            versions: [['1.2.0', null, 0]],
         }))
         expect(Number.isNaN(info.versions[0].timestamp)).toBe(true)
+    })
+
+    it('turns epoch seconds into the epoch milliseconds LibraryInfo has always held', () => {
+        const info = toLibraryInfo(record({
+            versions: [['1.2.0', 1523478433, 0]],
+        }))
+        expect(info.versions[0].timestamp).toBe(1523478433_000)
+        expect(new Date(info.versions[0].timestamp).toISOString()).toBe('2018-04-11T20:27:13.000Z')
     })
 
     it('names a maven package group:artifact, the way the java parser does', () => {
@@ -105,5 +174,92 @@ describe('the resolver package record adapter', () => {
         expect(info.licenses).toEqual([])
         expect(info.reposUrl).toEqual([])
         expect(info.homepageUrl).toBe('')
+    })
+})
+
+/**
+ * The two readers that actually look at `versions` downstream, against the same package in both
+ * shapes. The old-shape `LibraryInfo` below is written out by hand — it is what the adapter
+ * produced when every version arrived as `{version, released_at, licenses, prerelease, yanked}` —
+ * so this fails if the expansion loses a date, a license, a version, or the millisecond scale.
+ */
+describe('the readers of an expanded record, against the shape they used to get', () => {
+    const compare = comparatorForPurlType('npm')
+
+    const versions: CompactVersion[] = [
+        ['0.9.9', at('2019-06-01T00:00:00Z'), 2],                  // yanked: never a version to be behind
+        ['1.0.0', at('2020-01-01T00:00:00Z'), 0],                  // package license
+        ['1.1.0', at('2021-01-01T00:00:00Z'), 0, ['Apache-2.0']],  // relicensed mid-life
+        ['2.0.0-rc.1', at('2021-06-01T00:00:00Z'), 1],             // prerelease, still counted
+        ['2.0.0', at('2022-01-01T00:00:00Z'), 0],
+    ]
+
+    const compact = record({
+        licenses: ['MIT'],
+        latest: {version: '2.0.0', released_at: '2022-01-01T00:00:00Z'},
+        versions,
+    })
+
+    /** What `toLibraryInfo` returned before the wire shape changed, spelled out. */
+    const oldShape: LibraryInfo = {
+        name: 'left-pad',
+        description: 'pads on the left',
+        versions: [
+            {version: '1.0.0', timestamp: Date.parse('2020-01-01T00:00:00Z'), latest: false, licenses: ['MIT']},
+            {version: '1.1.0', timestamp: Date.parse('2021-01-01T00:00:00Z'), latest: false, licenses: ['Apache-2.0']},
+            {version: '2.0.0-rc.1', timestamp: Date.parse('2021-06-01T00:00:00Z'), latest: false, licenses: ['MIT']},
+            {version: '2.0.0', timestamp: Date.parse('2022-01-01T00:00:00Z'), latest: true, licenses: ['MIT']},
+        ],
+        licenses: ['MIT'],
+        homepageUrl: 'https://example.com',
+        reposUrl: ['https://github.com/example/left-pad'],
+        issuesUrl: [],
+        keywords: [],
+    }
+
+    it('expands to exactly the old LibraryInfo', () => {
+        expect(toLibraryInfo(compact)).toEqual(oldShape)
+    })
+
+    it('counts newer versions the same way, by date and by semver', () => {
+        const expanded = newerVersionCounts(toLibraryInfo(compact).versions, '1.0.0', compare)
+
+        // Three versions were released after 1.0.0 and three are numbered above it; the yanked
+        // 0.9.9 is in neither count because it is not in the list at all.
+        expect(expanded).toEqual({byDate: '3', bySemver: '3'})
+        expect(expanded).toEqual(newerVersionCounts(oldShape.versions, '1.0.0', compare))
+    })
+
+    it('leaves the counts empty for a version with no date, as it always did', () => {
+        const dateless = toLibraryInfo(record({
+            licenses: ['MIT'],
+            versions: [['1.0.0', null, 0], ['1.1.0', at('2021-01-01T00:00:00Z'), 0]],
+        }))
+        expect(newerVersionCounts(dateless.versions, '1.0.0', compare).byDate).toBe('')
+        expect(newerVersionCounts(dateless.versions, '1.0.0', compare).bySemver).toBe('1')
+    })
+
+    it('reports the same license', () => {
+        expect(licenseOf(toLibraryInfo(compact))).toBe('MIT')
+        expect(licenseOf(toLibraryInfo(compact))).toBe(licenseOf(oldShape))
+    })
+
+    it('still falls back to a per-version license when the package has none', () => {
+        // The maven registrar fills only the per-version lists, and `licenseOf` has always fallen
+        // back to them. A package-level `[]` expands into every three-element tuple, so the
+        // fallback has to find the version that shipped a fourth element.
+        const perVersionOnly = toLibraryInfo(record({
+            licenses: [],
+            versions: [['1.0.0', at('2020-01-01T00:00:00Z'), 0], ['1.1.0', at('2021-01-01T00:00:00Z'), 0, ['Apache-2.0']]],
+        }))
+        expect(licenseOf(perVersionOnly)).toBe('Apache-2.0')
+        expect(licenseOf(perVersionOnly)).toBe(licenseOf({
+            name: 'left-pad',
+            licenses: [],
+            versions: [
+                {version: '1.0.0', timestamp: Date.parse('2020-01-01T00:00:00Z'), latest: false, licenses: []},
+                {version: '1.1.0', timestamp: Date.parse('2021-01-01T00:00:00Z'), latest: false, licenses: ['Apache-2.0']},
+            ],
+        }))
     })
 })

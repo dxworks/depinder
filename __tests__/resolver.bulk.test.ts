@@ -67,8 +67,8 @@ const record = (type: string, namespace: string | null, name: string): PackageRe
     latest: {version: '2.0.0', released_at: '2024-01-01T00:00:00Z'},
     latest_prerelease: null,
     versions: [
-        {version: '1.0.0', released_at: '2023-01-01T00:00:00Z', licenses: ['Apache-2.0'], prerelease: false, yanked: false},
-        {version: '2.0.0', released_at: '2024-01-01T00:00:00Z', licenses: ['Apache-2.0'], prerelease: false, yanked: false},
+        ['1.0.0', Math.floor(Date.parse('2023-01-01T00:00:00Z') / 1000), 0],
+        ['2.0.0', Math.floor(Date.parse('2024-01-01T00:00:00Z') / 1000), 0],
     ],
     as_of: null, source: 'test', fetched_at: '2026-09-16T10:00:00Z',
 })

@@ -20,7 +20,7 @@ const pkg = (name: string): PackageRecord => ({
     licenses: ['MIT'],
     latest: {version: '1.0.0', released_at: '2020-01-01T00:00:00Z'},
     latest_prerelease: null,
-    versions: [{version: '1.0.0', released_at: '2020-01-01T00:00:00Z', licenses: ['MIT'], prerelease: false, yanked: false}],
+    versions: [['1.0.0', Math.floor(Date.parse('2020-01-01T00:00:00Z') / 1000), 0]],
     as_of: '2026-09-16T10:00:00Z', source: 'npm', fetched_at: '2026-09-16T10:00:00Z',
 })
 
