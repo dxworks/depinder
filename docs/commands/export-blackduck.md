@@ -17,6 +17,8 @@ output, in the same folder.
 | `--vuln-source <sources>` | `trivy`, `grype`, `github`, `all` | `trivy,grype` |
 | `--github-token-file <file>` | Tokens for `github`, relative to the working directory; `GH_TOKEN` from the environment when absent | `.github-tokens` |
 | `--github-max-age <hours>` | Advisory cache freshness | `24` |
+| `--resolver-url <url>` | A [bulk purl resolver](../configuration.md#bulk-resolver) to ask before the registries; needs `DEPINDER_RESOLVER_TOKEN` | `DEPINDER_RESOLVER_URL` |
+| `--no-resolver` | Skip the bulk resolver even when one is configured | off |
 | `--profile` | Timings and request counts | off |
 
 ## Output

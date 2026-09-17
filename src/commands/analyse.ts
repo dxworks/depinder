@@ -43,13 +43,16 @@ import {writeSecurityCsv} from '../blackduck/export'
 import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
 import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/profile'
+import {ResolverConfig, ResolverOptions, resolverConfig} from '../resolver/config'
+import {PackageRecord, resetResolverClient, resolvePurls} from '../resolver/client'
+import {toLibraryInfo} from '../resolver/adapter'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 require('events').EventEmitter.prototype._maxListeners = 100
 
-export interface AnalyseOptions {
+export interface AnalyseOptions extends ResolverOptions {
     plugins?: string[]
     results: string
     refresh: boolean
@@ -83,6 +86,10 @@ export function createAnalyseCommand(): Command {
         .option('--github-max-age <hours>',
             'Re-download a cached ecosystem\'s GitHub advisories when they are older than this',
             String(DEFAULT_MAX_AGE_HOURS))
+        .option('--resolver-url <url>',
+            'Base URL of a depinder resolver service that answers purls in bulk; '
+            + 'DEPINDER_RESOLVER_URL when unset, and DEPINDER_RESOLVER_TOKEN must be set with it')
+        .option('--no-resolver', 'Do not call the bulk resolver even when one is configured')
         .option('--profile', 'Print a phase timing and request count summary at the end', false)
         .action(analyseFiles)
 }
@@ -226,6 +233,155 @@ async function retrieveWithRetry(plugin: Plugin, name: string): Promise<LibraryI
  */
 export type AnalysisResult = AnalysedEcosystem
 
+/** A plugin and the projects its parser produced: what phase 1 hands to phases 2 and 3. */
+export interface PluginProjects {
+    plugin: Plugin
+    projects: DepinderProject[]
+}
+
+/**
+ * Phase 1b: names every dependency with its purl.
+ *
+ * `getPURL` is implemented by all eight checkers and was, until the resolver, dead code. A plugin
+ * without a checker (or a dependency the parser could not pin to a version) simply keeps no purl
+ * and takes the registrar path, as it always did. Returns how many were named.
+ */
+export function assignPurls(pluginProjects: PluginProjects[]): number {
+    let named = 0
+    for (const {plugin, projects} of pluginProjects) {
+        const getPURL = plugin.checker?.getPURL
+        if (!getPURL) continue
+        for (const project of projects) {
+            for (const dep of Object.values(project.dependencies)) {
+                const version = dep.version?.trim()
+                if (!version) continue
+                dep.purl = getPURL(dep.name, version)
+                named++
+            }
+        }
+    }
+    return named
+}
+
+async function allCached(cache: Cache, keys: Set<string>): Promise<boolean> {
+    for (const key of keys) {
+        if (!await cache.has(key)) return false
+    }
+    return true
+}
+
+/** What the bulk phase left behind for phase 3: the cache keys it filled, and a count or two. */
+export interface BulkResolveOutcome {
+    /** Cache keys written from resolver answers, `${ecosystem}:${library}`. */
+    written: Set<string>
+    /** How many distinct purls were actually asked about, after dedupe and the cache check. */
+    requested: number
+    /** How many of those came back `resolved`. */
+    resolved: number
+}
+
+/**
+ * Phase 2: one bulk call for the whole run, written into the same cache phase 3 reads.
+ *
+ * The map is global on purpose. A purl identifies a library-version the same way whichever plugin
+ * found it, so `java` and `sbom-java` scanning the same repository, or twenty projects sharing a
+ * dependency, produce one entry and one question. What comes back `resolved` is written under
+ * every cache key that purl belongs to — the key is per ecosystem, and two plugins can share one —
+ * so `cacheHit` in phase 3 finds it and the registrar is never called. Everything else (`pending`,
+ * `not_found`, `invalid`, or a resolver that never answered) is left alone and falls through to
+ * the registrar chain, the miss cache and the retries exactly as before.
+ *
+ * `resolve` is a parameter so the phase can be tested without a server.
+ */
+export async function bulkResolve(
+    config: ResolverConfig,
+    pluginProjects: PluginProjects[],
+    cache: Cache,
+    options: {refresh?: boolean} = {},
+    resolve: typeof resolvePurls = resolvePurls
+): Promise<BulkResolveOutcome> {
+    const byPurl = new Map<string, {plugin: Plugin, dep: DepinderDependency}[]>()
+    for (const {plugin, projects} of pluginProjects) {
+        for (const project of projects) {
+            for (const dep of Object.values(project.dependencies)) {
+                if (!dep.purl) continue
+                // The same filter phase 3 applies, so the resolver is never asked about a library
+                // this run has been told to ignore.
+                if (blacklistedGlobs.some(glob => minimatch(dep.name, glob))) continue
+                const entries = byPurl.get(dep.purl)
+                if (entries) entries.push({plugin, dep})
+                else byPurl.set(dep.purl, [{plugin, dep}])
+            }
+        }
+    }
+
+    const written = new Set<string>()
+    const wanted: string[] = []
+    for (const [purl, entries] of byPurl) {
+        const keys = new Set(entries.map(it => `${ecosystemOf(it.plugin)}:${it.dep.name}`))
+        // Already cached under every key it would fill: phase 3 will hit the cache and never reach
+        // a registry, so there is nothing to ask for. `--refresh` wants fresh facts, and the
+        // resolver is the cheapest place to get them.
+        if (!options.refresh && await allCached(cache, keys)) {
+            count('resolver:locally-cached')
+            continue
+        }
+        wanted.push(purl)
+    }
+
+    if (wanted.length === 0) {
+        log.info('Nothing to resolve in bulk: every dependency is already in the local cache')
+        return {written, requested: 0, resolved: 0}
+    }
+
+    const answers = await resolve(config, wanted, log)
+    let resolved = 0
+    const writes: {cacheKey: string, plugin: Plugin, pkg: PackageRecord}[] = []
+    for (const [purl, answer] of answers) {
+        if (answer.status !== 'resolved' || !answer.package) continue
+        resolved++
+        for (const {plugin, dep} of byPurl.get(purl) ?? []) {
+            const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
+            if (written.has(cacheKey)) continue
+            written.add(cacheKey)
+            writes.push({cacheKey, plugin, pkg: answer.package})
+        }
+    }
+
+    // The advisory lookup the registrar path does, on the same terms, because a resolved package
+    // is a cache hit in phase 3 and a cache hit has never fetched advisories. Without it a cold
+    // native run with GH_TOKEN would write entries with no vulnerabilities and empty the
+    // vulnerability columns for everything the resolver answered. It is one GraphQL call per cache
+    // key — exactly what the same cold run costs today — eight at a time, and a failure keeps the
+    // registry data rather than discarding it. The resolver serves registry facts only; GHSA is
+    // still depinder's to ask for.
+    //
+    // Each key gets its own LibraryInfo: two plugins can share a purl and not an advisory
+    // ecosystem, so they must not share one object to write vulnerabilities into.
+    let nextWrite = 0
+    await Promise.all(Array.from(
+        {length: Math.min(REGISTRY_CONCURRENCY, writes.length)},
+        async () => {
+            while (nextWrite < writes.length) {
+                const {cacheKey, plugin, pkg} = writes[nextWrite++]
+                const lib = toLibraryInfo(pkg)
+                const advisoryEcosystem = plugin.checker?.githubSecurityAdvisoryEcosystem
+                if (advisoryEcosystem && process.env.GH_TOKEN) {
+                    try {
+                        lib.vulnerabilities = await getVulnerabilitiesFromGithub(advisoryEcosystem, lib.name)
+                    } catch (e: any) {
+                        log.warn(`Vulnerability lookup failed for ${lib.name}: ${e.message ?? e}`)
+                    }
+                }
+                await cache.set(cacheKey, lib)
+            }
+        }
+    ))
+    count('resolver:cache-write', written.size)
+    log.info(`Resolver filled ${written.size} cache entries from ${resolved} of ${wanted.length} requested package(s)`)
+    return {written, requested: wanted.length, resolved}
+}
+
 export async function analyseFiles(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
     const resultFolder = path.resolve(process.cwd(), options.results || 'results')
     const analysed = await runAnalysis(folders, options, useCache)
@@ -252,6 +408,12 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
     const allFiles = folders.flatMap(it => walkDir(it))
 
     const selectedPlugins = getPluginsFromNames(options.plugins)
+
+    // Read before the parse rather than after it, so a missing token is reported in the first
+    // second of a run instead of the tenth minute.
+    resetResolverClient()
+    const resolver = resolverConfig(options)
+    if (resolver) log.info(`Bulk resolver: ${resolver.url}, waiting at most ${Math.round(resolver.maxWaitMs / 1000)}s for it`)
 
     // Scanner preflight, before any parsing: the SBOM parsers shell out to Trivy and Grype, and a
     // missing binary used to surface only as a mid-run warning per file — leaving the user with a
@@ -318,22 +480,46 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
     }
     const progress = new MultiBar({}, Presets.shades_grey)
 
-    // The plugins run side by side. Each talks to its own registry, so six at once put no more
-    // than REGISTRY_CONCURRENCY requests on any one of them, and a registry that stalls — Maven
-    // Central's search API, for one — no longer holds the others up.
-    const results = await Promise.all(selectedPlugins.map(async (plugin): Promise<AnalysisResult | undefined> => {
-        log.info(`Plugin ${plugin.name} starting`)
+    // Phase 1 — parse. Still one pass per plugin, side by side as before; what changed is that
+    // every plugin finishes parsing before any enrichment starts, because a bulk question is only
+    // worth asking once it can cover the whole run.
+    const pluginProjects: PluginProjects[] = await Promise.all(
+        selectedPlugins.map(async (plugin): Promise<PluginProjects> => {
+            log.info(`Plugin ${plugin.name} starting`)
 
-        const refreshedLibs = [] as string[]
+            const files = allFiles
+                .filter(it => plugin.extractor.filter ? plugin.extractor.filter(it) : true)
+                .filter(it => plugin.extractor.files
+                    .some(pattern => minimatch(it, pattern, {matchBase: true}))
+                )
+
+            const projects: DepinderProject[] = await timePhase(`parse:${plugin.name}`, () => extractProjects(plugin, files))
+            return {plugin, projects}
+        }))
+
+    // Phase 1b — the purl for every dependency, from the checker that already knew how to spell it.
+    const named = assignPurls(pluginProjects)
+
+    // Phase 2 — the bulk resolver, when one is configured. It fills the local cache; it never
+    // touches the dependencies, so nothing below can tell where an entry came from.
+    const bulkWritten = resolver
+        ? (await timePhase('resolve:bulk', async () => {
+            log.info(`Asking the resolver about up to ${named} dependency purls`)
+            return bulkResolve(resolver, pluginProjects, cache, options)
+        })).written
+        : new Set<string>()
+    if (bulkWritten.size > 0) await checkpointIfDue()
+
+    // Phase 3 — enrichment, unchanged. The plugins run side by side. Each talks to its own
+    // registry, so six at once put no more than REGISTRY_CONCURRENCY requests on any one of them,
+    // and a registry that stalls — Maven Central's search API, for one — no longer holds the
+    // others up. Whatever phase 2 cached is a cache hit here, and never reaches a registry.
+    const results = await Promise.all(pluginProjects.map(async ({plugin, projects}): Promise<AnalysisResult | undefined> => {
+        // A library the resolver just refreshed counts as refreshed: without this, `--refresh`
+        // would discard the answer that was fetched seconds ago and go back to the registry.
+        const keyPrefix = `${ecosystemOf(plugin)}:`
+        const refreshedLibs = [...bulkWritten].filter(it => it.startsWith(keyPrefix)).map(it => it.slice(keyPrefix.length))
         const inFlight = new Map<string, Promise<LibraryInfo>>()
-
-        const files = allFiles
-            .filter(it => plugin.extractor.filter ? plugin.extractor.filter(it) : true)
-            .filter(it => plugin.extractor.files
-                .some(pattern => minimatch(it, pattern, {matchBase: true}))
-            )
-
-        const projects: DepinderProject[] = await timePhase(`parse:${plugin.name}`, () => extractProjects(plugin, files))
 
         const projectsBar = progress.create(projects.length, 0, {name: 'Projects', state: 'Analysing'})
 

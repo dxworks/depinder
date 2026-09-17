@@ -59,6 +59,14 @@ export interface DepinderDependency {
     semver: SemVer | null
     type?: string  // dev dependency, test dependency, provided, etc.
     requestedBy: string[] // the list of ids for dependencies that requested this dependency
+    /**
+     * The package URL for this exact name and version, e.g. `pkg:maven/com.google.guava/guava@32.1.2-jre`.
+     *
+     * Filled by `analyse` from the plugin's `checker.getPURL`, not by the parsers: it is the key
+     * the bulk resolver speaks, and the one identifier that means the same thing across plugins,
+     * which is what lets one dependency shared by two plugins be asked about once.
+     */
+    purl?: string
     libraryInfo?: LibraryInfo
     vulnerabilities?: Vulnerability[]
 }
