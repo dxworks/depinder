@@ -1,4 +1,4 @@
-import {DEFAULT_RESOLVER_MAX_WAIT_MS, resolverConfig} from '../src/resolver/config'
+import {DEFAULT_RESOLVER_MAX_WAIT_MS, RESOLVER_CHUNK_CONCURRENCY, resolverConfig} from '../src/resolver/config'
 
 /**
  * The resolver is opt-in, and every way of not opting in must end at the same place: `undefined`,
@@ -7,7 +7,12 @@ import {DEFAULT_RESOLVER_MAX_WAIT_MS, resolverConfig} from '../src/resolver/conf
  * without a bearer token, so it would otherwise look like a resolver that knows nothing.
  */
 
-const vars = ['DEPINDER_RESOLVER_URL', 'DEPINDER_RESOLVER_TOKEN', 'DEPINDER_RESOLVER_MAX_WAIT_MS'] as const
+const vars = [
+    'DEPINDER_RESOLVER_URL',
+    'DEPINDER_RESOLVER_TOKEN',
+    'DEPINDER_RESOLVER_MAX_WAIT_MS',
+    'DEPINDER_RESOLVER_CONCURRENCY',
+] as const
 
 describe('the resolver configuration', () => {
     const saved: {[key: string]: string | undefined} = {}
@@ -38,6 +43,7 @@ describe('the resolver configuration', () => {
             url: 'https://resolver.example',
             token: 'secret',
             maxWaitMs: DEFAULT_RESOLVER_MAX_WAIT_MS,
+            chunkConcurrency: RESOLVER_CHUNK_CONCURRENCY,
         })
     })
 
@@ -83,6 +89,21 @@ describe('the resolver configuration', () => {
 
         process.env.DEPINDER_RESOLVER_MAX_WAIT_MS = '-1'
         expect(resolverConfig(options)?.maxWaitMs).toBe(DEFAULT_RESOLVER_MAX_WAIT_MS)
+    })
+
+    it('takes the chunk concurrency from the environment, and ignores nonsense', () => {
+        process.env.DEPINDER_RESOLVER_TOKEN = 'secret'
+        const options = {resolverUrl: 'https://resolver.example'}
+
+        process.env.DEPINDER_RESOLVER_CONCURRENCY = '8'
+        expect(resolverConfig(options)?.chunkConcurrency).toBe(8)
+
+        // Half a chunk in flight is not a thing, and neither is none: both fall back rather than
+        // leaving the bulk phase asking nothing at all.
+        for (const nonsense of ['four', '0', '-2', '2.5', '']) {
+            process.env.DEPINDER_RESOLVER_CONCURRENCY = nonsense
+            expect(resolverConfig(options)?.chunkConcurrency).toBe(RESOLVER_CHUNK_CONCURRENCY)
+        }
     })
 
     it('ignores an empty or whitespace url', () => {

@@ -15,6 +15,8 @@ export interface ResolverConfig {
     token: string
     /** Upper bound on the whole bulk phase, including re-asks for purls the server is still filling. */
     maxWaitMs: number
+    /** How many chunks of one ask are posted at the same time. */
+    chunkConcurrency: number
 }
 
 /** The options `analyse` and `export-blackduck` declare; both commands share this shape. */
@@ -27,6 +29,18 @@ export interface ResolverOptions {
 
 export const DEFAULT_RESOLVER_MAX_WAIT_MS = 60_000
 
+/**
+ * How many chunks of one bulk ask are in flight at once.
+ *
+ * A run is six chunks of 2000 purls, and the server answers each of them independently — the time
+ * is upstream fetches and a large response body, not contention on anything the client owns. Six
+ * chunks one after another measured 22-30 s against the same server that answered all six at once
+ * in 12-14 s. Four rather than "all of them" because the server's database pool is the binding
+ * constraint at the other end (15 connections), and four chunks is where the measured gain was
+ * already most of the way to the concurrent number.
+ */
+export const RESOLVER_CHUNK_CONCURRENCY = 4
+
 function maxWaitFromEnv(): number {
     const raw = process.env.DEPINDER_RESOLVER_MAX_WAIT_MS
     if (!raw) return DEFAULT_RESOLVER_MAX_WAIT_MS
@@ -34,6 +48,17 @@ function maxWaitFromEnv(): number {
     if (!Number.isFinite(parsed) || parsed <= 0) {
         log.warn(`Ignoring DEPINDER_RESOLVER_MAX_WAIT_MS=${raw}: not a positive number of milliseconds`)
         return DEFAULT_RESOLVER_MAX_WAIT_MS
+    }
+    return parsed
+}
+
+function chunkConcurrencyFromEnv(): number {
+    const raw = process.env.DEPINDER_RESOLVER_CONCURRENCY
+    if (!raw) return RESOLVER_CHUNK_CONCURRENCY
+    const parsed = Number(raw)
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+        log.warn(`Ignoring DEPINDER_RESOLVER_CONCURRENCY=${raw}: not a positive whole number of chunks`)
+        return RESOLVER_CHUNK_CONCURRENCY
     }
     return parsed
 }
@@ -57,5 +82,10 @@ export function resolverConfig(options: ResolverOptions = {}): ResolverConfig | 
         return undefined
     }
 
-    return {url: url.replace(/\/+$/, ''), token, maxWaitMs: maxWaitFromEnv()}
+    return {
+        url: url.replace(/\/+$/, ''),
+        token,
+        maxWaitMs: maxWaitFromEnv(),
+        chunkConcurrency: chunkConcurrencyFromEnv(),
+    }
 }

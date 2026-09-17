@@ -15,6 +15,7 @@ No configuration file: command-line options, environment variables, and a few fi
 | `DEPINDER_RESOLVER_URL` | Base URL of a bulk purl resolver. Same as `--resolver-url`; off when unset |
 | `DEPINDER_RESOLVER_TOKEN` | Bearer token for it. Required with the URL: without it the resolver is skipped |
 | `DEPINDER_RESOLVER_MAX_WAIT_MS` | How long one run waits for the resolver in total. Default `60000` |
+| `DEPINDER_RESOLVER_CONCURRENCY` | How many 2000-purl chunks are posted at once. Default `4` |
 | `TRIVY_BIN`, `GRYPE_BIN` | Scanner binaries when not on `PATH` |
 
 ## Files
@@ -56,6 +57,7 @@ depinder analyse ./repo
 | `--resolver-url <url>` / `DEPINDER_RESOLVER_URL` | Where the resolver is. Nothing set, nothing changes |
 | `DEPINDER_RESOLVER_TOKEN` | Mandatory with the URL; a missing token warns and skips the resolver |
 | `DEPINDER_RESOLVER_MAX_WAIT_MS` | Budget for the whole bulk phase, re-asks included. Default `60000` |
+| `DEPINDER_RESOLVER_CONCURRENCY` | Chunks in flight at once. Default `4`; `1` restores one chunk at a time |
 | `--no-resolver` | Skip it for this run |
 
 Every project is parsed first, every dependency's purl is collected into one list, and the answers

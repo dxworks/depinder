@@ -21,7 +21,7 @@ const advisories = getVulnerabilitiesFromGithub as jest.Mock
  * the cache and on what was asked for, not on the dependencies, which the phase never touches.
  */
 
-const config: ResolverConfig = {url: 'https://resolver.example', token: 'secret', maxWaitMs: 60_000}
+const config: ResolverConfig = {url: 'https://resolver.example', token: 'secret', maxWaitMs: 60_000, chunkConcurrency: 4}
 
 function fakeCache(): Cache & {entries: Map<string, LibraryInfo>} {
     const entries = new Map<string, LibraryInfo>()

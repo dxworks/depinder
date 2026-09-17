@@ -238,17 +238,36 @@ export async function resolvePurls(
     const reAskIntervalMs = timing.reAskIntervalMs ?? RE_ASK_INTERVAL_MS
     let feedsLogged = false
 
+    /**
+     * Posts the chunks of one batch, `config.chunkConcurrency` of them at a time.
+     *
+     * The chunks are independent questions — the server answers each from its own database and its
+     * own upstream fetches — so waiting for one before asking the next spent the whole run in
+     * series for nothing: six chunks took 22-30 s one after another and 12-14 s side by side.
+     *
+     * `unavailable` is re-read before each chunk is taken rather than once at the top, which is
+     * what keeps the old "stop asking" semantics: a chunk that is already in flight when another
+     * one turns the resolver off runs to its end and its answer is kept — throwing away a response
+     * that has already been paid for helps nobody — but nothing new is started after that.
+     */
     const ask = async (batch: string[], waitMs: number): Promise<void> => {
-        for (const chunk of chunked(batch, CHUNK_SIZE)) {
-            if (unavailable) return
-            const response = await post(config, chunk, waitMs, log)
-            if (!response) return
-            if (!feedsLogged) {
-                feedsLogged = true
-                logFeeds(response.feeds, log)
+        const chunks = chunked(batch, CHUNK_SIZE)
+        let next = 0
+        await Promise.all(Array.from(
+            {length: Math.min(Math.max(1, config.chunkConcurrency), chunks.length)},
+            async () => {
+                while (next < chunks.length) {
+                    if (unavailable) return
+                    const response = await post(config, chunks[next++], waitMs, log)
+                    if (!response) return
+                    if (!feedsLogged) {
+                        feedsLogged = true
+                        logFeeds(response.feeds, log)
+                    }
+                    absorb(response, entries)
+                }
             }
-            absorb(response, entries)
-        }
+        ))
     }
 
     await ask(purls, FIRST_WAIT_MS)
