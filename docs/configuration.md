@@ -15,7 +15,7 @@ No configuration file: command-line options, environment variables, and a few fi
 | `DEPINDER_RESOLVER_URL` | Base URL of a bulk purl resolver. Same as `--resolver-url`; off when unset |
 | `DEPINDER_RESOLVER_TOKEN` | Bearer token for it. Required with the URL: without it the resolver is skipped |
 | `DEPINDER_RESOLVER_MAX_WAIT_MS` | How long one run waits for the resolver in total. Default `60000` |
-| `DEPINDER_RESOLVER_CONCURRENCY` | How many 2000-purl chunks are posted at once. Default `4` |
+| `DEPINDER_RESOLVER_CONCURRENCY` | How many 2000-purl chunks are posted at once. Default `3` |
 | `TRIVY_BIN`, `GRYPE_BIN` | Scanner binaries when not on `PATH` |
 
 ## Files
@@ -57,8 +57,13 @@ depinder analyse ./repo
 | `--resolver-url <url>` / `DEPINDER_RESOLVER_URL` | Where the resolver is. Nothing set, nothing changes |
 | `DEPINDER_RESOLVER_TOKEN` | Mandatory with the URL; a missing token warns and skips the resolver |
 | `DEPINDER_RESOLVER_MAX_WAIT_MS` | Budget for the whole bulk phase, re-asks included. Default `60000` |
-| `DEPINDER_RESOLVER_CONCURRENCY` | Chunks in flight at once. Default `4`; `1` restores one chunk at a time |
+| `DEPINDER_RESOLVER_CONCURRENCY` | Chunks in flight at once. Default `3`; `1` restores one chunk at a time |
 | `--no-resolver` | Skip it for this run |
+
+Three chunks at once, not more: the server builds every answer with one aggregate over a single
+link to its database, and its API connection pool is four — three chunks and the retry a failed
+chunk is allowed. A retry with nowhere to go waits out the server's connection timeout and comes
+back a 500, and one 500 makes the run fall back to the registries for good.
 
 Every project is parsed first, every dependency's purl is collected into one list, and the answers
 land in the same local cache the registrars fill. What the resolver does not know — a package it is

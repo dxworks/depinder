@@ -35,11 +35,14 @@ export const DEFAULT_RESOLVER_MAX_WAIT_MS = 60_000
  * A run is six chunks of 2000 purls, and the server answers each of them independently — the time
  * is upstream fetches and a large response body, not contention on anything the client owns. Six
  * chunks one after another measured 22-30 s against the same server that answered all six at once
- * in 12-14 s. Four rather than "all of them" because the server's database pool is the binding
- * constraint at the other end (15 connections), and four chunks is where the measured gain was
- * already most of the way to the concurrent number.
+ * in 12-14 s. Not "all of them", because the constraint is at the other end and it is narrow: every
+ * chunk's answer is built by one `json_agg` over a single link to a remote database, and the api
+ * has four connections to run them on (`API_POOL_SIZE`). Three leaves the fourth for the retry a
+ * failed chunk is allowed, which is the one request that must not queue — a retry that waits out
+ * the server's connection timeout comes back a 500, and a single 500 is what makes a run give up on
+ * the resolver and send every remaining purl to the registries.
  */
-export const RESOLVER_CHUNK_CONCURRENCY = 4
+export const RESOLVER_CHUNK_CONCURRENCY = 3
 
 function maxWaitFromEnv(): number {
     const raw = process.env.DEPINDER_RESOLVER_MAX_WAIT_MS

@@ -276,23 +276,24 @@ describe('the resolver client', () => {
 
         await resolvePurls(config, manyPurls(6), quiet, fast)
 
-        // The first window's worth was already asked before the first 403 came back; the two
-        // chunks behind them are never asked, and only one line is logged about it.
+        // The first window's worth was already asked before the first 403 came back; the chunks
+        // behind them are never asked, and only one line is logged about it.
         expect(calls).toHaveLength(RESOLVER_CHUNK_CONCURRENCY)
         expect(quiet.warn.mock.calls.map(it => String(it[0])).filter(it => it.includes('Resolver unavailable'))).toHaveLength(1)
     })
 
-    it('keeps four chunks in flight at once, and starts a fifth only as one lands', async () => {
+    it('keeps the window full, and starts the next chunk only as one lands', async () => {
         const server = gatedServe()
         const answers = resolvePurls(config, manyPurls(6), quiet, fast)
 
         await until('the first window of chunks', () => server.calls.length === RESOLVER_CHUNK_CONCURRENCY)
         await tick()
-        // Bounded: the fifth chunk waits for a slot rather than piling onto the server.
+        // Bounded: the chunk after the window waits for a slot rather than piling onto the server,
+        // whose api pool has one connection per chunk and one spare for a retry.
         expect(server.calls).toHaveLength(RESOLVER_CHUNK_CONCURRENCY)
 
         server.release(0)
-        await until('the fifth chunk', () => server.calls.length === RESOLVER_CHUNK_CONCURRENCY + 1)
+        await until('the chunk after the window', () => server.calls.length === RESOLVER_CHUNK_CONCURRENCY + 1)
         expect(server.peakInFlight()).toBe(RESOLVER_CHUNK_CONCURRENCY)
 
         server.releaseAll()
@@ -323,8 +324,8 @@ describe('the resolver client', () => {
     })
 
     it('keeps the answer of a chunk already in flight when another chunk turned the resolver off', async () => {
-        // A 4xx is final for the run, but the three chunks beside it have already been paid for:
-        // throwing their answers away would send those libraries to the registrars for nothing.
+        // A 4xx is final for the run, but the chunks beside it have already been paid for: throwing
+        // their answers away would send those libraries to the registrars for nothing.
         const server = gatedServe((call, index) => index === 1
             ? {status: 400, body: {}}
             : {body: resolvedBody(call.purls)})
@@ -333,14 +334,12 @@ describe('the resolver client', () => {
         await until('the first window of chunks', () => server.calls.length === RESOLVER_CHUNK_CONCURRENCY)
         server.release(1)
         await until('the client to give up on the resolver', () => resolverUnavailable())
-        server.release(0)
-        server.release(2)
-        server.release(3)
+        server.releaseAll()
 
         const result = await answers
 
         expect(server.calls).toHaveLength(RESOLVER_CHUNK_CONCURRENCY)
-        expect(result.size).toBe(CHUNK_SIZE * 3)
+        expect(result.size).toBe(CHUNK_SIZE * (RESOLVER_CHUNK_CONCURRENCY - 1))
         expect(resolverUnavailable()).toBe(true)
     })
 
@@ -366,6 +365,53 @@ describe('the resolver client', () => {
         const result = await answers
         expect(server.calls).toHaveLength(4)
         expect([...result.values()].every(it => it.status === 'resolved')).toBe(true)
+    })
+
+    it('treats a client-side timeout as transient: one retry, and the run carries on', async () => {
+        // What `AbortSignal.timeout` throws when the slack runs out. It carries no HTTP status, so
+        // it is retryable — and the retry's answer is kept, rather than the abort costing the run
+        // the resolver. The slack is 60 s for exactly this reason: the abort is a last resort, and
+        // abandoning a request the server is still working on is worse than waiting for it.
+        const timeout = Object.assign(new Error('The operation was aborted due to timeout'), {name: 'TimeoutError'})
+        const calls = serve((call, index) => index === 0 ? timeout : {body: resolvedBody(call.purls)})
+
+        const answers = await resolvePurls(config, ['pkg:npm/left-pad@1.0.0'], quiet, fast)
+
+        expect(calls).toHaveLength(2)
+        expect(answers.get('pkg:npm/left-pad@1.0.0')?.status).toBe('resolved')
+        expect(resolverUnavailable()).toBe(false)
+        expect(quiet.warn.mock.calls.map(it => String(it[0])).filter(it => it.includes('Resolver unavailable'))).toHaveLength(0)
+        expect(quiet.warn.mock.calls.map(it => String(it[0])).filter(it => it.includes('retrying once'))).toHaveLength(1)
+    })
+
+    it('starts no re-ask round it has no budget left for', async () => {
+        // A first ask that outruns `maxWaitMs` on its own — a server that had just restarted, and
+        // so had a full wait and a cold payload cache for every chunk. The deadline is the run's
+        // real bound, and it is re-read before each round rather than only at the top.
+        const calls: string[][] = []
+        global.fetch = (async (_url: string, init: any) => {
+            const purls: string[] = JSON.parse(init.body).purls
+            calls.push(purls)
+            await new Promise(resolve => setTimeout(resolve, 40))
+            return {
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    results: purls.map(purl => ({
+                        purl, package_key: purl, status: 'pending', requested_version: null,
+                    })),
+                    packages: {},
+                }),
+            } as any
+        }) as any
+
+        const answers = await resolvePurls(
+            {...config, maxWaitMs: 30}, ['pkg:npm/slow@1.0.0'], quiet, {reAskIntervalMs: 10})
+
+        expect(calls).toHaveLength(1)
+        expect(answers.get('pkg:npm/slow@1.0.0')?.status).toBe('pending')
+        // Out of time is not out of order: the resolver stays available for the next run.
+        expect(resolverUnavailable()).toBe(false)
     })
 
     it('asks nothing when given no purls', async () => {

@@ -98,8 +98,20 @@ export const CHUNK_SIZE = 2000
 export const FIRST_WAIT_MS = 15_000
 /** How often still-`pending` purls are asked for again. */
 export const RE_ASK_INTERVAL_MS = 3000
-/** How long a single HTTP call may take beyond the server-side wait before it is abandoned. */
-const REQUEST_TIMEOUT_SLACK_MS = 20_000
+/**
+ * How long a single HTTP call may take beyond the server-side wait before it is abandoned.
+ *
+ * This is a last resort, not a budget. The budget is `config.maxWaitMs`, which bounds the whole
+ * bulk phase and is re-checked before every re-ask; this only exists so a connection that is never
+ * going to answer cannot hold a chunk forever. Twenty seconds was too close to be that: a server
+ * restarted a moment earlier holds nothing in its payload cache, so several chunks arrive together
+ * needing a full `wait_ms` and then a multi-megabyte read each, and 15 + 20 s was the budget two of
+ * them went past. Aborting there cost far more than waiting would have — the server went on
+ * building the payloads nobody was waiting for, the retries queued behind them for a database
+ * connection and came back 500, and one 500 makes the whole run fall back to the registries. Sixty
+ * gives the slowest realistic answer room to arrive, and `maxWaitMs` still ends the phase on time.
+ */
+const REQUEST_TIMEOUT_SLACK_MS = 60_000
 
 type Logger = Pick<typeof defaultLog, 'info' | 'warn'>
 
