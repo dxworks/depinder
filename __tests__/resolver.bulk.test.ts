@@ -256,7 +256,7 @@ describe('the bulk resolve phase', () => {
         const outcome = await bulkResolve(config, projects, cache, {}, server.resolve)
 
         expect(server.resolve).not.toHaveBeenCalled()
-        expect(outcome).toEqual({written: new Set(), requested: 0, resolved: 0})
+        expect(outcome).toEqual({written: new Set(), libs: new Map(), requested: 0, resolved: 0})
     })
 
     /**
@@ -349,6 +349,43 @@ describe('the bulk resolve phase', () => {
             expect(cache.entries.get('npm:left-pad')?.versions).toHaveLength(2)
             expect(cache.entries.get('npm:left-pad')?.vulnerabilities).toBeUndefined()
         })
+    })
+
+    /**
+     * Phase 3 looks here before it touches the cache, so what comes back has to be the same object
+     * under the same key — a `has` plus a `get` plus a `JSON.parse` of ~10 KB per dependency,
+     * 15,587 times on the benchmark, to arrive at something phase 2 had in its hand.
+     */
+    it('hands back the library objects it wrote, under the keys it wrote them as', async () => {
+        const cache = fakeCache()
+        const projects: PluginProjects[] = [
+            {plugin: maven, projects: [project('app', [dep('com.google.guava:guava', '32.1.2-jre')])]},
+            {plugin: npm, projects: [project('web', [dep('left-pad', '1.0.0')])]},
+        ]
+        assignPurls(projects)
+        const server = answering({
+            'pkg:maven/com.google.guava/guava@32.1.2-jre': record('maven', 'com.google.guava', 'guava'),
+            'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+        })
+
+        const outcome = await bulkResolve(config, projects, cache, {}, server.resolve)
+
+        expect([...outcome.libs.keys()].sort()).toEqual([...outcome.written].sort())
+        expect(outcome.libs.get('npm:left-pad')?.versions.map(it => it.version)).toEqual(['1.0.0', '2.0.0'])
+        // The same object, not a copy of it: the cached row is the durable copy, this is the one
+        // phase 3 hands to every dependency of that library.
+        expect(outcome.libs.get('java:com.google.guava:guava')).toBe(cache.entries.get('java:com.google.guava:guava'))
+        expect(outcome.libs.get('npm:left-pad')).toBe(cache.entries.get('npm:left-pad'))
+    })
+
+    it('hands back nothing when nothing resolved', async () => {
+        const cache = fakeCache()
+        const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('missing-pkg', '1.0.0')])]}]
+        assignPurls(projects)
+
+        const outcome = await bulkResolve(config, projects, cache, {}, answering({}).resolve)
+
+        expect(outcome.libs.size).toBe(0)
     })
 
     it('survives a resolver that answered nothing, leaving the cache untouched', async () => {
