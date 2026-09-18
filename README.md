@@ -43,8 +43,8 @@ depinder analyse ./sboms -r out -p sbom-npm --vuln-source github
 
 `--vuln-source` takes a comma-separated list of `trivy`, `grype`, `github` and `all`, and defaults
 to `trivy,grype` — today's behaviour. Whichever sources run, the findings also go to
-`security.csv` next to the libs CSVs, one row per (component, advisory), in Black Duck's own
-column shape (see [Black Duck-shaped exports](#black-duck-shaped-exports)).
+`security.csv` next to the libs CSVs of each SBOM source, one row per (component, advisory), in
+Black Duck's own column shape (see [Black Duck-shaped exports](#black-duck-shaped-exports)).
 
 The download needs GitHub tokens. Put them in a dotenv-style file — `.github-tokens` in the working
 directory by default, `--github-token-file` to point elsewhere:
@@ -63,19 +63,21 @@ before its rate-limit window is exhausted rather than after. The cache lives in
 
 ## Black Duck-shaped exports
 
-`export-blackduck` turns a folder of CycloneDX SBOMs into the four CSVs a Black Duck project
-version exports, with Black Duck's exact column headers, so the two can be diffed side by side,
-plus one file Black Duck has no counterpart for: `_dependency_edges.csv`, the dependency graph.
+For every folder of CycloneDX SBOMs it is given, `analyse` writes the four CSVs a Black Duck
+project version exports, with Black Duck's exact column headers, so the two can be diffed side
+by side, plus files Black Duck has no counterpart for, such as `_dependency_edges.csv`, the
+dependency graph.
 
 ```shell
-depinder export-blackduck <sbom-folder...> -r <out> \
-    [--vuln-source trivy,grype,github] [--github-token-file F] [--project-name NAME]
+depinder analyse <sbom-folder...> -r <out> \
+    [--vuln-source trivy,grype,github] [--github-token-file F] [--project-name NAME] [--target DIR]
 ```
 
-It runs the same analysis `analyse` runs — dependency tree, registry licences and versions,
-vulnerabilities from the selected sources — and writes the normal depinder CSVs into the same
-folder, then the Black Duck files on top. You do not name plugins: the ecosystems present in
-the SBOMs select the `sbom-*` plugins for you.
+Each SBOM is sorted by its content — a Trivy SBOM goes to `<out>/trivy/`, a Syft SBOM to
+`<out>/syft/` — and each subfolder gets the normal depinder CSVs for that source, then the
+Black Duck files on top. You do not name plugins: the ecosystems present in the SBOMs select
+the `sbom-*` plugins for you. Native input, when present, goes to `<out>/depinder/` with the
+`<plugin>-*.csv` triples only.
 
 | File | One row per | Notes |
 |---|---|---|
@@ -85,7 +87,7 @@ the SBOMs select the `sbom-*` plugins for you.
 | `_component_versions.csv` | component | **Not a Black Duck file.** `Release Date`, `Newer Versions` and our `Newer Versions (semver)`, the count by version number |
 | `_dependency_edges.csv` | (parent, child) | **Not a Black Duck file.** `Path` keeps one chain per component, as Black Duck does, so a component with three parents keeps one; this is every edge, with each component's depth. Columns: `Repo, Tree, Ecosystem, Parent Origin Id, Child Origin Id, Child Depth`. A `Tree` is `<repo>/<module>/-<package manager>`; a component nothing pulls in has parent `(root)` and depth 1 |
 | `_upgrade_guidance.csv` | component with ≥ 1 finding | Short/long term recommended versions |
-| `security.csv` | (component, advisory) | Black Duck's `security_*.csv` header byte for byte; its internal ids, triage fields and CISA block are empty for us. `analyse` writes this one file too, through the same serialiser |
+| `security.csv` | (component, advisory) | Black Duck's `security_*.csv` header byte for byte; its internal ids, triage fields and CISA block are empty for us |
 | `_vulnerability_findings.json` | component with ≥ 1 finding | **Not a Black Duck file.** The findings as the exporter saw them, fix versions per line included — what no CSV carries |
 
 ### Column mapping
@@ -271,7 +273,7 @@ Every row is committed as it is written, so the 60-second checkpoint costs nothi
 (`cache/libs.json`, `misses.json`) is not read by a run any more;
 `depinder cache import cache` copies it into the database, keeping rows already there.
 
-Add `--profile` to `analyse` or `export-blackduck` to get, at the end of the run, the wall-clock
+Add `--profile` to `analyse` to get, at the end of the run, the wall-clock
 of each phase (parse, scans, registry enrichment, CSV writing), the cache hit/miss counts and the
 number of HTTP requests made to each host.
 
@@ -281,17 +283,10 @@ To analyse a project, run the following command:
 ```shell
 depinder analyse <paths-to-analysed-project-folders> ... -r <path-to-results-folder>
 ```
-This command gets as an argument multiple fully qualified folder paths and will automatically run all plugins that are available for the project's used languages 
-and export the results in the specified `results` folder.
-
-### Export Black Duck-shaped CSVs
-
-```shell
-depinder export-blackduck <sbom-folders> ... -r <path-to-results-folder> --vuln-source trivy,grype,github
-```
-
-Runs the analysis above over a folder of CycloneDX SBOMs and writes Black Duck's five export files
-alongside the normal depinder CSVs. See [Black Duck-shaped exports](#black-duck-shaped-exports).
+This command gets as an argument multiple fully qualified folder paths, sorts every file it finds
+by content — Trivy SBOM, Syft SBOM, or native manifest — and writes one subfolder per source under
+`results`: `trivy/` and `syft/` with the `sbom-*` CSVs and the Black Duck-shaped files, `depinder/`
+with the native plugins' CSVs. See [Black Duck-shaped exports](#black-duck-shaped-exports).
 
 ## Acknowledgements
 

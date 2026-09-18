@@ -170,7 +170,12 @@ export const [sbomJava, sbomNpm, sbomRuby, sbomPython, sbomPhp, sbomDotnet, sbom
  */
 export function sbomFilesFor(plugins: Plugin[], files: string[]): string[] {
     if (!plugins.some(plugin => sbomPlugins.includes(plugin))) return []
-    return files.filter(file => SBOM_GLOBS.some(glob => minimatch(file, glob, {matchBase: true})))
+    return files.filter(isSbomFile)
+}
+
+/** Whether a file is one the SBOM extractors would pick up — the same globs, one place. */
+export function isSbomFile(file: string): boolean {
+    return SBOM_GLOBS.some(glob => minimatch(file, glob, {matchBase: true}))
 }
 
 /**
@@ -211,7 +216,7 @@ export function purlTypeOfEcosystem(ecosystem: string): string | undefined {
 /**
  * The SBOM plugins that can say anything about these purl types.
  *
- * `export-blackduck` selects its own plugins from the SBOMs it was given, so that a user pointing
+ * `analyse` selects the plugins for an SBOM source from the SBOMs it found, so that a user pointing
  * at a folder of SBOMs never has to work out which `sbom-*` plugins their ecosystems correspond to.
  */
 export function sbomPluginsForPurlTypes(purlTypes: Iterable<string>): Plugin[] {

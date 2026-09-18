@@ -63,7 +63,7 @@ interface SecurityRecord {
     [key: string]: string;
 }
 
-/** The four output shapes live in `blackduck/columns.ts`, shared with `export-blackduck`. */
+/** The four output shapes live in `blackduck/columns.ts`, shared with `analyse`'s SBOM export. */
 const DEPENDENCIES_COLUMN_ORDER = DEPENDENCIES_COLUMNS;
 const DEPENDENCIES_SOURCES_COLUMN_ORDER = DEPENDENCIES_SOURCES_COLUMNS;
 const VULNERABILITY_DETAILS_HEADERS = VULNERABILITY_DETAILS_COLUMNS;

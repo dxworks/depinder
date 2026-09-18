@@ -2,7 +2,7 @@
  * The shareable Black Duck report shape, in one place.
  *
  * `transformBlackDuckReports` reshapes a real Black Duck export into four `_*.csv` files, and
- * `export-blackduck` writes the same four files from SBOMs. Both import their headers and their
+ * `analyse` writes the same four files from SBOMs. Both import their headers and their
  * cell conventions from here, so the two commands cannot drift into two spellings of one column
  * and a downstream reader can process either folder the same way.
  *

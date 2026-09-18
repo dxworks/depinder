@@ -1,6 +1,6 @@
 # Black Duck Export
 
-[`export-blackduck`](commands/export-blackduck.md) writes the four shareable CSVs
+[`analyse`](commands/analyse.md) writes, for each SBOM source it finds, the four shareable CSVs
 [`transformBlackDuckReports`](commands/blackduck-reports.md) produces from a real Black Duck
 export — same header line, same cell conventions, so a downstream reader processes either folder
 the same way — plus the raw-shaped `security.csv` and files Black Duck has no counterpart for.
@@ -88,7 +88,7 @@ id, triage and CISA columns are dropped. The derivations are the same:
 project), as Black Duck writes it. Ties go to the greater parent. Segments join name and version
 like the origin id. The tag after the project is the package manager whose manifest was walked:
 `-yarn`, `-npm`, `-pnpm`, `-rubygems`, `-maven`, `-gradle`, `-packagist`, `-cargo`, `-go_mod`,
-`-nuget`, `-uv`, `-pip`. With [`--target`](commands/export-blackduck.md#-target) the project
+`-nuget`, `-uv`, `-pip`. With [`--target`](commands/analyse.md#-target) the project
 segment becomes Black Duck's `<name>/<version>/<dir>/` prefix and own code leaves the chain.
 
 **Direct** is what the manifest declares. When an SBOM carries workspace nodes (Syft, yarn berry),

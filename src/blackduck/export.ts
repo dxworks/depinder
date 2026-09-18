@@ -433,7 +433,7 @@ export function writeUpgradeGuidanceCsv(components: ExportComponent[], resultFol
  * `_vulnerability_findings.json`: every finding the scanners reported, per component, as the
  * exporter saw it — including the fields no CSV carries (`patchedVersions`, the fix per line).
  *
- * The scanners run inside `export-blackduck` and their answer lives nowhere else: the saved SBOM
+ * The scanners run inside `analyse` and their answer lives nowhere else: the saved SBOM
  * has no vulnerabilities and `security.csv` names no fixed version. So a change to the upgrade
  * guidance rule could only be seen by re-running the scanners, which puts today's databases under
  * a run made against yesterday's — no longer the run that was compared with Black Duck. This file
@@ -467,10 +467,9 @@ export function writeVulnerabilityFindings(model: BlackDuckModel, resultFolder: 
 }
 
 /**
- * Just `security.csv`. `analyse` writes this one file for every run, SBOM or not — it is the only
- * place the CVSS vector, CWE ids, fixed version and publication date behind the two libs.csv
- * vulnerability columns survive — and calls the same serialiser `export-blackduck` does, so the
- * two commands cannot drift into two spellings of the same header.
+ * Just `security.csv`: the only place the CVSS vector, CWE ids, fixed version and publication
+ * date behind the two libs.csv vulnerability columns survive. Written for every SBOM source
+ * through `writeBlackDuckExport`; exposed on its own for callers that have only findings.
  */
 export function writeSecurityCsv(model: BlackDuckModel, resultFolder: string): WrittenFile {
     return write(resultFolder, SECURITY_FILE, SECURITY_HEADERS, model.findings.map(it => securityRow(model, it)))

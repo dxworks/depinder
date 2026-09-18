@@ -58,6 +58,19 @@ describe('the analyse command line', () => {
         expect((await parseArgs('/repo')).options.refresh).toBe(false)
     })
 
+    it('accepts the SBOM export options that export-blackduck used to take', async () => {
+        const {options} = await parseArgs('/sboms', '--project-name', 'mastodon', '--target', '/repos', '--github-token-file', 'f')
+        expect(options.projectName).toBe('mastodon')
+        expect(options.target).toBe('/repos')
+        expect(options.githubTokenFile).toBe('f')
+        expect((await parseArgs('/sboms')).options.projectName).toBeUndefined()
+    })
+
+    it('defaults --vuln-source to trivy and grype', async () => {
+        expect((await parseArgs('/sboms')).options.vulnSource).toBe('trivy,grype')
+        expect((await parseArgs('/sboms', '--vuln-source', 'trivy,grype,github')).options.vulnSource).toBe('trivy,grype,github')
+    })
+
     it('accepts both value options together with several folders', async () => {
         const {folders, options} = await parseArgs('/a', '/b', '-r', 'out', '-p', 'java')
         expect(folders).toEqual(['/a', '/b'])

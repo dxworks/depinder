@@ -115,7 +115,7 @@ function parseCsv(raw: string): CsvRecord[] {
 /**
  * The column the two files are joined on. A real Black Duck export carries its version UUID in
  * `Version id`, and needs it: Black Duck can aggregate several origin ids into one row. A
- * depinder `export-blackduck` folder has no UUID to write, so `Version id` is empty on every row
+ * depinder `analyse` SBOM subfolder has no UUID to write, so `Version id` is empty on every row
  * of both files; there the origin id is unique per component and is the key instead.
  */
 export function chooseJoinKey(dependencies: CsvRecord[], dependenciesSources: CsvRecord[]): string {
