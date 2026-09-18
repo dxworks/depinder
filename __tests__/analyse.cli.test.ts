@@ -58,7 +58,7 @@ describe('the analyse command line', () => {
         expect((await parseArgs('/repo')).options.refresh).toBe(false)
     })
 
-    it('accepts the SBOM export options that export-blackduck used to take', async () => {
+    it('accepts the SBOM export options --project-name and --target', async () => {
         const {options} = await parseArgs('/sboms', '--project-name', 'mastodon', '--target', '/repos', '--github-token-file', 'f')
         expect(options.projectName).toBe('mastodon')
         expect(options.target).toBe('/repos')
