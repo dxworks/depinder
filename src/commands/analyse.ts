@@ -2,9 +2,11 @@ import {Command} from 'commander'
 import fs from 'fs'
 import path from 'path'
 import {getPluginsFromNames} from '../plugins'
-import {purlTypeOfEcosystem, purlTypeOfPlugin, sbomFilesFor, sbomFilesToParse} from '../plugins/sbom'
+import {purlTypeOfEcosystem, purlTypeOfPlugin, sbomFilesToParse, sbomPlugins, sbomPluginsForPurlTypes} from '../plugins/sbom'
+import {SbomDescription} from '../plugins/sbom/describe'
 import {
     preflightScanners,
+    ScannerPreflight,
     scanSbomFileOnce,
     scannerPreflightMessages,
     scannerSummaryLine,
@@ -38,8 +40,9 @@ import {ecosystemsInSboms} from '../vuln-sources/github/scan'
 import {refreshEcosystems} from '../vuln-sources/github/download'
 import {DEFAULT_MAX_AGE_HOURS} from '../vuln-sources/github/cache'
 import {DEFAULT_TOKEN_FILE} from '../vuln-sources/github/tokens'
-import {AnalysedEcosystem, buildModel} from '../blackduck/model'
-import {writeSecurityCsv} from '../blackduck/export'
+import {AnalysedEcosystem} from '../blackduck/model'
+import {writeBlackDuckForSource} from '../blackduck/run'
+import {classifyInputs, inputFolderOf, InputSources, NATIVE_SOURCE} from './sources'
 import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
 import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/profile'
@@ -60,13 +63,17 @@ export interface AnalyseOptions {
     githubMaxAge?: string
     /** Print per-phase wall-clock, cache and HTTP request counts at the end of the run. */
     profile?: boolean
+    /** SBOM sources: the `Project path` value and the head of every dependency path. */
+    projectName?: string
+    /** SBOM sources: the scanned repositories, one per SBOM repo name, for Black Duck's `Path` prefix. */
+    target?: string
 }
 
 /** A factory rather than a single instance, so tests can parse arguments from a clean slate. */
 export function createAnalyseCommand(): Command {
     return new Command()
         .name('analyse')
-        .argument('[folders...]', 'A list of folders to walk for files')
+        .argument('[folders...]', 'Folders to walk: native project folders, SBOM folders, or both')
         // .argument('[depext-files...]', 'A list of files to parse for dependency information')
         // Both value-taking options need a <value> placeholder: without one Commander registers
         // them as booleans, so `-r out` set `{R: true}` and left `out` to be walked as another
@@ -74,6 +81,11 @@ export function createAnalyseCommand(): Command {
         .option('-r, --results <folder>', 'The results folder', 'results')
         .option('--refresh', 'Refresh the cache', false)
         .option('-p, --plugins [plugins...]', 'A list of plugins')
+        .option('--project-name <name>',
+            'SBOM sources: the name to write in the Project path column and at the head of every dependency path')
+        .option('--target <folder>',
+            'SBOM sources: the folder holding the scanned repositories, one per SBOM name; their manifests give '
+            + 'Path its Black Duck project prefix and drop the repository\'s own code from the chain')
         .option('--vuln-source <sources>',
             'Vulnerability sources for the SBOM route: a comma-separated list of trivy, grype, github, all',
             DEFAULT_VULN_SOURCE)
@@ -221,52 +233,104 @@ async function retrieveWithRetry(plugin: Plugin, name: string): Promise<LibraryI
 
 /**
  * What one plugin's pass produced: the purl type its components carry, and the projects it
- * enriched. `export-blackduck` builds its whole model out of this, which is what keeps the two
- * commands from growing two copies of the analysis.
+ * enriched. The Black Duck-shaped files are built out of this, which is what keeps the SBOM
+ * sources from growing a second copy of the analysis.
  */
 export type AnalysisResult = AnalysedEcosystem
 
-export async function analyseFiles(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
-    const resultFolder = path.resolve(process.cwd(), options.results || 'results')
-    const analysed = await runAnalysis(folders, options, useCache)
-
-    // One security CSV for the whole run, not one per plugin: a finding is identified by
-    // (component, advisory), and which depinder plugin happened to enrich the component is not
-    // part of that identity. It is written by the Black Duck writer, so `analyse` and
-    // `export-blackduck` cannot disagree about its columns — and `export-blackduck` writes it
-    // itself, from a model that also knows the project name, which is why it is here rather than
-    // inside `runAnalysis`.
-    const written = writeSecurityCsv(buildModel(path.basename(resultFolder), analysed, []), resultFolder)
-    log.info(`${written.rows} security finding row(s) written to ${written.file}`)
-    logProfile()
+/**
+ * One results subfolder's worth of work: the plugins that run, the files their extractors see,
+ * and — for an SBOM source — the SBOMs themselves, in walk order.
+ */
+export interface PlannedRun {
+    /** `trivy`, `syft` or `depinder`; also the subfolder under the results folder. */
+    source: string
+    /** Absolute: `<results>/<source>`. */
+    folder: string
+    /** The input folder the source's files came from — the project-name fallback. */
+    inputFolder: string
+    plugins: Plugin[]
+    files: string[]
+    sboms?: SbomDescription[]
 }
 
-/** `analyse`, plus the enriched projects, so a caller can write its own reports from them. */
-export async function runAnalysis(folders: string[], options: AnalyseOptions, useCache = true): Promise<AnalysisResult[]> {
-    if (options.profile) enableProfile()
-    const resultFolder = options.results || 'results'
-    if (!fs.existsSync(path.resolve(process.cwd(), resultFolder))) {
-        fs.mkdirSync(path.resolve(process.cwd(), resultFolder), {recursive: true})
-        log.info('Creating results dir')
-    }
-    const allFiles = folders.flatMap(it => walkDir(it))
+/** The files one plugin's extractor takes from a pool. */
+export function filesForPlugin(plugin: Plugin, files: string[]): string[] {
+    return files
+        .filter(it => plugin.extractor.filter ? plugin.extractor.filter(it) : true)
+        .filter(it => plugin.extractor.files.some(pattern => minimatch(it, pattern, {matchBase: true})))
+}
 
-    const selectedPlugins = getPluginsFromNames(options.plugins)
+/**
+ * Which sources get a run, and with which plugins.
+ *
+ * Native: every selected native plugin, into `depinder/`, as long as at least one of them has a
+ * file to read — a plugin with no files still writes its three empty CSVs, as it always has.
+ * SBOM: the `sbom-*` plugins the source's purl types call for (an explicit `-p` narrows to the
+ * sbom plugins it names), into `<producer>/`.
+ */
+export function planRuns(sources: InputSources, selected: Plugin[], options: AnalyseOptions, resultRoot: string, folders: string[]): PlannedRun[] {
+    const runs: PlannedRun[] = []
+    const explicit = !!options.plugins?.length
+    for (const source of sources.sbom) {
+        const purlTypes = new Set(source.sboms.flatMap(it => [...it.purlTypes]))
+        const plugins = explicit
+            ? selected.filter(it => sbomPlugins.includes(it))
+            : sbomPluginsForPurlTypes(purlTypes)
+        if (plugins.length === 0) {
+            if (explicit) log.info(`${source.name}: skipped, --plugins names no sbom-* plugin`)
+            else log.warn(`${source.name}: no sbom-* plugin covers the ecosystems in these SBOMs`
+                + ` (${[...purlTypes].sort().join(', ')}); nothing to analyse`)
+            continue
+        }
+        log.info(`${source.name}: ${source.sboms.length} SBOM(s), ecosystems ${[...purlTypes].sort().join(', ')}`
+            + ` -> plugins ${plugins.map(it => it.name).join(', ')}`)
+        runs.push({
+            source: source.name,
+            folder: path.join(resultRoot, source.name),
+            inputFolder: inputFolderOf(source, folders),
+            plugins,
+            files: source.sboms.map(it => it.file),
+            sboms: source.sboms,
+        })
+    }
+    const nativePlugins = selected.filter(it => !sbomPlugins.includes(it))
+    if (nativePlugins.some(it => filesForPlugin(it, sources.native).length > 0)) {
+        runs.push({
+            source: NATIVE_SOURCE,
+            folder: path.join(resultRoot, NATIVE_SOURCE),
+            inputFolder: folders[0] ?? '.',
+            plugins: nativePlugins,
+            files: sources.native,
+        })
+    }
+    return runs
+}
+
+interface SbomPreparation {
+    preflight?: ScannerPreflight
+    hasGithubToken: boolean
+}
+
+/**
+ * Everything the SBOM route does once per process, before any parsing: the scanner preflight,
+ * the GitHub advisory refresh and the up-front scan of every SBOM any run will parse.
+ */
+async function prepareSbomScans(runs: PlannedRun[], options: AnalyseOptions): Promise<SbomPreparation | undefined> {
+    const sbomRuns = runs.filter(it => it.sboms)
+    if (sbomRuns.length === 0) return undefined
+    const sbomFiles = sbomRuns.flatMap(it => it.files)
+    const hasGithubToken = !!process.env.GH_TOKEN
+    const sources = parseVulnSources(options.vulnSource ?? DEFAULT_VULN_SOURCE)
+    setVulnSources(sources)
+    log.info(`Vulnerability sources: ${describeVulnSources(sources)}`)
 
     // Scanner preflight, before any parsing: the SBOM parsers shell out to Trivy and Grype, and a
     // missing binary used to surface only as a mid-run warning per file — leaving the user with a
     // completed run, empty vulnerability columns and nothing that said so. Run once, say it up
     // front, and never abort: a run without scanners is degraded, not invalid.
-    const sbomFiles = sbomFilesFor(selectedPlugins, allFiles)
-    const hasGithubToken = !!process.env.GH_TOKEN
-    const sources = parseVulnSources(options.vulnSource ?? DEFAULT_VULN_SOURCE)
-    setVulnSources(sources)
-    if (sbomFiles.length > 0) log.info(`Vulnerability sources: ${describeVulnSources(sources)}`)
-
     const runsLocalScanners = sources.trivy || sources.grype
-    const preflight = sbomFiles.length > 0 && runsLocalScanners
-        ? await timePhase('preflight', () => preflightScanners())
-        : undefined
+    const preflight = runsLocalScanners ? await timePhase('preflight', () => preflightScanners()) : undefined
     if (preflight) {
         for (const message of scannerPreflightMessages(preflight, hasGithubToken)) log[message.level](message.text)
     }
@@ -274,7 +338,7 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
     // The GitHub cache is refreshed before any parsing, and only for the ecosystems these SBOMs
     // actually contain — a Ruby project never downloads npm's 7,000 advisories. A refresh failure
     // is a warning: whatever is already cached still matches.
-    if (sbomFiles.length > 0 && sources.github) {
+    if (sources.github) {
         const ecosystems = ecosystemsInSboms(sbomFiles)
         log.info(`GitHub advisory ecosystems in these SBOMs: ${ecosystems.join(', ') || 'none'}`)
         try {
@@ -293,9 +357,21 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
     // one project at a time, which serialised a dozen one-to-two-second Grype runs.
     if (preflight) {
         await timePhase('scan:prescan', () =>
-            Promise.all(sbomFilesToParse(selectedPlugins, sbomFiles).map(file => scanSbomFileOnce(file))))
+            Promise.all(sbomRuns.flatMap(it => sbomFilesToParse(it.plugins, it.files)).map(file => scanSbomFileOnce(file))))
     }
+    return {preflight, hasGithubToken}
+}
 
+/** The process-wide cache handle: opened once, checkpointed mid-run, closed once at the end. */
+export interface CacheSession {
+    cache: Cache
+    misses: MissCache
+    checkpointIfDue: () => Promise<void>
+    /** The teardown write: flushes anything still pending and releases the cache's resources. */
+    close: () => Promise<void>
+}
+
+async function openCacheSession(useCache: boolean): Promise<CacheSession> {
     const cache: Cache = useCache ? chooseCacheOption() : noCache
     const misses: MissCache = useCache ? missCache : noMissCache
     await timePhase('cache:load', async () => {
@@ -316,24 +392,89 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         lastCheckpoint = Date.now()
         await checkpoint()
     }
+    const close = () => timePhase('cache:write', async () => {
+        await cache.write()
+        misses.write()
+    })
+    return {cache, misses, checkpointIfDue, close}
+}
+
+/**
+ * `depinder analyse <folders...>`: one results subfolder per source found under the folders.
+ *
+ * The files decide, not the folders: every walked file is classified by content (`sources.ts`),
+ * so a folder of Trivy SBOMs, one of Syft SBOMs and a checked-out repository can be given in one
+ * invocation, or in three. Each SBOM source gets the `sbom-*` plugin CSVs, the scan provenance
+ * and the Black Duck-shaped files under `<results>/<producer>/`; the native plugins write their
+ * CSVs under `<results>/depinder/`. A subfolder exists only when its source had input.
+ */
+export async function analyseFiles(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
+    if (options.profile) enableProfile()
+    const resultRoot = path.resolve(process.cwd(), options.results || 'results')
+    const allFiles = folders.flatMap(it => walkDir(it))
+    const selected = getPluginsFromNames(options.plugins)
+    const runs = planRuns(classifyInputs(allFiles), selected, options, resultRoot, folders)
+    if (runs.length === 0) {
+        log.warn(`Nothing to analyse under ${folders.join(', ') || '.'}`)
+        return
+    }
+
+    const prep = await prepareSbomScans(runs, options)
+    const session = await openCacheSession(useCache)
+    try {
+        for (const run of runs) {
+            const analysed = await runAnalysis(run.files, run.plugins, run.folder, options, session)
+            if (run.sboms) {
+                // Only when the local scanners ran: the file records their versions and DB builds,
+                // which is what makes a vulnerability count reproducible.
+                if (prep?.preflight) {
+                    try {
+                        const provenanceFile = await writeScanProvenance(run.folder, prep.hasGithubToken, run.sboms)
+                        log.info(`Scan provenance written to ${provenanceFile}`)
+                    } catch (e: any) {
+                        log.warn(`Could not write scan provenance: ${e?.message ?? e}`)
+                    }
+                }
+                writeBlackDuckForSource(run.sboms, analysed, run.folder, run.inputFolder, options)
+            }
+            log.info(`Results for ${run.source} are written to ${run.folder}`)
+        }
+    } finally {
+        await session.close()
+    }
+
+    if (prep?.preflight) {
+        // Repeated here because the preflight banner is thousands of log lines back by now, and
+        // because a CSV is only readable next to the matcher and DB build that produced it.
+        const summary = scannerSummaryLine(prep.preflight, prep.hasGithubToken)
+        log[summary.level](summary.text)
+    }
+    log.info('Done')
+    logProfile()
+}
+
+/**
+ * Runs `plugins` over `files` and writes each plugin's three CSVs into `resultFolder`. The
+ * enrichment is shared by every source: this is the one place a dependency is looked up.
+ */
+export async function runAnalysis(files: string[], plugins: Plugin[], resultFolder: string, options: AnalyseOptions, session: CacheSession): Promise<AnalysisResult[]> {
+    if (!fs.existsSync(resultFolder)) {
+        fs.mkdirSync(resultFolder, {recursive: true})
+        log.info(`Creating results dir ${resultFolder}`)
+    }
     const progress = new MultiBar({}, Presets.shades_grey)
 
     // The plugins run side by side. Each talks to its own registry, so six at once put no more
     // than REGISTRY_CONCURRENCY requests on any one of them, and a registry that stalls — Maven
     // Central's search API, for one — no longer holds the others up.
-    const results = await Promise.all(selectedPlugins.map(async (plugin): Promise<AnalysisResult | undefined> => {
+    const results = await Promise.all(plugins.map(async (plugin): Promise<AnalysisResult | undefined> => {
         log.info(`Plugin ${plugin.name} starting`)
 
         const refreshedLibs = [] as string[]
         const inFlight = new Map<string, Promise<LibraryInfo>>()
 
-        const files = allFiles
-            .filter(it => plugin.extractor.filter ? plugin.extractor.filter(it) : true)
-            .filter(it => plugin.extractor.files
-                .some(pattern => minimatch(it, pattern, {matchBase: true}))
-            )
-
-        const projects: DepinderProject[] = await timePhase(`parse:${plugin.name}`, () => extractProjects(plugin, files))
+        const projects: DepinderProject[] = await timePhase(`parse:${plugin.name}`, () =>
+            extractProjects(plugin, filesForPlugin(plugin, files)))
 
         const projectsBar = progress.create(projects.length, 0, {name: 'Projects', state: 'Analysing'})
 
@@ -356,10 +497,10 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
                     // registrar, so they must share cache entries rather than fetch each library
                     // twice. `update.ts` reconstructs library names from this same prefix.
                     const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
-                    if (await cacheHit(cache, cacheKey, dep, options.refresh, refreshedLibs)) {
+                    if (await cacheHit(session.cache, cacheKey, dep, options.refresh, refreshedLibs)) {
                         count('cache:hit')
-                        lib = await cache.get(cacheKey) as LibraryInfo
-                    } else if (!options.refresh && misses.has(cacheKey)) {
+                        lib = await session.cache.get(cacheKey) as LibraryInfo
+                    } else if (!options.refresh && session.misses.has(cacheKey)) {
                         // Same outcome as the failed lookup it remembers: the dependency
                         // keeps whatever the parser gave it, untouched.
                         count('cache:known-miss')
@@ -375,7 +516,7 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
                                 try {
                                     fetched = await retrieveWithRetry(plugin, dep.name)
                                 } catch (e: any) {
-                                    if (!isRateLimit(e)) misses.set(cacheKey)
+                                    if (!isRateLimit(e)) session.misses.set(cacheKey)
                                     throw e
                                 }
                                 if (plugin.checker?.githubSecurityAdvisoryEcosystem && process.env.GH_TOKEN) {
@@ -387,9 +528,9 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
                                         log.warn(`Vulnerability lookup failed for ${fetched.name}: ${e.message ?? e}`)
                                     }
                                 }
-                                await cache.set(cacheKey, fetched)
+                                await session.cache.set(cacheKey, fetched)
                                 if (options.refresh) refreshedLibs.push(dep.name)
-                                await checkpointIfDue()
+                                await session.checkpointIfDue()
                                 return fetched
                             })()
                             inFlight.set(cacheKey, fetch)
@@ -434,18 +575,18 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         const allLicenses = _.groupBy(allLibsInfo, licenseOf)
 
         const licensesHeader = 'License,Libraries,Library Names\n'
-        fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-licenses.csv`),
+        fs.writeFileSync(path.resolve(resultFolder, `${plugin.name}-licenses.csv`),
             licensesHeader + Object.keys(allLicenses).map(license =>
                 csvRow([license, allLicenses[license].length, allLicenses[license].map(it => it.name).join(', ')])
             ).join('\n'))
 
         const header = 'Project Path,Project,Library,Used Version,Latest Version,Used Version Release Date,Latest Version Release Date,Latest-Used,Now-Used,Now-latest,Vulnerabilities,Vulnerability Details,DirectDependency,Type,Licenses\n'
-        fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-libs.csv`), header + projects.flatMap(proj =>
+        fs.writeFileSync(path.resolve(resultFolder, `${plugin.name}-libs.csv`), header + projects.flatMap(proj =>
             Object.values(proj.dependencies).map(dep => convertDepToRow(proj, dep))).join('\n'))
 
 
         const projectStatsHeader = 'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct Out of Support, Indirect Out of Support\n'
-        fs.writeFileSync(path.resolve(process.cwd(), resultFolder, `${plugin.name}-project-stats.csv`), projectStatsHeader + projects.map(proj => {
+        fs.writeFileSync(path.resolve(resultFolder, `${plugin.name}-project-stats.csv`), projectStatsHeader + projects.map(proj => {
             const enhancedDeps: DependencyInfo[] = Object.values(proj.dependencies).map(dep => {
                 const latestVersion = dep.libraryInfo?.versions.find(it => it.latest)
                 const currentVersion = dep.libraryInfo?.versions.find(it => it.version == dep.version.trim())
@@ -491,28 +632,8 @@ export async function runAnalysis(folders: string[], options: AnalyseOptions, us
         return purlType ? {purlType, projects} : undefined
     }))
     progress.stop()
-    // The teardown write: flushes anything still pending and releases the cache's resources.
-    await timePhase('cache:write', async () => {
-        await cache.write()
-        misses.write()
-    })
     const analysed = results.filter((it): it is AnalysisResult => it !== undefined)
-
-    if (preflight) {
-        // Repeated here because the preflight banner is thousands of log lines back by now, and
-        // because a CSV is only readable next to the matcher and DB build that produced it.
-        const summary = scannerSummaryLine(preflight, hasGithubToken)
-        log[summary.level](summary.text)
-        try {
-            const provenanceFile = await writeScanProvenance(path.resolve(process.cwd(), resultFolder), hasGithubToken)
-            log.info(`Scan provenance written to ${provenanceFile}`)
-        } catch (e: any) {
-            log.warn(`Could not write scan provenance: ${e?.message ?? e}`)
-        }
-    }
-
-    log.info(`Results are written to ${path.resolve(process.cwd(), resultFolder)}`)
-    log.info('Done')
+    log.info(`Results are written to ${resultFolder}`)
     return analysed
 }
 

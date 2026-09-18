@@ -13,7 +13,8 @@ const DEPENDENCIES_FILE = '_dependencies.csv';
 const DEPENDENCIES_SOURCES_FILE = '_dependencies_sources.csv';
 const DEPENDENCIES_BY_CATEGORY_FILE = '_dependencies_by_category.csv';
 const DEPENDENCIES_SOURCES_BY_CATEGORY_FILE = '_dependencies_sources_by_category.csv';
-const JOIN_KEY = 'Version id';
+const VERSION_ID_KEY = 'Version id';
+const ORIGIN_ID_KEY = 'Component Version Origin Id';
 
 export const COULD_NOT_MAP_REPOSITORY_CATEGORY = 'COULD_NOT_MAP_REPOSITORY';
 
@@ -50,11 +51,12 @@ export function addCategoriesToReports(
     dependenciesSources: CsvRecord[],
     repoCategories: Map<string, string>
 ): CategoryOutputs {
-    validateJoinKeys(dependencies, DEPENDENCIES_FILE);
-    validateJoinKeys(dependenciesSources, DEPENDENCIES_SOURCES_FILE);
+    const joinKey = chooseJoinKey(dependencies, dependenciesSources);
+    validateJoinKeys(dependencies, DEPENDENCIES_FILE, joinKey);
+    validateJoinKeys(dependenciesSources, DEPENDENCIES_SOURCES_FILE, joinKey);
 
     const dependenciesSourcesByCategory = dependenciesSources.map(row => {
-        const repository = getRepository(row['VerifiedPath'] || '');
+        const repository = getRepository(row['VerifiedPath'] || row['ProjectPath'] || '');
         const category = getCategory(repository, repoCategories);
 
         return {
@@ -64,9 +66,9 @@ export function addCategoriesToReports(
         };
     });
 
-    const categoriesByOriginId = buildCategoriesByOriginId(dependenciesSourcesByCategory);
+    const categoriesByOriginId = buildCategoriesByOriginId(dependenciesSourcesByCategory, joinKey);
     const dependenciesByCategory = dependencies.flatMap(row => {
-        const categories = categoriesByOriginId.get(row[JOIN_KEY]) || [''];
+        const categories = categoriesByOriginId.get(row[joinKey]) || [''];
 
         return categories.map(category => ({
             Category: category,
@@ -110,14 +112,25 @@ function parseCsv(raw: string): CsvRecord[] {
     return parse(raw, CSV_PARSE_OPTIONS) as CsvRecord[];
 }
 
-function validateJoinKeys(rows: CsvRecord[], fileName: string): void {
-    const firstInvalidRow = rows.findIndex(row => !(row[JOIN_KEY] || '').trim());
+/**
+ * The column the two files are joined on. A real Black Duck export carries its version UUID in
+ * `Version id`, and needs it: Black Duck can aggregate several origin ids into one row. A
+ * depinder `analyse` SBOM subfolder has no UUID to write, so `Version id` is empty on every row
+ * of both files; there the origin id is unique per component and is the key instead.
+ */
+export function chooseJoinKey(dependencies: CsvRecord[], dependenciesSources: CsvRecord[]): string {
+    const noVersionIds = (rows: CsvRecord[]) => rows.every(row => !(row[VERSION_ID_KEY] || '').trim());
+    return noVersionIds(dependencies) && noVersionIds(dependenciesSources) ? ORIGIN_ID_KEY : VERSION_ID_KEY;
+}
+
+function validateJoinKeys(rows: CsvRecord[], fileName: string, joinKey: string): void {
+    const firstInvalidRow = rows.findIndex(row => !(row[joinKey] || '').trim());
     if (firstInvalidRow >= 0) {
-        throw new Error(`${fileName} contains an empty ${JOIN_KEY} at data row ${firstInvalidRow + 1}`);
+        throw new Error(`${fileName} contains an empty ${joinKey} at data row ${firstInvalidRow + 1}`);
     }
 }
 
-function buildCategoriesByOriginId(rows: CsvRecord[]): Map<string, string[]> {
+function buildCategoriesByOriginId(rows: CsvRecord[], joinKey: string): Map<string, string[]> {
     const categoriesByOriginId = new Map<string, Set<string>>();
 
     for (const row of rows) {
@@ -126,7 +139,7 @@ function buildCategoriesByOriginId(rows: CsvRecord[]): Map<string, string[]> {
             continue;
         }
 
-        const originId = row[JOIN_KEY];
+        const originId = row[joinKey];
         if (!categoriesByOriginId.has(originId)) {
             categoriesByOriginId.set(originId, new Set<string>());
         }
@@ -149,6 +162,11 @@ function getCategory(repository: string, repoCategories: Map<string, string>): s
     return repoCategories.get(normalizeRepo(repository)) || COULD_NOT_MAP_REPOSITORY_CATEGORY;
 }
 
+/**
+ * The repository is the first segment of the path. `VerifiedPath` when the transform verified one
+ * on disk; otherwise `ProjectPath`, which an `analyse` SBOM subfolder writes as `<repo>` or
+ * `<repo>/<module>` and never verifies.
+ */
 function getRepository(verifiedPath: string): string {
     const normalizedPath = verifiedPath.trim().replace(/\\/g, '/');
     return normalizedPath.split('/').find(segment => segment.length > 0) || '';

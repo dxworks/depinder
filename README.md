@@ -43,8 +43,8 @@ depinder analyse ./sboms -r out -p sbom-npm --vuln-source github
 
 `--vuln-source` takes a comma-separated list of `trivy`, `grype`, `github` and `all`, and defaults
 to `trivy,grype` — today's behaviour. Whichever sources run, the findings also go to
-`security.csv` next to the libs CSVs, one row per (component, advisory), in Black Duck's own
-column shape (see [Black Duck-shaped exports](#black-duck-shaped-exports)).
+`security.csv` next to the libs CSVs of each SBOM source, one row per (component, advisory), in
+Black Duck's own column shape (see [Black Duck-shaped exports](#black-duck-shaped-exports)).
 
 The download needs GitHub tokens. Put them in a dotenv-style file — `.github-tokens` in the working
 directory by default, `--github-token-file` to point elsewhere:
@@ -63,27 +63,31 @@ before its rate-limit window is exhausted rather than after. The cache lives in
 
 ## Black Duck-shaped exports
 
-`export-blackduck` turns a folder of CycloneDX SBOMs into the four CSVs a Black Duck project
-version exports, with Black Duck's exact column headers, so the two can be diffed side by side,
-plus one file Black Duck has no counterpart for: `_dependency_edges.csv`, the dependency graph.
+For every folder of CycloneDX SBOMs it is given, `analyse` writes the four CSVs a Black Duck
+project version exports, with Black Duck's exact column headers, so the two can be diffed side
+by side, plus files Black Duck has no counterpart for, such as `_dependency_edges.csv`, the
+dependency graph.
 
 ```shell
-depinder export-blackduck <sbom-folder...> -r <out> \
-    [--vuln-source trivy,grype,github] [--github-token-file F] [--project-name NAME]
+depinder analyse <sbom-folder...> -r <out> \
+    [--vuln-source trivy,grype,github] [--github-token-file F] [--project-name NAME] [--target DIR]
 ```
 
-It runs the same analysis `analyse` runs — dependency tree, registry licences and versions,
-vulnerabilities from the selected sources — and writes the normal depinder CSVs into the same
-folder, then the Black Duck files on top. You do not name plugins: the ecosystems present in
-the SBOMs select the `sbom-*` plugins for you.
+Each SBOM is sorted by its content — a Trivy SBOM goes to `<out>/trivy/`, a Syft SBOM to
+`<out>/syft/` — and each subfolder gets the normal depinder CSVs for that source, then the
+Black Duck files on top. You do not name plugins: the ecosystems present in the SBOMs select
+the `sbom-*` plugins for you. Native input, when present, goes to `<out>/depinder/` with the
+`<plugin>-*.csv` triples only.
 
 | File | One row per | Notes |
 |---|---|---|
-| `_dependencies.csv` | (component, version, origin) | The first header really is `1Component name` — Black Duck's own spelling, reproduced verbatim so a diff lines up |
-| `_dependencies_sources.csv` | (component, path) | The dependency chain, walked from the SBOM's `dependsOn` edges |
+| `_dependencies.csv` | (component, version, origin) | The 25 columns `transformBlackDuckReports` writes, same header line and cell conventions (`src/blackduck/columns.ts`, shared by both commands) |
+| `_dependencies_sources.csv` | (component, path) | The transform's 23 columns; the dependency chain, walked from the SBOM's `dependsOn` edges |
+| `_vulnerability_details.csv` | (component, advisory) | The transform's 23 columns: `security.csv` without Black Duck's ids, triage and CISA block; dates as `\tYYYY-MM-DD` |
+| `_component_versions.csv` | component | **Not a Black Duck file.** `Release Date`, `Newer Versions` and our `Newer Versions (semver)`, the count by version number |
 | `_dependency_edges.csv` | (parent, child) | **Not a Black Duck file.** `Path` keeps one chain per component, as Black Duck does, so a component with three parents keeps one; this is every edge, with each component's depth. Columns: `Repo, Tree, Ecosystem, Parent Origin Id, Child Origin Id, Child Depth`. A `Tree` is `<repo>/<module>/-<package manager>`; a component nothing pulls in has parent `(root)` and depth 1 |
 | `_upgrade_guidance.csv` | component with ≥ 1 finding | Short/long term recommended versions |
-| `security.csv` | (component, advisory) | Black Duck's `security_*.csv` header byte for byte; its internal ids, triage fields and CISA block are empty for us. `analyse` writes this one file too, through the same serialiser |
+| `security.csv` | (component, advisory) | Black Duck's `security_*.csv` header byte for byte; its internal ids, triage fields and CISA block are empty for us |
 | `_vulnerability_findings.json` | component with ≥ 1 finding | **Not a Black Duck file.** The findings as the exporter saw them, fix versions per line included — what no CSV carries |
 
 ### Column mapping
@@ -93,29 +97,31 @@ than guessed.
 
 | Black Duck column | Our source | Derivation |
 |---|---|---|
-| `1Component name` / `Component name` | SBOM purl | The registry name. Black Duck's is a Knowledge Base *display* name (`Action Mailer` for `actionmailer`), so the two never match — join on the origin id instead |
+| `Component name` | SBOM purl | The registry name. Black Duck's is a Knowledge Base *display* name (`Action Mailer` for `actionmailer`), so the two never match — join on the origin id instead |
 | `Component version name` | SBOM purl | verbatim |
+| `Version id` | — | **empty** — Black Duck's internal version UUID. `addCategoriesToBlackDuckReports` joins on `Component Version Origin Id` when every `Version id` is empty |
 | `Component Version Origin Id` | SBOM purl | `name/version` for npmjs, rubygems, pypi, nuget, crates; `name:version` for maven, packagist — read off the real export, not guessed. Go: `owner/repo:version` under `github`, `go.googlesource.com/<name>#version` under `long_tail`, a pseudo-version written as its 12-character commit (Black Duck holds the full hash) |
 | `Origin name` | purl type | `npm`→`npmjs`, `gem`→`rubygems`, `composer`→`packagist`, `cargo`→`crates`, else the purl type; unmapped → `unknown`. Go modules go by host: `github.com/…`→`github`, `golang.org/x/…`→`long_tail`, any other host → `unknown` (Black Duck resolves those to a GitHub repo through its Knowledge Base, which an SBOM does not carry) |
 | `License names` | registrar, else the SBOM | SPDX id mapped to Black Duck's display name (`MIT` → `MIT License`); an unmapped id is written as-is so it stays visible. Black Duck collapses `MIT-0` into `MIT License`; we keep the distinct name |
 | `License families` | the same table | `PERMISSIVE` / `WEAK_RECIPROCAL` / `RECIPROCAL` / `RESTRICTED_PROPRIETARY` / `UNKNOWN` |
-| `Match type` | `requestedBy` | `Direct Dependency` / `Transitive Dependency` / `Direct Dependency,Transitive Dependency` — the rule `<plugin>-libs.csv` already uses, made three-valued, in Black Duck's own wording so the column compares without a translation step |
+| `Match type` | `requestedBy` | `Direct` / `Transitive` / `Direct,Transitive` — the rule `<plugin>-libs.csv` already uses, made three-valued, in the transform's wording (it strips ` Dependency` from Black Duck's) |
 | `Usage` | — | Constant `DYNAMICALLY_LINKED`, which is what Black Duck writes for every row of a dependency scan |
 | `Operational Risk` | `Release Date` + `Newer Versions` | `OK` / `LOW` / `MEDIUM` / `HIGH`, **approximated** — see *The two risk columns* below. Empty when either input is missing |
 | `License Risk` | `License names` | `OK` / `MEDIUM` / `HIGH` from the licence family, with `OR` read as a choice and `AND` as a conjunction — see below |
-| `Total` / `Critical and High` / `Critical` / `High` / `Medium` / `Low Vulnerability Count` | findings | Counted from the merged findings. Black Duck leaves a per-severity cell blank when it is 0; we always write the number |
-| `Release Date` | registrar | ISO `YYYY-MM-DD`. Black Duck's cell carries a leading TAB; we do not reproduce it |
-| `Newer Versions` | registrar | Registry versions ordered above the installed one, using the ecosystem's comparator. Empty when no registrar answered |
+| `Critical` / `High` / `Medium` / `Low Vulnerability Count` | findings | Counted from the merged findings; a zero cell is blank, as the transform writes it |
+| `Total` / `Critical and High Vulnerability Count` | findings | Always a number. `Total` is every finding, the same count as libs.csv and `_upgrade_guidance.csv`; `Critical and High` is the sum of those two. A finding with no recognised severity is in `Total` only, and the exporter warns how many |
+| `Release Date` | registrar | `\tYYYY-MM-DD` — the transform's shape, tab included, so Excel keeps the ISO date as text. `_component_versions.csv` carries it plain |
+| `Newer Versions` | registrar | Registry versions ordered above the installed one, using the ecosystem's comparator. Empty when no registrar answered. `Newer Versions (semver)`, the count by version number, is in `_component_versions.csv` |
 | `Commit Activity`, `Commits in Past 12 Months`, `Contributors in Past 12 Months`, `Open Hub URL` / `OpenHubURL` | — | **empty, not derivable** — Open Hub data |
 | `Has License Conflicts` | — | Constant `false`; we run no licence-conflict analysis |
 | `Component Link` | registrar homepage, else registry | The registrar's `homepageUrl`, falling back to a registry page URL built from the coordinates (maven has none we can derive) |
 | `Path` | SBOM `dependsOn` | `<project>/-<package manager>/<name>/<version>/…` — see *Dependency paths* below |
 | `ProjectPath` | — | The project name, plus `/<module>` when the SBOM names its modules |
-| `ProjectPathExists`, `VerifiedPath` | — | **empty** — Black Duck leaves them empty too |
+| `VerifiedPath`, `VerifiedPathMethod` | — | empty and `not-checked` — what the transform writes without `--basePath` |
 | `Vulnerability id` | findings | `GHSA-… (CVE-…)` when both are known, else the single id — Black Duck's `BDSA-… (CVE-…)` shape. We have no BDSA numbers |
 | `Vulnerability source` | finding origin | `GHSA` (advisory cache), `TRIVY`, `GRYPE`. A finding two sources agree on reports the advisory database, since that is the one that names it |
 | `Description`, `Security Risk` | findings | verbatim from the source |
-| `Published on` | findings | Black Duck's own date shape, `7/24/26` (unpadded, two-digit year, UTC). `Release Date` in `_dependencies.csv` stays ISO because Black Duck writes ISO there |
+| `Published on` | findings | `7/24/26` in `security.csv`, Black Duck's raw shape (unpadded, two-digit year, UTC); `\tYYYY-MM-DD` in `_vulnerability_details.csv`, as the transform rewrites it |
 | `Base score` | findings | GHSA's score first — the catalogue our ids are named after, CVSS 4 nowadays — then NVD's (on grype it sits on the related CVE record, not the GHSA one), then the highest of any other source. Black Duck's column is NVD's CVSS 3.x, so the two differ wherever GHSA rescored; that is a chosen difference, not a normalisation gap |
 | `Exploitability`, `Impact` | CVSS 3.x vector | The CVSS 3.1 sub-scores (specification §7.1), rounded to one decimal as Black Duck prints them. Empty for a CVSS 4 or 2 vector, which have no such split |
 | `URL` | findings | The NVD page, `https://nvd.nist.gov/vuln/detail/<CVE>`, whenever a CVE is known — Black Duck links there whatever the catalogue. Without a CVE, the scanner's own page |
@@ -267,7 +273,7 @@ Every row is committed as it is written, so the 60-second checkpoint costs nothi
 (`cache/libs.json`, `misses.json`) is not read by a run any more;
 `depinder cache import cache` copies it into the database, keeping rows already there.
 
-Add `--profile` to `analyse` or `export-blackduck` to get, at the end of the run, the wall-clock
+Add `--profile` to `analyse` to get, at the end of the run, the wall-clock
 of each phase (parse, scans, registry enrichment, CSV writing), the cache hit/miss counts and the
 number of HTTP requests made to each host.
 
@@ -277,17 +283,10 @@ To analyse a project, run the following command:
 ```shell
 depinder analyse <paths-to-analysed-project-folders> ... -r <path-to-results-folder>
 ```
-This command gets as an argument multiple fully qualified folder paths and will automatically run all plugins that are available for the project's used languages 
-and export the results in the specified `results` folder.
-
-### Export Black Duck-shaped CSVs
-
-```shell
-depinder export-blackduck <sbom-folders> ... -r <path-to-results-folder> --vuln-source trivy,grype,github
-```
-
-Runs the analysis above over a folder of CycloneDX SBOMs and writes Black Duck's five export files
-alongside the normal depinder CSVs. See [Black Duck-shaped exports](#black-duck-shaped-exports).
+This command gets as an argument multiple fully qualified folder paths, sorts every file it finds
+by content — Trivy SBOM, Syft SBOM, or native manifest — and writes one subfolder per source under
+`results`: `trivy/` and `syft/` with the `sbom-*` CSVs and the Black Duck-shaped files, `depinder/`
+with the native plugins' CSVs. See [Black Duck-shaped exports](#black-duck-shaped-exports).
 
 ## Acknowledgements
 

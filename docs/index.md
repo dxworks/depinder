@@ -32,7 +32,9 @@ Per ecosystem found, three CSVs named after the plugin (`npm`, `ruby`, `java`, `
 - `<plugin>-licenses.csv` — licences seen, with counts
 - `<plugin>-project-stats.csv` — per project: dependency, outdated and vulnerable counts
 
-Plus `security.csv`, one row per (component, advisory), in Black Duck's column shape.
+Each source `analyse` finds — Trivy SBOMs, Syft SBOMs, native manifests — gets its own
+subfolder (`trivy/`, `syft/`, `depinder/`). The SBOM subfolders also hold `security.csv`, one
+row per (component, advisory), and the [Black Duck-shaped files](blackduck-export.md).
 
 ## Ecosystems
 

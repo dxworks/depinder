@@ -2,6 +2,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import {BLACKDUCK_FILES, blackDuckDate, upgradeGuidanceRows, vulnerabilityFindings, vulnerabilityUrl, writeBlackDuckExport, writeSecurityCsv, writeUpgradeGuidanceCsv} from '../src/blackduck/export'
+import {COMPONENT_VERSIONS_COLUMNS, DEPENDENCIES_COLUMNS, DEPENDENCIES_SOURCES_COLUMNS, UPGRADE_GUIDANCE_COLUMNS, VULNERABILITY_DETAILS_COLUMNS} from '../src/blackduck/columns'
 import {cvss3SubScores} from '../src/blackduck/cvss'
 import {licenseColumns} from '../src/blackduck/licenses'
 import {AnalysedEcosystem, buildModel, comparatorForPurlType} from '../src/blackduck/model'
@@ -595,37 +596,107 @@ describe('dependency paths', () => {
 
 describe('the written files', () => {
     const readCsv = (folder: string, file: string): string[] =>
-        fs.readFileSync(path.join(folder, file), 'utf8').split('\n')
+        fs.readFileSync(path.join(folder, file), 'utf8').trimEnd().split('\n')
 
     let folder: string
     beforeEach(() => {
         folder = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder-bd-'))
     })
 
-    it('writes the five CSVs and the findings sidecar', () => {
+    it('writes the seven CSVs and the findings sidecar', () => {
         const model = buildModel('demo', [ecosystem(dependency())], [])
         const written = writeBlackDuckExport(model, folder)
         expect(written.map(it => it.file)).toEqual([...BLACKDUCK_FILES])
         for (const file of BLACKDUCK_FILES) expect(fs.existsSync(path.join(folder, file))).toBe(true)
     })
 
-    it('spells the first _dependencies.csv column the way Black Duck does', () => {
+    it('writes the header lines transformBlackDuckReports writes, and ends every file with a newline', () => {
         writeBlackDuckExport(buildModel('demo', [ecosystem(dependency())], []), folder)
-        expect(readCsv(folder, '_dependencies.csv')[0].startsWith('1Component name,')).toBe(true)
+        expect(readCsv(folder, '_dependencies.csv')[0]).toBe(DEPENDENCIES_COLUMNS.join(','))
+        expect(readCsv(folder, '_dependencies_sources.csv')[0]).toBe(DEPENDENCIES_SOURCES_COLUMNS.join(','))
+        expect(readCsv(folder, '_vulnerability_details.csv')[0]).toBe(VULNERABILITY_DETAILS_COLUMNS.join(','))
+        expect(readCsv(folder, '_upgrade_guidance.csv')[0]).toBe(UPGRADE_GUIDANCE_COLUMNS.join(','))
+        expect(readCsv(folder, '_component_versions.csv')[0]).toBe(COMPONENT_VERSIONS_COLUMNS.join(','))
+        for (const file of BLACKDUCK_FILES.filter(it => it.endsWith('.csv'))) {
+            expect(fs.readFileSync(path.join(folder, file), 'utf8').endsWith('\n')).toBe(true)
+        }
     })
 
     it('fills a dependency row from the model', () => {
         writeBlackDuckExport(buildModel('demo', [ecosystem(dependency())], []), folder)
         const [, row] = readCsv(folder, '_dependencies.csv')
         expect(row).toBe([
-            'qs', '6.10.2', 'qs/6.10.2', 'BSD 3-clause ""New"" or ""Revised"" License'.replace(/""/g, '"'),
+            'qs', '6.10.2', '', 'qs/6.10.2', 'BSD 3-clause ""New"" or ""Revised"" License'.replace(/""/g, '"'),
             // Operational Risk MEDIUM: released 2021-10-06 with exactly 2 newer versions, over four
             // years stale -- and two newer versions never goes past MEDIUM, so this holds whenever
             // the test runs. License Risk OK: BSD-3-Clause is PERMISSIVE.
-            'PERMISSIVE', 'Direct Dependency', 'DYNAMICALLY_LINKED', 'MEDIUM', 'npmjs', 'OK',
-            '1', '1', '0', '1', '0', '0',
-            '2021-10-06', '2', '2', '', '', '', 'false', 'https://github.com/ljharb/qs', '',
+            // Version id is empty: Black Duck's internal UUID has no counterpart here.
+            'PERMISSIVE', 'Direct', 'DYNAMICALLY_LINKED', 'MEDIUM', 'npmjs', 'OK',
+            // Total and Critical-and-High always numeric; a zero per-severity cell is blank.
+            '1', '1', '', '1', '', '',
+            '\t2021-10-06', '2', '', '', '', 'false', 'https://github.com/ljharb/qs', '',
         ].map(it => (/[",]/.test(it) ? `"${it.replaceAll('"', '""')}"` : it)).join(','))
+    })
+
+    it('fills a dependency source row the way the transform does without --basePath', () => {
+        const model = buildModel('demo', [ecosystem(dependency())], [
+            {name: 'qs', version: '6.10.2', purlType: 'npm', path: 'demo/-npm/qs/6.10.2',
+                projectPath: 'demo', matchType: 'Direct Dependency'},
+        ])
+        writeBlackDuckExport(model, folder)
+        const [, row] = readCsv(folder, '_dependencies_sources.csv')
+        const cells = Object.fromEntries(DEPENDENCIES_SOURCES_COLUMNS.map((it, i) => [it, row.split(',')[i]]))
+        expect(cells['Version id']).toBe('')
+        expect(cells['Match type']).toBe('Direct')
+        expect(cells['Path']).toBe('demo/-npm/qs/6.10.2')
+        expect(cells['VerifiedPath']).toBe('')
+        expect(cells['VerifiedPathMethod']).toBe('not-checked')
+        expect(cells['Release Date']).toBe('\t2021-10-06')
+        expect(cells['Critical Vulnerability Count']).toBe('')
+        expect(cells['High Vulnerability Count']).toBe('1')
+        expect(cells['Total Vulnerability Count']).toBe('1')
+    })
+
+    it('writes _vulnerability_details.csv with the transform conventions and security.csv untouched', () => {
+        writeBlackDuckExport(buildModel('demo', [ecosystem(dependency())], []), folder)
+        const [, row] = readCsv(folder, '_vulnerability_details.csv')
+        const cells = row.split(',')
+        expect(cells).toHaveLength(VULNERABILITY_DETAILS_COLUMNS.length)
+        const cell = (name: string) => cells[VULNERABILITY_DETAILS_COLUMNS.indexOf(name as any)]
+        expect(cell('Component Version Origin Id')).toBe('qs/6.10.2')
+        expect(cell('Published on')).toBe('\t2022-11-27')
+        expect(cell('Updated on')).toBe('')
+        expect(cell('Match type')).toBe('Direct Dependency')
+        expect(cell('Vulnerability id')).toBe('GHSA-hrpp-h998-j3pp (CVE-2022-24999)')
+        expect(readCsv(folder, 'security.csv')[1]).toContain(',11/27/22,')
+    })
+
+    it('counts every finding in Total, only the four severities per column, and writes a zero total as 0', () => {
+        const unknown: Vulnerability = {...advisory, severity: 'UNKNOWN', identifiers: [{value: 'GHSA-unkn-0000-0000', type: 'GHSA'}]}
+        const model = buildModel('demo', [ecosystem(
+            dependency({vulnerabilities: [advisory, unknown]}),
+            dependency({id: 'clean@1.0.0', name: 'clean', version: '1.0.0', vulnerabilities: []}),
+        )], [])
+        writeBlackDuckExport(model, folder)
+        const rows = readCsv(folder, '_dependencies.csv').slice(1).map(row => row.split(','))
+        const at = (name: string, row: string[]) => row[DEPENDENCIES_COLUMNS.indexOf(name as any)]
+        const clean = rows.find(it => at('Component name', it) === 'clean')!
+        expect(at('Total Vulnerability Count', clean)).toBe('0')
+        expect(at('Critical and High Vulnerability Count', clean)).toBe('0')
+        expect(at('High Vulnerability Count', clean)).toBe('')
+        // The two-finding row is the quoted-licence one; parse it by its known tail instead.
+        const detail = readCsv(folder, '_vulnerability_details.csv')
+        expect(detail).toHaveLength(3)                      // header + both findings survive here
+        expect(readCsv(folder, 'security.csv')).toHaveLength(3)
+        const qsCounts = readCsv(folder, '_dependencies.csv').find(it => it.startsWith('qs,'))!
+        expect(qsCounts).toContain(',OK,2,1,,1,,,\t2021-10-06,')  // Total 2, C&H 1, High 1; UNKNOWN in no severity cell
+    })
+
+    it('moves Newer Versions (semver) to _component_versions.csv', () => {
+        writeBlackDuckExport(buildModel('demo', [ecosystem(dependency())], []), folder)
+        expect(readCsv(folder, '_dependencies.csv')[0]).not.toContain('semver')
+        const [, row] = readCsv(folder, '_component_versions.csv')
+        expect(row).toBe('qs,6.10.2,qs/6.10.2,npmjs,2021-10-06,2,2')
     })
 
     it('writes the vulnerability id as Black Duck pairs a GHSA with its CVE', () => {
