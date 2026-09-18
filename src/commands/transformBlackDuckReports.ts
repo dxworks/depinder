@@ -6,6 +6,14 @@ import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
 import { extractProjectInfo, PathMappings, createPathMappings } from '../utils/projectMapping';
 import { addCategoriesToBlackDuckReports } from '../utils/blackDuckReportCategories';
+import {
+    blackDuckDateToTabIso,
+    countCell,
+    DEPENDENCIES_COLUMNS,
+    DEPENDENCIES_SOURCES_COLUMNS,
+    normalizeMatchType,
+    VULNERABILITY_DETAILS_COLUMNS
+} from '../blackduck/columns';
 
 /**
  * Common options for CSV parsing
@@ -55,94 +63,10 @@ interface SecurityRecord {
     [key: string]: string;
 }
 
-/**
- * Column order for dependencies.csv output
- */
-const DEPENDENCIES_COLUMN_ORDER = [
-    'Component name',
-    'Component version name',
-    'Version id',
-    'Component Version Origin Id',
-    'License names',
-    'License families',
-    'Match type',
-    'Usage',
-    'Operational Risk',
-    'Origin name',
-    'License Risk',
-    'Total Vulnerability Count',
-    'Critical and High Vulnerability Count',
-    'Critical Vulnerability Count',
-    'High Vulnerability Count',
-    'Medium Vulnerability Count',
-    'Low Vulnerability Count',
-    'Release Date',
-    'Newer Versions',
-    'Commit Activity',
-    'Commits in Past 12 Months',
-    'Contributors in Past 12 Months',
-    'Has License Conflicts',
-    'Component Link',
-    'Open Hub URL'
-] as const;
-
-/**
- * Column order for dependencies_sources.csv output
- */
-const DEPENDENCIES_SOURCES_COLUMN_ORDER = [
-    'Component name',
-    'Component version name',
-    'Version id',
-    'Component Version Origin Id',
-    'Match type',
-    'Path',
-    'ProjectPath',
-    'VerifiedPath',
-    'VerifiedPathMethod',
-    'Origin name',
-    'License names',
-    'License families',
-    'License Risk',
-    'Critical Vulnerability Count',
-    'High Vulnerability Count',
-    'Medium Vulnerability Count',
-    'Low Vulnerability Count',
-    'Total Vulnerability Count',
-    'Critical and High Vulnerability Count',
-    'Operational Risk',
-    'Release Date',
-    'Newer Versions',
-    'OpenHubURL'
-] as const;
-
-/**
- * Headers to keep for vulnerability_details.csv output
- */
-const VULNERABILITY_DETAILS_HEADERS = [
-    'Component name',
-    'Component version name',
-    'Component Version Origin Id',
-    'Vulnerability id',
-    'Description',
-    'Published on',
-    'Updated on',
-    'Base score',
-    'Exploitability',
-    'Impact',
-    'Vulnerability source',
-    'Remediation status',
-    'URL',
-    'Security Risk',
-    'Project path',
-    'Overall score',
-    'CWE Ids',
-    'Solution available',
-    'Workaround available',
-    'Exploit available',
-    'CVSS Version',
-    'Match type',
-    'Vulnerability tags'
-];
+/** The four output shapes live in `blackduck/columns.ts`, shared with `export-blackduck`. */
+const DEPENDENCIES_COLUMN_ORDER = DEPENDENCIES_COLUMNS;
+const DEPENDENCIES_SOURCES_COLUMN_ORDER = DEPENDENCIES_SOURCES_COLUMNS;
+const VULNERABILITY_DETAILS_HEADERS = VULNERABILITY_DETAILS_COLUMNS;
 
 /**
  * Columns to remove from upgrade guidance CSV
@@ -182,20 +106,8 @@ function safeInt(s?: string): number {
     return isNaN(v) ? 0 : v;
 }
 
-/**
- * Formats a date string from MM/DD/YY to \tYYYY-MM-DD format for Excel compatibility
- * @param raw Raw date string in MM/DD/YY format
- * @returns Formatted date string or empty string if invalid
- */
-function formatDateField(raw: string): string {
-    if (!raw) return '';
-    const parts = raw.trim().split('/');
-    if (parts.length !== 3) return '';
-    const [month, day, year] = parts.map(s => parseInt(s, 10));
-    if (isNaN(month) || isNaN(day) || isNaN(year)) return '';
-    const fullYear = year < 50 ? 2000 + year : 1900 + year;
-    return `\t${fullYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
+/** Black Duck's `M/D/YY` → `\tYYYY-MM-DD`; see `blackduck/columns.ts`. */
+const formatDateField = blackDuckDateToTabIso;
 
 /**
  * Normalizes values to string format according to Black Duck report requirements
@@ -208,15 +120,6 @@ function normalizeValue(val: unknown): string {
     if (val === null || val === undefined) return '';
     if (typeof val === 'number') return `${val}`;
     return `${val}`.trim();
-}
-
-/**
- * Normalizes match type by removing " Dependency" suffix
- * @param matchType Match type string
- * @returns Normalized match type
- */
-function normalizeMatchType(matchType: string): string {
-    return (matchType || '').replace(/ Dependency/g, '');
 }
 
 /**
@@ -283,10 +186,10 @@ function transformDependencies(components: ComponentRecord[]): Record<string, st
             'License Risk': component['License Risk'],
             'Total Vulnerability Count': `${counts.total}`,
             'Critical and High Vulnerability Count': `${counts.criticalAndHigh}`,
-            'Critical Vulnerability Count': counts.critical > 0 ? `${counts.critical}` : '',
-            'High Vulnerability Count': counts.high > 0 ? `${counts.high}` : '',
-            'Medium Vulnerability Count': counts.medium > 0 ? `${counts.medium}` : '',
-            'Low Vulnerability Count': counts.low > 0 ? `${counts.low}` : '',
+            'Critical Vulnerability Count': countCell(counts.critical),
+            'High Vulnerability Count': countCell(counts.high),
+            'Medium Vulnerability Count': countCell(counts.medium),
+            'Low Vulnerability Count': countCell(counts.low),
             'Release Date': formatDateField(component['Release Date']),
             'Newer Versions': component['Newer Versions'],
             'Open Hub URL': component['Open Hub URL']
@@ -344,10 +247,10 @@ function transformDependenciesSources(
             'License names': comp['License names'],
             'License families': comp['License families'],
             'License Risk': comp['License Risk'],
-            'Critical Vulnerability Count': counts.critical > 0 ? `${counts.critical}` : '',
-            'High Vulnerability Count': counts.high > 0 ? `${counts.high}` : '',
-            'Medium Vulnerability Count': counts.medium > 0 ? `${counts.medium}` : '',
-            'Low Vulnerability Count': counts.low > 0 ? `${counts.low}` : '',
+            'Critical Vulnerability Count': countCell(counts.critical),
+            'High Vulnerability Count': countCell(counts.high),
+            'Medium Vulnerability Count': countCell(counts.medium),
+            'Low Vulnerability Count': countCell(counts.low),
             'Total Vulnerability Count': `${counts.total}`,
             'Critical and High Vulnerability Count': `${counts.criticalAndHigh}`,
             'Operational Risk': comp['Operational Risk'],

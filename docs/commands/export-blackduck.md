@@ -21,13 +21,19 @@ output, in the same folder.
 
 ## Output
 
+The four `_*.csv` files have the header line and cell conventions of
+[`transformBlackDuckReports`](blackduck-reports.md), so a downstream reader processes a
+depinder folder and a transformed Black Duck folder the same way.
+
 | File | Black Duck counterpart |
 |---|---|
-| `_dependencies.csv` | `components_*.csv` |
-| `_dependencies_sources.csv` | `source_*.csv` |
-| `_upgrade_guidance.csv` | `project_version_upgrade_guidance_*.csv` |
-| `security.csv` | `security_*.csv` |
+| `_dependencies.csv` | the transform's `_dependencies.csv`, from `components_*.csv` |
+| `_dependencies_sources.csv` | the transform's `_dependencies_sources.csv`, from `source_*.csv` |
+| `_vulnerability_details.csv` | the transform's `_vulnerability_details.csv`, from `security_*.csv` |
+| `_upgrade_guidance.csv` | the transform's `_upgrade_guidance.csv`, from `project_version_upgrade_guidance_*.csv` |
+| `security.csv` | raw `security_*.csv`, header byte for byte |
 | `_dependency_edges.csv` | none — every edge of the graph |
+| `_component_versions.csv` | none — `Newer Versions` next to our count by version number, `Newer Versions (semver)` |
 | `_vulnerability_findings.json` | none — the findings as the exporter saw them, fix versions included |
 | `sbom-<eco>-libs.csv`, `sbom-<eco>-licenses.csv`, `sbom-<eco>-project-stats.csv` | none — the [`analyse`](analyse.md#output) triple, one per ecosystem in the SBOMs |
 | `sbom-scan-provenance.json` | none — which scanners ran, at which version |

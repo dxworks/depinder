@@ -16,9 +16,11 @@ depinder transformBlackDuckReports <reportPath> [options]
 | `-m, --pathMappings <path>` | JSON mapping Black Duck project paths to real ones |
 | `--repoCategories <path>` | `repo-to-category.csv`; runs the command below afterwards |
 
-Writes `_dependencies.csv`, `_dependencies_sources.csv` (with `ProjectPathExists`,
-`VerifiedPath`), `_vulnerability_details.csv` and `_upgrade_guidance.csv` into the same folder.
-How project paths are extracted: [Project mapping](../project-mapping.md).
+Writes `_dependencies.csv`, `_dependencies_sources.csv` (with `VerifiedPath`,
+`VerifiedPathMethod`), `_vulnerability_details.csv` and `_upgrade_guidance.csv` into the same
+folder. How project paths are extracted: [Project mapping](../project-mapping.md).
+[`export-blackduck`](export-blackduck.md) writes the same four files, same headers and cell
+conventions, from SBOMs; the shared definition is `src/blackduck/columns.ts`.
 
 ## addCategoriesToBlackDuckReports
 
@@ -27,4 +29,6 @@ depinder addCategoriesToBlackDuckReports <reportPath> <repoCategoriesPath>
 ```
 
 Adds the repository's category to every row of `_dependencies.csv` and
-`_dependencies_sources.csv`, joined on the project path.
+`_dependencies_sources.csv`, joined on the project path. The two files are matched on
+`Version id`; when every `Version id` in both is empty — an `export-blackduck` folder, which has
+no Black Duck UUIDs — they are matched on `Component Version Origin Id` instead.

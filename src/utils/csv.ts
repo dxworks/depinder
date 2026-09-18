@@ -20,7 +20,11 @@ export interface NamedRow {
     [column: string]: string
 }
 
-/** A complete file: the header line, then one line per row, in the header's column order. */
+/**
+ * A complete file: the header line, then one line per row, in the header's column order, ending
+ * with a newline like `csv-stringify` does — so a file from here and one from
+ * `transformBlackDuckReports` diff byte for byte.
+ */
 export function csvDocument(headers: readonly string[], rows: NamedRow[]): string {
-    return [csvRow([...headers]), ...rows.map(row => csvRow(headers.map(it => row[it])))].join('\n')
+    return [csvRow([...headers]), ...rows.map(row => csvRow(headers.map(it => row[it])))].join('\n') + '\n'
 }
