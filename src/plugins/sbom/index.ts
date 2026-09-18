@@ -1,3 +1,4 @@
+import fs from 'fs'
 import path from 'path'
 import {minimatch} from 'minimatch'
 import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
@@ -33,7 +34,14 @@ import {cratesRegistrar, rustChecker} from '../rust/registrar'
  *   <project>.trivy.cdx.json  (Trivy)
  */
 
-const SBOM_GLOBS = ['*.cdx.json']
+/**
+ * Every JSON file is a candidate; `isSbomFile` then reads the head of the file and keeps the ones
+ * that declare `"bomFormat": "CycloneDX"`. `*.cdx.json` is kept by name alone, as before.
+ */
+const SBOM_GLOBS = ['*.json']
+const SBOM_NAME_GLOBS = ['*.cdx.json']
+const SBOM_HEAD_BYTES = 4096
+const BOM_FORMAT = /"bomFormat"\s*:\s*"CycloneDX"/
 
 /**
  * One SBOM yields many projects (Trivy emits one `application` node per manifest), but
@@ -59,6 +67,7 @@ function projectsOf(sbomFile: string, purlType: string): DepinderProject[] {
 function createExtractor(purlType: string): Extractor {
     return {
         files: SBOM_GLOBS,
+        filter: isSbomFile,
         createContexts: (files: string[]) => files.flatMap(file =>
             projectsOf(file, purlType).map((_, index) => ({
                 root: path.dirname(file),
@@ -173,9 +182,41 @@ export function sbomFilesFor(plugins: Plugin[], files: string[]): string[] {
     return files.filter(isSbomFile)
 }
 
-/** Whether a file is one the SBOM extractors would pick up — the same globs, one place. */
+const sbomByContent = new Map<string, boolean>()
+
+/**
+ * Whether a file is one the SBOM extractors pick up. A `*.cdx.json` is one by name; any other
+ * `*.json` is one when its first bytes declare a CycloneDX `bomFormat` — so a SBOM saved as
+ * `bom.json` is found, while `package.json` and lockfiles cost one short read and stay native.
+ * The extractor's `filter` and `analyse`'s classification both come here, so they cannot drift.
+ */
 export function isSbomFile(file: string): boolean {
-    return SBOM_GLOBS.some(glob => minimatch(file, glob, {matchBase: true}))
+    if (SBOM_NAME_GLOBS.some(glob => minimatch(file, glob, {matchBase: true}))) return true
+    if (!SBOM_GLOBS.some(glob => minimatch(file, glob, {matchBase: true}))) return false
+    const hit = sbomByContent.get(file)
+    if (hit !== undefined) return hit
+    const result = declaresCycloneDx(file)
+    sbomByContent.set(file, result)
+    return result
+}
+
+function declaresCycloneDx(file: string): boolean {
+    let fd: number | undefined
+    try {
+        fd = fs.openSync(file, 'r')
+        const buffer = Buffer.alloc(SBOM_HEAD_BYTES)
+        const read = fs.readSync(fd, buffer, 0, SBOM_HEAD_BYTES, 0)
+        return BOM_FORMAT.test(buffer.toString('utf8', 0, read))
+    } catch {
+        return false
+    } finally {
+        if (fd !== undefined) fs.closeSync(fd)
+    }
+}
+
+/** Exposed for tests, which rewrite a file under the same name. */
+export function clearSbomFileCache(): void {
+    sbomByContent.clear()
 }
 
 /**

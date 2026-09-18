@@ -671,7 +671,7 @@ describe('the written files', () => {
         expect(readCsv(folder, 'security.csv')[1]).toContain(',11/27/22,')
     })
 
-    it('counts only the four severities in the totals, and writes a zero total as 0', () => {
+    it('counts every finding in Total, only the four severities per column, and writes a zero total as 0', () => {
         const unknown: Vulnerability = {...advisory, severity: 'UNKNOWN', identifiers: [{value: 'GHSA-unkn-0000-0000', type: 'GHSA'}]}
         const model = buildModel('demo', [ecosystem(
             dependency({vulnerabilities: [advisory, unknown]}),
@@ -689,7 +689,7 @@ describe('the written files', () => {
         expect(detail).toHaveLength(3)                      // header + both findings survive here
         expect(readCsv(folder, 'security.csv')).toHaveLength(3)
         const qsCounts = readCsv(folder, '_dependencies.csv').find(it => it.startsWith('qs,'))!
-        expect(qsCounts).toContain(',OK,1,1,,1,,,\t2021-10-06,')  // Total 1, C&H 1, High 1; UNKNOWN uncounted
+        expect(qsCounts).toContain(',OK,2,1,,1,,,\t2021-10-06,')  // Total 2, C&H 1, High 1; UNKNOWN in no severity cell
     })
 
     it('moves Newer Versions (semver) to _component_versions.csv', () => {

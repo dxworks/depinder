@@ -29,6 +29,7 @@ depinder addCategoriesToBlackDuckReports <reportPath> <repoCategoriesPath>
 ```
 
 Adds the repository's category to every row of `_dependencies.csv` and
-`_dependencies_sources.csv`, joined on the project path. The two files are matched on
-`Version id`; when every `Version id` in both is empty — an `analyse` SBOM subfolder, which has
-no Black Duck UUIDs — they are matched on `Component Version Origin Id` instead.
+`_dependencies_sources.csv`. The repository is the first segment of `VerifiedPath`, or of
+`ProjectPath` when no path was verified — which is every row of an `analyse` SBOM subfolder.
+The two files are matched on `Version id`; when every `Version id` in both is empty — an
+`analyse` subfolder has no Black Duck UUIDs — they are matched on `Component Version Origin Id`.

@@ -12,7 +12,7 @@ optional: depinder processes whatever it finds.
 
 | Option | Meaning | Default |
 |---|---|---|
-| `[folders...]` | Project folders (native), folders of `*.cdx.json` (SBOM), or both | — |
+| `[folders...]` | Project folders (native), folders of CycloneDX SBOMs, or both | — |
 | `-r, --results <folder>` | Output folder; one subfolder per source appears under it | `results` |
 | `-p, --plugins [plugins...]` | Restrict to these plugins, by name or [alias](../index.md#ecosystems) | all |
 | `--project-name <name>` | SBOM sources: `ProjectPath` value and head of every `Path` | the SBOMs' repo name |
@@ -29,12 +29,14 @@ A file is placed by what it says about itself, never by its name or the folder i
 
 | Source | Recognised by | Subfolder |
 |---|---|---|
-| Trivy | `*.cdx.json` whose `metadata.tools` names `trivy` | `trivy/` |
-| Syft | `*.cdx.json` whose `metadata.tools` names `syft` | `syft/` |
+| Trivy | a JSON file with `"bomFormat": "CycloneDX"` whose `metadata.tools` names `trivy` | `trivy/` |
+| Syft | a JSON file with `"bomFormat": "CycloneDX"` whose `metadata.tools` names `syft` | `syft/` |
 | native | any other file a native plugin reads (`package-lock.json`, `Gemfile.lock`, `pom.xml`, ...) | `depinder/` |
 
-A `*.cdx.json` from any other tool, or one that is not a CycloneDX BOM, is named in a warning
-and skipped. The repository an SBOM describes is its `metadata.component.name` — both tools
+A `*.cdx.json` is read whatever it holds; any other `*.json` is read when its first bytes
+declare a CycloneDX `bomFormat`, so a SBOM saved as `bom.json` is found and `package.json` stays
+native. A CycloneDX file from any other tool, or a `*.cdx.json` that is not a CycloneDX BOM, is
+named in a warning and skipped. The repository an SBOM describes is its `metadata.component.name` — both tools
 write the scanned directory's name there — with the file name as fallback. When one producer
 describes the same repository twice, both files are analysed and a warning says so.
 

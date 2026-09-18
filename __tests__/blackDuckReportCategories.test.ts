@@ -94,13 +94,15 @@ CORE-WEB,Deprecated
             {'Version id': '', 'Component Version Origin Id': 'lodash/4.17.21', 'Component name': 'lodash'},
             {'Version id': '', 'Component Version Origin Id': 'qs/6.10.2', 'Component name': 'qs'}
         ];
+        // What analyse writes: VerifiedPath always empty, the repo in ProjectPath.
         const sources = [
-            {'Version id': '', 'Component Version Origin Id': 'lodash/4.17.21', 'VerifiedPath': 'core-web/app'},
-            {'Version id': '', 'Component Version Origin Id': 'qs/6.10.2', 'VerifiedPath': ''}
+            {'Version id': '', 'Component Version Origin Id': 'lodash/4.17.21', 'VerifiedPath': '', 'ProjectPath': 'core-web/app'},
+            {'Version id': '', 'Component Version Origin Id': 'qs/6.10.2', 'VerifiedPath': '', 'ProjectPath': 'unmapped-repo'}
         ];
         expect(chooseJoinKey(dependencies, sources)).toBe('Component Version Origin Id');
         const result = addCategoriesToReports(dependencies, sources, parseRepoCategories('repo,category\ncore-web,Active\n'));
-        expect(result.dependenciesByCategory.map(it => it.Category)).toEqual(['Active', '']);
+        expect(result.dependenciesSourcesByCategory.map(it => it.Repository)).toEqual(['core-web', 'unmapped-repo']);
+        expect(result.dependenciesByCategory.map(it => it.Category)).toEqual(['Active', COULD_NOT_MAP_REPOSITORY_CATEGORY]);
     });
 
     it('keeps Version id as the key while any row carries one', () => {

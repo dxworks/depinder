@@ -109,7 +109,7 @@ than guessed.
 | `Operational Risk` | `Release Date` + `Newer Versions` | `OK` / `LOW` / `MEDIUM` / `HIGH`, **approximated** — see *The two risk columns* below. Empty when either input is missing |
 | `License Risk` | `License names` | `OK` / `MEDIUM` / `HIGH` from the licence family, with `OR` read as a choice and `AND` as a conjunction — see below |
 | `Critical` / `High` / `Medium` / `Low Vulnerability Count` | findings | Counted from the merged findings; a zero cell is blank, as the transform writes it |
-| `Total` / `Critical and High Vulnerability Count` | the four counts | Their sums, always a number. A finding with no recognised severity is in neither, and the exporter warns how many it left out |
+| `Total` / `Critical and High Vulnerability Count` | findings | Always a number. `Total` is every finding, the same count as libs.csv and `_upgrade_guidance.csv`; `Critical and High` is the sum of those two. A finding with no recognised severity is in `Total` only, and the exporter warns how many |
 | `Release Date` | registrar | `\tYYYY-MM-DD` — the transform's shape, tab included, so Excel keeps the ISO date as text. `_component_versions.csv` carries it plain |
 | `Newer Versions` | registrar | Registry versions ordered above the installed one, using the ecosystem's comparator. Empty when no registrar answered. `Newer Versions (semver)`, the count by version number, is in `_component_versions.csv` |
 | `Commit Activity`, `Commits in Past 12 Months`, `Contributors in Past 12 Months`, `Open Hub URL` / `OpenHubURL` | — | **empty, not derivable** — Open Hub data |

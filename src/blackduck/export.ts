@@ -75,18 +75,20 @@ interface SeverityCounts {
     high: number
     medium: number
     low: number
-    /** A finding whose severity is none of the four; it stays out of every count column. */
+    /** A finding whose severity is none of the four: in `total`, in no per-severity cell. */
     unknown: number
+    /** Every finding, whatever its severity — the same number libs.csv and the upgrade guidance carry. */
+    total: number
 }
 
 /**
- * Black Duck exports the four per-severity counts and nothing else; `Total` and `Critical and
- * High` are their sums, which is how `transformBlackDuckReports` derives them. The same rule here,
- * so a finding with no recognised severity is counted in neither — it is still in `security.csv`,
- * `_vulnerability_details.csv` and the findings sidecar.
+ * `Total` is every finding, so it agrees with `Vulnerabilities` in `sbom-*-libs.csv` and
+ * `Total Known Vulnerabilities` in `_upgrade_guidance.csv`. A finding with no recognised severity
+ * (Trivy writes `UNKNOWN`) lands in no per-severity cell; the four then sum to less than `Total`,
+ * which `transformBlackDuckReports` never sees because a Black Duck row always has a severity.
  */
 function severityCounts(vulnerabilities: Vulnerability[]): SeverityCounts {
-    const counts = {critical: 0, high: 0, medium: 0, low: 0, unknown: 0}
+    const counts = {critical: 0, high: 0, medium: 0, low: 0, unknown: 0, total: vulnerabilities.length}
     for (const it of vulnerabilities) {
         switch (it.severity?.toUpperCase()) {
             case 'CRITICAL': counts.critical++; break
@@ -99,14 +101,14 @@ function severityCounts(vulnerabilities: Vulnerability[]): SeverityCounts {
     return counts
 }
 
-/** Per-severity cells blank when zero, the two sums always a number — `columns.ts`'s rule. */
+/** Per-severity cells blank when zero, `Total` and `Critical and High` always a number — `columns.ts`'s rule. */
 function countCells(counts: SeverityCounts): NamedRow {
     return {
         'Critical Vulnerability Count': countCell(counts.critical),
         'High Vulnerability Count': countCell(counts.high),
         'Medium Vulnerability Count': countCell(counts.medium),
         'Low Vulnerability Count': countCell(counts.low),
-        'Total Vulnerability Count': String(counts.critical + counts.high + counts.medium + counts.low),
+        'Total Vulnerability Count': String(counts.total),
         'Critical and High Vulnerability Count': String(counts.critical + counts.high),
     }
 }
@@ -408,8 +410,8 @@ function write(resultFolder: string, file: string, headers: readonly string[], r
 export function writeBlackDuckExport(model: BlackDuckModel, resultFolder: string): WrittenFile[] {
     const unknown = model.components.reduce((n, it) => n + severityCounts(it.vulnerabilities).unknown, 0)
     if (unknown > 0) {
-        log.warn(`${unknown} finding(s) carry no recognised severity and are left out of the vulnerability`
-            + ` count columns; they are still in security.csv, ${VULNERABILITY_DETAILS_FILE} and ${VULNERABILITY_FINDINGS_FILE}`)
+        log.warn(`${unknown} finding(s) carry no recognised severity: counted in Total Vulnerability Count,`
+            + ` in no per-severity column; see security.csv, ${VULNERABILITY_DETAILS_FILE} and ${VULNERABILITY_FINDINGS_FILE}`)
     }
     return [
         write(resultFolder, DEPENDENCIES_FILE, DEPENDENCIES_COLUMNS, dependencyRows(model)),

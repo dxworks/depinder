@@ -30,7 +30,7 @@ command wrote it:
 | Rule | Where |
 |---|---|
 | `Match type` is `Direct`, `Transitive` or `Direct,Transitive` | `_dependencies.csv`, `_dependencies_sources.csv`. `_vulnerability_details.csv` and `security.csv` keep `Direct Dependency` / `Transitive Dependency`, as the transform does |
-| A zero per-severity vulnerability count is blank; `Total` and `Critical and High` are always a number, the sum of the four | both dependency files |
+| A zero per-severity vulnerability count is blank; `Total` and `Critical and High` are always a number. `Total` is every finding, as in libs.csv and `_upgrade_guidance.csv`; a finding with no recognised severity is in no per-severity cell | both dependency files |
 | Dates are `\tYYYY-MM-DD` — the leading tab keeps Excel from re-reading them | `Release Date`, `Published on`, `Updated on`. `security.csv` keeps Black Duck's raw `7/24/26` |
 | `Version id` is empty | Black Duck's internal version UUID; nothing on our side corresponds to it |
 | `VerifiedPath` empty, `VerifiedPathMethod` = `not-checked` | What the transform writes when no `--basePath` verifies paths on disk; we verify none |
@@ -51,7 +51,7 @@ command wrote it:
 | `Match type` | `requestedBy` | `Direct`, `Transitive`, or `Direct,Transitive` |
 | `Usage` | — | `DYNAMICALLY_LINKED` |
 | `Operational Risk` | date + newer versions | `OK` / `LOW` / `MEDIUM` / `HIGH` — see [risk](#risk-columns) |
-| Vulnerability counts | findings | Per severity, blank when zero; `Total` and `Critical and High` are the sums |
+| Vulnerability counts | findings | Per severity, blank when zero; `Total` is every finding; `Critical and High` is the sum of those two |
 | `Release Date` | registrar | `\tYYYY-MM-DD` |
 | `Newer Versions` | registrar | Versions **published after** the installed one, Black Duck's rule. The count by version number is in `_component_versions.csv` |
 | `Component Link` | registrar | Declared project homepage, per component. Empty when none, as Black Duck. Go: derived from the module path |

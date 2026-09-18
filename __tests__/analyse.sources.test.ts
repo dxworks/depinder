@@ -5,6 +5,7 @@ import {classifyInputs, inputFolderOf, NATIVE_SOURCE} from '../src/commands/sour
 import {planRuns} from '../src/commands/analyse'
 import {defaultProjectName} from '../src/blackduck/run'
 import {clearSbomDescriptions, describeSbom} from '../src/plugins/sbom/describe'
+import {clearSbomFileCache, isSbomFile} from '../src/plugins/sbom'
 import {getPluginsFromNames} from '../src/plugins'
 import {log} from '../src/utils/logging'
 
@@ -47,6 +48,7 @@ afterAll(() => {
 
 beforeEach(() => {
     clearSbomDescriptions()
+    clearSbomFileCache()
     warnings = []
     warnSpy = jest.spyOn(log, 'warn').mockImplementation(((message: string) => {
         warnings.push(message)
@@ -100,6 +102,24 @@ describe('classifyInputs', () => {
 
         expect(sources.sbom.find(it => it.name === 'trivy')?.sboms).toHaveLength(2)
         expect(warnings).toEqual([expect.stringContaining('trivy has 2 SBOMs for repo repo: one.cdx.json, two.cdx.json')])
+    })
+
+    it('finds a CycloneDX file by its content whatever its name, and leaves other JSON native', () => {
+        const dir = path.join(tmpDir, 'by-content')
+        const bom = write(dir, 'bom.json', sbom(trivyTools, 'repo-b', ['pkg:npm/qs@6.10.2']))
+        const pkg = write(dir, 'package.json', {name: 'repo-b', dependencies: {qs: '6.10.2'}})
+        const lock = write(dir, 'package-lock.json', {name: 'repo-b', lockfileVersion: 3, packages: {}})
+        const spdx = write(dir, 'repo-b.spdx.json', {spdxVersion: 'SPDX-2.3', packages: []})
+
+        expect(isSbomFile(bom)).toBe(true)
+        expect(isSbomFile(pkg)).toBe(false)
+        const sources = classifyInputs([pkg, bom, lock, spdx])
+        expect(sources.native).toEqual([pkg, lock, spdx])
+        expect(sources.sbom).toEqual([{name: 'trivy', sboms: [describeSbom(bom)]}])
+        // The extractor takes the same file, so it is parsed, not just classified.
+        const [run] = planRuns(sources, getPluginsFromNames(), {results: '/out', refresh: false}, '/out', [dir])
+        expect(run.plugins[0].extractor.createContexts([bom])).toHaveLength(1)
+        expect(warnings).toEqual([])
     })
 
     it('has nothing to say about a folder with no SBOMs', () => {

@@ -5,7 +5,7 @@ A folder of CycloneDX SBOMs in, a folder of CSVs out.
 ## Prerequisites
 
 - Depinder [installed](install.md).
-- A folder of `*.cdx.json` files. A [DepMiner](https://dxworks.org/depminer/) results zip has them
+- A folder of CycloneDX SBOMs (`*.cdx.json`, or any `.json` declaring `bomFormat`). A [DepMiner](https://dxworks.org/depminer/) results zip has them
   under `depminer/results/syft/` and `depminer/results/trivy/`.
 - Trivy and/or Grype on `PATH`, for vulnerabilities.
 

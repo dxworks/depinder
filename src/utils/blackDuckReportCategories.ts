@@ -56,7 +56,7 @@ export function addCategoriesToReports(
     validateJoinKeys(dependenciesSources, DEPENDENCIES_SOURCES_FILE, joinKey);
 
     const dependenciesSourcesByCategory = dependenciesSources.map(row => {
-        const repository = getRepository(row['VerifiedPath'] || '');
+        const repository = getRepository(row['VerifiedPath'] || row['ProjectPath'] || '');
         const category = getCategory(repository, repoCategories);
 
         return {
@@ -162,6 +162,11 @@ function getCategory(repository: string, repoCategories: Map<string, string>): s
     return repoCategories.get(normalizeRepo(repository)) || COULD_NOT_MAP_REPOSITORY_CATEGORY;
 }
 
+/**
+ * The repository is the first segment of the path. `VerifiedPath` when the transform verified one
+ * on disk; otherwise `ProjectPath`, which an `analyse` SBOM subfolder writes as `<repo>` or
+ * `<repo>/<module>` and never verifies.
+ */
 function getRepository(verifiedPath: string): string {
     const normalizedPath = verifiedPath.trim().replace(/\\/g, '/');
     return normalizedPath.split('/').find(segment => segment.length > 0) || '';
