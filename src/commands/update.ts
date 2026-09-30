@@ -1,8 +1,7 @@
 import {Command} from 'commander'
 import chalk from 'chalk'
-import {getMongoDockerContainerStatus} from './cache'
-import {LibraryInfoModel, mongoCache} from '../cache/mongo-cache'
-import moment, {Moment} from 'moment'
+import {sharedCacheDb, sqliteCache} from '../cache/sqlite-cache'
+import moment from 'moment'
 import {getPluginsFromNames} from '../plugins'
 import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
 import {Presets, SingleBar} from 'cli-progress'
@@ -11,6 +10,7 @@ import {log} from '../utils/logging'
 
 export const updateCommand = new Command()
     .name('update')
+    .description('Re-fetch the local cache\'s libraries last written before a date')
     .argument('[updated_before]', 'Update all libs that were updated before this date')
     .argument('[plugins...]', 'A list of plugins to update database libs for')
     .action(updateLibs)
@@ -25,19 +25,11 @@ async function updateLibrariesAndLogProcess(idsToUpdate: string[], selectedPlugi
 }
 
 export async function updateLibs(updated_before: string, plugins: string[]): Promise<void> {
-
-    const status = getMongoDockerContainerStatus()
-    if (status !== 'running') {
-        log.info(chalk.red('Mongo Cache is not running properly.'))
-        log.info(`To start Mongo cache run: ${chalk.yellow('depinder cache up')}`)
-        return
-    }
-
-
     const lastUpdateMoment = updated_before ? moment(updated_before) : moment().subtract(1, 'month')
 
-    mongoCache.load()
-    const ids = await getLibraryIdsToUpdate(lastUpdateMoment)
+    const db = sharedCacheDb()
+    log.info(`Local cache: ${chalk.yellow(db.file)}`)
+    const ids = db.libKeysUpdatedBefore(lastUpdateMoment.valueOf())
 
     const selectedPlugins = getPluginsFromNames(plugins)
 
@@ -47,20 +39,6 @@ export async function updateLibs(updated_before: string, plugins: string[]): Pro
         await updateLibrariesAndLogProcess(idsToUpdate, selectedPlugins)
     } else {
         log.info('No libraries to update.')
-    }
-
-    mongoCache.write()
-}
-
-async function getLibraryIdsToUpdate(lastUpdateMoment: Moment): Promise<string[]> {
-    try {
-        const query = {updatedAt: {$lt: lastUpdateMoment.toDate()}}
-
-        const docs = await LibraryInfoModel.find(query, '_id')
-        return docs.map(doc => doc._id.toString())
-    } catch (err) {
-        log.error('Error while searching for libraries to update in cache: ', err)
-        return []
     }
 }
 
@@ -85,7 +63,7 @@ async function updateLibrariesFor(selectedPlugins: Plugin[], idsToUpdate: string
                     if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
                         lib.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, lib.name)
                     }
-                    await mongoCache.set(id, lib)
+                    sqliteCache.set(id, lib)
                 } catch (e: any) {
                     log.warn(`Exception getting remote info for ${libraryName}`)
                     log.error(e)

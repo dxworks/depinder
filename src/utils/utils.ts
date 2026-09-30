@@ -6,22 +6,8 @@ import fs from 'fs'
 export const _package = require('../../package.json')
 
 
-export function getAssetFile(assetName: string): string {
-    return path.join(__dirname, '..', 'assets', assetName)
-}
-
 export const depinderFolder = path.join(homedir(), '.dxw', 'depinder')
 export const depinderTempFolder = path.join(depinderFolder, 'temp')
-
-export function getHomeDir(): string {
-    if (!fs.existsSync(depinderFolder)) {
-        fs.mkdirSync(depinderFolder)
-    }
-    if (!fs.existsSync(depinderTempFolder)) {
-        fs.mkdirSync(depinderTempFolder)
-    }
-    return depinderFolder
-}
 
 export function walkDir(dir: string): string[] {
     const allChildren = fs.readdirSync(dir)

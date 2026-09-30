@@ -27,10 +27,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "npm run clean && tsc -p tsconfig.build.json && npm run copy-files",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "clean": "rimraf dist/ *.tsbuildinfo",
     "clean:modules": "rm -rf ./node_modules ./package-lock.json",
-    "copy-files": "copyfiles -a -u 1 src/assets/**/*.* dist",
     "create": "npm run build && npm run test",
     "lint": "eslint ./src",
     "lint:fix": "eslint ./src --fix",
@@ -53,8 +52,6 @@
     "lodash": "^4.17.21",
     "minimatch": "^10.0.0",
     "moment": "^2.30.0",
-    "mongodb": "^7.0.0",
-    "mongoose": "^9.0.0",
     "node-fetch": "^2.7.0",
     "npm-registry-fetch": "^19.0.0",
     "semver": "^7.7.0",
@@ -77,7 +74,6 @@
     "@types/spdx-correct": "^3.1.0",
     "@types/string-template": "^1.0.0",
     "@types/ws": "^8.18.0",
-    "copyfiles": "^2.4.1",
     "eslint": "^9.0.0",
     "i": "^0.3.7",
     "jest": "^29.0.0",

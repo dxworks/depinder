@@ -1,18 +1,14 @@
 # cache & update
 
-Two backends. **SQLite**, the default: `~/.dxw/depinder/cache/depinder.sqlite`, shared by every
-run on the machine, nothing to install. **MongoDB**, optional: used automatically when its
-container is running.
+One backend: **SQLite**, `~/.dxw/depinder/cache/depinder.sqlite`, shared by every run on the
+machine, nothing to install. Each machine has its own.
 
 ## cache
 
 ```
 depinder cache                 same as `cache info`
-depinder cache info            SQLite path and row counts; is depinder-mongo running?
+depinder cache info            SQLite path, size and row counts   (alias: i)
 depinder cache import <dir>    pull a libs.json / misses.json folder into SQLite
-depinder cache init            write the MongoDB docker-compose files to ~/.dxw/depinder/cache/
-depinder cache up              start MongoDB   (alias: start)
-depinder cache down            stop MongoDB    (alias: stop)
 ```
 
 ### SQLite
@@ -29,16 +25,10 @@ depinder cache down            stop MongoDB    (alias: stop)
     `depinder cache import cache` copies the old per-directory files into the database. Existing
     rows are kept; the files are not touched.
 
-### MongoDB
-
-`init` writes the Compose file once. It starts `depinder-mongo` on port `27018` (user `root`,
-password `secret`) and Mongo Express on [localhost:8002](http://localhost:8002/).
-
-!!! warning
-    The Compose file joins an external Docker network, `traefiknet`. Create it once with
-    `docker network create traefiknet`, or edit the file.
-
-Connection: `MONGO_URI`, `MONGO_USER`, `MONGO_PASSWORD` — see [Configuration](../configuration.md).
+!!! note "Coming from the MongoDB cache"
+    The MongoDB cache and `cache init` / `up` / `down` are gone. `docker-compose.yml` and
+    `init-mongo.js`, left in `~/.dxw/depinder/cache/` by an earlier `cache init`, are no longer
+    used and can be deleted.
 
 ## update
 
@@ -46,7 +36,7 @@ Connection: `MONGO_URI`, `MONGO_USER`, `MONGO_PASSWORD` — see [Configuration](
 depinder update [updated_before] [plugins...]
 ```
 
-Refreshes MongoDB entries older than `updated_before` (default one month ago) for the plugins
-named (default all), by name or [alias](../index.md#ecosystems): `sbom-java` and `java` both
-refresh the `java:` entries. Needs the container running and `GH_TOKEN`. SQLite has no equivalent: use
-`--refresh`.
+Re-fetches the `libs` rows last written before `updated_before` (default one month ago) for the
+plugins named (default all), by name or [alias](../index.md#ecosystems): `sbom-java` and `java`
+both refresh the `java:` entries. Needs `GH_TOKEN` for the advisories. To bypass the cache for a
+single run instead, use `analyse --refresh`.

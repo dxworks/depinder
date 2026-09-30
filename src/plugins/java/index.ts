@@ -137,6 +137,7 @@ export class MavenCentralRegistrar extends AbstractRegistrar {
         const pomResponse = await getLatestAvailablePom(groupId, artifactId, docs)
         const pomData = await pomResponse.text()
 
+        fs.mkdirSync(depinderTempFolder, {recursive: true})
         const pomFile = path.resolve(depinderTempFolder, `${libraryName}.pom`)
         fs.writeFileSync(pomFile, pomData)
 

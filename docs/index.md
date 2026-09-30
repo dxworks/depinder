@@ -50,5 +50,5 @@ Each source `analyse` finds — Trivy SBOMs, Syft SBOMs — gets its own subfold
 The aliases without `sbom-` are the names of the lockfile plugins depinder had before, so an
 existing `-p java` still selects the Java ecosystem.
 
-Registry lookups are cached in `~/.dxw/depinder/cache/depinder.sqlite`, shared by every run on the
-machine. When the optional [MongoDB cache](commands/cache.md) is running, it is used instead.
+Registry lookups are [cached](commands/cache.md) in `~/.dxw/depinder/cache/depinder.sqlite`, shared
+by every run on the machine.

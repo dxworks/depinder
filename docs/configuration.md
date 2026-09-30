@@ -10,7 +10,6 @@ No configuration file: command-line options, environment variables, and a few fi
 | `GH_TOKEN_1`, `GH_TOKEN_2`, … | The token pool for `github-advisories`; usually in `.github-tokens` instead |
 | `LIBRARIES_IO_API_KEY` | Optional fallback for release dates and versions |
 | `DEPINDER_CACHE_DB` | SQLite cache path. Default `~/.dxw/depinder/cache/depinder.sqlite` |
-| `MONGO_URI`, `MONGO_USER`, `MONGO_PASSWORD` | MongoDB cache. Default `mongodb://localhost:27018/depinder`, `root` |
 | `DEPINDER_PROFILE` | `1` for the same output as `--profile` |
 | `DEPINDER_RESOLVER_URL` | Base URL of a bulk purl resolver. Same as `--resolver-url`; off when unset |
 | `DEPINDER_RESOLVER_TOKEN` | Bearer token for it. Required with the URL: without it the resolver is skipped |
@@ -23,7 +22,6 @@ No configuration file: command-line options, environment variables, and a few fi
 | Path | What |
 |---|---|
 | `~/.dxw/depinder/cache/depinder.sqlite` | The registry cache: `libs`, `misses` |
-| `~/.dxw/depinder/cache/docker-compose.yml` | MongoDB setup, written by `cache init` |
 | `./cache/github-advisories/<ecosystem>.json` | The advisory cache |
 | `./.github-tokens` | The token pool: `GH_TOKEN_1=…`, contiguous from 1 |
 | `./plugins.json` | Extra plugins: `[{"path": "<module>", "field": "<export>"}]` |

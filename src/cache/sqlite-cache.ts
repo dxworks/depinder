@@ -12,9 +12,8 @@ import {depinderFolder} from '../utils/utils'
  * two costs that grew with every run: `libs.json` reached 94 MB on a twelve-repository run and
  * was serialised WHOLE at every checkpoint, blocking the event loop for seconds; and a cache per
  * working directory meant the same packument was fetched once per project folder. This database
- * is written per row, so a checkpoint is free, and it lives in `~/.dxw/depinder/cache/` — the
- * folder `depinder cache init` already owns — so every run on the machine shares it, the way the
- * MongoDB cache does. The MongoDB cache is untouched: it is still chosen when its container runs.
+ * is written per row, so a checkpoint is free, and it lives in `~/.dxw/depinder/cache/`, so every
+ * run on the machine shares it. It is the only cache: each machine has its own.
  *
  * `node:sqlite` is Node's own module (stable API, `ExperimentalWarning` still printed on Node 24;
  * `index.ts` silences that one warning). No native addon, nothing to compile per platform.
@@ -92,6 +91,11 @@ export class CacheDb {
     /** In insertion order (rowid), the order `libs.json` had. */
     libKeys(): string[] {
         return (this.db.prepare('SELECT key FROM libs ORDER BY rowid').all() as {key: string}[]).map(it => it.key)
+    }
+
+    /** Keys last written before `ms` (epoch milliseconds), in insertion order: what `update` refreshes. */
+    libKeysUpdatedBefore(ms: number): string[] {
+        return (this.db.prepare('SELECT key FROM libs WHERE updated_at < ? ORDER BY rowid').all(ms) as {key: string}[]).map(it => it.key)
     }
 
     /** Every entry, parsed, in insertion order. A twelve-repository run is ~90 MB of JSON; call it once. */
@@ -217,7 +221,7 @@ export function resetSharedCacheDb(): void {
     shared = undefined
 }
 
-/** The `Cache` a run picks when MongoDB is not running. Every `set` is durable on its own. */
+/** The `Cache` every run uses. Every `set` is durable on its own. */
 export const sqliteCache: Cache = {
     get(key: string): LibraryInfo | undefined {
         return sharedCacheDb().getLib(key)

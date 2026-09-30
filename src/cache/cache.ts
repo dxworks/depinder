@@ -8,10 +8,10 @@ export interface Cache {
     /**
      * Makes everything written so far durable and LEAVES THE CACHE USABLE.
      *
-     * Separate from `write` because `write` is also the teardown step: the Mongo cache closes its
-     * connection there, so calling it from the mid-run checkpoint dropped the connection under a
-     * run that then failed every remaining lookup. A cache whose `set` is already durable (Mongo)
-     * implements this as a no-op; one that batches in memory (the JSON file) serialises here.
+     * Separate from `write` because `write` is also the teardown step and may release what the
+     * cache holds open; calling it from the mid-run checkpoint would fail every remaining lookup.
+     * A cache whose `set` is already durable (SQLite) implements this as a no-op; one that batches
+     * in memory would serialise here.
      * Optional: a cache that does not implement it simply keeps the pre-checkpoint behaviour of
      * only becoming durable at the end of the run.
      */

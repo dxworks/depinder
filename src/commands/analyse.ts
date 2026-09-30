@@ -21,15 +21,13 @@ import spdxCorrect from 'spdx-correct'
 import moment from 'moment'
 import {ecosystemOf, Plugin} from '../extension-points/plugin'
 import {Cache, noCache} from '../cache/cache'
-import {getMongoDockerContainerStatus} from './cache'
-import {sqliteCache} from '../cache/sqlite-cache'
+import {sharedCacheDb, sqliteCache} from '../cache/sqlite-cache'
 import {MISS_TTL_HOURS, missCache, MissCache, noMissCache} from '../cache/misses'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {MultiBar, Presets} from 'cli-progress'
 import {walkDir} from '../utils/utils'
 import {blacklistedGlobs} from '../utils/blacklist'
 import { minimatch } from 'minimatch'
-import {mongoCache} from '../cache/mongo-cache'
 import {
     DEFAULT_VULN_SOURCE,
     describeVulnSources,
@@ -194,16 +192,6 @@ export function licenseOf(lib: LibraryInfo): string {
     if (!licenseIds.includes(license))
         return spdxCorrect(license) || 'unknown'
     return license
-}
-
-function chooseCacheOption(): Cache {
-
-    if (getMongoDockerContainerStatus() != 'running') {
-        log.info('Mongo cache is not running, using the local SQLite cache')
-        return sqliteCache
-    }
-    log.info('Mongo cache is up and running, using Mongo cache')
-    return mongoCache
 }
 
 async function cacheHit(cache: Cache, cacheKey: string, dep: DepinderDependency, refresh: boolean, refreshedLibs: any[]) {
@@ -538,16 +526,17 @@ export interface CacheSession {
 }
 
 async function openCacheSession(useCache: boolean): Promise<CacheSession> {
-    const cache: Cache = useCache ? chooseCacheOption() : noCache
+    const cache: Cache = useCache ? sqliteCache : noCache
+    if (useCache) log.info(`Using the local SQLite cache: ${sharedCacheDb().file}`)
     const misses: MissCache = useCache ? missCache : noMissCache
     await timePhase('cache:load', async () => {
         await cache.load()
         misses.load()
     })
-    // Mid-run durability only: `cache.write()` is also the teardown step (the Mongo cache closes
-    // its connection there), so a checkpoint that called it would leave every later lookup in the
-    // run talking to a disconnected client — and those failures are swallowed per dependency, so
-    // the run would still finish and write CSVs with the enrichment silently missing.
+    // Mid-run durability only: `cache.write()` is the teardown step and may release the cache's
+    // resources, so a checkpoint that called it could leave every later lookup in the run failing
+    // — and those failures are swallowed per dependency, so the run would still finish and write
+    // CSVs with the enrichment silently missing.
     const checkpoint = () => timePhase('cache:write', async () => {
         await cache.flush?.()
         misses.write()

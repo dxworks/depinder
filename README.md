@@ -225,23 +225,19 @@ The following commands can be used either as standalone, or with the `dxw` prefi
 
 ### Cache command
 
-Registry answers are cached in one of two places: a **SQLite database global to the machine**,
-`~/.dxw/depinder/cache/depinder.sqlite`, through Node's own `node:sqlite` (no native addon), or
-MongoDB when its container is running.
+Registry answers are cached in a **SQLite database global to the machine**,
+`~/.dxw/depinder/cache/depinder.sqlite`, through Node's own `node:sqlite` (no native addon). Each
+machine has its own.
 
 ```shell
-depinder cache               # where the SQLite cache is and what it holds; is Mongo running?
+depinder cache               # where the SQLite cache is and what it holds
 depinder cache import <dir>  # pull a libs.json / misses.json folder into it
-depinder cache init          # write the MongoDB docker-compose files to ~/.dxw/depinder/cache/
-depinder cache up            # start MongoDB (alias: start)
-depinder cache down          # stop it (alias: stop)
+depinder update [date] [plugins...]  # re-fetch the entries last written before date (default: a month ago)
 ```
-
-To see what is in MongoDB, visit the [Mongo Express Dashboard](http://localhost:8002/).
 
 ### The library cache
 
-Without MongoDB, registry answers are kept in the `libs` table of the SQLite database, so a second
+Registry answers are kept in the `libs` table of the SQLite database, so a second
 run over the same libraries — from any working directory — makes no registry calls. Lookups that
 *failed* are kept too, in `misses`, for 24 hours: a library a registry cannot find — or a registry
 that does not answer — would otherwise be asked again on every run, and a failed lookup is the
