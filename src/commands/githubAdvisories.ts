@@ -12,6 +12,7 @@ import {GITHUB_ECOSYSTEMS, resolveEcosystems} from '../vuln-sources/github/ecosy
 import {ecosystemsInSboms} from '../vuln-sources/github/scan'
 import {DEFAULT_TOKEN_FILE, loadTokens, maskToken, MAX_CONCURRENCY} from '../vuln-sources/github/tokens'
 import {walkDir} from '../utils/utils'
+import {isSbomFile} from '../plugins/sbom'
 import {log} from '../utils/logging'
 
 /**
@@ -38,7 +39,7 @@ interface DownloadCommandOptions {
 function chooseEcosystems(options: DownloadCommandOptions): string[] {
     if (options.ecosystems) return options.ecosystems.split(',')
     if (options.sbom?.length) {
-        const files = options.sbom.flatMap(it => walkDir(it)).filter(it => it.endsWith('.cdx.json'))
+        const files = options.sbom.flatMap(it => walkDir(it)).filter(isSbomFile)
         log.info(`Deriving ecosystems from ${files.length} SBOM file(s)`)
         return ecosystemsInSboms(files)
     }

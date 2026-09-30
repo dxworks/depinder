@@ -77,7 +77,6 @@ nav:
   - Commands:
       - commands/index.md
       - analyse: commands/analyse.md
-      - export-blackduck: commands/export-blackduck.md
       - github-advisories: commands/github-advisories.md
       - cache & update: commands/cache.md
       - Black Duck report tools: commands/blackduck-reports.md

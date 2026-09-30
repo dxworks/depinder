@@ -243,6 +243,26 @@ describe('scan provenance', () => {
         ])
     })
 
+    it('lists only the given SBOMs, each with the tool that wrote it, for a per-source file', async () => {
+        process.env.TRIVY_BIN = stubTrivy('trivy-prov-src.sh', PINNED_SCANNER_VERSIONS.trivy)
+        process.env.GRYPE_BIN = missing('grype')
+        const other = path.join(tmpDir, 'other.cdx.json')
+        fs.writeFileSync(other, JSON.stringify({metadata: {}, components: [], dependencies: []}))
+        await scanSbomFileOnce(sbomFile)
+        await scanSbomFileOnce(other)
+
+        const resultFolder = fs.mkdtempSync(path.join(tmpDir, 'results-'))
+        const file = await writeScanProvenance(resultFolder, false, [{
+            file: other, producer: 'syft', toolVersion: '1.46.0', repo: 'other', repoFromMetadata: true, purlTypes: new Set(),
+        }])
+
+        const provenance = JSON.parse(fs.readFileSync(file, 'utf8'))
+        expect(provenance.source).toBe('syft')
+        expect(provenance.sbomFiles).toEqual([
+            {file: other, trivy: 'ok', grype: 'skipped', findingEntries: 2, packageKeys: 2, producer: 'syft', producerVersion: '1.46.0', repo: 'other'},
+        ])
+    })
+
     it('marks the run disabled when nothing ran and no token is set', async () => {
         process.env.TRIVY_BIN = missing('trivy')
         process.env.GRYPE_BIN = missing('grype')

@@ -1,4 +1,5 @@
 import { transformUpgradeGuidance } from '../src/commands/transformBlackDuckReports';
+import { UPGRADE_GUIDANCE_COLUMNS } from '../src/blackduck/columns';
 
 describe('transformUpgradeGuidance', () => {
     it('keeps CSV columns aligned when quoted values contain commas', () => {
@@ -8,6 +9,7 @@ describe('transformUpgradeGuidance', () => {
         const [header, data] = output.trimEnd().split('\n');
 
         expect(header).toBe('Component Name,Component Version Name,Component Origin Name,Component Version Origin Id,Total Known Vulnerabilities,Short Term Recommended Version Name,Short Term Recommended Origin Name,Short Term Recommended Origin Id,Short Term Recommended Origin Version Name,Short Term Critical Vulnerability,Short Term High Vulnerability,Short Term Medium Vulnerability,Short Term Low Vulnerability,Long Term Recommended Version Name,Long Term Recommended Origin Name,Long Term Recommended Origin Id,Long Term Recommended Origin Version Name,Long Term Critical Vulnerability,Long Term High Vulnerability,Long Term Medium Vulnerability,Long Term Low Vulnerability');
+        expect(header).toBe(UPGRADE_GUIDANCE_COLUMNS.join(','));
         expect(data).toContain('sample:package:1.2.3,4,2.0.0,sample-origin');
         expect(data).not.toContain('sample:package:1.2.3,recommended-version-id-short');
     });

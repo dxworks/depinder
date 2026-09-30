@@ -1,5 +1,6 @@
 import {
     addCategoriesToReports,
+    chooseJoinKey,
     COULD_NOT_MAP_REPOSITORY_CATEGORY,
     parseRepoCategories
 } from '../src/utils/blackDuckReportCategories';
@@ -86,6 +87,26 @@ legacy-api,Deprecated
 core-web,Active
 CORE-WEB,Deprecated
 `)).toThrow('repo-to-category.csv contains duplicate repo: CORE-WEB');
+    });
+
+    it('joins on Component Version Origin Id when every Version id is empty, as in a depinder export', () => {
+        const dependencies = [
+            {'Version id': '', 'Component Version Origin Id': 'lodash/4.17.21', 'Component name': 'lodash'},
+            {'Version id': '', 'Component Version Origin Id': 'qs/6.10.2', 'Component name': 'qs'}
+        ];
+        // What analyse writes: VerifiedPath always empty, the repo in ProjectPath.
+        const sources = [
+            {'Version id': '', 'Component Version Origin Id': 'lodash/4.17.21', 'VerifiedPath': '', 'ProjectPath': 'core-web/app'},
+            {'Version id': '', 'Component Version Origin Id': 'qs/6.10.2', 'VerifiedPath': '', 'ProjectPath': 'unmapped-repo'}
+        ];
+        expect(chooseJoinKey(dependencies, sources)).toBe('Component Version Origin Id');
+        const result = addCategoriesToReports(dependencies, sources, parseRepoCategories('repo,category\ncore-web,Active\n'));
+        expect(result.dependenciesSourcesByCategory.map(it => it.Repository)).toEqual(['core-web', 'unmapped-repo']);
+        expect(result.dependenciesByCategory.map(it => it.Category)).toEqual(['Active', COULD_NOT_MAP_REPOSITORY_CATEGORY]);
+    });
+
+    it('keeps Version id as the key while any row carries one', () => {
+        expect(chooseJoinKey([dependencyRow('v-1', 'dep-1')], [sourceRow('', 'core-web/app', 'src-1')])).toBe('Version id');
     });
 
     it('fails when repo mapping category is empty', () => {

@@ -41,7 +41,10 @@ export interface CycloneDxComponent {
 }
 
 export interface CycloneDxBom {
-    metadata?: { component?: CycloneDxComponent }
+    bomFormat?: string
+    specVersion?: string
+    /** `tools.components[]` (1.5+) or `tools[]` (1.4); `describe.ts` reads either shape. */
+    metadata?: { component?: CycloneDxComponent, tools?: unknown, timestamp?: string }
     components?: CycloneDxComponent[]
     dependencies?: { ref: string, dependsOn?: string[] }[]
 }
@@ -63,9 +66,26 @@ export function readBomGraph(sbomFile: string): BomGraph {
     return {bom, byRef, edges}
 }
 
+/**
+ * The project the SBOM describes, as the SBOM itself records it. Both Trivy and Syft write the
+ * scanned directory's name to `metadata.component.name` — `ruby-mastodon` for a scan of
+ * `.../ruby-mastodon` — so the file's name need not carry it. A path (Syft on `dir:/x/y` without
+ * `--source-name`), `.` or an empty string is not a name, and yields undefined.
+ */
+export function metadataProjectName(bom: CycloneDxBom): string | undefined {
+    const name = bom.metadata?.component?.name?.trim()
+    if (!name || name === '.' || name === '..' || /[\\/]/.test(name)) return undefined
+    return name
+}
+
 /** `ruby-mastodon.trivy.cdx.json` and `ruby-mastodon.cdx.json` are both the project `ruby-mastodon`. */
-export function projectNameOf(sbomFile: string): string {
+export function repoNameFromFile(sbomFile: string): string {
     return path.basename(sbomFile).replace(/\.(trivy\.)?cdx\.json$/, '')
+}
+
+/** The project name: what the SBOM records, else what the file is called. */
+export function projectNameOf(bom: CycloneDxBom, sbomFile: string): string {
+    return metadataProjectName(bom) ?? repoNameFromFile(sbomFile)
 }
 
 /** A parsed purl, reduced to what depinder's model needs. */
@@ -425,7 +445,7 @@ function findSyftMavenModules(
         const manifestPath = pomPath.replace(/^\//, '')
         nodes.push({
             ref: anchor.ref,
-            ...moduleNames(manifestPath, sbomFile),
+            ...moduleNames(bom, manifestPath, sbomFile),
             version: anchor.version,
             path: manifestPath,
             allComponents: false,
@@ -436,10 +456,10 @@ function findSyftMavenModules(
 }
 
 /** `neo4j/pom.xml` -> module `neo4j`; a top-level `pom.xml` -> no module, named after the SBOM. */
-function moduleNames(manifestPath: string, sbomFile: string): {module: string, name: string} {
+function moduleNames(bom: CycloneDxBom, manifestPath: string, sbomFile: string): {module: string, name: string} {
     const dir = path.dirname(manifestPath)
     const module = dir === '.' ? '' : dir
-    return {module, name: module || projectNameOf(sbomFile)}
+    return {module, name: module || projectNameOf(bom, sbomFile)}
 }
 
 /**
@@ -465,7 +485,7 @@ export function findProjectNodes({bom, byRef, edges}: BomGraph, sbomFile: string
             const manifestPath = c.name ?? 'unknown'
             return {
                 ref: c['bom-ref'],
-                ...moduleNames(manifestPath, sbomFile),
+                ...moduleNames(bom, manifestPath, sbomFile),
                 version: c.version ?? 'unknown',
                 path: manifestPath,
                 allComponents: false,
@@ -499,7 +519,7 @@ export function findProjectNodes({bom, byRef, edges}: BomGraph, sbomFile: string
         const anchors = workspaceAnchorsOf(bom, edges, purlType)
         return [...located].sort(([a], [b]) => a.split('/').length - b.split('/').length || a.localeCompare(b)).map(([location, refs]) => ({
             ref: rootRef ?? '',
-            ...moduleNames(location, sbomFile),
+            ...moduleNames(bom, location, sbomFile),
             path: location,
             version: bom.metadata?.component?.version ?? 'unknown',
             allComponents: true,
@@ -512,10 +532,10 @@ export function findProjectNodes({bom, byRef, edges}: BomGraph, sbomFile: string
     return [{
         ref: rootRef ?? '',
         module: '',
-        name: projectNameOf(sbomFile),
+        name: projectNameOf(bom, sbomFile),
         version: bom.metadata?.component?.version ?? 'unknown',
         // Never `sbomFile`: that is an absolute path on the analysing machine. See manifestPathOf.
-        path: manifestPathOf(bom, purlType) ?? projectNameOf(sbomFile),
+        path: manifestPathOf(bom, purlType) ?? projectNameOf(bom, sbomFile),
         allComponents: true,
         anchorRefs: workspaceAnchorsOf(bom, edges, purlType),
     }]

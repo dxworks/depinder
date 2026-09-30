@@ -19,7 +19,7 @@ export interface ResolverConfig {
     chunkConcurrency: number
 }
 
-/** The options `analyse` and `export-blackduck` declare; both commands share this shape. */
+/** The resolver options `analyse` declares. */
 export interface ResolverOptions {
     /** `--resolver-url <url>`. Overrides `DEPINDER_RESOLVER_URL`. */
     resolverUrl?: string
