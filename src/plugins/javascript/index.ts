@@ -45,7 +45,9 @@ export async function retrieveFromNpm(libraryName: string): Promise<LibraryInfo>
         }),
         description: response.description,
         issuesUrl: [],
-        licenses: [response.license],
+        // A package with no `license` must yield [], not [undefined]: the cache serialises that as
+        // [null], which a warm run then wrote into the Licenses cell as the text `null`.
+        licenses: response.license != null ? [response.license] : [],
         reposUrl: [],
         homepageUrl: npmProjectUrl(response),
         keywords: response.keywords,

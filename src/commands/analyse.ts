@@ -108,7 +108,8 @@ export const analyseCommand = createAnalyseCommand()
 
 
 function extractLicenses(dep: DepinderDependency) {
-    return dep.libraryInfo?.licenses?.map(it => {
+    // Caches written before the npm registrar stopped emitting [undefined] hold [null]; skip it.
+    return dep.libraryInfo?.licenses?.filter(it => it != null).map(it => {
         if (typeof it === 'string') return it.substring(0, 100); else return JSON.stringify(it)
     })
 }
