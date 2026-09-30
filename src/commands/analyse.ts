@@ -21,7 +21,8 @@ import spdxCorrect from 'spdx-correct'
 import moment from 'moment'
 import {ecosystemOf, Plugin} from '../extension-points/plugin'
 import {Cache, noCache} from '../cache/cache'
-import {sharedCacheDb, sqliteCache} from '../cache/sqlite-cache'
+import {sharedCacheDb, sqliteCacheWithCutoff} from '../cache/sqlite-cache'
+import {CacheMaxAgeOptions, cacheMaxAgeSeconds, formatDuration, freshnessCutoffMs} from '../cache/max-age'
 import {MISS_TTL_HOURS, missCache, MissCache, noMissCache} from '../cache/misses'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {MultiBar, Presets} from 'cli-progress'
@@ -53,7 +54,7 @@ const licenseIds = require('spdx-license-ids/')
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 require('events').EventEmitter.prototype._maxListeners = 100
 
-export interface AnalyseOptions extends ResolverOptions {
+export interface AnalyseOptions extends ResolverOptions, CacheMaxAgeOptions {
     plugins?: string[]
     results: string
     refresh: boolean
@@ -81,6 +82,9 @@ export function createAnalyseCommand(): Command {
         // folder, and `--plugins` never reached getPluginsFromNames.
         .option('-r, --results <folder>', 'The results folder', 'results')
         .option('--refresh', 'Refresh the cache', false)
+        .option('--cache-max-age <duration>',
+            'Cached packages older than this are fetched again: <n>[s|m|h|d], a bare number being seconds; '
+            + 'DEPINDER_CACHE_MAX_AGE when unset, else 1d')
         .option('-p, --plugins [plugins...]', 'A list of plugins')
         .option('--project-name <name>',
             'SBOM sources: the name to write in the Project path column and at the head of every dependency path')
@@ -276,6 +280,14 @@ async function allCached(cache: Cache, keys: Set<string>): Promise<boolean> {
     return true
 }
 
+async function anyExpired(cache: Cache, keys: Set<string>): Promise<boolean> {
+    if (!cache.isExpired) return false
+    for (const key of keys) {
+        if (await cache.isExpired(key)) return true
+    }
+    return false
+}
+
 /** What the bulk phase left behind for phase 3: the cache keys it filled, and a count or two. */
 export interface BulkResolveOutcome {
     /** Cache keys written from resolver answers, `${ecosystem}:${library}`. */
@@ -336,6 +348,7 @@ export async function bulkResolve(
     const written = new Set<string>()
     const libs = new Map<string, LibraryInfo>()
     const wanted: string[] = []
+    let expired = 0
     for (const [purl, entries] of byPurl) {
         const keys = new Set(entries.map(it => `${ecosystemOf(it.plugin)}:${it.dep.name}`))
         // Already cached under every key it would fill: phase 3 will hit the cache and never reach
@@ -345,7 +358,16 @@ export async function bulkResolve(
             count('resolver:locally-cached')
             continue
         }
+        // An expired entry is asked for like a missing one; counted apart only for the log line.
+        if (!options.refresh && await anyExpired(cache, keys)) {
+            count('resolver:expired')
+            expired++
+        }
         wanted.push(purl)
+    }
+    if (wanted.length > 0) {
+        log.info(`Asking the resolver about ${wanted.length} purl(s): `
+            + `${wanted.length - expired} not cached${options.refresh ? ' (--refresh)' : ''}, ${expired} expired`)
     }
 
     if (wanted.length === 0) {
@@ -526,8 +548,8 @@ export interface CacheSession {
     close: () => Promise<void>
 }
 
-async function openCacheSession(useCache: boolean): Promise<CacheSession> {
-    const cache: Cache = useCache ? sqliteCache : noCache
+async function openCacheSession(useCache: boolean, cutoffMs: number): Promise<CacheSession> {
+    const cache: Cache = useCache ? sqliteCacheWithCutoff(cutoffMs) : noCache
     if (useCache) log.info(`Using the local SQLite cache: ${sharedCacheDb().file}`)
     const misses: MissCache = useCache ? missCache : noMissCache
     await timePhase('cache:load', async () => {
@@ -581,8 +603,14 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
     const resolver = resolverConfig(options)
     if (resolver) log.info(`Bulk resolver: ${resolver.url}, waiting at most ${Math.round(resolver.maxWaitMs / 1000)}s for it`)
 
+    // One cutoff for the whole run, taken before anything is fetched: every row written by this
+    // run is fresh for the rest of it, and the resolver can later be sent the very same instant.
+    const maxAgeSeconds = cacheMaxAgeSeconds(options)
+    const cutoffMs = freshnessCutoffMs(maxAgeSeconds)
+    if (useCache) log.info(`Cache max age: ${formatDuration(maxAgeSeconds)} (entries written before ${new Date(cutoffMs).toISOString()} are expired)`)
+
     const prep = await prepareSbomScans(runs, options)
-    const session = await openCacheSession(useCache)
+    const session = await openCacheSession(useCache, cutoffMs)
     try {
         for (const run of runs) {
             const analysed = await runAnalysis(run.files, run.plugins, run.folder, options, session, resolver)
@@ -707,7 +735,8 @@ export async function runAnalysis(files: string[], plugins: Plugin[], resultFold
                         log.warn(`Skipping ${dep.name}: its registry lookup failed within the last ${MISS_TTL_HOURS}h (--refresh to retry)`)
                         return
                     } else {
-                        count('cache:miss')
+                        // An expired entry is a miss like any other; the count only tells them apart.
+                        count(!options.refresh && await session.cache.isExpired?.(cacheKey) ? 'cache:expired' : 'cache:miss')
                         // log.info(`Getting remote information on ${dep.name}`)
                         let fetch = inFlight.get(cacheKey)
                         if (!fetch) {

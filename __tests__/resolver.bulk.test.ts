@@ -1,5 +1,10 @@
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import {assignPurls, bulkResolve, PluginProjects} from '../src/commands/analyse'
 import {Cache} from '../src/cache/cache'
+import {resetSharedCacheDb, sharedCacheDb, sqliteCacheWithCutoff} from '../src/cache/sqlite-cache'
+import {freshnessCutoffMs} from '../src/cache/max-age'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
 import {LibraryInfo} from '../src/extension-points/registrar'
 import {Plugin} from '../src/extension-points/plugin'
@@ -424,5 +429,68 @@ describe('the bulk resolve phase', () => {
         expect(outcome.requested).toBe(1)
         expect(outcome.resolved).toBe(0)
         expect(cache.entries.size).toBe(0)
+    })
+})
+
+/**
+ * The bulk phase asks about expired entries too, not only missing ones: an entry past the cache
+ * max age reads as absent through the analyse cache, so its purl lands in the ask list, and the
+ * answer rewrites the row with a new age.
+ */
+describe('the bulk resolve phase with a cache max age', () => {
+    let tmp: string
+
+    beforeEach(() => {
+        tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder-bulk-age-'))
+        process.env.DEPINDER_CACHE_DB = path.join(tmp, 'depinder.sqlite')
+        resetSharedCacheDb()
+    })
+    afterEach(() => {
+        resetSharedCacheDb()
+        delete process.env.DEPINDER_CACHE_DB
+        fs.rmSync(tmp, {recursive: true, force: true})
+    })
+
+    function cachedAgo(key: string, ageMs: number) {
+        const db = sharedCacheDb()
+        db.setLib(key, {name: key, description: 'cached', licenses: [], versions: []})
+        ;(db as any).db.prepare('UPDATE libs SET updated_at = ? WHERE key = ?').run(Date.now() - ageMs, key)
+    }
+
+    it('asks about an expired entry, skips a fresh one, and rewrites the expired row', async () => {
+        cachedAgo('npm:left-pad', 2 * 86_400_000)
+        cachedAgo('npm:right-pad', 60_000)
+        const runStart = Date.now()
+        const cache = sqliteCacheWithCutoff(freshnessCutoffMs(86_400, runStart))
+        const projects: PluginProjects[] = [{
+            plugin: npm,
+            projects: [project('app', [dep('left-pad', '1.0.0'), dep('right-pad', '2.0.0')])],
+        }]
+        assignPurls(projects)
+        const server = answering({'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad')})
+
+        const outcome = await bulkResolve(config, projects, cache, {}, server.resolve)
+
+        expect(server.asked[0]).toEqual(['pkg:npm/left-pad@1.0.0'])
+        expect(outcome.written.has('npm:left-pad')).toBe(true)
+        expect(sharedCacheDb().getLib('npm:left-pad')?.description).toBe('a package')
+        expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBeGreaterThanOrEqual(runStart)
+        expect(sharedCacheDb().getLib('npm:right-pad')?.description).toBe('cached')
+    })
+
+    it('leaves an expired row untouched when the resolver cannot answer, for the registrar to try', async () => {
+        cachedAgo('npm:left-pad', 2 * 86_400_000)
+        const before = sharedCacheDb().libUpdatedAt('npm:left-pad')
+        const cache = sqliteCacheWithCutoff(freshnessCutoffMs(86_400))
+        const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('left-pad', '1.0.0')])]}]
+        assignPurls(projects)
+        const server = answering({})
+
+        const outcome = await bulkResolve(config, projects, cache, {}, server.resolve)
+
+        expect(server.asked[0]).toEqual(['pkg:npm/left-pad@1.0.0'])
+        expect(outcome.written.size).toBe(0)
+        expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBe(before)
+        expect(await cache.has('npm:left-pad')).toBe(false)
     })
 })

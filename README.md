@@ -70,7 +70,8 @@ dependency graph.
 
 ```shell
 depinder analyse <sbom-folder...> -r <out> \
-    [--vuln-source trivy,grype,github] [--github-token-file F] [--project-name NAME] [--target DIR]
+    [--vuln-source trivy,grype,github] [--github-token-file F] [--project-name NAME] [--target DIR] \
+    [--cache-max-age 1d] [--refresh]
 ```
 
 Each SBOM is sorted by its content — a Trivy SBOM goes to `<out>/trivy/`, a Syft SBOM to
@@ -230,9 +231,9 @@ Registry answers are cached in a **SQLite database global to the machine**,
 machine has its own.
 
 ```shell
-depinder cache               # where the SQLite cache is and what it holds
+depinder cache               # where the SQLite cache is, what it holds and how much of it has expired
 depinder cache import <dir>  # pull a libs.json / misses.json folder into it
-depinder update [date] [plugins...]  # re-fetch the entries last written before date (default: a month ago)
+depinder update [date] [plugins...]  # re-fetch the entries last written before date (default: the expired ones)
 ```
 
 ### The library cache
@@ -242,12 +243,20 @@ run over the same libraries — from any working directory — makes no registry
 *failed* are kept too, in `misses`, for 24 hours: a library a registry cannot find — or a registry
 that does not answer — would otherwise be asked again on every run, and a failed lookup is the
 slowest kind. `--refresh` bypasses both. A rate-limited (429) lookup is never remembered as a miss.
+
+Every cached library has an age. One younger than the **cache max age** is answered locally; an
+older one is expired and counts as missing: the bulk resolver is asked for it, then its registry,
+and the answer is written back with a new age. An expired library that nothing answers for is
+left without data, like one never cached. The max age is `--cache-max-age <duration>` (`90s`,
+`30m`, `12h`, `7d`; a bare number is seconds), else `DEPINDER_CACHE_MAX_AGE`, else `1d`. The
+24-hour miss TTL is separate and unchanged.
 Every row is committed as it is written, so the 60-second checkpoint costs nothing; the previous
 `cache/libs.json` (94 MB on the twelve-repository run) was serialised whole at every one.
 
 `DEPINDER_CACHE_DB=<file>` points a run at another database. The previous per-directory layout
 (`cache/libs.json`, `misses.json`) is not read by a run any more;
-`depinder cache import cache` copies it into the database, keeping rows already there.
+`depinder cache import cache` copies it into the database, keeping rows already there. Imported
+libraries are as old as `libs.json`, so an old file's entries are expired and fetched on the next run.
 
 Add `--profile` to `analyse` to get, at the end of the run, the wall-clock
 of each phase (parse, scans, registry enrichment, CSV writing), the cache hit/miss counts and the
@@ -263,6 +272,14 @@ This command gets as an argument multiple fully qualified folder paths, sorts ev
 by content — Trivy SBOM or Syft SBOM; anything else is ignored — and writes one subfolder per
 source under `results`: `trivy/` and `syft/`, each with the `sbom-*` CSVs and the Black Duck-shaped
 files. See [Black Duck-shaped exports](#black-duck-shaped-exports).
+
+Cached registry answers are reused for one day, then fetched again. Change the window with
+`--cache-max-age` or `DEPINDER_CACHE_MAX_AGE` (see [The library cache](#the-library-cache)):
+
+```shell
+depinder analyse <paths...> -r <results> --cache-max-age 7d   # reuse answers for a week
+depinder analyse <paths...> -r <results> --cache-max-age 0    # fetch everything again now
+```
 
 ## Acknowledgements
 

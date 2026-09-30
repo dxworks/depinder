@@ -7,12 +7,16 @@ import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
 import {Presets, SingleBar} from 'cli-progress'
 import {ecosystemOf, Plugin} from '../extension-points/plugin'
 import {log} from '../utils/logging'
+import {CacheMaxAgeOptions, cacheMaxAgeSeconds, formatDuration, freshnessCutoffMs} from '../cache/max-age'
 
 export const updateCommand = new Command()
     .name('update')
-    .description('Re-fetch the local cache\'s libraries last written before a date')
-    .argument('[updated_before]', 'Update all libs that were updated before this date')
+    .description('Re-fetch the local cache\'s libraries last written before a date, by default the expired ones')
+    .argument('[updated_before]', 'Update all libs that were updated before this date; '
+        + 'when omitted, the ones older than the cache max age')
     .argument('[plugins...]', 'A list of plugins to update database libs for')
+    .option('--cache-max-age <duration>',
+        'Without a date, re-fetch the libraries older than this: <n>[s|m|h|d]; DEPINDER_CACHE_MAX_AGE when unset, else 1d')
     .action(updateLibs)
 
 async function updateLibrariesAndLogProcess(idsToUpdate: string[], selectedPlugins: Plugin[]) {
@@ -24,12 +28,20 @@ async function updateLibrariesAndLogProcess(idsToUpdate: string[], selectedPlugi
     progressBar.stop()
 }
 
-export async function updateLibs(updated_before: string, plugins: string[]): Promise<void> {
-    const lastUpdateMoment = updated_before ? moment(updated_before) : moment().subtract(1, 'month')
+export async function updateLibs(updated_before: string, plugins: string[], options: CacheMaxAgeOptions = {}): Promise<void> {
+    // No date: exactly the entries an analyse run would treat as expired.
+    let before: number
+    if (updated_before) {
+        before = moment(updated_before).valueOf()
+    } else {
+        const maxAgeSeconds = cacheMaxAgeSeconds(options)
+        before = freshnessCutoffMs(maxAgeSeconds)
+        log.info(`Updating the libraries older than the cache max age, ${formatDuration(maxAgeSeconds)}`)
+    }
 
     const db = sharedCacheDb()
     log.info(`Local cache: ${chalk.yellow(db.file)}`)
-    const ids = db.libKeysUpdatedBefore(lastUpdateMoment.valueOf())
+    const ids = db.libKeysUpdatedBefore(before)
 
     const selectedPlugins = getPluginsFromNames(plugins)
 

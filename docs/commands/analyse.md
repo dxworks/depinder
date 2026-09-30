@@ -18,6 +18,7 @@ any mix, and both sources are optional: depinder processes whatever it finds.
 | `--project-name <name>` | SBOM sources: `ProjectPath` value and head of every `Path` | the SBOMs' repo name |
 | `--target <folder>` | SBOM sources: the scanned repositories, one per SBOM repo name; gives `Path` Black Duck's project prefix and drops own code from the chain | off |
 | `--refresh` | Ignore the cache | off |
+| `--cache-max-age <duration>` | Cached libraries older than this are fetched again: `90s`, `30m`, `12h`, `7d`; a bare number is seconds | `DEPINDER_CACHE_MAX_AGE`, else `1d` |
 | `--vuln-source <sources>` | `trivy`, `grype`, `github`, `all`, comma-separated | `trivy,grype` |
 | `--github-token-file <file>` | Tokens for `github`, relative to the working directory; `GH_TOKEN` from the environment when absent | `.github-tokens` |
 | `--github-max-age <hours>` | Re-download advisories older than this | `24` |
@@ -111,12 +112,22 @@ depinder analyse ./sboms -r exports/my-project --project-name my-project --targe
 
 # Only three ecosystems; the old plugin names select sbom-npm, sbom-ruby and sbom-java
 depinder analyse ./sboms -r results -p npm ruby java
+
+# Reuse cached registry answers for a week instead of a day
+depinder analyse ./sboms -r results --cache-max-age 7d
+
+# Fetch everything again, but still skip lookups that failed in the last 24 hours
+depinder analyse ./sboms -r results --cache-max-age 0
+
+# The same window for every run in this shell
+export DEPINDER_CACHE_MAX_AGE=12h
 ```
 
 ## Cache
 
 Registry answers go to `~/.dxw/depinder/cache/depinder.sqlite`; failed lookups too, for 24 hours.
-`--refresh` bypasses both. See [cache](cache.md).
+An answer older than `--cache-max-age` (default `1d`) is expired and fetched again, the resolver
+first. `--refresh` bypasses both. See [cache](cache.md#expiry).
 
 With a [bulk resolver](../configuration.md#bulk-resolver) configured, every purl this run needs is
 asked for in one call after parsing and before enrichment, and what comes back fills that same

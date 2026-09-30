@@ -58,6 +58,13 @@ describe('the analyse command line', () => {
         expect((await parseArgs('/repo')).options.refresh).toBe(false)
     })
 
+    it('reads --cache-max-age, and leaves it undefined when not given so the env var applies', async () => {
+        const {folders, options} = await parseArgs('/repo', '--cache-max-age', '12h')
+        expect(options.cacheMaxAge).toBe('12h')
+        expect(folders).toEqual(['/repo'])
+        expect((await parseArgs('/repo')).options.cacheMaxAge).toBeUndefined()
+    })
+
     it('accepts the SBOM export options --project-name and --target', async () => {
         const {options} = await parseArgs('/sboms', '--project-name', 'mastodon', '--target', '/repos', '--github-token-file', 'f')
         expect(options.projectName).toBe('mastodon')

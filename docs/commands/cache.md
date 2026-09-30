@@ -7,7 +7,7 @@ machine, nothing to install. Each machine has its own.
 
 ```
 depinder cache                 same as `cache info`
-depinder cache info            SQLite path, size and row counts   (alias: i)
+depinder cache info            SQLite path, size, row counts, fresh/expired split   (alias: i)
 depinder cache import <dir>    pull a libs.json / misses.json folder into SQLite
 ```
 
@@ -15,15 +15,30 @@ depinder cache import <dir>    pull a libs.json / misses.json folder into SQLite
 
 | Table | Holds |
 |---|---|
-| `libs` | Registry answer per `<ecosystem>:<name>`: versions with dates, licences, homepage |
+| `libs` | Registry answer per `<ecosystem>:<name>`: versions with dates, licences, homepage, and `updated_at`, when it was written |
 | `misses` | Failed lookups, forgotten after 24 hours; HTTP 429 is never recorded |
 
 `DEPINDER_CACHE_DB=<file>` points a run at another database. `--refresh` bypasses `libs` and
 `misses` for one run.
 
+### Expiry
+
+A `libs` row written more than the **cache max age** ago is expired: `analyse` treats it as
+missing, asks the bulk resolver and then the registry for it, and rewrites it with a new age. If
+nothing answers, the dependency gets no library data, as if it had never been cached. The cutoff is
+taken once at the start of a run, so whatever the run writes stays fresh for the rest of it.
+
+| Setting | Meaning | Default |
+|---|---|---|
+| `--cache-max-age <duration>` | `<n>[s\|m\|h\|d]`, a bare number being seconds; `0` expires everything on disk | `DEPINDER_CACHE_MAX_AGE`, else `1d` |
+
+`analyse`, `update` and `cache info` all take it. The 24-hour miss TTL is a separate setting: it says
+how soon a *failed* lookup is retried, not how long an answer may be reused.
+
 !!! note "Coming from `cache/libs.json`"
     `depinder cache import cache` copies the old per-directory files into the database. Existing
-    rows are kept; the files are not touched.
+    rows are kept; the files are not touched. Imported libraries are as old as `libs.json` (its
+    modification time), so a file older than the max age imports as expired.
 
 !!! note "Coming from the MongoDB cache"
     The MongoDB cache and `cache init` / `up` / `down` are gone. `docker-compose.yml` and
@@ -36,7 +51,7 @@ depinder cache import <dir>    pull a libs.json / misses.json folder into SQLite
 depinder update [updated_before] [plugins...]
 ```
 
-Re-fetches the `libs` rows last written before `updated_before` (default one month ago) for the
-plugins named (default all), by name or [alias](../index.md#ecosystems): `sbom-java` and `java`
-both refresh the `java:` entries. Needs `GH_TOKEN` for the advisories. To bypass the cache for a
+Re-fetches the `libs` rows last written before `updated_before` (default: the expired ones, older
+than `--cache-max-age`) for the plugins named (default all), by name or
+[alias](../index.md#ecosystems): `sbom-java` and `java` both refresh the `java:` entries. Needs `GH_TOKEN` for the advisories. To bypass the cache for a
 single run instead, use `analyse --refresh`.

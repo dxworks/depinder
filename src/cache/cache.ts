@@ -4,6 +4,11 @@ export interface Cache {
     get: (key: string) => LibraryInfo | Promise<LibraryInfo> | undefined | any
     set: (key: string, value: LibraryInfo) => void | Promise<void>
     has: (key: string) => boolean | Promise<boolean>
+    /**
+     * True when an entry exists under `key` but is past the cache max age, so `has` and `get`
+     * ignore it. Only counters and log lines read it; a cache without ages leaves it out.
+     */
+    isExpired?: (key: string) => boolean | Promise<boolean>
     load: () => void | Promise<void>,
     /**
      * Makes everything written so far durable and LEAVES THE CACHE USABLE.
