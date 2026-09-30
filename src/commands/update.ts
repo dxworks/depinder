@@ -65,8 +65,9 @@ async function getLibraryIdsToUpdate(lastUpdateMoment: Moment): Promise<string[]
 }
 
 async function updateLibrariesFor(selectedPlugins: Plugin[], idsToUpdate: string[], progressBar: SingleBar) {
-    // One plugin per ecosystem: plugins sharing an ecosystem (java / sbom-java) share cache ids,
-    // so iterating all of them would refresh every id once per plugin claiming that prefix.
+    // One plugin per ecosystem: plugins sharing an ecosystem (a plugins.json plugin reusing a
+    // default one's) share cache ids, so iterating all of them would refresh every id once per
+    // plugin claiming that prefix.
     const byEcosystem = new Map<string, Plugin>()
     for (const plugin of selectedPlugins) {
         if (!byEcosystem.has(ecosystemOf(plugin))) byEcosystem.set(ecosystemOf(plugin), plugin)

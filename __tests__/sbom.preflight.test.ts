@@ -15,7 +15,7 @@ import {
 } from '../src/plugins/sbom/local-scan'
 import {log} from '../src/utils/logging'
 import {sbomFilesFor, sbomJava} from '../src/plugins/sbom'
-import {java} from '../src/plugins/java'
+import {Plugin} from '../src/extension-points/plugin'
 
 /**
  * The preflight is the only thing standing between a user with no scanners and a completed run
@@ -281,8 +281,9 @@ describe('sbomFilesFor', () => {
         expect(sbomFilesFor([sbomJava], files)).toEqual(['/x/zeppelin.cdx.json', '/x/zeppelin.trivy.cdx.json'])
     })
 
-    it('is empty when no sbom plugin is selected, so a native run never preflights scanners', () => {
-        expect(sbomFilesFor([java], ['/x/zeppelin.cdx.json'])).toEqual([])
+    it('is empty when no sbom plugin is selected, so a plugins.json-only run never preflights scanners', () => {
+        const custom = {name: 'custom', extractor: {files: ['*.lock'], createContexts: () => []}, registrar: {retrieve: async () => { throw new Error('unused') }}} as Plugin
+        expect(sbomFilesFor([custom], ['/x/zeppelin.cdx.json'])).toEqual([])
     })
 })
 

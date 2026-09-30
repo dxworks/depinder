@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import {minimatch} from 'minimatch'
 import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
-import {ecosystemOf, Plugin} from '../../extension-points/plugin'
+import {Plugin} from '../../extension-points/plugin'
 import {Registrar} from '../../extension-points/registrar'
 import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
 import {parseCycloneDxFile} from './cyclonedx'
@@ -10,12 +10,12 @@ import {scanSbomFileOnce} from './local-scan'
 import {githubScanSbomFileOnce} from '../../vuln-sources/github/scan'
 import {mergeVulnerabilityIndexes} from '../../vuln-sources/merge'
 import {vulnSources} from '../../vuln-sources/selection'
-import {java} from '../java'
-import {javascript} from '../javascript'
-import {ruby} from '../ruby'
-import {python} from '../python'
-import {php} from '../php'
-import {dotnet} from '../dotnet'
+import {javaChecker, javaRegistrar} from '../java'
+import {npmChecker, npmRegistrar} from '../javascript'
+import {rubyChecker, rubyRegistrar} from '../ruby'
+import {pythonChecker, pythonRegistrar} from '../python'
+import {phpChecker, phpRegistrar} from '../php'
+import {dotnetChecker, dotnetRegistrar} from '../dotnet'
 import {goChecker, goRegistrar} from '../go/registrar'
 import {cratesRegistrar, rustChecker} from '../rust/registrar'
 
@@ -25,9 +25,8 @@ import {cratesRegistrar, rustChecker} from '../rust/registrar'
  * A single SBOM spans several ecosystems at once (on Apache Zeppelin: maven, npm, gem, pypi), but a
  * depinder Plugin has exactly one registrar and one advisory ecosystem. So rather than one `sbom`
  * plugin, we register one per ecosystem: each reads the same SBOM files, filters to its own purl
- * type, and reuses the registrar and vulnerability checker of the corresponding native plugin. No
- * registry code is duplicated. Go and Rust have no native plugin to borrow from — depinder never
- * parsed go.sum or Cargo.lock — so their registrars exist for the SBOM route alone.
+ * type, and enriches through that ecosystem's registrar and vulnerability checker. CycloneDX SBOMs
+ * are depinder's only input; the per-ecosystem folders under `plugins/` hold registry code alone.
  *
  * Files are matched by suffix so that both tools' outputs are picked up:
  *   <project>.cdx.json        (Syft)
@@ -101,7 +100,7 @@ function createParser(purlType: string): Parser {
             // exact version recorded in the SBOM, so these findings are final:
             // `exactVersionVulnerabilities` is what tells analyse.ts not to range-filter them.
             // When no source produced anything the flag stays unset and the per-package GHSA
-            // GraphQL path runs exactly as it does for a native plugin. `projectsOf` memoises
+            // GraphQL path runs instead. `projectsOf` memoises
             // projects by reference, so the flag sticks for the process — correct here, since it
             // is a property of the file, not of the caller.
             const scan = await scanSbomFileOnce(sbomFile)
@@ -126,23 +125,22 @@ interface SbomEcosystem {
     name: string
     purlType: string
     /**
-     * The cache namespace. The native plugin's own, where one exists: same registrar, same library
-     * names, so the enrichment cache must not be fetched twice.
+     * The cache namespace, `${ecosystem}:${name}`. These are the names the ecosystem-specific
+     * manifest plugins cached under before SBOMs became the only input: changing one would
+     * invalidate every cached library of that ecosystem.
      */
     ecosystem: string
+    /** Extra CLI names for `-p`, after `sbom-<purlType>`: the old plugin names still select it. */
+    aliases: string[]
     registrar: Registrar
     checker?: VulnerabilityChecker
 }
 
-/** An ecosystem that borrows registrar, checker and cache namespace from a native plugin. */
-function borrowing(name: string, purlType: string, source: Plugin): SbomEcosystem {
-    return {name, purlType, ecosystem: ecosystemOf(source), registrar: source.registrar, checker: source.checker}
-}
-
-function sbomPluginFor({name, purlType, ecosystem, registrar, checker}: SbomEcosystem): Plugin {
+function sbomPluginFor({name, purlType, ecosystem, aliases, registrar, checker}: SbomEcosystem): Plugin {
     return {
         name,
-        aliases: [`sbom-${purlType}`],
+        // `sbom-<purlType>` stays first: `purlTypeOfPlugin` reads the purl type back from it.
+        aliases: [`sbom-${purlType}`, ...aliases],
         ecosystem,
         extractor: createExtractor(purlType),
         parser: createParser(purlType),
@@ -156,14 +154,20 @@ function sbomPluginFor({name, purlType, ecosystem, registrar, checker}: SbomEcos
  * registrar) correspondence is written down — every lookup below reads it rather than restating it.
  */
 const SBOM_ECOSYSTEMS: readonly SbomEcosystem[] = [
-    borrowing('sbom-java', 'maven', java),
-    borrowing('sbom-npm', 'npm', javascript),
-    borrowing('sbom-ruby', 'gem', ruby),
-    borrowing('sbom-python', 'pypi', python),
-    borrowing('sbom-php', 'composer', php),
-    borrowing('sbom-dotnet', 'nuget', dotnet),
-    {name: 'sbom-go', purlType: 'golang', ecosystem: 'go', registrar: goRegistrar, checker: goChecker},
-    {name: 'sbom-rust', purlType: 'cargo', ecosystem: 'rust', registrar: cratesRegistrar, checker: rustChecker},
+    {name: 'sbom-java', purlType: 'maven', ecosystem: 'java', aliases: ['java', 'maven', 'gradle'],
+        registrar: javaRegistrar, checker: javaChecker},
+    {name: 'sbom-npm', purlType: 'npm', ecosystem: 'npm', aliases: ['npm', 'js', 'javascript', 'node', 'nodejs', 'yarn'],
+        registrar: npmRegistrar, checker: npmChecker},
+    {name: 'sbom-ruby', purlType: 'gem', ecosystem: 'ruby', aliases: ['ruby', 'gem'],
+        registrar: rubyRegistrar, checker: rubyChecker},
+    {name: 'sbom-python', purlType: 'pypi', ecosystem: 'python', aliases: ['python', 'pip', 'pipenv', 'poetry'],
+        registrar: pythonRegistrar, checker: pythonChecker},
+    {name: 'sbom-php', purlType: 'composer', ecosystem: 'php', aliases: ['php', 'composer'],
+        registrar: phpRegistrar, checker: phpChecker},
+    {name: 'sbom-dotnet', purlType: 'nuget', ecosystem: 'dotnet', aliases: ['dotnet', '.net', 'c#', 'csharp', 'nuget'],
+        registrar: dotnetRegistrar, checker: dotnetChecker},
+    {name: 'sbom-go', purlType: 'golang', ecosystem: 'go', aliases: [], registrar: goRegistrar, checker: goChecker},
+    {name: 'sbom-rust', purlType: 'cargo', ecosystem: 'rust', aliases: [], registrar: cratesRegistrar, checker: rustChecker},
 ]
 
 export const sbomPlugins: Plugin[] = SBOM_ECOSYSTEMS.map(sbomPluginFor)
@@ -187,7 +191,7 @@ const sbomByContent = new Map<string, boolean>()
 /**
  * Whether a file is one the SBOM extractors pick up. A `*.cdx.json` is one by name; any other
  * `*.json` is one when its first bytes declare a CycloneDX `bomFormat` — so a SBOM saved as
- * `bom.json` is found, while `package.json` and lockfiles cost one short read and stay native.
+ * `bom.json` is found, while `package.json` and lockfiles cost one short read and are ignored.
  * The extractor's `filter` and `analyse`'s classification both come here, so they cannot drift.
  */
 export function isSbomFile(file: string): boolean {
@@ -239,19 +243,10 @@ export function sbomFilesToParse(plugins: Plugin[], files: string[]): string[] {
 /**
  * The purl type an SBOM plugin filters on — `sbom-npm` -> `npm`. The alias is where that type is
  * already recorded, so reading it back beats a second table that could drift out of step. Returns
- * undefined for a native plugin, which has no single purl type.
+ * undefined for a plugin loaded from plugins.json that carries no `sbom-` alias.
  */
 export function purlTypeOfPlugin(plugin: Plugin): string | undefined {
-    if (!sbomPlugins.includes(plugin)) return undefined
     return plugin.aliases?.find(it => it.startsWith('sbom-'))?.slice('sbom-'.length)
-}
-
-/**
- * The purl type a NATIVE plugin's components carry — `java` -> `maven`. The SBOM ecosystem table
- * already pairs the two, so reading it back beats a second table that could drift out of step.
- */
-export function purlTypeOfEcosystem(ecosystem: string): string | undefined {
-    return SBOM_ECOSYSTEMS.find(it => it.ecosystem === ecosystem)?.purlType
 }
 
 /**

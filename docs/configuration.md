@@ -6,7 +6,7 @@ No configuration file: command-line options, environment variables, and a few fi
 
 | Variable | Meaning |
 |---|---|
-| `GH_TOKEN` | GitHub token for the native route and `update`; also a pool of one for `github` |
+| `GH_TOKEN` | GitHub token for per-library advisory lookups (when no SBOM scan answered) and `update`; also a pool of one for `github` |
 | `GH_TOKEN_1`, `GH_TOKEN_2`, … | The token pool for `github-advisories`; usually in `.github-tokens` instead |
 | `LIBRARIES_IO_API_KEY` | Optional fallback for release dates and versions |
 | `DEPINDER_CACHE_DB` | SQLite cache path. Default `~/.dxw/depinder/cache/depinder.sqlite` |
@@ -73,20 +73,3 @@ still ignores the local cache, but takes its fresh facts from the resolver first
 
 The resolver serves registry facts only. GitHub advisories are still fetched per library, on the
 same terms as without it: once per newly cached library, and only with `GH_TOKEN` set.
-
-## Native route prep
-
-=== "Maven"
-
-    ```bash
-    mvn dependency:tree -DoutputFile=deptree.txt
-    ```
-
-=== "Gradle"
-
-    ```bash
-    gradle dependencies --configuration compileClasspath > deptree.txt
-    ```
-
-Run in each project, or the root project when it has modules. Or skip the native route: a
-[DepMiner](https://dxworks.org/depminer/) run produces SBOMs for every ecosystem.

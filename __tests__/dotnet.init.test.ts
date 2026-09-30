@@ -1,5 +1,4 @@
-import {dotnet, NugetRegistrar, NUGET_REGISTRATION_URL} from '../src/plugins/dotnet'
-import { minimatch } from 'minimatch'
+import {NugetRegistrar, NUGET_REGISTRATION_URL} from '../src/plugins/dotnet'
 
 describe('default test', () => {
     it('should pass', async () => {
@@ -8,14 +7,6 @@ describe('default test', () => {
         // console.log(res)
     })
 
-    it('should match just files with *proj extension', async () => {
-        expect(dotnet.extractor.files.some(it => minimatch('demo/test/test.csproj', it, {matchBase: true}))).toBeTruthy()
-        expect(dotnet.extractor.files.some(it => minimatch('demo/test/test.fsproj', it, {matchBase: true}))).toBeTruthy()
-        expect(dotnet.extractor.files.some(it => minimatch('demo/test/test.vbproj', it, {matchBase: true}))).toBeTruthy()
-        expect(dotnet.extractor.files.some(it => minimatch('demo/test/test.csproj.json', it, {matchBase: true}))).toBeFalsy()
-        expect(dotnet.extractor.files.some(it => minimatch('demo/test/test.fsproj.json', it, {matchBase: true}))).toBeFalsy()
-        expect(dotnet.extractor.files.some(it => minimatch('demo/test/test.vbproj.json', it, {matchBase: true}))).toBeFalsy()
-    })
 })
 
 describe('registration hive', () => {

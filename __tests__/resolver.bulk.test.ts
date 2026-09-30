@@ -115,6 +115,31 @@ describe('assignPurls', () => {
     })
 })
 
+describe('assignPurls with purls from the SBOM', () => {
+    it('keeps a purl the parser already set, and fills a missing one via getPURL', () => {
+        // Trivy's golang purl would lowercase the module; the parser restored the case, and
+        // getPURL must not undo that.
+        const fromSbom = {...dep('github.com/Masterminds/semver/v3', 'v3.4.0'),
+            purl: 'pkg:golang/github.com/Masterminds/semver/v3@v3.4.0'}
+        const missing = dep('com.google.guava:guava', '32.1.2-jre')
+        const projects: PluginProjects[] = [{plugin: sbomMaven, projects: [project('app', [fromSbom, missing])]}]
+
+        expect(assignPurls(projects)).toBe(2)
+        expect(fromSbom.purl).toBe('pkg:golang/github.com/Masterminds/semver/v3@v3.4.0')
+        expect(missing.purl).toBe('pkg:maven/com.google.guava/guava@32.1.2-jre')
+    })
+
+    it('counts an SBOM purl even when the plugin has no checker to fall back on', () => {
+        const noChecker: Plugin = {...maven, checker: undefined}
+        const versionless = {...dep('org.apache.phoenix:phoenix-core', 'UNKNOWN'),
+            purl: 'pkg:maven/org.apache.phoenix/phoenix-core'}
+        const projects: PluginProjects[] = [{plugin: noChecker, projects: [project('app', [versionless])]}]
+
+        expect(assignPurls(projects)).toBe(1)
+        expect(versionless.purl).toBe('pkg:maven/org.apache.phoenix/phoenix-core')
+    })
+})
+
 describe('the bulk resolve phase', () => {
     const savedToken = process.env.GH_TOKEN
 
@@ -151,7 +176,7 @@ describe('the bulk resolve phase', () => {
         const guava = 'com.google.guava:guava'
         const projects: PluginProjects[] = [
             {plugin: maven, projects: [project('app', [dep(guava, '32.1.2-jre')]), project('lib', [dep(guava, '32.1.2-jre')])]},
-            // `java` and `sbom-java` share an ecosystem, so they share a cache key too.
+            // Two plugins sharing an ecosystem share a cache key too.
             {plugin: sbomMaven, projects: [project('sbom', [dep(guava, '32.1.2-jre')])]},
         ]
         assignPurls(projects)
@@ -262,7 +287,7 @@ describe('the bulk resolve phase', () => {
     /**
      * A resolved package is a cache hit in phase 3, and a cache hit has never fetched advisories —
      * so without this the bulk phase would empty the vulnerability columns for everything the
-     * resolver answered on a cold native run. Parity with the registrar path, at the same cost:
+     * resolver answered on a cold run. Parity with the registrar path, at the same cost:
      * one GraphQL call per cache key, which is what that cold run pays today.
      */
     describe('the GitHub advisory lookup', () => {

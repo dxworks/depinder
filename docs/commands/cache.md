@@ -47,5 +47,6 @@ depinder update [updated_before] [plugins...]
 ```
 
 Refreshes MongoDB entries older than `updated_before` (default one month ago) for the plugins
-named (default all). Needs the container running and `GH_TOKEN`. SQLite has no equivalent: use
+named (default all), by name or [alias](../index.md#ecosystems): `sbom-java` and `java` both
+refresh the `java:` entries. Needs the container running and `GH_TOKEN`. SQLite has no equivalent: use
 `--refresh`.

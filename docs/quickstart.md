@@ -16,8 +16,8 @@ depinder analyse /path/to/depminer/results/trivy /path/to/depminer/results/syft 
     --vuln-source trivy,grype,github --project-name my-project
 ```
 
-Each file is sorted by its content: a Trivy SBOM, a Syft SBOM, or native input. Plugins are
-picked from the purl types in the SBOMs. The first run fills the registry cache; `--profile`
+Each file is sorted by its content: a Trivy SBOM or a Syft SBOM; anything else is ignored.
+Plugins are picked from the purl types in the SBOMs. The first run fills the registry cache; `--profile`
 shows where the time went.
 
 The `github` source needs a GitHub token, read from the directory you run the command in:
@@ -65,12 +65,3 @@ results/
 
 The four `_*.csv` files have the exact shape [`transformBlackDuckReports`](commands/blackduck-reports.md)
 gives a real Black Duck export — see [Black Duck files](blackduck-export.md).
-
-## Native route
-
-```bash
-depinder analyse /path/to/repo-a /path/to/repo-b -r results -p npm ruby
-```
-
-Writes the `<plugin>-*.csv` triples under `results/depinder/`. Maven and Gradle need a
-`deptree.txt` first — see [Configuration](configuration.md#native-route-prep).

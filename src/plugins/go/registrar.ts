@@ -5,9 +5,8 @@ import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker
 /**
  * Go module enrichment through the public module proxy.
  *
- * There is no native `go` plugin — depinder never parsed go.sum — so the SBOM route is the only
- * consumer of this registrar, and this file holds just the registrar and the checker `sbom-go`
- * borrows, not a Plugin.
+ * Like every ecosystem folder under `plugins/`, this file holds just the registrar and the checker
+ * that `sbom-go` enriches through, not a Plugin.
  *
  * proxy.golang.org offers three read-only endpoints and no search, so a lookup is:
  *   GET <module>/@v/list       the tagged versions, one per line (empty for untagged modules)

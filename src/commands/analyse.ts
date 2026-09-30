@@ -2,7 +2,7 @@ import {Command} from 'commander'
 import fs from 'fs'
 import path from 'path'
 import {getPluginsFromNames} from '../plugins'
-import {purlTypeOfEcosystem, purlTypeOfPlugin, sbomFilesToParse, sbomPlugins, sbomPluginsForPurlTypes} from '../plugins/sbom'
+import {purlTypeOfPlugin, sbomFilesToParse, sbomPluginsForPurlTypes} from '../plugins/sbom'
 import {SbomDescription} from '../plugins/sbom/describe'
 import {
     preflightScanners,
@@ -42,7 +42,7 @@ import {DEFAULT_MAX_AGE_HOURS} from '../vuln-sources/github/cache'
 import {DEFAULT_TOKEN_FILE} from '../vuln-sources/github/tokens'
 import {AnalysedEcosystem} from '../blackduck/model'
 import {writeBlackDuckForSource} from '../blackduck/run'
-import {classifyInputs, inputFolderOf, InputSources, NATIVE_SOURCE} from './sources'
+import {classifyInputs, inputFolderOf, InputSources} from './sources'
 import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
 import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/profile'
@@ -76,7 +76,7 @@ export interface AnalyseOptions extends ResolverOptions {
 export function createAnalyseCommand(): Command {
     return new Command()
         .name('analyse')
-        .argument('[folders...]', 'Folders to walk: native project folders, SBOM folders, or both')
+        .argument('[folders...]', 'Folders to walk for CycloneDX SBOMs')
         // .argument('[depext-files...]', 'A list of files to parse for dependency information')
         // Both value-taking options need a <value> placeholder: without one Commander registers
         // them as booleans, so `-r out` set `{R: true}` and left `out` to be walked as another
@@ -253,23 +253,27 @@ export interface PluginProjects {
 }
 
 /**
- * Phase 1b: names every dependency with its purl.
+ * Phase 1b: makes sure every dependency carries its purl.
  *
- * `getPURL` is implemented by all eight checkers and was, until the resolver, dead code. A plugin
- * without a checker (or a dependency the parser could not pin to a version) simply keeps no purl
- * and takes the registrar path, as it always did. Returns how many were named.
+ * The SBOM is the source: the CycloneDX parser already set `dep.purl` from the component's own
+ * purl, normalised (see `normalizePurl`), so a golang module keeps the case Syft recorded and
+ * `pkg:cargo/tikv-jemalloc-sys@0.7.1%2B5.3.1-...` stays exactly as both tools wrote it. `checker.getPURL`
+ * is only the fallback, for a component whose purl did not parse; it needs a version to spell one, so a dependency with
+ * neither keeps no purl and takes the registrar path. Returns how many dependencies end up with a
+ * purl, from either source.
  */
 export function assignPurls(pluginProjects: PluginProjects[]): number {
     let named = 0
     for (const {plugin, projects} of pluginProjects) {
         const getPURL = plugin.checker?.getPURL
-        if (!getPURL) continue
         for (const project of projects) {
             for (const dep of Object.values(project.dependencies)) {
-                const version = dep.version?.trim()
-                if (!version) continue
-                dep.purl = getPURL(dep.name, version)
-                named++
+                if (!dep.purl && getPURL) {
+                    const version = dep.version?.trim()
+                    if (!version) continue
+                    dep.purl = getPURL(dep.name, version)
+                }
+                if (dep.purl) named++
             }
         }
     }
@@ -307,7 +311,7 @@ export interface BulkResolveOutcome {
  * Phase 2: one bulk call for the whole run, written into the same cache phase 3 reads.
  *
  * The map is global on purpose. A purl identifies a library-version the same way whichever plugin
- * found it, so `java` and `sbom-java` scanning the same repository, or twenty projects sharing a
+ * found it, so `sbom-java` reading a Trivy and a Syft SBOM of the same repository, or twenty projects sharing a
  * dependency, produce one entry and one question. What comes back `resolved` is written under
  * every cache key that purl belongs to — the key is per ecosystem, and two plugins can share one —
  * so `cacheHit` in phase 3 finds it and the registrar is never called. Everything else (`pending`,
@@ -378,7 +382,7 @@ export async function bulkResolve(
 
     // The advisory lookup the registrar path does, on the same terms, because a resolved package
     // is a cache hit in phase 3 and a cache hit has never fetched advisories. Without it a cold
-    // native run with GH_TOKEN would write entries with no vulnerabilities and empty the
+    // run with GH_TOKEN would write entries with no vulnerabilities and empty the
     // vulnerability columns for everything the resolver answered. It is one GraphQL call per cache
     // key — exactly what the same cold run costs today — eight at a time, and a failure keeps the
     // registry data rather than discarding it. The resolver serves registry facts only; GHSA is
@@ -420,7 +424,7 @@ export async function bulkResolve(
  * and — for an SBOM source — the SBOMs themselves, in walk order.
  */
 export interface PlannedRun {
-    /** `trivy`, `syft` or `depinder`; also the subfolder under the results folder. */
+    /** `trivy` or `syft`; also the subfolder under the results folder. */
     source: string
     /** Absolute: `<results>/<source>`. */
     folder: string
@@ -439,23 +443,18 @@ export function filesForPlugin(plugin: Plugin, files: string[]): string[] {
 }
 
 /**
- * Which sources get a run, and with which plugins.
- *
- * Native: every selected native plugin, into `depinder/`, as long as at least one of them has a
- * file to read — a plugin with no files still writes its three empty CSVs, as it always has.
- * SBOM: the `sbom-*` plugins the source's purl types call for (an explicit `-p` narrows to the
- * sbom plugins it names), into `<producer>/`.
+ * Which sources get a run, and with which plugins: per SBOM producer, the `sbom-*` plugins the
+ * source's purl types call for (an explicit `-p` selects the plugins it names instead), into
+ * `<producer>/`.
  */
 export function planRuns(sources: InputSources, selected: Plugin[], options: AnalyseOptions, resultRoot: string, folders: string[]): PlannedRun[] {
     const runs: PlannedRun[] = []
     const explicit = !!options.plugins?.length
     for (const source of sources.sbom) {
         const purlTypes = new Set(source.sboms.flatMap(it => [...it.purlTypes]))
-        const plugins = explicit
-            ? selected.filter(it => sbomPlugins.includes(it))
-            : sbomPluginsForPurlTypes(purlTypes)
+        const plugins = explicit ? selected : sbomPluginsForPurlTypes(purlTypes)
         if (plugins.length === 0) {
-            if (explicit) log.info(`${source.name}: skipped, --plugins names no sbom-* plugin`)
+            if (explicit) log.info(`${source.name}: skipped, --plugins names no known plugin`)
             else log.warn(`${source.name}: no sbom-* plugin covers the ecosystems in these SBOMs`
                 + ` (${[...purlTypes].sort().join(', ')}); nothing to analyse`)
             continue
@@ -469,16 +468,6 @@ export function planRuns(sources: InputSources, selected: Plugin[], options: Ana
             plugins,
             files: source.sboms.map(it => it.file),
             sboms: source.sboms,
-        })
-    }
-    const nativePlugins = selected.filter(it => !sbomPlugins.includes(it))
-    if (nativePlugins.some(it => filesForPlugin(it, sources.native).length > 0)) {
-        runs.push({
-            source: NATIVE_SOURCE,
-            folder: path.join(resultRoot, NATIVE_SOURCE),
-            inputFolder: folders[0] ?? '.',
-            plugins: nativePlugins,
-            files: sources.native,
         })
     }
     return runs
@@ -580,10 +569,10 @@ async function openCacheSession(useCache: boolean): Promise<CacheSession> {
  * `depinder analyse <folders...>`: one results subfolder per source found under the folders.
  *
  * The files decide, not the folders: every walked file is classified by content (`sources.ts`),
- * so a folder of Trivy SBOMs, one of Syft SBOMs and a checked-out repository can be given in one
- * invocation, or in three. Each SBOM source gets the `sbom-*` plugin CSVs, the scan provenance
- * and the Black Duck-shaped files under `<results>/<producer>/`; the native plugins write their
- * CSVs under `<results>/depinder/`. A subfolder exists only when its source had input.
+ * so a folder of Trivy SBOMs and one of Syft SBOMs can be given in one invocation, or in two.
+ * Each SBOM source gets the `sbom-*` plugin CSVs, the scan provenance and the Black Duck-shaped
+ * files under `<results>/<producer>/`; anything that is not a CycloneDX SBOM is ignored. A
+ * subfolder exists only when its source had input.
  */
 export async function analyseFiles(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
     if (options.profile) enableProfile()
@@ -660,7 +649,7 @@ export async function runAnalysis(files: string[], plugins: Plugin[], resultFold
         }))
 
     // FLOW 1b — assignPurls (see above): name every dep the way the server expects. Still no network.
-    // Phase 1b — the purl for every dependency, from the checker that already knew how to spell it.
+    // Phase 1b — the purl for every dependency: the SBOM's own, else the checker's spelling of it.
     const named = assignPurls(pluginProjects)
 
     // FLOW 2 — bulkResolve (see above): ONE server call for the whole run; it only fills the cache.
@@ -704,9 +693,9 @@ export async function runAnalysis(files: string[], plugins: Plugin[], resultFold
             const processDep = async (dep: DepinderDependency) => {
                 try {
                     let lib
-                    // Keyed by ecosystem, not plugin name: `java` and `sbom-java` share a
-                    // registrar, so they must share cache entries rather than fetch each library
-                    // twice. `update.ts` reconstructs library names from this same prefix.
+                    // Keyed by ecosystem, not plugin name: `sbom-java` caches under `java`, the
+                    // namespace every existing entry was written under. `update.ts` reconstructs
+                    // library names from this same prefix.
                     const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
                     // Phase 2 built this object and wrote it to the cache moments ago; reading it
                     // back would be a `has`, a `get` and a `JSON.parse` of ~10 KB to arrive at the
@@ -850,7 +839,7 @@ export async function runAnalysis(files: string[], plugins: Plugin[], resultFold
         }).join('\n'))
         csv.end()
 
-        const purlType = purlTypeOfPlugin(plugin) ?? purlTypeOfEcosystem(ecosystemOf(plugin))
+        const purlType = purlTypeOfPlugin(plugin)
         return purlType ? {purlType, projects} : undefined
     }))
     progress.stop()

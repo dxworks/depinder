@@ -1,7 +1,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {classifyInputs, inputFolderOf, NATIVE_SOURCE} from '../src/commands/sources'
+import {classifyInputs, inputFolderOf} from '../src/commands/sources'
 import {planRuns} from '../src/commands/analyse'
 import {defaultProjectName} from '../src/blackduck/run'
 import {clearSbomDescriptions, describeSbom} from '../src/plugins/sbom/describe'
@@ -10,15 +10,17 @@ import {getPluginsFromNames} from '../src/plugins'
 import {log} from '../src/utils/logging'
 
 /**
- * One `analyse` invocation may point at a folder of Trivy SBOMs, a folder of Syft SBOMs, a
- * checked-out repository, or all three at once — and each source gets its own results subfolder.
- * What decides is the content of each file, so a mixed folder must sort itself out, and a file
- * depinder cannot use must be named and skipped rather than fail the run.
+ * One `analyse` invocation may point at a folder of Trivy SBOMs, a folder of Syft SBOMs, or both
+ * — and each source gets its own results subfolder. What decides is the content of each file, so
+ * a mixed folder must sort itself out: anything that is not a CycloneDX SBOM is counted and
+ * ignored, and an SBOM depinder cannot use is named and skipped rather than fail the run.
  */
 
 let tmpDir: string
 let warnings: string[]
+let infos: string[]
 let warnSpy: jest.SpyInstance
+let infoSpy: jest.SpyInstance
 
 const trivyTools = {components: [{type: 'application', name: 'trivy', version: '0.72.0'}]}
 const syftTools = {components: [{type: 'application', name: 'syft', version: '1.46.0'}]}
@@ -50,13 +52,23 @@ beforeEach(() => {
     clearSbomDescriptions()
     clearSbomFileCache()
     warnings = []
+    infos = []
     warnSpy = jest.spyOn(log, 'warn').mockImplementation(((message: string) => {
         warnings.push(message)
         return log
     }) as any)
+    infoSpy = jest.spyOn(log, 'info').mockImplementation(((message: string) => {
+        infos.push(message)
+        return log
+    }) as any)
 })
 
-afterEach(() => warnSpy.mockRestore())
+afterEach(() => {
+    warnSpy.mockRestore()
+    infoSpy.mockRestore()
+})
+
+const IGNORED = /^Ignored \d+ file\(s\) that are not CycloneDX SBOMs$/
 
 describe('classifyInputs', () => {
     it('sorts a mixed folder by what each file says about itself', () => {
@@ -68,7 +80,8 @@ describe('classifyInputs', () => {
 
         const sources = classifyInputs([syft, lock, trivy, other])
 
-        expect(sources.native).toEqual([lock, other])
+        expect(Object.keys(sources)).toEqual(['sbom'])
+        expect(infos.filter(it => IGNORED.test(it))).toEqual(['Ignored 2 file(s) that are not CycloneDX SBOMs'])
         expect(sources.sbom.map(it => it.name)).toEqual(['trivy', 'syft'])
         expect(sources.sbom[0].sboms.map(it => it.file)).toEqual([trivy])
         expect(sources.sbom[1].sboms.map(it => it.file)).toEqual([syft])
@@ -84,7 +97,7 @@ describe('classifyInputs', () => {
 
         const sources = classifyInputs([broken, cdxgen, spdx, good])
 
-        expect(sources.native).toEqual([])
+        expect(infos.filter(it => IGNORED.test(it))).toEqual([])
         expect(sources.sbom).toEqual([{name: 'trivy', sboms: [describeSbom(good)]}])
         expect(warnings).toHaveLength(3)
         expect(warnings.find(it => it.startsWith('Skipping broken.cdx.json'))).toBeDefined()
@@ -104,7 +117,7 @@ describe('classifyInputs', () => {
         expect(warnings).toEqual([expect.stringContaining('trivy has 2 SBOMs for repo repo: one.cdx.json, two.cdx.json')])
     })
 
-    it('finds a CycloneDX file by its content whatever its name, and leaves other JSON native', () => {
+    it('finds a CycloneDX file by its content whatever its name, and ignores other JSON', () => {
         const dir = path.join(tmpDir, 'by-content')
         const bom = write(dir, 'bom.json', sbom(trivyTools, 'repo-b', ['pkg:npm/qs@6.10.2']))
         const pkg = write(dir, 'package.json', {name: 'repo-b', dependencies: {qs: '6.10.2'}})
@@ -114,7 +127,7 @@ describe('classifyInputs', () => {
         expect(isSbomFile(bom)).toBe(true)
         expect(isSbomFile(pkg)).toBe(false)
         const sources = classifyInputs([pkg, bom, lock, spdx])
-        expect(sources.native).toEqual([pkg, lock, spdx])
+        expect(infos).toContain('Ignored 3 file(s) that are not CycloneDX SBOMs')
         expect(sources.sbom).toEqual([{name: 'trivy', sboms: [describeSbom(bom)]}])
         // The extractor takes the same file, so it is parsed, not just classified.
         const [run] = planRuns(sources, getPluginsFromNames(), {results: '/out', refresh: false}, '/out', [dir])
@@ -122,9 +135,11 @@ describe('classifyInputs', () => {
         expect(warnings).toEqual([])
     })
 
-    it('has nothing to say about a folder with no SBOMs', () => {
-        const lock = write(path.join(tmpDir, 'native'), 'Gemfile.lock', '')
-        expect(classifyInputs([lock])).toEqual({native: [lock], sbom: []})
+    it('ignores a folder with no SBOMs, saying how many files it passed over', () => {
+        const lock = write(path.join(tmpDir, 'manifests'), 'Gemfile.lock', '')
+        const pom = write(path.join(tmpDir, 'manifests'), 'pom.xml', '<project/>')
+        expect(classifyInputs([lock, pom])).toEqual({sbom: []})
+        expect(infos).toEqual(['Ignored 2 file(s) that are not CycloneDX SBOMs'])
     })
 })
 
@@ -141,37 +156,36 @@ describe('planRuns', () => {
         }
     }
 
-    it('gives every source its own subfolder, the sbom plugins its ecosystems need and every native plugin', () => {
+    it('gives every source its own subfolder and the sbom plugins its ecosystems need', () => {
         const {trivy, syft, lock, pom} = inputs()
         const runs = planRuns(classifyInputs([trivy, syft, lock, pom]), getPluginsFromNames(), {results, refresh: false}, results, [tmpDir])
 
-        expect(runs.map(it => it.source)).toEqual(['trivy', 'syft', NATIVE_SOURCE])
-        expect(runs.map(it => it.folder)).toEqual(['/out/trivy', '/out/syft', `/out/${NATIVE_SOURCE}`])
+        expect(runs.map(it => it.source)).toEqual(['trivy', 'syft'])
+        expect(runs.map(it => it.folder)).toEqual(['/out/trivy', '/out/syft'])
         expect(runs[0].plugins.map(it => it.name)).toEqual(['sbom-npm'])
         expect(runs[0].files).toEqual([trivy])
         expect(runs[0].sboms?.map(it => it.repo)).toEqual(['repo'])
         expect(runs[1].plugins.map(it => it.name)).toEqual(['sbom-ruby'])
-        // The native run is every native plugin, files or not: the empty CSVs are part of the output.
-        expect(runs[2].plugins.map(it => it.name).sort()).toEqual(['dotnet', 'java', 'npm', 'php', 'python', 'ruby'])
-        expect(runs[2].files).toEqual([lock, pom])
-        expect(runs[2].sboms).toBeUndefined()
+        expect(runs[1].files).toEqual([syft])
     })
 
-    it('honours an explicit plugin list on both sides', () => {
-        const {trivy, syft, lock, pom} = inputs()
-        const sources = classifyInputs([trivy, syft, lock, pom])
+    it('honours an explicit plugin list, by sbom name or by a legacy alias', () => {
+        const {trivy, syft} = inputs()
+        const sources = classifyInputs([trivy, syft])
 
-        const sbomOnly = planRuns(sources, getPluginsFromNames(['sbom-npm']), {results, refresh: false, plugins: ['sbom-npm']}, results, [tmpDir])
-        expect(sbomOnly.map(it => [it.source, it.plugins.map(p => p.name)])).toEqual([['trivy', ['sbom-npm']], ['syft', ['sbom-npm']]])
+        const byName = planRuns(sources, getPluginsFromNames(['sbom-npm']), {results, refresh: false, plugins: ['sbom-npm']}, results, [tmpDir])
+        expect(byName.map(it => [it.source, it.plugins.map(p => p.name)])).toEqual([['trivy', ['sbom-npm']], ['syft', ['sbom-npm']]])
 
-        const nativeOnly = planRuns(sources, getPluginsFromNames(['java']), {results, refresh: false, plugins: ['java']}, results, [tmpDir])
-        expect(nativeOnly.map(it => [it.source, it.plugins.map(p => p.name)])).toEqual([[NATIVE_SOURCE, ['java']]])
+        // `-p java` selects sbom-java alone, even for SBOMs that hold no Maven component.
+        const byAlias = planRuns(sources, getPluginsFromNames(['java']), {results, refresh: false, plugins: ['java']}, results, [tmpDir])
+        expect(byAlias.map(it => [it.source, it.plugins.map(p => p.name)])).toEqual([['trivy', ['sbom-java']], ['syft', ['sbom-java']]])
     })
 
-    it('plans nothing for a native plugin with no files, or an SBOM source no plugin covers', () => {
+    it('plans nothing when -p names no plugin that exists, or no plugin covers an SBOM source', () => {
         const {trivy} = inputs()
-        expect(planRuns(classifyInputs([trivy]), getPluginsFromNames(['java']), {results, refresh: false, plugins: ['java']}, results, [tmpDir]))
+        expect(planRuns(classifyInputs([trivy]), getPluginsFromNames(['cobol']), {results, refresh: false, plugins: ['cobol']}, results, [tmpDir]))
             .toEqual([])
+        expect(infos).toContain('trivy: skipped, --plugins names no known plugin')
         const hexOnly = write(path.join(tmpDir, 'plan'), 'hex.cdx.json', sbom(trivyTools, 'hex', ['pkg:hex/plug@1.0.0']))
         expect(planRuns(classifyInputs([hexOnly]), getPluginsFromNames(), {results, refresh: false}, results, [tmpDir])).toEqual([])
         expect(warnings).toEqual([expect.stringContaining('trivy: no sbom-* plugin covers the ecosystems in these SBOMs (hex)')])

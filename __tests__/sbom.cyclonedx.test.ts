@@ -342,6 +342,12 @@ describe('parseCycloneDxFile — Syft shape (no project nodes)', () => {
         expect(Object.keys(deps)).toEqual(['org.apache.phoenix:phoenix-core@UNKNOWN'])
     })
 
+    it('carries the component\'s own purl, normalised, on every dependency', () => {
+        const deps = parseCycloneDxFile(writeBom('purl.cdx.json', syftBom), 'maven')[0].dependencies
+        expect(deps['org.slf4j:slf4j-api@1.7.35'].purl).toBe('pkg:maven/org.slf4j/slf4j-api@1.7.35')
+        expect(deps['org.slf4j:slf4j-reload4j@1.7.35'].purl).toBe('pkg:maven/org.slf4j/slf4j-reload4j@1.7.35')
+    })
+
     it('leaves type undefined, because no SBOM format carries dependency scope', () => {
         const deps = parseCycloneDxFile(writeBom('e.cdx.json', syftBom), 'maven')[0].dependencies
         expect(deps['org.slf4j:slf4j-api@1.7.35'].type).toBeUndefined()
@@ -714,5 +720,49 @@ describe('parseCycloneDxFile — Syft yarn workspaces define what is direct', ()
         expect(Object.keys(project.dependencies).sort())
             .toEqual(['cacheable@2.3.4', 'react@19.2.8', 'rollup@4.60.1', 'vite@7.3.1', 'ws@8.21.1'])
         expect(project.dependencies['cacheable@2.3.4'].requestedBy).toEqual([])
+    })
+})
+
+describe('parseCycloneDxFile — one package, one purl, whichever tool wrote the SBOM', () => {
+    // The shapes of the real go-caddy SBOMs: Syft keeps the module path's case in the purl and
+    // qualifies its bom-ref; Trivy lowercases the purl but keeps the case in `name`.
+    const syftGo = {
+        metadata: {component: {'bom-ref': 'root', type: 'file', name: '/repo'}},
+        components: [{
+            'bom-ref': 'pkg:golang/github.com/Masterminds/semver/v3@v3.4.0?package-id=abc',
+            type: 'library', name: 'github.com/Masterminds/semver/v3', version: 'v3.4.0',
+            purl: 'pkg:golang/github.com/Masterminds/semver/v3@v3.4.0',
+        }],
+        dependencies: [],
+    }
+    const trivyGo = {
+        metadata: {component: {'bom-ref': 'root', type: 'application', name: '/repo'}},
+        components: [
+            {'bom-ref': 'app', type: 'application', name: 'go.mod'},
+            {
+                'bom-ref': 'pkg:golang/github.com/masterminds/semver/v3@v3.4.0',
+                type: 'library', name: 'github.com/Masterminds/semver/v3', version: 'v3.4.0',
+                purl: 'pkg:golang/github.com/masterminds/semver/v3@v3.4.0',
+            },
+            {
+                'bom-ref': 'pkg:golang/github.com/other/dep@v1.0.0',
+                type: 'library', name: 'github.com/other/dep', version: 'v1.0.0',
+                purl: 'pkg:golang/github.com/other/dep@v1.0.0',
+            },
+        ],
+        dependencies: [
+            {ref: 'root', dependsOn: ['app']},
+            // Two children, neither with edges: no self-anchor, both stay dependencies.
+            {ref: 'app', dependsOn: ['pkg:golang/github.com/masterminds/semver/v3@v3.4.0', 'pkg:golang/github.com/other/dep@v1.0.0']},
+        ],
+    }
+
+    it('gives the Syft and the Trivy dependency the same purl', () => {
+        const syft = Object.values(parseCycloneDxFile(writeBom('go-syft.cdx.json', syftGo), 'golang')[0].dependencies)
+        const trivy = Object.values(parseCycloneDxFile(writeBom('go-trivy.cdx.json', trivyGo), 'golang')[0].dependencies)
+        const syftSemver = syft.find(d => d.name.toLowerCase().includes('semver'))
+        const trivySemver = trivy.find(d => d.name.toLowerCase().includes('semver'))
+        expect(syftSemver?.purl).toBe('pkg:golang/github.com/Masterminds/semver/v3@v3.4.0')
+        expect(trivySemver?.purl).toBe(syftSemver?.purl)
     })
 })

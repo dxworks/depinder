@@ -5,9 +5,8 @@ import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker
 /**
  * Crate enrichment through the crates.io API.
  *
- * There is no native `rust` plugin — depinder never parsed Cargo.lock — so the SBOM route is the
- * only consumer of this registrar, and this file holds just the registrar and the checker
- * `sbom-rust` borrows, not a Plugin.
+ * Like every ecosystem folder under `plugins/`, this file holds just the registrar and the checker
+ * that `sbom-rust` enriches through, not a Plugin.
  *
  * One request answers everything: `GET /api/v1/crates/<name>` returns the crate with its newest
  * version and links, plus every version with its publication time and SPDX licence expression.
