@@ -8,7 +8,7 @@ import {freshnessCutoffMs} from '../src/cache/max-age'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
 import {LibraryInfo} from '../src/extension-points/registrar'
 import {Plugin} from '../src/extension-points/plugin'
-import {PackageRecord, ResolvedEntry} from '../src/resolver/client'
+import {ItemHandler, PackageRecord, ResolvedEntry} from '../src/resolver/client'
 import {ResolverConfig} from '../src/resolver/config'
 import {getVulnerabilitiesFromGithub} from '../src/utils/vulnerabilities'
 
@@ -78,17 +78,22 @@ const record = (type: string, namespace: string | null, name: string): PackageRe
     as_of: null, source: 'test', fetched_at: '2026-09-16T10:00:00Z',
 })
 
-/** A resolver that resolves everything it is asked about, and records what that was. */
+/**
+ * A resolver that resolves everything it is asked about, and records what that was. Like the real
+ * client it hands each answer to `onItem` as it goes, and returns them all at the end too.
+ */
 function answering(packages: {[purl: string]: PackageRecord}) {
     const asked: string[][] = []
-    const resolve = jest.fn(async (_config: ResolverConfig, purls: string[]) => {
+    const resolve = jest.fn(async (_config: ResolverConfig, purls: string[], _log?: unknown, onItem?: ItemHandler) => {
         asked.push([...purls])
-        return new Map<string, ResolvedEntry>(purls.map(purl => [
+        const answers = new Map<string, ResolvedEntry>(purls.map(purl => [
             purl,
             packages[purl]
                 ? {status: 'resolved' as const, package: packages[purl]}
                 : {status: 'not_found' as const},
         ]))
+        for (const [purl, entry] of answers) onItem?.(purl, entry)
+        return answers
     })
     return {asked, resolve: resolve as any}
 }
@@ -438,6 +443,114 @@ describe('the bulk resolve phase', () => {
         const outcome = await bulkResolve(config, projects, cache, {}, answering({}).resolve)
 
         expect(outcome.libs.size).toBe(0)
+    })
+
+    /**
+     * The stream is the point: a package the server answered at once is written while the server is
+     * still fetching the others, rather than after the slowest one of the run.
+     */
+    describe('with a streamed answer', () => {
+        const threeLibs = (): PluginProjects[] => {
+            const projects: PluginProjects[] = [{
+                plugin: npm,
+                projects: [project('app', [dep('fast', '1.0.0'), dep('slow', '1.0.0'), dep('fast', '1.1.0')])],
+            }]
+            assignPurls(projects)
+            return projects
+        }
+
+        it('writes an answer as it arrives, before the stream has ended', async () => {
+            const cache = fakeCache()
+            let finish: () => void = () => undefined
+            let writtenMidStream: boolean | undefined
+            const resolve = jest.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem: ItemHandler) => {
+                const fast: ResolvedEntry = {status: 'resolved', package: record('npm', null, 'fast')}
+                onItem('pkg:npm/fast@1.0.0', fast)
+                // The server is still fetching `slow`: give the write queue time to run.
+                await new Promise<void>(resolve => { finish = resolve })
+                writtenMidStream = cache.entries.has('npm:fast')
+                const slow: ResolvedEntry = {status: 'resolved', package: record('npm', null, 'slow')}
+                onItem('pkg:npm/slow@1.0.0', slow)
+                onItem('pkg:npm/fast@1.1.0', fast)
+                return new Map<string, ResolvedEntry>(purls.map(purl => [purl, purl.includes('slow') ? slow : fast]))
+            }) as any
+
+            const outcome = bulkResolve(config, threeLibs(), cache, {}, resolve)
+            await new Promise(resolve => setTimeout(resolve, 5))
+            finish()
+            const result = await outcome
+
+            expect(writtenMidStream).toBe(true)
+            expect([...result.written].sort()).toEqual(['npm:fast', 'npm:slow'])
+            // Two versions of `fast` answered, one cache key written, once.
+            expect(result.resolved).toBe(3)
+            expect(cache.entries.size).toBe(2)
+        })
+
+        it('returns only once every write it started has finished', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            let releaseLookups: () => void = () => undefined
+            const lookupsHeld = new Promise<void>(resolve => { releaseLookups = resolve })
+            advisories.mockImplementation(async () => {
+                await lookupsHeld
+                return []
+            })
+            const cache = fakeCache()
+            let settled = false
+
+            const outcome = bulkResolve(config, threeLibs(), cache, {}, answering({
+                'pkg:npm/fast@1.0.0': record('npm', null, 'fast'),
+                'pkg:npm/fast@1.1.0': record('npm', null, 'fast'),
+                'pkg:npm/slow@1.0.0': record('npm', null, 'slow'),
+            }).resolve)
+            outcome.then(() => { settled = true })
+
+            await new Promise(resolve => setTimeout(resolve, 5))
+            // The stream has ended; the lookups have not.
+            expect(settled).toBe(false)
+            expect(advisories).toHaveBeenCalledTimes(2)
+
+            releaseLookups()
+            const result = await outcome
+            expect(result.libs.size).toBe(2)
+            expect(cache.entries.size).toBe(2)
+        })
+
+        it('runs no more than eight writes at once', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            let inFlight = 0
+            let peak = 0
+            advisories.mockImplementation(async () => {
+                peak = Math.max(peak, ++inFlight)
+                await new Promise(resolve => setTimeout(resolve, 2))
+                inFlight--
+                return []
+            })
+            const names = Array.from({length: 20}, (_, i) => `lib${i}`)
+            const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', names.map(it => dep(it, '1.0.0')))]}]
+            assignPurls(projects)
+            const cache = fakeCache()
+
+            const outcome = await bulkResolve(config, projects, cache, {}, answering(Object.fromEntries(
+                names.map(it => [`pkg:npm/${it}@1.0.0`, record('npm', null, it)]))).resolve)
+
+            expect(outcome.written.size).toBe(20)
+            expect(cache.entries.size).toBe(20)
+            expect(peak).toBe(8)
+        })
+
+        it('still writes an answer the resolver returned without streaming it', async () => {
+            const cache = fakeCache()
+            const silentStream = jest.fn(async (_config: ResolverConfig, purls: string[]) =>
+                new Map<string, ResolvedEntry>(purls.map(purl => [purl, {status: 'resolved', package: record('npm', null, 'fast')}]))) as any
+            const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('fast', '1.0.0')])]}]
+            assignPurls(projects)
+
+            const outcome = await bulkResolve(config, projects, cache, {}, silentStream)
+
+            expect([...outcome.written]).toEqual(['npm:fast'])
+            expect(outcome.resolved).toBe(1)
+        })
     })
 
     it('survives a resolver that answered nothing, leaving the cache untouched', async () => {

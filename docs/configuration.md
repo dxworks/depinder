@@ -55,7 +55,7 @@ depinder analyse ./repo
 |---|---|
 | `--resolver-url <url>` / `DEPINDER_RESOLVER_URL` | Where the resolver is. Nothing set, nothing changes |
 | `DEPINDER_RESOLVER_TOKEN` | Mandatory with the URL; a missing token warns and skips the resolver |
-| `DEPINDER_RESOLVER_MAX_WAIT_MS` | Budget for the whole bulk phase, re-asks included. Default `60000` |
+| `DEPINDER_RESOLVER_MAX_WAIT_MS` | Budget for the whole bulk phase; each request sends what is left of it as `deadline_ms` (at most 60 s). Default `60000` |
 | `DEPINDER_RESOLVER_CONCURRENCY` | Chunks in flight at once. Default `3`; `1` restores one chunk at a time |
 | `--no-resolver` | Skip it for this run |
 

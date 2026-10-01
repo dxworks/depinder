@@ -13,7 +13,10 @@ export interface ResolverConfig {
     url: string
     /** Bearer token. The server refuses every route without it, so an unset token disables the client. */
     token: string
-    /** Upper bound on the whole bulk phase, including re-asks for purls the server is still filling. */
+    /**
+     * Upper bound on the whole bulk phase. Each post sends what is left of it as `deadline_ms`
+     * (capped at the server's 60 s), and the server answers whatever is still open when that passes.
+     */
     maxWaitMs: number
     /** How many chunks of one ask are posted at the same time. */
     chunkConcurrency: number

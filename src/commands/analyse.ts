@@ -46,7 +46,7 @@ import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
 import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/profile'
 import {ResolverConfig, ResolverOptions, resolverConfig} from '../resolver/config'
-import {PackageRecord, resetResolverClient, resolvePurls} from '../resolver/client'
+import {PackageRecord, ResolvedEntry, resetResolverClient, resolvePurls} from '../resolver/client'
 import {toLibraryInfo} from '../resolver/adapter'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
@@ -319,6 +319,9 @@ export interface BulkResolveOutcome {
  * `not_found`, `invalid`, or a resolver that never answered) is left alone and falls through to
  * the registrar chain, the miss cache and the retries exactly as before.
  *
+ * Answers arrive as a stream, and each one is written as it arrives rather than after the last:
+ * the phase returns once the stream has ended and every write it started has finished.
+ *
  * `resolve` is a parameter so the phase can be tested without a server.
  */
 export async function bulkResolve(
@@ -375,23 +378,50 @@ export async function bulkResolve(
         return {written, libs, requested: 0, resolved: 0}
     }
 
-    // FLOW 2c — THE SERVER CALL: resolver/client.ts POSTs these purls to <resolver-url>/resolve, in chunks.
-    const answers = await resolve(config, wanted, log)
-    // FLOW 2d — each resolved answer → one cache write per (ecosystem, library) key it belongs to.
+    // FLOW 2c — THE SERVER CALL: resolver/client.ts POSTs these purls to <resolver-url>/resolve, in
+    // chunks, and reads each answer as a stream. Every usable answer is taken the moment its line
+    // arrives (FLOW 2d), and its advisory lookup and cache write start then (FLOW 2e), while the
+    // server is still fetching the packages it did not know. Waiting for the last chunk first used
+    // to put all of that work after the slowest package of the run.
     let resolved = 0
+    const taken = new Set<string>()
     const writes: {cacheKey: string, plugin: Plugin, pkg: PackageRecord}[] = []
-    for (const [purl, answer] of answers) {
-        // A package still `refreshing` when the client stopped asking carries facts older than this
-        // run's cutoff. They are better than nothing — unless the run said `--refresh`, which is
-        // exactly a request for nothing older than the run, and the registrar chain gets it.
+    let nextWrite = 0
+    const workers = new Set<Promise<void>>()
+    let writeFailure: {error: unknown} | undefined
+
+    // FLOW 2d — each resolved answer → one cache write per (ecosystem, library) key it belongs to.
+    const take = (purl: string, answer: ResolvedEntry): void => {
+        if (taken.has(purl)) return
+        taken.add(purl)
+        // A `refreshing` package is one the server could not refetch before the deadline, and it
+        // carries facts older than this run's cutoff. They are better than nothing — unless the run
+        // said `--refresh`, which is exactly a request for nothing older than the run, and the
+        // registrar chain gets it.
         const usable = answer.status === 'resolved' || (answer.status === 'refreshing' && !options.refresh)
-        if (!usable || !answer.package) continue
+        if (!usable || !answer.package) return
         resolved++
         for (const {plugin, dep} of byPurl.get(purl) ?? []) {
             const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
             if (written.has(cacheKey)) continue
             written.add(cacheKey)
             writes.push({cacheKey, plugin, pkg: answer.package})
+        }
+        pump()
+    }
+
+    // Up to REGISTRY_CONCURRENCY workers drain the queue; one that finds it empty ends, and the next
+    // answer starts a new one. A worker that ends pumps once more, for a write queued in the moment
+    // between its last look at the queue and its leaving the set.
+    function pump(): void {
+        while (workers.size < REGISTRY_CONCURRENCY && nextWrite < writes.length) {
+            const worker: Promise<void> = drain()
+                .catch(error => { writeFailure ??= {error} })
+                .finally(() => {
+                    workers.delete(worker)
+                    pump()
+                })
+            workers.add(worker)
         }
     }
 
@@ -406,29 +436,34 @@ export async function bulkResolve(
     // Each key gets its own LibraryInfo: two plugins can share a purl and not an advisory
     // ecosystem, so they must not share one object to write vulnerabilities into.
     // FLOW 2e — GHSA advisories per key, then cache.set: the server returns registry facts only.
-    let nextWrite = 0
-    await Promise.all(Array.from(
-        {length: Math.min(REGISTRY_CONCURRENCY, writes.length)},
-        async () => {
-            while (nextWrite < writes.length) {
-                const {cacheKey, plugin, pkg} = writes[nextWrite++]
-                const lib = toLibraryInfo(pkg)
-                const advisoryEcosystem = plugin.checker?.githubSecurityAdvisoryEcosystem
-                if (advisoryEcosystem && process.env.GH_TOKEN) {
-                    try {
-                        lib.vulnerabilities = await getVulnerabilitiesFromGithub(advisoryEcosystem, lib.name)
-                    } catch (e: any) {
-                        log.warn(`Vulnerability lookup failed for ${lib.name}: ${e.message ?? e}`)
-                    }
+    async function drain(): Promise<void> {
+        while (nextWrite < writes.length) {
+            const {cacheKey, plugin, pkg} = writes[nextWrite++]
+            const lib = toLibraryInfo(pkg)
+            const advisoryEcosystem = plugin.checker?.githubSecurityAdvisoryEcosystem
+            if (advisoryEcosystem && process.env.GH_TOKEN) {
+                try {
+                    lib.vulnerabilities = await getVulnerabilitiesFromGithub(advisoryEcosystem, lib.name)
+                } catch (e: any) {
+                    log.warn(`Vulnerability lookup failed for ${lib.name}: ${e.message ?? e}`)
                 }
-                await cache.set(cacheKey, lib)
-                // Handed to phase 3 as it is, so the entry written here is not read straight back
-                // out of the database a moment later. The `cache.set` above is still what makes it
-                // durable and what every later run reads.
-                libs.set(cacheKey, lib)
             }
+            await cache.set(cacheKey, lib)
+            // Handed to phase 3 as it is, so the entry written here is not read straight back
+            // out of the database a moment later. The `cache.set` above is still what makes it
+            // durable and what every later run reads.
+            libs.set(cacheKey, lib)
         }
-    ))
+    }
+
+    const answers = await resolve(config, wanted, log, take)
+    // The map holds every answer the stream delivered, so this only catches one `onItem` did not
+    // see; `take` ignores a purl it has already had.
+    for (const [purl, answer] of answers) take(purl, answer)
+    // The phase ends when the stream has AND every write it started has: phase 3 must not look a
+    // key up while it is still being written.
+    while (workers.size > 0) await Promise.all(workers)
+    if (writeFailure) throw writeFailure.error
     count('resolver:cache-write', written.size)
     log.info(`Resolver filled ${written.size} cache entries from ${resolved} of ${wanted.length} requested package(s)`)
     return {written, libs, requested: wanted.length, resolved}

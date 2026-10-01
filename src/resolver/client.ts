@@ -7,10 +7,16 @@ import {ResolverConfig} from './config'
  *
  * One call answers thousands of purls, which is the whole point: the per-package registrar chain
  * costs one upstream request per library, the resolver costs one request per 2000 of them. What it
- * cannot answer — a package it has never seen and is still fetching (`pending`), one the registry
- * does not have (`not_found`), an unparseable purl (`invalid`) — falls through to that chain
- * untouched, so this module never throws into the pipeline and never fails a run. A server that is
- * down, unauthorised or slow degrades the run to exactly today's behaviour.
+ * cannot answer — a package it has never seen and did not fetch in time (`pending`), one the
+ * registry does not have (`not_found`), an unparseable purl (`invalid`) — falls through to that
+ * chain untouched, so this module never throws into the pipeline and never fails a run. A server
+ * that is down, unauthorised or slow degrades the run to exactly today's behaviour.
+ *
+ * The answer is a stream (NDJSON, one package per line), not one JSON body. The server sends each
+ * package once, as soon as its answer is final: fresh ones at once, unknown and stale ones as their
+ * fetch lands, and whatever is still open when the deadline passes. That is what lets `analyse`
+ * start its own per-package work while the server is still fetching, and it is why the client no
+ * longer re-asks anything: every line is the last word on its package for this run.
  */
 
 /**
@@ -19,17 +25,10 @@ import {ResolverConfig} from './config'
  * but it has to be counted, or the summary line silently loses purls.
  *
  * `refreshing` is a package the server holds but has not confirmed within the `max_age` it was
- * sent: it comes with its last known facts, and the server is refetching it. It is asked for again
- * like `pending`, and what it carries is the answer if the refetch does not land in time.
+ * sent, and could not refetch before the deadline: it comes with its last known facts, and those
+ * are the answer for this run. `pending` is the same for a package the server had never seen.
  */
 export type ResolveStatus = 'resolved' | 'refreshing' | 'not_found' | 'pending' | 'invalid' | 'error'
-
-export interface ResolvedVersionRecord {
-    version: string
-    released_at: string | null
-    licenses: string[]
-    found: boolean
-}
 
 /** `flags` bit 0: the version is a prerelease. Nothing downstream reads it yet. */
 export const VERSION_FLAG_PRERELEASE = 1
@@ -76,17 +75,22 @@ export interface FeedRecord {
     cursor_time: string | null
 }
 
-interface ResolveResult {
-    purl: string
-    package_key: string
+/**
+ * One item line: one package, with every purl the client sent that belongs to it, spelled exactly
+ * as sent. `key` is the server's canonical package key, `null` for an `invalid` purl (which gets an
+ * item of its own).
+ */
+interface ItemLine {
+    key: string | null
+    purls: string[]
     status: ResolveStatus
+    package?: PackageRecord
     reason?: string
-    requested_version: ResolvedVersionRecord | null
 }
 
-interface ResolveResponse {
-    results?: ResolveResult[]
-    packages?: {[packageKey: string]: PackageRecord}
+/** The last line, exactly once. A stream without it was cut short. */
+interface TrailerLine {
+    done: true
     feeds?: {[type: string]: FeedRecord}
 }
 
@@ -94,36 +98,35 @@ interface ResolveResponse {
 export interface ResolvedEntry {
     status: ResolveStatus
     package?: PackageRecord
-    requestedVersion?: ResolvedVersionRecord
     reason?: string
 }
 
+/** Called once per purl, as the line that answers it arrives — long before `resolvePurls` returns. */
+export type ItemHandler = (purl: string, entry: ResolvedEntry) => void
+
 /** The server caps a request at 5000 purls; stay well under it so one slow chunk is not the run. */
 export const CHUNK_SIZE = 2000
-/** Sent on the first ask only: the server holds the connection while it fills what it can. */
-export const FIRST_WAIT_MS = 15_000
-/** How often still-`pending` purls are asked for again. */
-export const RE_ASK_INTERVAL_MS = 3000
+/** The server's own cap on `deadline_ms`; more would be a 400. */
+export const MAX_DEADLINE_MS = 60_000
 /**
- * How long a single HTTP call may take beyond the server-side wait before it is abandoned.
+ * How long a single HTTP call may take beyond the `deadline_ms` it sent before it is abandoned.
  *
- * This is a last resort, not a budget. The budget is `config.maxWaitMs`, which bounds the whole
- * bulk phase and is re-checked before every re-ask; this only exists so a connection that is never
- * going to answer cannot hold a chunk forever. Twenty seconds was too close to be that: a server
- * restarted a moment earlier holds nothing in its payload cache, so several chunks arrive together
- * needing a full `wait_ms` and then a multi-megabyte read each, and 15 + 20 s was the budget two of
- * them went past. Aborting there cost far more than waiting would have — the server went on
- * building the payloads nobody was waiting for, the retries queued behind them for a database
- * connection and came back 500, and one 500 makes the whole run fall back to the registries. Sixty
- * gives the slowest realistic answer room to arrive, and `maxWaitMs` still ends the phase on time.
+ * This is a last resort, not a budget. The server enforces the deadline itself — at `deadline_ms`
+ * it sends whatever is still open and the trailer — so the slack only has to cover the last flush
+ * and the trip back. It used to be 60 s, when the server held every answer until the end and then
+ * built one multi-megabyte body: a server restarted a moment earlier could take that long, and an
+ * abort there cost more than the wait (the server built payloads nobody was reading, the retries
+ * queued behind them and came back 500, and one 500 sends the whole run to the registries). With
+ * the stream, lines are flushed as packages are read, so nothing large is left for the end. Thirty
+ * seconds still covers a slow link, and `maxWaitMs` still ends the phase on time.
  */
-const REQUEST_TIMEOUT_SLACK_MS = 60_000
+const REQUEST_TIMEOUT_SLACK_MS = 30_000
 
 type Logger = Pick<typeof defaultLog, 'info' | 'warn'>
 
 /**
  * "The server is not answering" is a property of the run, not of one chunk: once a call has failed
- * its retry, every later chunk and every re-ask is skipped rather than paying the timeout again.
+ * its retry, every later chunk is skipped rather than paying the timeout again.
  */
 let unavailable = false
 let warned = false
@@ -145,13 +148,55 @@ function markUnavailable(log: Logger, reason: string): void {
     log.warn(`Resolver unavailable (${reason}); falling back to the per-package registries for the rest of this run`)
 }
 
-export function chunked<T>(items: T[], size: number): T[][] {
-    const chunks: T[][] = []
-    for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size))
-    return chunks
+/**
+ * A cheap stand-in for the server's package key: the purl without its `#subpath`, `?qualifiers`
+ * and `@version`.
+ *
+ * The version `@` is the first one after the last `/`, not simply the last `@` in the string: an
+ * npm scope may arrive unencoded (`pkg:npm/@types/node@20.1.0`) and a golang namespace can carry an
+ * `@` of its own, but a name never contains a `/`. This is not the canonical key (no case folding,
+ * no percent-decoding), and it does not need to be: it only decides which purls travel together. A
+ * disagreement with the server costs one package sent twice in two chunks, nothing more.
+ */
+export function packageKeyOf(purl: string): string {
+    let rest = purl
+    const hash = rest.indexOf('#')
+    if (hash >= 0) rest = rest.slice(0, hash)
+    const query = rest.indexOf('?')
+    if (query >= 0) rest = rest.slice(0, query)
+    const at = rest.indexOf('@', rest.lastIndexOf('/') + 1)
+    return at >= 0 ? rest.slice(0, at) : rest
 }
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+/**
+ * Splits the purls into chunks of at most `size`, never putting two versions of one package in two
+ * chunks.
+ *
+ * The server answers per package, with every version it has, so a package split across chunks
+ * would have its whole version list built and sent once per chunk. Groups are packed whole, in the
+ * order they first appear; a single package with more purls than `size` gets a chunk to itself
+ * (the server's own cap is well above `size`).
+ */
+export function packChunks(purls: string[], size: number): string[][] {
+    const groups = new Map<string, string[]>()
+    for (const purl of new Set(purls)) {
+        const key = packageKeyOf(purl)
+        const group = groups.get(key)
+        if (group) group.push(purl)
+        else groups.set(key, [purl])
+    }
+    const chunks: string[][] = []
+    let current: string[] = []
+    for (const group of groups.values()) {
+        if (current.length > 0 && current.length + group.length > size) {
+            chunks.push(current)
+            current = []
+        }
+        current.push(...group)
+    }
+    if (current.length > 0) chunks.push(current)
+    return chunks
+}
 
 class HttpStatusError extends Error {
     constructor(readonly status: number) {
@@ -160,79 +205,103 @@ class HttpStatusError extends Error {
 }
 
 /**
- * The `max_age` of one post: the seconds since the run's cutoff, worked out again for every post.
+ * The `max_age` of one post: the seconds since the run's cutoff, worked out at the moment it is
+ * sent.
  *
  * The server measures a duration from its own clock, and the run means an instant. Sending the
  * distance to that instant each time — floored, so nothing confirmed before it is ever accepted —
- * keeps every re-ask meaning the same thing. A fixed duration would not: under `--refresh` it would
- * be `0`, and a package the server refetched a second ago would be stale again on the next ask,
- * refreshing for ever.
+ * keeps a late chunk or a retry meaning the same thing as the first post. A fixed duration would
+ * not: under `--refresh` it would be `0`, and a package the server refetched a second ago would be
+ * stale again for the next chunk that names it.
  */
 export function maxAgeFor(freshAfterMs: number, now = Date.now()): number {
     return Math.max(0, Math.floor((now - freshAfterMs) / 1000))
 }
 
-async function postOnce(config: ResolverConfig, purls: string[], waitMs: number): Promise<ResolveResponse> {
-    count('resolver:request')
-    const body: {purls: string[], wait_ms?: number, max_age?: number} = {purls}
-    if (waitMs > 0) body.wait_ms = waitMs
-    if (config.freshAfterMs !== undefined) body.max_age = maxAgeFor(config.freshAfterMs)
-    const response = await fetch(`${config.url}/resolve`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${config.token}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal: typeof AbortSignal?.timeout === 'function'
-            ? AbortSignal.timeout(waitMs + REQUEST_TIMEOUT_SLACK_MS)
-            : undefined,
-    })
-    if (!response.ok) throw new HttpStatusError(response.status)
-    return await response.json() as ResolveResponse
+/**
+ * Every complete line of an NDJSON body, as it arrives.
+ *
+ * A read hands over whatever bytes the network delivered, which is rarely a whole number of lines
+ * (or even of UTF-8 characters): the decoder keeps a split character for the next read
+ * (`stream: true`), and the buffer keeps a split line. Blank lines are skipped, which also lets a
+ * server send a bare `\n` as a keepalive. Undici has already undone any br/gzip encoding.
+ */
+async function* lines(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+    const reader = body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    try {
+        for (;;) {
+            const {done, value} = await reader.read()
+            buffer += done ? decoder.decode() : decoder.decode(value, {stream: true})
+            let newline: number
+            while ((newline = buffer.indexOf('\n')) >= 0) {
+                const line = buffer.slice(0, newline).trim()
+                buffer = buffer.slice(newline + 1)
+                if (line) yield line
+            }
+            if (done) break
+        }
+        const last = buffer.trim()
+        if (last) yield last
+    } finally {
+        // A no-op after a clean end; after the trailer or a bad line it lets undici drop the rest.
+        await reader.cancel().catch(() => undefined)
+    }
 }
+
+/** How one post ended. `items` counts the item lines that arrived, whatever came after them. */
+type PostOutcome =
+    | {kind: 'done', items: number, feeds?: {[type: string]: FeedRecord}}
+    | {kind: 'http', items: 0, status: number}
+    | {kind: 'broken', items: number, reason: string}
 
 /**
- * One chunk, with the single retry the design allows.
+ * One post, read to its end.
  *
- * A network error or a 5xx is transient, so it is worth one more attempt. A 4xx is not — a bad
- * token or a malformed body will answer the same way forever — so it goes straight to unavailable.
- * Either way the caller gets `undefined` and keeps whatever it already has.
+ * Never throws: a status, a network error, a malformed line and a body that stops before the
+ * trailer all come back as an outcome, with every item that did arrive already handed to `onLine`.
+ * Each line is a complete, final fact about its package, so a stream cut short is not discarded —
+ * only the purls nobody answered for are worth asking again.
  */
-async function post(config: ResolverConfig, purls: string[], waitMs: number, log: Logger): Promise<ResolveResponse | undefined> {
-    for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-            return await postOnce(config, purls, waitMs)
-        } catch (e: any) {
-            const status = e instanceof HttpStatusError ? e.status : undefined
-            const retryable = status === undefined || status >= 500
-            if (!retryable) {
-                markUnavailable(log, `HTTP ${status}`)
-                return undefined
-            }
-            if (attempt === 1) {
-                markUnavailable(log, status ? `HTTP ${status}` : (e?.message ?? String(e)))
-                return undefined
-            }
-            log.warn(`Resolver request failed (${status ? `HTTP ${status}` : e?.message ?? e}), retrying once`)
-        }
-    }
-    return undefined
-}
-
-function absorb(response: ResolveResponse, into: Map<string, ResolvedEntry>): void {
-    const packages = response.packages ?? {}
-    for (const result of response.results ?? []) {
-        // Keyed on the purl as sent: the server canonicalises `package_key`, so the echoed `purl`
-        // is the only field guaranteed to match what the caller asked for.
-        into.set(result.purl, {
-            status: result.status,
-            package: result.status === 'resolved' || result.status === 'refreshing'
-                ? packages[result.package_key]
+async function postOnce(
+    config: ResolverConfig,
+    purls: string[],
+    deadlineMs: number,
+    onLine: (item: ItemLine) => void
+): Promise<PostOutcome> {
+    count('resolver:request')
+    const body: {purls: string[], max_age?: number, deadline_ms: number} = {purls, deadline_ms: deadlineMs}
+    if (config.freshAfterMs !== undefined) body.max_age = maxAgeFor(config.freshAfterMs)
+    let items = 0
+    try {
+        const response = await fetch(`${config.url}/resolve`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${config.token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+            signal: typeof AbortSignal?.timeout === 'function'
+                ? AbortSignal.timeout(deadlineMs + REQUEST_TIMEOUT_SLACK_MS)
                 : undefined,
-            requestedVersion: result.requested_version ?? undefined,
-            reason: result.reason,
         })
+        if (!response.ok) {
+            // Nothing else will be read from it; let undici close the connection.
+            await response.body?.cancel().catch(() => undefined)
+            throw new HttpStatusError(response.status)
+        }
+        if (!response.body) return {kind: 'broken', items, reason: 'empty response body'}
+        for await (const line of lines(response.body)) {
+            const parsed = JSON.parse(line) as ItemLine | TrailerLine
+            if ('done' in parsed && parsed.done) return {kind: 'done', items, feeds: parsed.feeds}
+            items++
+            onLine(parsed as ItemLine)
+        }
+        return {kind: 'broken', items, reason: 'stream ended without its last line'}
+    } catch (e: any) {
+        if (e instanceof HttpStatusError) return {kind: 'http', items: 0, status: e.status}
+        return {kind: 'broken', items, reason: e?.message ?? String(e)}
     }
 }
 
@@ -254,26 +323,87 @@ function tally(entries: Map<string, ResolvedEntry>, status: ResolveStatus): numb
 }
 
 /**
- * Asks the resolver about every purl, and returns what it knew in time.
+ * Asks the resolver about every purl, and returns what it answered.
+ *
+ * Each purl's answer is also handed to `onItem` the moment its line arrives, so the caller can
+ * start on it while the rest of the stream is still coming. The returned map holds the same
+ * answers, for the counts.
  *
  * A purl missing from the returned map is not an error: it means the server never answered for it
- * (unavailable, or still `pending` when the deadline passed), and the caller must fall back.
+ * (unavailable, or cut off twice), and the caller must fall back. So does a `pending` one.
  */
 export async function resolvePurls(
     config: ResolverConfig,
     purls: string[],
     log: Logger = defaultLog,
-    timing: {reAskIntervalMs?: number} = {}
+    onItem?: ItemHandler
 ): Promise<Map<string, ResolvedEntry>> {
     const entries = new Map<string, ResolvedEntry>()
     if (purls.length === 0 || unavailable) return entries
 
     const deadline = Date.now() + config.maxWaitMs
-    const reAskIntervalMs = timing.reAskIntervalMs ?? RE_ASK_INTERVAL_MS
+    /**
+     * What is left of the phase's budget, as the server's `deadline_ms`: worked out per post, so a
+     * chunk that waited for a slot, or a retry, does not get the whole budget again. `0` is valid
+     * and means "send what you have now", so a late chunk still gets every fresh answer.
+     */
+    const deadlineMs = () => Math.min(MAX_DEADLINE_MS, Math.max(0, deadline - Date.now()))
     let feedsLogged = false
 
     /**
-     * Posts the chunks of one batch, `config.chunkConcurrency` of them at a time.
+     * One chunk, with the single retry the design allows.
+     *
+     * A network error or a 5xx is transient, so it is worth one more attempt. A 4xx is not — a bad
+     * token or a malformed body will answer the same way forever — so it goes straight to
+     * unavailable. A stream that breaks off keeps every line it delivered, and the retry asks only
+     * for the purls no line answered; a stream that ended cleanly but skipped a purl is treated the
+     * same way. A second failure of either kind makes the resolver unavailable for the run.
+     */
+    const askChunk = async (chunk: string[]): Promise<void> => {
+        let missing = chunk
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const asked = new Set(missing)
+            const outcome = await postOnce(config, missing, deadlineMs(), item => {
+                const entry: ResolvedEntry = {
+                    status: item.status,
+                    package: item.status === 'resolved' || item.status === 'refreshing' ? item.package : undefined,
+                    reason: item.reason,
+                }
+                // Keyed on the purl as sent, which the server echoes verbatim; anything it names
+                // that this post did not ask for, or answers twice, is ignored.
+                for (const purl of item.purls ?? []) {
+                    if (!asked.has(purl) || entries.has(purl)) continue
+                    entries.set(purl, entry)
+                    onItem?.(purl, entry)
+                }
+            })
+            if (outcome.kind === 'done' && !feedsLogged) {
+                feedsLogged = true
+                logFeeds(outcome.feeds, log)
+            }
+            missing = missing.filter(purl => !entries.has(purl))
+            if (outcome.kind === 'done' && missing.length === 0) return
+
+            if (outcome.kind === 'http' && outcome.status < 500) {
+                markUnavailable(log, `HTTP ${outcome.status}`)
+                return
+            }
+            const reason = outcome.kind === 'http' ? `HTTP ${outcome.status}`
+                : outcome.kind === 'broken' ? outcome.reason
+                    : `${missing.length} purl(s) missing from a complete answer`
+            if (attempt === 1) {
+                markUnavailable(log, reason)
+                return
+            }
+            log.warn(outcome.items > 0
+                ? `Resolver stream broke off (${reason}) after ${outcome.items} package(s); `
+                    + `asking again for the ${missing.length} purl(s) it did not answer, retrying once`
+                : `Resolver request failed (${reason}), retrying once`)
+        }
+    }
+
+    /**
+     * Posts the chunks, `config.chunkConcurrency` of them at a time.
      *
      * The chunks are independent questions — the server answers each from its own database and its
      * own upstream fetches — so waiting for one before asking the next spent the whole run in
@@ -284,42 +414,17 @@ export async function resolvePurls(
      * one turns the resolver off runs to its end and its answer is kept — throwing away a response
      * that has already been paid for helps nobody — but nothing new is started after that.
      */
-    const ask = async (batch: string[], waitMs: number): Promise<void> => {
-        const chunks = chunked(batch, CHUNK_SIZE)
-        let next = 0
-        await Promise.all(Array.from(
-            {length: Math.min(Math.max(1, config.chunkConcurrency), chunks.length)},
-            async () => {
-                while (next < chunks.length) {
-                    if (unavailable) return
-                    const response = await post(config, chunks[next++], waitMs, log)
-                    if (!response) return
-                    if (!feedsLogged) {
-                        feedsLogged = true
-                        logFeeds(response.feeds, log)
-                    }
-                    absorb(response, entries)
-                }
+    const chunks = packChunks(purls, CHUNK_SIZE)
+    let next = 0
+    await Promise.all(Array.from(
+        {length: Math.min(Math.max(1, config.chunkConcurrency), chunks.length)},
+        async () => {
+            while (next < chunks.length) {
+                if (unavailable) return
+                await askChunk(chunks[next++])
             }
-        ))
-    }
-
-    await ask(purls, FIRST_WAIT_MS)
-
-    // Re-ask only what is still being filled — new packages, and stale ones the server is
-    // refetching. Everything else is final: `not_found` and `invalid` will not change within a run,
-    // and `resolved` is already in hand. A `refreshing` purl keeps the facts it last came with, so
-    // running out of time costs it freshness, not its answer.
-    const unsettled = (purl: string) => {
-        const status = entries.get(purl)?.status
-        return status === 'pending' || status === 'refreshing'
-    }
-    let pending = purls.filter(unsettled)
-    while (pending.length > 0 && !unavailable && Date.now() + reAskIntervalMs < deadline) {
-        await delay(reAskIntervalMs)
-        await ask(pending, 0)
-        pending = pending.filter(unsettled)
-    }
+        }
+    ))
 
     const resolved = tally(entries, 'resolved')
     const refreshing = tally(entries, 'refreshing')
