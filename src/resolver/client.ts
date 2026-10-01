@@ -17,6 +17,11 @@ import {ResolverConfig} from './config'
  * fetch lands, and whatever is still open when the deadline passes. That is what lets `analyse`
  * start its own per-package work while the server is still fetching, and it is why the client no
  * longer re-asks anything: every line is the last word on its package for this run.
+ *
+ * Every chunk of an ask is posted at once, under one deadline, and each is posted exactly once.
+ * There are no retries: whatever has not answered by the deadline — or at all, because the post
+ * failed — goes to the registrar chain, and a failed post turns the resolver off for the rest of
+ * the process.
  */
 
 /**
@@ -118,15 +123,17 @@ export const MAX_DEADLINE_MS = 60_000
  * abort there cost more than the wait (the server built payloads nobody was reading, the retries
  * queued behind them and came back 500, and one 500 sends the whole run to the registries). With
  * the stream, lines are flushed as packages are read, so nothing large is left for the end. Thirty
- * seconds still covers a slow link, and `maxWaitMs` still ends the phase on time.
+ * seconds still covers a slow link, and `maxWaitMs` still ends the phase on time. An abort is a
+ * failed post like any other: what arrived before it is kept, and nothing is asked again.
  */
 const REQUEST_TIMEOUT_SLACK_MS = 30_000
 
 type Logger = Pick<typeof defaultLog, 'info' | 'warn'>
 
 /**
- * "The server is not answering" is a property of the run, not of one chunk: once a call has failed
- * its retry, every later chunk is skipped rather than paying the timeout again.
+ * "The server is not answering" is a property of the run, not of one chunk: once a call has failed,
+ * nothing more is asked of the server in this process — every later ask is skipped rather than
+ * paying the timeout again, and its purls go to the registrar chain.
  */
 let unavailable = false
 let warned = false
@@ -210,7 +217,7 @@ class HttpStatusError extends Error {
  *
  * The server measures a duration from its own clock, and the run means an instant. Sending the
  * distance to that instant each time — floored, so nothing confirmed before it is ever accepted —
- * keeps a late chunk or a retry meaning the same thing as the first post. A fixed duration would
+ * keeps a chunk that waited for a slot meaning the same thing as the first post. A fixed duration would
  * not: under `--refresh` it would be `0`, and a package the server refetched a second ago would be
  * stale again for the next chunk that names it.
  */
@@ -262,7 +269,7 @@ type PostOutcome =
  * Never throws: a status, a network error, a malformed line and a body that stops before the
  * trailer all come back as an outcome, with every item that did arrive already handed to `onLine`.
  * Each line is a complete, final fact about its package, so a stream cut short is not discarded —
- * only the purls nobody answered for are worth asking again.
+ * only the purls nobody answered for go to the registrars.
  */
 async function postOnce(
     config: ResolverConfig,
@@ -334,7 +341,8 @@ function tally(entries: Map<string, ResolvedEntry>, status: ResolveStatus): numb
  * answers, for the counts.
  *
  * A purl missing from the returned map is not an error: it means the server never answered for it
- * (unavailable, or cut off twice), and the caller must fall back. So does a `pending` one.
+ * (unavailable, cut off, or past the deadline), and the caller must fall back. So does a `pending`
+ * one. Nothing is ever asked twice.
  */
 export async function resolvePurls(
     config: ResolverConfig,
@@ -361,55 +369,48 @@ export async function resolvePurls(
     let feedsLogged = false
 
     /**
-     * One chunk, with the single retry the design allows.
+     * One chunk, asked once.
      *
-     * A network error or a 5xx is transient, so it is worth one more attempt. A 4xx is not — a bad
-     * token or a malformed body will answer the same way forever — so it goes straight to
-     * unavailable. A stream that breaks off keeps every line it delivered, and the retry asks only
-     * for the purls no line answered; a stream that ended cleanly but skipped a purl is treated the
-     * same way. A second failure of either kind makes the resolver unavailable for the run.
+     * There is no retry, of any kind. Every line that arrived is kept — each is the last word on its
+     * package — and a purl no line answered is simply not in the map, so the caller sends it to the
+     * registrar chain. Asking the server again bought little and cost a lot: the retry went out with
+     * what was left of the deadline, so it rarely had time to fetch anything new, and it queued on
+     * the same narrow server the first post had just failed on.
+     *
+     * Any post that does not end cleanly with every purl answered — an HTTP error, a network error,
+     * the client's own timeout, a stream without its trailer, a malformed line, or a complete
+     * stream that skipped a purl — turns the resolver off for the rest of the process, with one
+     * warning. The chunks beside it were posted at the same moment, so they run to their end and
+     * keep their answers; there is nothing left to stop.
      */
     const askChunk = async (chunk: string[]): Promise<void> => {
-        let missing = chunk
-        for (let attempt = 0; attempt < 2; attempt++) {
-            const asked = new Set(missing)
-            const outcome = await postOnce(config, missing, deadlineMs(), item => {
-                const entry: ResolvedEntry = {
-                    status: item.status,
-                    package: item.status === 'resolved' || item.status === 'refreshing' ? item.package : undefined,
-                    reason: item.reason,
-                }
-                // Keyed on the purl as sent, which the server echoes verbatim; anything it names
-                // that this post did not ask for, or answers twice, is ignored.
-                for (const purl of item.purls ?? []) {
-                    if (!asked.has(purl) || entries.has(purl)) continue
-                    entries.set(purl, entry)
-                    onItem?.(purl, entry)
-                }
-            })
-            if (outcome.kind === 'done' && !feedsLogged) {
-                feedsLogged = true
-                logFeeds(outcome.feeds, log)
+        const asked = new Set(chunk)
+        const outcome = await postOnce(config, chunk, deadlineMs(), item => {
+            const entry: ResolvedEntry = {
+                status: item.status,
+                package: item.status === 'resolved' || item.status === 'refreshing' ? item.package : undefined,
+                reason: item.reason,
             }
-            missing = missing.filter(purl => !entries.has(purl))
-            if (outcome.kind === 'done' && missing.length === 0) return
-
-            if (outcome.kind === 'http' && outcome.status < 500) {
-                markUnavailable(log, `HTTP ${outcome.status}`)
-                return
+            // Keyed on the purl as sent, which the server echoes verbatim; anything it names that
+            // this post did not ask for, or answers twice, is ignored.
+            for (const purl of item.purls ?? []) {
+                if (!asked.has(purl) || entries.has(purl)) continue
+                entries.set(purl, entry)
+                onItem?.(purl, entry)
             }
-            const reason = outcome.kind === 'http' ? `HTTP ${outcome.status}`
-                : outcome.kind === 'broken' ? outcome.reason
-                    : `${missing.length} purl(s) missing from a complete answer`
-            if (attempt === 1) {
-                markUnavailable(log, reason)
-                return
-            }
-            log.warn(outcome.items > 0
-                ? `Resolver stream broke off (${reason}) after ${outcome.items} package(s); `
-                    + `asking again for the ${missing.length} purl(s) it did not answer, retrying once`
-                : `Resolver request failed (${reason}), retrying once`)
+        })
+        if (outcome.kind === 'done' && !feedsLogged) {
+            feedsLogged = true
+            logFeeds(outcome.feeds, log)
         }
+        const missing = chunk.filter(purl => !entries.has(purl)).length
+        if (outcome.kind === 'done' && missing === 0) return
+
+        const reason = outcome.kind === 'http' ? `HTTP ${outcome.status}`
+            : outcome.kind === 'broken'
+                ? `${outcome.reason}${outcome.items > 0 ? ` after ${outcome.items} package(s)` : ''}`
+                : `${missing} purl(s) missing from a complete answer`
+        markUnavailable(log, reason)
     }
 
     /**

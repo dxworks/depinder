@@ -16,9 +16,9 @@ import {RESOLVER_CHUNK_CONCURRENCY, ResolverConfig} from '../src/resolver/config
  * The resolver client against a canned server that answers in NDJSON, one package per line and a
  * trailer last. What is worth pinning is not that it can parse a line — it is that every way the
  * stream can arrive or fail to arrive ends with the run continuing: a line split across two reads
- * is still one line, a stream cut short keeps what it delivered and asks again only for the rest,
- * a 401 is fatal to the client and to nothing else, and a network error costs one retry and then
- * silence.
+ * is still one line, a stream cut short keeps what it delivered and leaves the rest to the
+ * registrars, and any failed post — a 401, a 500, a network error, a timeout — is asked exactly
+ * once, turns the client off for the run, and fails nothing else.
  *
  * Every chunk is posted at once, so the second thing worth pinning is that this did not cost any of
  * the above: every chunk is on the wire before any answers, all of them with the same deadline, a
@@ -117,7 +117,7 @@ function record(url: string, init: any): Call {
 /**
  * Installs a fake server and returns the requests it saw, in order. Nothing is asserted in here:
  * the client swallows every exception a request throws, so an assertion failure inside the mock
- * would be reported as a network error and retried rather than failing the test.
+ * would be reported as a network error rather than failing the test.
  */
 function serve(handler: (call: Call, index: number) => Answer) {
     const calls: Call[] = []
@@ -362,70 +362,52 @@ describe('the resolver client', () => {
             /5 purl\(s\): 1 resolved, 1 refreshing \(last known facts\), 1 pending, 1 not found, 1 invalid$/))
     })
 
-    it('keeps what a cut-off stream delivered, and asks again only for the rest', async () => {
+    it('keeps what a cut-off stream delivered, asks nothing again, and leaves the rest unanswered', async () => {
         const purls = ['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0', 'pkg:npm/c@1.0.0']
-        const calls = serve((call, index) => index === 0
-            // Two packages, then the connection drops before the third and the trailer.
-            ? {parts: [ndjson(items(['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'])), new Error('socket hang up')]}
-            : answerAll(call.purls))
+        // Two packages, then the connection drops before the third and the trailer.
+        const calls = serve(() => ({parts: [ndjson(items(['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'])), new Error('socket hang up')]}))
         const seen: string[] = []
 
         const answers = await resolvePurls(config, purls, quiet, purl => seen.push(purl))
 
-        expect(calls).toHaveLength(2)
-        expect(calls[1].purls).toEqual(['pkg:npm/c@1.0.0'])
-        expect(calls[1].body.deadline_ms).toBeGreaterThan(0)
-        expect([...answers.keys()].sort()).toEqual(purls)
-        // Every purl is handed over exactly once, across both posts.
-        expect(seen.sort()).toEqual(purls)
-        expect(resolverUnavailable()).toBe(false)
-        expect(warnings('asking again for the 1 purl(s)')).toHaveLength(1)
-    })
-
-    it('treats a body that ends without its trailer as cut off', async () => {
-        const calls = serve((call, index) => index === 0
-            ? {parts: [ndjson(items(['pkg:npm/a@1.0.0']))]}
-            : answerAll(call.purls))
-
-        const answers = await resolvePurls(config, ['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'], quiet)
-
-        expect(calls.map(it => it.purls)).toEqual([['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'], ['pkg:npm/b@1.0.0']])
-        expect(answers.size).toBe(2)
-    })
-
-    it('asks again for a purl a complete stream left out', async () => {
-        const calls = serve((call, index) => index === 0
-            ? {parts: [ndjson([...items(['pkg:npm/a@1.0.0']), trailer])]}
-            : answerAll(call.purls))
-
-        const answers = await resolvePurls(config, ['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'], quiet)
-
-        expect(calls[1].purls).toEqual(['pkg:npm/b@1.0.0'])
-        expect(answers.get('pkg:npm/b@1.0.0')?.status).toBe('resolved')
-    })
-
-    it('gives up for the run when the retry is cut off too, keeping both halves', async () => {
-        const calls = serve((_call, index) => index === 0
-            ? {parts: [ndjson(items(['pkg:npm/a@1.0.0'])), new Error('reset')]}
-            : {parts: [ndjson(items(['pkg:npm/b@1.0.0'])), new Error('reset')]})
-
-        const answers = await resolvePurls(config, ['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0', 'pkg:npm/c@1.0.0'], quiet)
-
-        expect(calls).toHaveLength(2)
+        expect(calls).toHaveLength(1)
         expect([...answers.keys()].sort()).toEqual(['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'])
+        expect(seen.sort()).toEqual(['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'])
+        // c is the caller's to send to the registrars; the server is not asked about it again.
         expect(resolverUnavailable()).toBe(true)
+        expect(warnings('Resolver unavailable (socket hang up after 2 package(s))')).toHaveLength(1)
         expect(quiet.info).toHaveBeenCalledWith(expect.stringMatching(/1 unanswered$/))
     })
 
-    it('treats a malformed line as a broken stream, keeping the lines before it', async () => {
-        const calls = serve((call, index) => index === 0
-            ? {parts: [ndjson(items(['pkg:npm/a@1.0.0'])) + '{"key": tru\n' + ndjson(items(['pkg:npm/b@1.0.0']))]}
-            : answerAll(call.purls))
+    it('treats a body that ends without its trailer as cut off', async () => {
+        const calls = serve(() => ({parts: [ndjson(items(['pkg:npm/a@1.0.0']))]}))
 
         const answers = await resolvePurls(config, ['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'], quiet)
 
-        expect(calls[1].purls).toEqual(['pkg:npm/b@1.0.0'])
-        expect(answers.size).toBe(2)
+        expect(calls).toHaveLength(1)
+        expect([...answers.keys()]).toEqual(['pkg:npm/a@1.0.0'])
+        expect(resolverUnavailable()).toBe(true)
+    })
+
+    it('leaves a purl a complete stream left out to the registrars, without asking again', async () => {
+        const calls = serve(() => ({parts: [ndjson([...items(['pkg:npm/a@1.0.0']), trailer])]}))
+
+        const answers = await resolvePurls(config, ['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'], quiet)
+
+        expect(calls).toHaveLength(1)
+        expect(answers.has('pkg:npm/b@1.0.0')).toBe(false)
+        expect(resolverUnavailable()).toBe(true)
+        expect(warnings('1 purl(s) missing from a complete answer')).toHaveLength(1)
+    })
+
+    it('treats a malformed line as a broken stream, keeping the lines before it', async () => {
+        const calls = serve(() => ({parts: [ndjson(items(['pkg:npm/a@1.0.0'])) + '{"key": tru\n' + ndjson(items(['pkg:npm/b@1.0.0']))]}))
+
+        const answers = await resolvePurls(config, ['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'], quiet)
+
+        expect(calls).toHaveLength(1)
+        expect([...answers.keys()]).toEqual(['pkg:npm/a@1.0.0'])
+        expect(resolverUnavailable()).toBe(true)
     })
 
     it('sends max_age as the seconds since the run\'s cutoff, worked out at the moment it is sent', async () => {
@@ -473,26 +455,31 @@ describe('the resolver client', () => {
         expect(warnings('HTTP 400')).toHaveLength(1)
     })
 
-    it('retries a network error exactly once, then gives up for the run', async () => {
+    it('posts a chunk exactly once when the network fails, and asks nothing more this run', async () => {
         const calls = serve(() => new Error('ECONNREFUSED'))
 
         const answers = await resolvePurls(config, ['pkg:npm/left-pad@1.0.0'], quiet)
 
-        expect(calls).toHaveLength(2)
+        expect(calls).toHaveLength(1)
         expect(answers.size).toBe(0)
         expect(resolverUnavailable()).toBe(true)
+        expect(warnings('Resolver unavailable')).toHaveLength(1)
+
+        // The resolver stays off for the run: the next ask goes nowhere, and warns no more.
+        expect((await resolvePurls(config, ['pkg:npm/other@1.0.0'], quiet)).size).toBe(0)
+        expect(calls).toHaveLength(1)
+        expect(warnings('Resolver unavailable')).toHaveLength(1)
     })
 
-    it('retries a 500 once, with the whole chunk, and keeps the answer when the retry succeeds', async () => {
-        const purls = ['pkg:npm/left-pad@1.0.0', 'pkg:npm/right-pad@1.0.0']
-        const calls = serve((call, index) => index === 0 ? {status: 503} : answerAll(call.purls))
+    it('does not retry a 500 either', async () => {
+        const calls = serve(() => ({status: 503}))
 
-        const answers = await resolvePurls(config, purls, quiet)
+        const answers = await resolvePurls(config, ['pkg:npm/left-pad@1.0.0', 'pkg:npm/right-pad@1.0.0'], quiet)
 
-        expect(calls).toHaveLength(2)
-        expect(calls[1].purls).toEqual(purls)
-        expect(answers.get('pkg:npm/left-pad@1.0.0')?.status).toBe('resolved')
-        expect(resolverUnavailable()).toBe(false)
+        expect(calls).toHaveLength(1)
+        expect(answers.size).toBe(0)
+        expect(resolverUnavailable()).toBe(true)
+        expect(warnings('HTTP 503')).toHaveLength(1)
     })
 
     it('posts every chunk before any of them answers', async () => {
@@ -580,20 +567,17 @@ describe('the resolver client', () => {
         expect(warnings('Resolver unavailable')).toHaveLength(1)
     })
 
-    it('treats a client-side timeout as transient: one retry, and the run carries on', async () => {
-        // What `AbortSignal.timeout` throws when the slack runs out. It carries no HTTP status, so
-        // it is retryable — and the retry's answer is kept, rather than the abort costing the run
-        // the resolver.
+    it('treats a client-side timeout like any failed post: kept what arrived, asked once', async () => {
+        // What `AbortSignal.timeout` throws when the slack runs out.
         const timeout = Object.assign(new Error('The operation was aborted due to timeout'), {name: 'TimeoutError'})
-        const calls = serve((call, index) => index === 0 ? timeout : answerAll(call.purls))
+        const calls = serve(() => ({parts: [ndjson(items(['pkg:npm/a@1.0.0'])), timeout]}))
 
-        const answers = await resolvePurls(config, ['pkg:npm/left-pad@1.0.0'], quiet)
+        const answers = await resolvePurls(config, ['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'], quiet)
 
-        expect(calls).toHaveLength(2)
-        expect(answers.get('pkg:npm/left-pad@1.0.0')?.status).toBe('resolved')
-        expect(resolverUnavailable()).toBe(false)
-        expect(warnings('Resolver unavailable')).toHaveLength(0)
-        expect(warnings('retrying once')).toHaveLength(1)
+        expect(calls).toHaveLength(1)
+        expect([...answers.keys()]).toEqual(['pkg:npm/a@1.0.0'])
+        expect(resolverUnavailable()).toBe(true)
+        expect(warnings('Resolver unavailable')).toHaveLength(1)
     })
 
     it('asks nothing when given no purls', async () => {

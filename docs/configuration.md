@@ -60,7 +60,10 @@ depinder analyse ./repo
 | `--no-resolver` | Skip it for this run |
 
 Every chunk is posted at once, with one deadline for all of them, so no chunk waits behind another
-and each has the whole budget to fetch what the server does not know yet.
+and each has the whole budget to fetch what the server does not know yet. Each is posted once: there
+are no retries. What has not answered by the deadline goes to the registries, and a request that
+fails — an error status, a dropped connection, a stream cut short — keeps what it delivered and
+turns the resolver off for the rest of the run, with one warning.
 
 Every project is parsed first, every dependency's purl is collected into one list, and the answers
 land in the same local cache the registrars fill. What the resolver does not know — a package it is
