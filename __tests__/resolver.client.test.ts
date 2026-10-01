@@ -20,9 +20,10 @@ import {RESOLVER_CHUNK_CONCURRENCY, ResolverConfig} from '../src/resolver/config
  * a 401 is fatal to the client and to nothing else, and a network error costs one retry and then
  * silence.
  *
- * Chunks are posted several at a time, so the second thing worth pinning is that concurrency did
- * not cost any of the above: the window is bounded, an answer already in flight when the resolver
- * goes unavailable is still kept, and nothing is asked after that.
+ * Every chunk is posted at once, so the second thing worth pinning is that this did not cost any of
+ * the above: every chunk is on the wire before any answers, all of them with the same deadline, a
+ * cap still bounds them when one is configured, and an answer already in flight when the resolver
+ * goes unavailable is still kept.
  */
 
 const config: ResolverConfig = {
@@ -494,42 +495,58 @@ describe('the resolver client', () => {
         expect(resolverUnavailable()).toBe(false)
     })
 
-    it('abandons the remaining chunks once the server is unavailable', async () => {
-        const calls = serve(() => ({status: 403}))
-
-        await resolvePurls(config, manyPurls(6), quiet)
-
-        // The first window's worth was already asked before the first 403 came back; the chunks
-        // behind them are never asked, and only one line is logged about it.
-        expect(calls).toHaveLength(RESOLVER_CHUNK_CONCURRENCY)
-        expect(warnings('Resolver unavailable')).toHaveLength(1)
-    })
-
-    it('keeps the window full, and starts the next chunk only as one lands', async () => {
+    it('posts every chunk before any of them answers', async () => {
         const server = gatedServe()
         const answers = resolvePurls(config, manyPurls(6), quiet)
 
-        await until('the first window of chunks', () => server.calls.length === RESOLVER_CHUNK_CONCURRENCY)
+        // Nothing has been released, so a client that waited for a slot would be stuck at its
+        // window here: all six are already on the wire.
+        await until('every chunk', () => server.calls.length === 6)
         await tick()
-        // Bounded: the chunk after the window waits for a slot rather than piling onto the server,
-        // whose api pool has one connection per chunk and one spare for a retry.
-        expect(server.calls).toHaveLength(RESOLVER_CHUNK_CONCURRENCY)
-
-        server.release(0)
-        await until('the chunk after the window', () => server.calls.length === RESOLVER_CHUNK_CONCURRENCY + 1)
-        expect(server.peakInFlight()).toBe(RESOLVER_CHUNK_CONCURRENCY)
-
-        server.releaseAll()
-        await until('the sixth chunk', () => server.calls.length === 6)
-        server.releaseAll()
-
-        const result = await answers
         expect(server.calls).toHaveLength(6)
+        expect(server.peakInFlight()).toBe(6)
+
+        server.releaseAll()
+        const result = await answers
         expect(result.size).toBe(CHUNK_SIZE * 6)
     })
 
-    it('posts one chunk at a time when the configuration says so', async () => {
+    it('gives every chunk the same deadline', async () => {
+        // The clock is held still, so "the same" is exact: the deadline is fixed once, before the
+        // first post, and no chunk is sent later than another.
+        const now = Date.now()
+        const clock = jest.spyOn(Date, 'now').mockReturnValue(now)
+        try {
+            const calls = serve(call => answerAll(call.purls))
+            await resolvePurls({...config, maxWaitMs: 20_000}, manyPurls(4), quiet)
+            expect(calls.map(it => it.body.deadline_ms)).toEqual([20_000, 20_000, 20_000, 20_000])
+        } finally {
+            clock.mockRestore()
+        }
+    })
+
+    it('still honours a cap on the chunks in flight, starting the next chunk only as one lands', async () => {
+        // DEPINDER_RESOLVER_CONCURRENCY, for a server that turns out to need it.
         const server = gatedServe()
+        const answers = resolvePurls({...config, chunkConcurrency: 2}, manyPurls(4), quiet)
+
+        await until('the first window of chunks', () => server.calls.length === 2)
+        await tick()
+        expect(server.calls).toHaveLength(2)
+
+        server.release(0)
+        await until('the chunk after the window', () => server.calls.length === 3)
+        server.releaseAll()
+        await until('the fourth chunk', () => server.calls.length === 4)
+        server.releaseAll()
+
+        const result = await answers
+        expect(server.peakInFlight()).toBe(2)
+        expect(result.size).toBe(CHUNK_SIZE * 4)
+    })
+
+    it('posts one chunk at a time when the configuration says so, and nothing after the server turns it away', async () => {
+        const server = gatedServe(() => ({status: 403}))
         const answers = resolvePurls({...config, chunkConcurrency: 1}, manyPurls(3), quiet)
 
         await until('the first chunk', () => server.calls.length === 1)
@@ -537,31 +554,30 @@ describe('the resolver client', () => {
         expect(server.calls).toHaveLength(1)
 
         server.release(0)
-        await until('the second chunk', () => server.calls.length === 2)
-        server.releaseAll()
-        await until('the third chunk', () => server.calls.length === 3)
-        server.releaseAll()
-
         await answers
+        // Under a cap the chunks behind the failure are never asked, and one line is logged.
+        expect(server.calls).toHaveLength(1)
         expect(server.peakInFlight()).toBe(1)
+        expect(warnings('Resolver unavailable')).toHaveLength(1)
     })
 
-    it('keeps the answer of a chunk already in flight when another chunk turned the resolver off', async () => {
+    it('keeps the answers of the other chunks when one of them turned the resolver off', async () => {
         // A 4xx is final for the run, but the chunks beside it have already been paid for: throwing
         // their answers away would send those libraries to the registrars for nothing.
         const server = gatedServe((call, index) => index === 1 ? {status: 400} : answerAll(call.purls))
         const answers = resolvePurls(config, manyPurls(6), quiet)
 
-        await until('the first window of chunks', () => server.calls.length === RESOLVER_CHUNK_CONCURRENCY)
+        await until('every chunk', () => server.calls.length === 6)
         server.release(1)
         await until('the client to give up on the resolver', () => resolverUnavailable())
         server.releaseAll()
 
         const result = await answers
 
-        expect(server.calls).toHaveLength(RESOLVER_CHUNK_CONCURRENCY)
-        expect(result.size).toBe(CHUNK_SIZE * (RESOLVER_CHUNK_CONCURRENCY - 1))
+        expect(server.calls).toHaveLength(6)
+        expect(result.size).toBe(CHUNK_SIZE * 5)
         expect(resolverUnavailable()).toBe(true)
+        expect(warnings('Resolver unavailable')).toHaveLength(1)
     })
 
     it('treats a client-side timeout as transient: one retry, and the run carries on', async () => {

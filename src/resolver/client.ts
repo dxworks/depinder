@@ -345,11 +345,17 @@ export async function resolvePurls(
     const entries = new Map<string, ResolvedEntry>()
     if (purls.length === 0 || unavailable) return entries
 
+    /**
+     * One deadline for the whole ask, fixed before the first post. Every chunk is posted at once,
+     * so every chunk gets all of it, and its cold packages are urgent on the server for the whole
+     * wait.
+     */
     const deadline = Date.now() + config.maxWaitMs
     /**
-     * What is left of the phase's budget, as the server's `deadline_ms`: worked out per post, so a
-     * chunk that waited for a slot, or a retry, does not get the whole budget again. `0` is valid
-     * and means "send what you have now", so a late chunk still gets every fresh answer.
+     * What is left of that budget, as the server's `deadline_ms`: worked out per post, so a chunk
+     * that waited for a slot under `DEPINDER_RESOLVER_CONCURRENCY` does not get the whole budget
+     * again. `0` is valid and means "send what you have now", so a late chunk still gets every
+     * fresh answer.
      */
     const deadlineMs = () => Math.min(MAX_DEADLINE_MS, Math.max(0, deadline - Date.now()))
     let feedsLogged = false
@@ -407,16 +413,19 @@ export async function resolvePurls(
     }
 
     /**
-     * Posts the chunks, `config.chunkConcurrency` of them at a time.
+     * Posts the chunks — all of them at once, unless `config.chunkConcurrency` caps it.
      *
      * The chunks are independent questions — the server answers each from its own database and its
-     * own upstream fetches — so waiting for one before asking the next spent the whole run in
-     * series for nothing: six chunks took 22-30 s one after another and 12-14 s side by side.
+     * own upstream fetches — so waiting for one before asking the next spent the run in series for
+     * nothing: six chunks took 22-30 s one after another and 12-14 s side by side. Posting only a
+     * few at a time was the same mistake on a smaller scale: a chunk that waited for a slot went out
+     * with what was left of the deadline, and its cold packages were never urgent on the server.
      *
-     * `unavailable` is re-read before each chunk is taken rather than once at the top, which is
-     * what keeps the old "stop asking" semantics: a chunk that is already in flight when another
+     * `unavailable` is re-read before each chunk is taken rather than once at the top. With every
+     * chunk posted together that changes nothing — they are all in flight before any answers —
+     * but under a cap it keeps the "stop asking" semantics: a chunk already in flight when another
      * one turns the resolver off runs to its end and its answer is kept — throwing away a response
-     * that has already been paid for helps nobody — but nothing new is started after that.
+     * that has already been paid for helps nobody — and nothing new is started after that.
      */
     const chunks = packChunks(purls, CHUNK_SIZE)
     let next = 0

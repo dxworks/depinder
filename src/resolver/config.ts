@@ -18,7 +18,7 @@ export interface ResolverConfig {
      * (capped at the server's 60 s), and the server answers whatever is still open when that passes.
      */
     maxWaitMs: number
-    /** How many chunks of one ask are posted at the same time. */
+    /** How many chunks of one ask are posted at the same time; `Infinity`, the default, is all of them. */
     chunkConcurrency: number
     /**
      * The run's freshness cutoff (epoch milliseconds): a package the server has not confirmed since
@@ -39,19 +39,22 @@ export interface ResolverOptions {
 export const DEFAULT_RESOLVER_MAX_WAIT_MS = 60_000
 
 /**
- * How many chunks of one bulk ask are in flight at once.
+ * How many chunks of one bulk ask are in flight at once: by default, all of them.
  *
- * A run is six chunks of 2000 purls, and the server answers each of them independently — the time
- * is upstream fetches and a large response body, not contention on anything the client owns. Six
- * chunks one after another measured 22-30 s against the same server that answered all six at once
- * in 12-14 s. Not "all of them", because the constraint is at the other end and it is narrow: every
- * chunk's answer is built by one `json_agg` over a single link to a remote database, and the api
- * has four connections to run them on (`API_POOL_SIZE`). Three leaves the fourth for the retry a
- * failed chunk is allowed, which is the one request that must not queue — a retry that waits out
- * the server's connection timeout comes back a 500, and a single 500 is what makes a run give up on
- * the resolver and send every remaining purl to the registries.
+ * The chunks are independent questions, and they share one deadline. Posting them a few at a time
+ * made every chunk after the first window wait for a slot — behind the slowest package of the
+ * chunk before it — and then go out with whatever was left of that deadline, often nothing: its
+ * cold packages were never urgent on the server, and came back `pending` for the registries to
+ * fetch one by one. Posted together, every chunk gets the whole budget.
+ *
+ * The old reason for three no longer holds. It was the server's api pool (`API_POOL_SIZE`, four):
+ * a chunk's answer used to be one aggregate held on a connection for the length of its wait, and
+ * the fourth connection was kept for the retry a failed chunk was allowed. The answer is a stream
+ * now, and a stream holds a client for one query at a time, never for the length of its deadline;
+ * and the client no longer retries. `DEPINDER_RESOLVER_CONCURRENCY` still caps it, for a server
+ * that turns out to need it.
  */
-export const RESOLVER_CHUNK_CONCURRENCY = 3
+export const RESOLVER_CHUNK_CONCURRENCY = Infinity
 
 function maxWaitFromEnv(): number {
     const raw = process.env.DEPINDER_RESOLVER_MAX_WAIT_MS

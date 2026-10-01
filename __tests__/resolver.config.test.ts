@@ -91,9 +91,13 @@ describe('the resolver configuration', () => {
         expect(resolverConfig(options)?.maxWaitMs).toBe(DEFAULT_RESOLVER_MAX_WAIT_MS)
     })
 
-    it('takes the chunk concurrency from the environment, and ignores nonsense', () => {
+    it('posts every chunk at once unless the environment caps it, and ignores nonsense', () => {
         process.env.DEPINDER_RESOLVER_TOKEN = 'secret'
         const options = {resolverUrl: 'https://resolver.example'}
+
+        expect(RESOLVER_CHUNK_CONCURRENCY).toBe(Infinity)
+        delete process.env.DEPINDER_RESOLVER_CONCURRENCY
+        expect(resolverConfig(options)?.chunkConcurrency).toBe(Infinity)
 
         process.env.DEPINDER_RESOLVER_CONCURRENCY = '8'
         expect(resolverConfig(options)?.chunkConcurrency).toBe(8)
