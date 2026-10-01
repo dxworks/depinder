@@ -1,10 +1,10 @@
 import fs from 'fs'
 import path from 'path'
 import {minimatch} from 'minimatch'
-import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
+import {DependencyFileContext, DepinderDependency, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
 import {Plugin} from '../../extension-points/plugin'
 import {Registrar} from '../../extension-points/registrar'
-import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
+import {Vulnerability, VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
 import {parseCycloneDxFile} from './cyclonedx'
 import {scanSbomFileOnce} from './local-scan'
 import {githubScanSbomFileOnce} from '../../vuln-sources/github/scan'
@@ -77,6 +77,70 @@ function createExtractor(purlType: string): Extractor {
     }
 }
 
+/**
+ * When set, the parser leaves `dep.vulnerabilities` and `exactVersionVulnerabilities` alone, and
+ * analyse.ts attaches them once the vulnerability server has answered, or once the local scan it
+ * fell back to has. Off by default: the parser then scans exactly as it always has.
+ */
+let findingsDeferred = false
+
+export function deferSbomFindings(deferred: boolean): void {
+    findingsDeferred = deferred
+}
+
+/** The projects of one SBOM for one purl type: the very objects the parser hands out. */
+export function sbomProjectsOf(sbomFile: string, purlType: string): DepinderProject[] {
+    return projectsOf(path.resolve(sbomFile), purlType)
+}
+
+/**
+ * The local scan's findings on one project of `sbomFile`: Trivy and Grype on this machine, plus
+ * GitHub's advisory cache when selected.
+ *
+ * Which sources run is the run's `--vuln-source` selection: Trivy and Grype shell out to a local
+ * binary, `github` matches against the downloaded advisory cache. All of them matched the exact
+ * version recorded in the SBOM, so these findings are final: `exactVersionVulnerabilities` is
+ * what tells analyse.ts not to range-filter them. When no source produced anything the flag stays
+ * unset and the per-package GHSA GraphQL path runs instead. `projectsOf` memoises projects by
+ * reference, so the flag sticks for the process — correct here, since it is a property of the
+ * file, not of the caller.
+ */
+export async function attachLocalFindings(sbomFile: string, project: DepinderProject): Promise<void> {
+    const scan = await scanSbomFileOnce(sbomFile)
+    const github = vulnSources().github
+        ? githubScanSbomFileOnce(sbomFile)
+        : {available: false, index: new Map()}
+    const findings = mergeVulnerabilityIndexes(new Map(scan.index), github.index)
+
+    if (scan.available || github.available) {
+        for (const dep of Object.values(project.dependencies)) {
+            dep.vulnerabilities = findings.get(dep.id) ?? []
+        }
+        project.exactVersionVulnerabilities = true
+    }
+}
+
+/**
+ * The vulnerability server's findings on one project of `sbomFile`: `serverFindings(dep)` is what
+ * the server answered for the dependency's purl, `[]` when it was clean or not scannable. GitHub's
+ * advisory cache, when selected, is matched locally and merged in exactly as it is into a local
+ * scan, keyed the same way. An answer from the server is a scan that ran, so the flag is set.
+ */
+export function attachServerFindings(
+    sbomFile: string, project: DepinderProject, serverFindings: (dep: DepinderDependency) => Vulnerability[],
+): void {
+    const github = vulnSources().github ? githubScanSbomFileOnce(sbomFile) : undefined
+    for (const dep of Object.values(project.dependencies)) {
+        const findings = [...serverFindings(dep)]
+        const advisories = github?.index.get(dep.id)
+        if (advisories?.length) {
+            mergeVulnerabilityIndexes(new Map([[dep.id, findings]]), new Map([[dep.id, advisories]]))
+        }
+        dep.vulnerabilities = findings
+    }
+    project.exactVersionVulnerabilities = true
+}
+
 function createParser(purlType: string): Parser {
     return {
         parseDependencyTree: async (context: DependencyFileContext) => {
@@ -94,27 +158,10 @@ function createParser(purlType: string): Parser {
                 throw new Error(`No ${purlType} project at index ${index} in ${context.lockFile}`)
             }
 
-            // Vulnerability scan of the SBOM, once per file per process. Which sources run is
-            // the run's `--vuln-source` selection: Trivy and Grype shell out to a local binary,
-            // `github` matches against the downloaded advisory cache. All of them matched the
-            // exact version recorded in the SBOM, so these findings are final:
-            // `exactVersionVulnerabilities` is what tells analyse.ts not to range-filter them.
-            // When no source produced anything the flag stays unset and the per-package GHSA
-            // GraphQL path runs instead. `projectsOf` memoises
-            // projects by reference, so the flag sticks for the process — correct here, since it
-            // is a property of the file, not of the caller.
-            const scan = await scanSbomFileOnce(sbomFile)
-            const github = vulnSources().github
-                ? githubScanSbomFileOnce(sbomFile)
-                : {available: false, index: new Map()}
-            const findings = mergeVulnerabilityIndexes(new Map(scan.index), github.index)
-
-            if (scan.available || github.available) {
-                for (const dep of Object.values(project.dependencies)) {
-                    dep.vulnerabilities = findings.get(dep.id) ?? []
-                }
-                project.exactVersionVulnerabilities = true
-            }
+            // Vulnerability scan of the SBOM, once per file per process — unless analyse.ts asks the
+            // vulnerability server for the whole run instead, and attaches the findings itself
+            // once the answer (or the local fallback) is in: see `deferSbomFindings`.
+            if (!findingsDeferred) await attachLocalFindings(sbomFile, project)
             return project
         },
     }

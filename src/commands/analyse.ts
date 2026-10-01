@@ -4,14 +4,8 @@ import path from 'path'
 import {getPluginsFromNames} from '../plugins'
 import {purlTypeOfPlugin, sbomFilesToParse, sbomPluginsForPurlTypes} from '../plugins/sbom'
 import {SbomDescription} from '../plugins/sbom/describe'
-import {
-    preflightScanners,
-    ScannerPreflight,
-    scanSbomFileOnce,
-    scannerPreflightMessages,
-    scannerSummaryLine,
-    writeScanProvenance,
-} from '../plugins/sbom/local-scan'
+import {deferSbomFindings} from '../plugins/sbom'
+import {ScannerPreflight, scannerSummaryLine, writeScanProvenance} from '../plugins/sbom/local-scan'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
 import {LibraryInfo} from '../extension-points/registrar'
 import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
@@ -48,6 +42,16 @@ import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/
 import {ResolverConfig, ResolverOptions, resolverConfig} from '../resolver/config'
 import {PackageRecord, ResolvedEntry, resetResolverClient, resolvePurls} from '../resolver/client'
 import {toLibraryInfo} from '../resolver/adapter'
+import {usesVulnServer, vulnServerConfig, VulnServerConfig} from '../vuln-sources/server'
+import {
+    collectSbomTargets,
+    localPrescan,
+    localScannerPreflight,
+    startServerVulnerabilities,
+    VulnOutcome,
+    vulnSummaryLine,
+    writeServerProvenance,
+} from '../vuln-sources/run'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
 
@@ -69,6 +73,8 @@ export interface AnalyseOptions extends ResolverOptions, CacheMaxAgeOptions {
     projectName?: string
     /** SBOM sources: the scanned repositories, one per SBOM repo name, for Black Duck's `Path` prefix. */
     target?: string
+    /** Commander sets this to `false` for `--no-vuln-server`, and leaves it `true` otherwise. */
+    vulnServer?: boolean
 }
 
 /** A factory rather than a single instance, so tests can parse arguments from a clean slate. */
@@ -104,6 +110,8 @@ export function createAnalyseCommand(): Command {
             'Base URL of a depinder resolver service that answers purls in bulk; '
             + 'DEPINDER_RESOLVER_URL when unset, and DEPINDER_RESOLVER_TOKEN must be set with it')
         .option('--no-resolver', 'Do not call the bulk resolver even when one is configured')
+        .option('--no-vuln-server',
+            'Scan the SBOMs with the local Trivy and Grype even when the resolver\'s server can answer vulnerabilities')
         .option('--profile', 'Print a phase timing and request count summary at the end', false)
         .action(analyseFiles)
 }
@@ -373,12 +381,16 @@ export interface BulkResolveOutcome {
  * the phase returns once the stream has ended and every advisory lookup it started has finished.
  *
  * `resolve` is a parameter so the phase can be tested without a server.
+ *
+ * `vulnerabilitiesReady`, when given, settles once every project's findings are attached — the
+ * vulnerability server's, or the local scan's it fell back to. Until then a project without
+ * `exactVersionVulnerabilities` is undecided rather than a reader of advisories: see FLOW 2g.
  */
 export async function bulkResolve(
     config: ResolverConfig,
     pluginProjects: PluginProjects[],
     cache: Cache,
-    options: {refresh?: boolean} = {},
+    options: {refresh?: boolean, vulnerabilitiesReady?: Promise<unknown>} = {},
     resolve: typeof resolvePurls = resolvePurls
 ): Promise<BulkResolveOutcome> {
     // FLOW 2a — every purl in the run, deduped, with the (plugin, dep) pairs that own it.
@@ -387,8 +399,11 @@ export async function bulkResolve(
     // in a project no SBOM scan answered for (`exactVersionVulnerabilities` unset, see
     // `plugins/sbom/index.ts`). A project the scanners covered takes its findings from the scan and
     // never looks at `lib.vulnerabilities`, so a GitHub call for it would be paid and thrown away.
-    // The flag is set while parsing, in phase 1, so it is already known here.
+    // The flag is set while parsing, in phase 1, so it is already known here — unless the findings
+    // come from the vulnerability server, whose answer may still be on its way: then a project
+    // without the flag is only undecided (`advisoriesUndecided`, settled in FLOW 2g).
     const advisoriesRead = new Set<string>()
+    const advisoriesUndecided = new Map<string, DepinderProject[]>()
     for (const {plugin, projects} of pluginProjects) {
         for (const project of projects) {
             for (const dep of Object.values(project.dependencies)) {
@@ -399,7 +414,15 @@ export async function bulkResolve(
                 const entries = byPurl.get(dep.purl)
                 if (entries) entries.push({plugin, dep})
                 else byPurl.set(dep.purl, [{plugin, dep}])
-                if (!project.exactVersionVulnerabilities) advisoriesRead.add(`${ecosystemOf(plugin)}:${dep.name}`)
+                if (project.exactVersionVulnerabilities) continue
+                const key = `${ecosystemOf(plugin)}:${dep.name}`
+                if (!options.vulnerabilitiesReady) {
+                    advisoriesRead.add(key)
+                    continue
+                }
+                const owners = advisoriesUndecided.get(key)
+                if (!owners) advisoriesUndecided.set(key, [project])
+                else if (!owners.includes(project)) owners.push(project)
             }
         }
     }
@@ -457,7 +480,9 @@ export async function bulkResolve(
     // package of the run.
     let resolved = 0
     const taken = new Set<string>()
-    const lookups: {cacheKey: string, advisoryEcosystem: string, lib: LibraryInfo, updatedAt: number}[] = []
+    type Lookup = {cacheKey: string, advisoryEcosystem: string, lib: LibraryInfo, updatedAt: number}
+    const lookups: Lookup[] = []
+    const undecidedLookups: Lookup[] = []
     let nextLookup = 0
     const workers = new Set<Promise<void>>()
     let writeFailure: {error: unknown} | undefined
@@ -517,9 +542,10 @@ export async function bulkResolve(
     // have been taken where every project had scan findings, and so never looked up.
     function queueLookup(cacheKey: string, plugin: Plugin, lib: LibraryInfo, updatedAt: number, githubToken: boolean): void {
         const advisoryEcosystem = plugin.checker?.githubSecurityAdvisoryEcosystem
-        if (!advisoryEcosystem || !githubToken || !advisoriesRead.has(cacheKey)) return
+        if (!advisoryEcosystem || !githubToken) return
         if (lib.vulnerabilities !== undefined) return
-        lookups.push({cacheKey, advisoryEcosystem, lib, updatedAt})
+        if (advisoriesRead.has(cacheKey)) lookups.push({cacheKey, advisoryEcosystem, lib, updatedAt})
+        else if (advisoriesUndecided.has(cacheKey)) undecidedLookups.push({cacheKey, advisoryEcosystem, lib, updatedAt})
     }
 
     // A cache whose `set` is asynchronous still gets its write awaited before the phase ends, and
@@ -603,6 +629,22 @@ export async function bulkResolve(
     // The phase ends when the stream has AND every write and lookup it started has: phase 3 must
     // not read a key while its advisories are still being added.
     while (workers.size > 0) await Promise.all(workers)
+
+    // FLOW 2g — the lookups held back for projects whose findings were not attached yet. Today's
+    // rule, applied once the flags are final: a server answer, or a local scan that produced a
+    // report, sets the flag and the lookup is never made; a fallback that found no scanner leaves
+    // it unset, and the lookup is made exactly as it would have been without a server. Waiting
+    // here costs nothing on the usual path — there is nothing to wait for unless GH_TOKEN is set
+    // and some library's advisories are still unknown.
+    if (undecidedLookups.length > 0) {
+        await timePhase('vuln:server-wait', () => options.vulnerabilitiesReady)
+        for (const lookup of undecidedLookups) {
+            const readers = advisoriesUndecided.get(lookup.cacheKey) ?? []
+            if (lookup.lib.vulnerabilities === undefined && readers.some(it => !it.exactVersionVulnerabilities)) lookups.push(lookup)
+        }
+        pump()
+        while (workers.size > 0) await Promise.all(workers)
+    }
     if (writeFailure) throw writeFailure.error
     if (wanted.length === 0) return {written, libs, requested: 0, resolved: 0}
     count('resolver:cache-write', written.size)
@@ -665,15 +707,24 @@ export function planRuns(sources: InputSources, selected: Plugin[], options: Ana
 }
 
 interface SbomPreparation {
+    /** The local scanner preflight, when the run scans locally from the start. */
     preflight?: ScannerPreflight
     hasGithubToken: boolean
+    /**
+     * When the vulnerability server was asked: settles once every project has its findings, from
+     * the server or from the local scan it fell back to. Never rejects.
+     */
+    vulnerabilities?: Promise<VulnOutcome>
 }
 
 /**
- * Everything the SBOM route does once per process, before any parsing: the scanner preflight,
- * the GitHub advisory refresh and the up-front scan of every SBOM any run will parse.
+ * Everything the SBOM route does once per process, before any parsing: either the question to the
+ * vulnerability server — posted here and awaited only where the findings are read — or the local
+ * scanner preflight and the up-front scan of every SBOM any run will parse; and the GitHub advisory
+ * refresh.
  */
-async function prepareSbomScans(runs: PlannedRun[], options: AnalyseOptions): Promise<SbomPreparation | undefined> {
+async function prepareSbomScans(runs: PlannedRun[], options: AnalyseOptions, vulnServer?: VulnServerConfig): Promise<SbomPreparation | undefined> {
+    deferSbomFindings(false)
     const sbomRuns = runs.filter(it => it.sboms)
     if (sbomRuns.length === 0) return undefined
     const sbomFiles = sbomRuns.flatMap(it => it.files)
@@ -681,42 +732,54 @@ async function prepareSbomScans(runs: PlannedRun[], options: AnalyseOptions): Pr
     const sources = parseVulnSources(options.vulnSource ?? DEFAULT_VULN_SOURCE)
     setVulnSources(sources)
     log.info(`Vulnerability sources: ${describeVulnSources(sources)}`)
+    const prescanFiles = () => sbomRuns.flatMap(it => sbomFilesToParse(it.plugins, it.files))
+
+    // The vulnerability server stands in for both local scanners at once, so only when both are
+    // selected. Asked first, before the GitHub refresh and the cache load, because nothing has to
+    // wait for it: the parser is told to leave the findings to it, and the pipeline awaits it just
+    // before the findings are read. Its findings are merged with GitHub's, so they are attached
+    // only once the refresh below is done.
+    let githubDone: () => void = () => undefined
+    const githubReady = new Promise<void>(resolve => { githubDone = resolve })
+    let vulnerabilities: Promise<VulnOutcome> | undefined
+    if (vulnServer && usesVulnServer(sources)) {
+        const targets = await timePhase('vuln:purls', () => collectSbomTargets(sbomRuns, filesForPlugin))
+        deferSbomFindings(true)
+        vulnerabilities = startServerVulnerabilities(vulnServer, targets, {githubReady, prescanFiles, hasGithubToken})
+    }
 
     // Scanner preflight, before any parsing: the SBOM parsers shell out to Trivy and Grype, and a
     // missing binary used to surface only as a mid-run warning per file — leaving the user with a
     // completed run, empty vulnerability columns and nothing that said so. Run once, say it up
-    // front, and never abort: a run without scanners is degraded, not invalid.
-    const runsLocalScanners = sources.trivy || sources.grype
-    const preflight = runsLocalScanners ? await timePhase('preflight', () => preflightScanners()) : undefined
-    if (preflight) {
-        for (const message of scannerPreflightMessages(preflight, hasGithubToken)) log[message.level](message.text)
-    }
+    // front, and never abort: a run without scanners is degraded, not invalid. With a vulnerability
+    // server it runs only if the server fails.
+    const runsLocalScanners = !vulnerabilities && (sources.trivy || sources.grype)
+    const preflight = runsLocalScanners ? await localScannerPreflight(hasGithubToken) : undefined
 
     // The GitHub cache is refreshed before any parsing, and only for the ecosystems these SBOMs
     // actually contain — a Ruby project never downloads npm's 7,000 advisories. A refresh failure
     // is a warning: whatever is already cached still matches.
-    if (sources.github) {
-        const ecosystems = ecosystemsInSboms(sbomFiles)
-        log.info(`GitHub advisory ecosystems in these SBOMs: ${ecosystems.join(', ') || 'none'}`)
-        try {
-            const report = await timePhase('github-advisories:refresh', () =>
-                refreshEcosystems(ecosystems, Number(options.githubMaxAge ?? DEFAULT_MAX_AGE_HOURS), {
-                    tokenFile: options.githubTokenFile,
-                }))
-            if (!report) log.info('GitHub advisory cache is up to date; nothing to download')
-        } catch (e: any) {
-            log.warn(`GitHub advisory refresh skipped: ${e?.message ?? e}`)
+    try {
+        if (sources.github) {
+            const ecosystems = ecosystemsInSboms(sbomFiles)
+            log.info(`GitHub advisory ecosystems in these SBOMs: ${ecosystems.join(', ') || 'none'}`)
+            try {
+                const report = await timePhase('github-advisories:refresh', () =>
+                    refreshEcosystems(ecosystems, Number(options.githubMaxAge ?? DEFAULT_MAX_AGE_HOURS), {
+                        tokenFile: options.githubTokenFile,
+                    }))
+                if (!report) log.info('GitHub advisory cache is up to date; nothing to download')
+            } catch (e: any) {
+                log.warn(`GitHub advisory refresh skipped: ${e?.message ?? e}`)
+            }
         }
+    } finally {
+        githubDone()
     }
 
-    // Trivy and Grype run on every SBOM a plugin will parse, all at once and up front. Each file
-    // is scanned exactly once either way — the parser memoises — but the parser reaches the files
-    // one project at a time, which serialised a dozen one-to-two-second Grype runs.
-    if (preflight) {
-        await timePhase('scan:prescan', () =>
-            Promise.all(sbomRuns.flatMap(it => sbomFilesToParse(it.plugins, it.files)).map(file => scanSbomFileOnce(file))))
-    }
-    return {preflight, hasGithubToken}
+    // Trivy and Grype run on every SBOM a plugin will parse, all at once and up front.
+    if (preflight) await localPrescan(prescanFiles)
+    return {preflight, hasGithubToken, vulnerabilities}
 }
 
 /** The process-wide cache handle: opened once, checkpointed mid-run, closed once at the end. */
@@ -792,22 +855,35 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
     const configured = resolverConfig(options)
     const resolver = configured && {...configured, freshAfterMs: options.refresh ? runStartMs : cutoffMs}
     if (resolver) log.info(`Bulk resolver: ${resolver.url}, waiting at most ${Math.round(resolver.maxWaitMs / 1000)}s for it`)
+    // Same server and token as the resolver; `--no-vuln-server` keeps the scan local.
+    const vulnServer = vulnServerConfig(configured, options)
 
-    const prep = await prepareSbomScans(runs, options)
+    const prep = await prepareSbomScans(runs, options, vulnServer)
     const session = await openCacheSession(useCache, cutoffMs)
+    let vulnOutcome: VulnOutcome | undefined
     try {
         for (const run of runs) {
-            const analysed = await runAnalysis(run.files, run.plugins, run.folder, options, session, resolver)
+            const analysed = await runAnalysis(run.files, run.plugins, run.folder, options, session, resolver, prep?.vulnerabilities)
             if (run.sboms) {
-                // Only when the local scanners ran: the file records their versions and DB builds,
-                // which is what makes a vulnerability count reproducible.
-                if (prep?.preflight) {
-                    try {
-                        const provenanceFile = await writeScanProvenance(run.folder, prep.hasGithubToken, run.sboms)
+                // Already settled: `runAnalysis` waited for it before reading any finding.
+                vulnOutcome = prep?.vulnerabilities ? await prep.vulnerabilities : undefined
+                const preflight = prep?.preflight
+                    ?? (vulnOutcome?.source === 'local' ? vulnOutcome.preflight : undefined)
+                // Only when some scanner ran, here or on the server: the file records their versions
+                // and DB builds, which is what makes a vulnerability count reproducible.
+                try {
+                    if (vulnOutcome?.source === 'server') {
+                        const provenanceFile = writeServerProvenance(run.folder, vulnOutcome, run.sboms)
                         log.info(`Scan provenance written to ${provenanceFile}`)
-                    } catch (e: any) {
-                        log.warn(`Could not write scan provenance: ${e?.message ?? e}`)
+                    } else if (preflight) {
+                        const fallback = vulnOutcome?.source === 'local' && vulnOutcome.fallbackReason
+                            ? {reason: vulnOutcome.fallbackReason}
+                            : undefined
+                        const provenanceFile = await writeScanProvenance(run.folder, prep?.hasGithubToken ?? false, run.sboms, fallback)
+                        log.info(`Scan provenance written to ${provenanceFile}`)
                     }
+                } catch (e: any) {
+                    log.warn(`Could not write scan provenance: ${e?.message ?? e}`)
                 }
                 writeBlackDuckForSource(run.sboms, analysed, run.folder, run.inputFolder, options)
             }
@@ -817,12 +893,12 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
         await session.close()
     }
 
-    if (prep?.preflight) {
-        // Repeated here because the preflight banner is thousands of log lines back by now, and
-        // because a CSV is only readable next to the matcher and DB build that produced it.
-        const summary = scannerSummaryLine(prep.preflight, prep.hasGithubToken)
-        log[summary.level](summary.text)
-    }
+    // Repeated here because the preflight banner is thousands of log lines back by now, and
+    // because a CSV is only readable next to the matcher and DB build that produced it.
+    const summary = prep?.preflight
+        ? scannerSummaryLine(prep.preflight, prep.hasGithubToken)
+        : vulnOutcome && vulnSummaryLine(vulnOutcome, prep?.hasGithubToken ?? false)
+    if (summary) log[summary.level](summary.text)
     log.info('Done')
     logProfile()
 }
@@ -831,7 +907,10 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
  * Runs `plugins` over `files` and writes each plugin's three CSVs into `resultFolder`. The
  * enrichment is shared by every source: this is the one place a dependency is looked up.
  */
-export async function runAnalysis(files: string[], plugins: Plugin[], resultFolder: string, options: AnalyseOptions, session: CacheSession, resolver?: ResolverConfig): Promise<AnalysisResult[]> {
+export async function runAnalysis(
+    files: string[], plugins: Plugin[], resultFolder: string, options: AnalyseOptions, session: CacheSession,
+    resolver?: ResolverConfig, vulnerabilities?: Promise<unknown>,
+): Promise<AnalysisResult[]> {
     if (!fs.existsSync(resultFolder)) {
         fs.mkdirSync(resultFolder, {recursive: true})
         log.info(`Creating results dir ${resultFolder}`)
@@ -863,11 +942,17 @@ export async function runAnalysis(files: string[], plugins: Plugin[], resultFold
     const bulk: BulkResolveOutcome = resolver
         ? await timePhase('resolve:bulk', async () => {
             log.info(`Asking the resolver about up to ${named} dependency purls`)
-            return bulkResolve(resolver, pluginProjects, session.cache, options)
+            return bulkResolve(resolver, pluginProjects, session.cache, {refresh: options.refresh, vulnerabilitiesReady: vulnerabilities})
         })
         : {written: new Set<string>(), libs: new Map<string, LibraryInfo>(), requested: 0, resolved: 0}
     const bulkWritten = bulk.written
     if (bulkWritten.size > 0) await session.checkpointIfDue()
+
+    // FLOW 2h — the vulnerability server's answer, asked at the start of the run: phase 3 is the
+    // first to read a finding or `exactVersionVulnerabilities`, so this is as late as the wait can
+    // go. Usually long settled by now; if the server failed, this is where the local scan it fell
+    // back to is waited for.
+    if (vulnerabilities) await timePhase('vuln:server-wait', () => vulnerabilities)
 
     // FLOW 3 — enrich: per dep, cache → miss cache → registrar. Whatever phase 2 wrote is a plain cache hit here.
     // Phase 3 — enrichment, unchanged. The plugins run side by side. Each talks to its own

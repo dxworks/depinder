@@ -651,6 +651,7 @@ export const PROVENANCE_FILE = 'sbom-scan-provenance.json'
  */
 export async function writeScanProvenance(
     resultFolder: string, hasGithubToken: boolean, sboms?: SbomDescription[],
+    fallback?: {reason: string},
 ): Promise<string> {
     const preflight = await preflightScanners()
     // One provenance file per source subfolder: only that source's files, in scan order, each
@@ -664,6 +665,8 @@ export async function writeScanProvenance(
     const provenance = {
         generatedAt: new Date().toISOString(),
         ...(sboms?.length ? {source: sboms[0].producer} : {}),
+        // Only when a vulnerability server was asked and failed: the local scan stood in for it.
+        ...(fallback ? {vulnerabilitySource: 'local', fallbackReason: fallback.reason} : {}),
         pinnedVersions: PINNED_SCANNER_VERSIONS,
         scanners: {
             trivy: preflight.trivy,

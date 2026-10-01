@@ -449,6 +449,77 @@ describe('the bulk resolve phase', () => {
             expect(outcome.libs.get('npm:left-pad')?.vulnerabilities).toHaveLength(1)
         })
 
+        /**
+         * With the vulnerability server, the findings — and so the flag — may land after phase 2 has
+         * started. The lookups wait for them, and then follow today's rule exactly.
+         */
+        describe('while the vulnerability findings are still on their way', () => {
+            const pending = () => {
+                let settle: () => void = () => undefined
+                const ready = new Promise<void>(resolve => { settle = resolve })
+                return {ready, settle}
+            }
+
+            it('is not called once the server\'s answer sets the flag', async () => {
+                process.env.GH_TOKEN = 'a-token'
+                const app = project('app', [dep('left-pad', '1.0.0')])
+                const projects: PluginProjects[] = [{plugin: npm, projects: [app]}]
+                assignPurls(projects)
+                const findings = pending()
+                const cache = fakeCache()
+
+                const phase = bulkResolve(config, projects, cache, {vulnerabilitiesReady: findings.ready}, answering({
+                    'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+                }).resolve)
+                await new Promise(resolve => setImmediate(resolve))
+                expect(advisories).not.toHaveBeenCalled()
+                app.exactVersionVulnerabilities = true
+                findings.settle()
+                const outcome = await phase
+
+                expect(advisories).not.toHaveBeenCalled()
+                expect(outcome.libs.get('npm:left-pad')?.vulnerabilities).toBeUndefined()
+            })
+
+            it('is called, as without a server, when the fallback found no scanner and left the flag unset', async () => {
+                process.env.GH_TOKEN = 'a-token'
+                advisories.mockImplementation(async () => [{severity: 'HIGH', description: 'bad', permalink: 'https://example/1'}])
+                const app = project('app', [dep('left-pad', '1.0.0')])
+                const projects: PluginProjects[] = [{plugin: npm, projects: [app]}]
+                assignPurls(projects)
+                const findings = pending()
+                const cache = fakeCache()
+
+                const phase = bulkResolve(config, projects, cache, {vulnerabilitiesReady: findings.ready}, answering({
+                    'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+                }).resolve)
+                await new Promise(resolve => setImmediate(resolve))
+                expect(advisories).not.toHaveBeenCalled()
+                findings.settle()
+                const outcome = await phase
+
+                expect(advisories).toHaveBeenCalledTimes(1)
+                expect(outcome.libs.get('npm:left-pad')?.vulnerabilities).toHaveLength(1)
+                expect(cache.sets).toEqual([
+                    {key: 'npm:left-pad', vulnerabilities: undefined},
+                    {key: 'npm:left-pad', vulnerabilities: 1},
+                ])
+            })
+
+            it('does not wait for them when no lookup is held back', async () => {
+                const app = project('app', [dep('left-pad', '1.0.0')])
+                const projects: PluginProjects[] = [{plugin: npm, projects: [app]}]
+                assignPurls(projects)
+                const never = new Promise<void>(() => undefined)
+
+                const outcome = await bulkResolve(config, projects, fakeCache(), {vulnerabilitiesReady: never}, answering({
+                    'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+                }).resolve)
+
+                expect(outcome.resolved).toBe(1)
+            })
+        })
+
         it('keeps the registry data when the lookup fails', async () => {
             process.env.GH_TOKEN = 'a-token'
             advisories.mockImplementation(async () => { throw new Error('401 Bad credentials') })
