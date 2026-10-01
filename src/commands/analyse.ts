@@ -46,7 +46,7 @@ import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
 import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/profile'
 import {ResolverConfig, ResolverOptions, resolverConfig} from '../resolver/config'
-import {ResolvedEntry, resetResolverClient, resolvePurls} from '../resolver/client'
+import {PackageRecord, ResolvedEntry, resetResolverClient, resolvePurls} from '../resolver/client'
 import {toLibraryInfo} from '../resolver/adapter'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
@@ -311,7 +311,8 @@ export function confirmedAtMs(confirmedAt: string | null | undefined, now = Date
  * expired (see `confirmedAtMs`), so without this the second would ask the server about the same
  * purl again: a retry by another name. Instead a purl in `askedThisProcess` is never sent again,
  * and every answer that was taken is kept here under its cache key, with the `updated_at` it was
- * written with, so a later source hands the very same object to its phase 3. A purl that was asked
+ * written with, so a later source hands the very same object to its phase 3 — or, under a key the
+ * earlier source did not write, the same answer written afresh (`answeredPurls`). A purl that was asked
  * and got no usable answer has nothing in here: its key is a cache hit if some registrar has since
  * filled it, and goes to the registrars otherwise.
  *
@@ -319,11 +320,20 @@ export function confirmedAtMs(confirmedAt: string | null | undefined, now = Date
  */
 const askedThisProcess = new Set<string>()
 const answeredThisProcess = new Map<string, {lib: LibraryInfo, updatedAt: number}>()
+/**
+ * The same answers, per purl as sent: the package and its `updated_at`. Needed because one purl can
+ * belong to different cache keys in different sources — Trivy lowercases a golang module path that
+ * Syft keeps in its original case, so `go:github.com/kimmachinegun/automemlimit` and
+ * `go:github.com/KimMachineGun/automemlimit` are one purl and two keys. A later source whose key
+ * the earlier one never wrote gets the earlier answer written under it, rather than a registry call.
+ */
+const answeredPurls = new Map<string, {pkg: PackageRecord, updatedAt: number}>()
 
 /** For tests, and for a second `analyseFiles` in the same process. */
 export function resetBulkResolve(): void {
     askedThisProcess.clear()
     answeredThisProcess.clear()
+    answeredPurls.clear()
 }
 
 /** What the bulk phase left behind for phase 3: the cache keys it filled, and a count or two. */
@@ -398,23 +408,18 @@ export async function bulkResolve(
     // covers; what is left is the ask list.
     const written = new Set<string>()
     const libs = new Map<string, LibraryInfo>()
-    const reused: {cacheKey: string, plugin: Plugin, lib: LibraryInfo, updatedAt: number}[] = []
+    const reusedPurls: string[] = []
     const wanted: string[] = []
     let expired = 0
     let alreadyAsked = 0
     for (const [purl, entries] of byPurl) {
         if (askedThisProcess.has(purl)) {
             // An earlier source asked, and the server's answer — or its silence — stands for the
-            // process. What it answered is handed on under every key this source owns it by.
+            // process. What it answered is handed on under every key this source owns it by, once
+            // the write machinery below exists (FLOW 2f).
             count('resolver:already-asked')
             alreadyAsked++
-            for (const {plugin, dep} of entries) {
-                const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
-                const earlier = answeredThisProcess.get(cacheKey)
-                if (!earlier || libs.has(cacheKey)) continue
-                libs.set(cacheKey, earlier.lib)
-                reused.push({cacheKey, plugin, ...earlier})
-            }
+            reusedPurls.push(purl)
             continue
         }
         const keys = new Set(entries.map(it => `${ecosystemOf(it.plugin)}:${it.dep.name}`))
@@ -480,25 +485,30 @@ export async function bulkResolve(
         // answer is older than the cutoff, so its row is written already expired. This run still
         // uses it, from `libs`; the next run asks the server for it again.
         const updatedAt = confirmedAtMs(answer.package.confirmed_at)
+        answeredPurls.set(purl, {pkg: answer.package, updatedAt})
         for (const {plugin, dep} of byPurl.get(purl) ?? []) {
-            const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
-            if (written.has(cacheKey)) continue
-            written.add(cacheKey)
-            const lib = toLibraryInfo(answer.package)
-            try {
-                track(cache.set(cacheKey, lib, updatedAt))
-            } catch (error) {
-                writeFailure ??= {error}
-                continue
-            }
-            // Handed to phase 3 as it is, so the entry written here is not read straight back out
-            // of the database a moment later. The `cache.set` above is what makes it durable and
-            // what every later run reads.
-            libs.set(cacheKey, lib)
-            answeredThisProcess.set(cacheKey, {lib, updatedAt})
-            queueLookup(cacheKey, plugin, lib, updatedAt, githubToken)
+            writeKey(`${ecosystemOf(plugin)}:${dep.name}`, plugin, answer.package, updatedAt, githubToken)
         }
         pump()
+    }
+
+    // One cache key's write of an answer, from `take` or from an answer an earlier source took.
+    function writeKey(cacheKey: string, plugin: Plugin, pkg: PackageRecord, updatedAt: number, githubToken: boolean): void {
+        if (written.has(cacheKey)) return
+        written.add(cacheKey)
+        const lib = toLibraryInfo(pkg)
+        try {
+            track(cache.set(cacheKey, lib, updatedAt))
+        } catch (error) {
+            writeFailure ??= {error}
+            return
+        }
+        // Handed to phase 3 as it is, so the entry written here is not read straight back out of
+        // the database a moment later. The `cache.set` above is what makes it durable and what
+        // every later run reads.
+        libs.set(cacheKey, lib)
+        answeredThisProcess.set(cacheKey, {lib, updatedAt})
+        queueLookup(cacheKey, plugin, lib, updatedAt, githubToken)
     }
 
     // An advisory lookup, when phase 3 will read its result: the plugin has a GitHub advisory
@@ -563,7 +573,25 @@ export async function bulkResolve(
         }
     }
 
-    for (const {cacheKey, plugin, lib, updatedAt} of reused) queueLookup(cacheKey, plugin, lib, updatedAt, !!process.env.GH_TOKEN)
+    // FLOW 2f — the purls an earlier source already asked about: never sent again. Under a key the
+    // earlier source wrote, its very object is handed on; under a key it did not (the same purl,
+    // named differently by this source's parser), the earlier answer is written now, with the
+    // `updated_at` the server gave it. Advisories follow the same rule as a fresh answer.
+    const hasGithubToken = !!process.env.GH_TOKEN
+    for (const purl of reusedPurls) {
+        for (const {plugin, dep} of byPurl.get(purl) ?? []) {
+            const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
+            if (libs.has(cacheKey)) continue
+            const earlier = answeredThisProcess.get(cacheKey)
+            if (earlier) {
+                libs.set(cacheKey, earlier.lib)
+                queueLookup(cacheKey, plugin, earlier.lib, earlier.updatedAt, hasGithubToken)
+                continue
+            }
+            const answer = answeredPurls.get(purl)
+            if (answer) writeKey(cacheKey, plugin, answer.pkg, answer.updatedAt, hasGithubToken)
+        }
+    }
     pump()
 
     if (wanted.length > 0) {

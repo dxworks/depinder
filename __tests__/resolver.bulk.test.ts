@@ -684,6 +684,35 @@ describe('the bulk resolve phase', () => {
             expect(cache.sets.filter(it => it.key === 'npm:old-pkg')).toHaveLength(1)
         })
 
+        it('writes the earlier answer under a key the earlier source did not name it by', async () => {
+            // Trivy lowercases a golang module path; Syft keeps its case. One purl, two cache keys.
+            const go = plugin('sbom-golang', 'go', 'golang')
+            const named = (name: string, sourceName: string): PluginProjects[] => [{plugin: go, projects: [project(sourceName, [
+                {...dep(name, 'v0.1.0'), purl: 'pkg:golang/github.com/KimMachineGun/automemlimit@v0.1.0'},
+            ])]}]
+            const confirmedAt = '2026-09-30T08:00:00Z'
+            const cache = fakeCache()
+            const server = answering({'pkg:golang/github.com/KimMachineGun/automemlimit@v0.1.0':
+                {...record('golang', 'github.com/KimMachineGun', 'automemlimit'), confirmed_at: confirmedAt}})
+            const stamps: number[] = []
+            const set = cache.set
+            cache.set = (key: string, value: LibraryInfo, updatedAt?: number) => {
+                if (updatedAt !== undefined) stamps.push(updatedAt)
+                return set(key, value, updatedAt)
+            }
+
+            await bulkResolve(config, named('github.com/kimmachinegun/automemlimit', 'trivy'), cache, {}, server.resolve)
+            const second = await bulkResolve(config, named('github.com/KimMachineGun/automemlimit', 'syft'), cache, {}, server.resolve)
+
+            expect(server.resolve).toHaveBeenCalledTimes(1)
+            expect(second.requested).toBe(0)
+            expect([...second.written]).toEqual(['go:github.com/KimMachineGun/automemlimit'])
+            expect(second.libs.get('go:github.com/KimMachineGun/automemlimit')?.versions.map(it => it.version)).toEqual(['1.0.0', '2.0.0'])
+            expect(cache.entries.has('go:github.com/KimMachineGun/automemlimit')).toBe(true)
+            // The server's stamp, carried over: not the moment the second key was written.
+            expect(stamps).toEqual([Date.parse(confirmedAt), Date.parse(confirmedAt)])
+        })
+
         it('does not call the resolver at all when every purl was already asked', async () => {
             const cache = fakeCache()
             const server = answering({'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad')})
