@@ -337,6 +337,48 @@ exit 0`}
         expect(calls.filter(it => it.startsWith('sbom --format json'))).toHaveLength(2)
     })
 
+    it('records in provenance the database builds the refresh left behind, not the ones the preflight saw', async () => {
+        // Each stub keeps its DB build in a file: stale (trivy) or missing (grype) until the
+        // warm-up's refresh command writes a fresh one, exactly like a real cache dir.
+        const trivyDb = path.join(tmpDir, 'trivy-db-state')
+        const grypeDb = path.join(tmpDir, 'grype-db-state')
+        fs.writeFileSync(trivyDb, '2026-09-19T19:00:16Z')
+        fs.rmSync(grypeDb, {force: true})
+        const trivy = path.join(tmpDir, 'trivy-stale.sh')
+        fs.writeFileSync(trivy, `#!/bin/sh
+if [ "$1" = --version ]; then
+  echo '{"Version":"${PINNED_SCANNER_VERSIONS.trivy}","VulnerabilityDB":{"Version":2,"UpdatedAt":"'$(cat ${trivyDb})'"}}'
+  exit 0
+fi
+if [ "$1" = image ]; then echo '2026-10-01T19:00:16Z' > ${trivyDb}; exit 0; fi
+echo '{"Results":[]}'
+`)
+        const grype = path.join(tmpDir, 'grype-empty.sh')
+        fs.writeFileSync(grype, `#!/bin/sh
+case "$1 $2" in
+  "version -o") echo '{"version":"${PINNED_SCANNER_VERSIONS.grype}"}'; exit 0 ;;
+  "db status") [ -f ${grypeDb} ] || exit 1; echo '{"schemaVersion":"v6.1.9","built":"'$(cat ${grypeDb})'"}'; exit 0 ;;
+  "db update") echo '2026-10-01T06:33:48Z' > ${grypeDb}; exit 0 ;;
+esac
+echo '{"matches":[]}'
+`)
+        fs.chmodSync(trivy, 0o755)
+        fs.chmodSync(grype, 0o755)
+        process.env.TRIVY_BIN = trivy
+        process.env.GRYPE_BIN = grype
+
+        const before = await preflightScanners()
+        expect(before.trivy.dbBuiltAt).toBe('2026-09-19T19:00:16Z')
+        expect(before.grype.dbBuiltAt).toBeUndefined()
+
+        await scanSbomFileOnce(sbomFile)
+        const resultFolder = fs.mkdtempSync(path.join(tmpDir, 'results-'))
+        const provenance = JSON.parse(fs.readFileSync(await writeScanProvenance(resultFolder, false), 'utf8'))
+
+        expect(provenance.scanners.trivy).toMatchObject({dbVersion: '2', dbBuiltAt: '2026-10-01T19:00:16Z'})
+        expect(provenance.scanners.grype).toMatchObject({dbVersion: 'v6.1.9', dbBuiltAt: '2026-10-01T06:33:48Z'})
+    })
+
     it('keeps the scanner\'s own reason in the warning when a scan fails', async () => {
         const callLog = path.join(tmpDir, 'calls-failing.txt')
         fs.writeFileSync(callLog, '')
