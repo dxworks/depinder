@@ -1,7 +1,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {assignPurls, bulkResolve, confirmedAtMs, PluginProjects} from '../src/commands/analyse'
+import {assignPurls, bulkResolve, confirmedAtMs, PluginProjects, resetBulkResolve} from '../src/commands/analyse'
 import {Cache} from '../src/cache/cache'
 import {resetSharedCacheDb, sharedCacheDb, sqliteCacheWithCutoff} from '../src/cache/sqlite-cache'
 import {freshnessCutoffMs} from '../src/cache/max-age'
@@ -20,8 +20,8 @@ jest.mock('../src/utils/vulnerabilities', () => ({getVulnerabilitiesFromGithub: 
 const advisories = getVulnerabilitiesFromGithub as jest.Mock
 
 /**
- * Phase 2 of `analyse`: one question for the whole run, and an answer that lands in the local cache
- * under the keys phase 3 looks them up by. Everything this phase gets right shows up downstream as
+ * Phase 2 of `analyse`: one question per purl for the whole process, and an answer that lands in
+ * the local cache under the keys phase 3 looks them up by. Everything this phase gets right shows up downstream as
  * a cache hit — which is exactly how the registrar stops being called — so these tests assert on
  * the cache and on what was asked for, not on the dependencies, which the phase never touches.
  */
@@ -161,6 +161,7 @@ describe('the bulk resolve phase', () => {
     const savedToken = process.env.GH_TOKEN
 
     beforeEach(() => {
+        resetBulkResolve()
         advisories.mockClear()
         advisories.mockImplementation(async () => [])
         delete process.env.GH_TOKEN
@@ -304,6 +305,7 @@ describe('the bulk resolve phase', () => {
         expect(await kept.has('npm:old-pkg')).toBe(true)
 
         // --refresh asked for nothing older than the run: the registrar gets it instead.
+        resetBulkResolve()
         const refreshed = fakeCache()
         const refreshOutcome = await bulkResolve(config, projects(), refreshed, {refresh: true}, resolve)
         expect(refreshOutcome.written.size).toBe(0)
@@ -641,6 +643,78 @@ describe('the bulk resolve phase', () => {
         })
     })
 
+    /**
+     * One `analyse` runs a bulk phase per source (Trivy, Syft). The second must not ask the server
+     * about a purl the first already asked about — with `refreshing` rows written already expired,
+     * that would be a retry by another name — and must reuse what the first was told.
+     */
+    describe('a second source in the same process', () => {
+        const source = (name: string, deps: DepinderDependency[]): PluginProjects[] => {
+            const projects: PluginProjects[] = [{plugin: npm, projects: [project(name, deps)]}]
+            assignPurls(projects)
+            return projects
+        }
+
+        it('does not ask again about a purl the first one asked about, and reuses its answer', async () => {
+            const cache = fakeCache()
+            const resolve = jest.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem?: ItemHandler) => {
+                const answers = new Map<string, ResolvedEntry>(purls.map(purl => [purl,
+                    purl === 'pkg:npm/old-pkg@1.0.0'
+                        ? {status: 'refreshing' as const, package: {...record('npm', null, 'old-pkg'), confirmed_at: '2020-01-01T00:00:00Z'}}
+                        : {status: 'pending' as const}]))
+                for (const [purl, entry] of answers) onItem?.(purl, entry)
+                return answers
+            }) as any
+
+            const first = await bulkResolve(config, source('trivy', [dep('old-pkg', '1.0.0'), dep('cold-pkg', '1.0.0')]), cache, {}, resolve)
+            // The `refreshing` row is expired for the cache, which is exactly why it must not be
+            // asked about again.
+            const second = await bulkResolve(config,
+                source('syft', [dep('old-pkg', '1.0.0'), dep('cold-pkg', '1.0.0'), dep('new-pkg', '1.0.0')]), cache, {}, resolve)
+
+            expect(resolve).toHaveBeenCalledTimes(2)
+            expect(resolve.mock.calls[1][1]).toEqual(['pkg:npm/new-pkg@1.0.0'])
+            expect(second.requested).toBe(1)
+            // The first source's object, handed to the second's phase 3 as it is.
+            expect(second.libs.get('npm:old-pkg')).toBe(first.libs.get('npm:old-pkg'))
+            // Asked and pending: nothing to reuse, so it is the registrars' in phase 3.
+            expect(second.libs.has('npm:cold-pkg')).toBe(false)
+            // Not written again: nothing new was learned about it.
+            expect(second.written.has('npm:old-pkg')).toBe(false)
+            expect(cache.sets.filter(it => it.key === 'npm:old-pkg')).toHaveLength(1)
+        })
+
+        it('does not call the resolver at all when every purl was already asked', async () => {
+            const cache = fakeCache()
+            const server = answering({'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad')})
+
+            const first = await bulkResolve(config, source('trivy', [dep('left-pad', '1.0.0')]), cache, {refresh: true}, server.resolve)
+            const second = await bulkResolve(config, source('syft', [dep('left-pad', '1.0.0')]), cache, {refresh: true}, server.resolve)
+
+            expect(server.resolve).toHaveBeenCalledTimes(1)
+            expect(second).toEqual({written: new Set(), libs: new Map([['npm:left-pad', first.libs.get('npm:left-pad')]]), requested: 0, resolved: 0})
+        })
+
+        it('looks up advisories for a reused answer the first source had no use for', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            advisories.mockImplementation(async () => [{severity: 'HIGH', description: 'bad', permalink: 'https://example/1'}])
+            const cache = fakeCache()
+            const server = answering({'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad')})
+            const scanned = source('trivy', [dep('left-pad', '1.0.0')])
+            scanned[0].projects[0].exactVersionVulnerabilities = true
+
+            await bulkResolve(config, scanned, cache, {}, server.resolve)
+            expect(advisories).not.toHaveBeenCalled()
+
+            const second = await bulkResolve(config, source('syft', [dep('left-pad', '1.0.0')]), cache, {}, server.resolve)
+
+            expect(server.resolve).toHaveBeenCalledTimes(1)
+            expect(advisories).toHaveBeenCalledTimes(1)
+            expect(second.libs.get('npm:left-pad')?.vulnerabilities).toHaveLength(1)
+            expect(cache.sets.map(it => it.vulnerabilities)).toEqual([undefined, 1])
+        })
+    })
+
     it('survives a resolver that answered nothing, leaving the cache untouched', async () => {
         const cache = fakeCache()
         const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('left-pad', '1.0.0')])]}]
@@ -664,6 +738,7 @@ describe('the bulk resolve phase with a cache max age', () => {
     let tmp: string
 
     beforeEach(() => {
+        resetBulkResolve()
         tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder-bulk-age-'))
         process.env.DEPINDER_CACHE_DB = path.join(tmp, 'depinder.sqlite')
         resetSharedCacheDb()

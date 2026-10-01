@@ -46,7 +46,7 @@ import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
 import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/profile'
 import {ResolverConfig, ResolverOptions, resolverConfig} from '../resolver/config'
-import {PackageRecord, ResolvedEntry, resetResolverClient, resolvePurls} from '../resolver/client'
+import {ResolvedEntry, resetResolverClient, resolvePurls} from '../resolver/client'
 import {toLibraryInfo} from '../resolver/adapter'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const licenseIds = require('spdx-license-ids/')
@@ -303,12 +303,36 @@ export function confirmedAtMs(confirmedAt: string | null | undefined, now = Date
     return Number.isFinite(ms) ? Math.min(ms, now) : 0
 }
 
+/**
+ * The resolver is asked about a purl at most once per process.
+ *
+ * One `analyse` can run two sources — the Trivy and the Syft SBOMs of the same repositories — and
+ * each has a bulk phase of its own. A `refreshing` answer the first one wrote is stored already
+ * expired (see `confirmedAtMs`), so without this the second would ask the server about the same
+ * purl again: a retry by another name. Instead a purl in `askedThisProcess` is never sent again,
+ * and every answer that was taken is kept here under its cache key, with the `updated_at` it was
+ * written with, so a later source hands the very same object to its phase 3. A purl that was asked
+ * and got no usable answer has nothing in here: its key is a cache hit if some registrar has since
+ * filled it, and goes to the registrars otherwise.
+ *
+ * Reset per `analyseFiles`, next to `resetResolverClient`.
+ */
+const askedThisProcess = new Set<string>()
+const answeredThisProcess = new Map<string, {lib: LibraryInfo, updatedAt: number}>()
+
+/** For tests, and for a second `analyseFiles` in the same process. */
+export function resetBulkResolve(): void {
+    askedThisProcess.clear()
+    answeredThisProcess.clear()
+}
+
 /** What the bulk phase left behind for phase 3: the cache keys it filled, and a count or two. */
 export interface BulkResolveOutcome {
     /** Cache keys written from resolver answers, `${ecosystem}:${library}`. */
     written: Set<string>
     /**
-     * The very objects that were written, under the same keys.
+     * The very objects that were written, under the same keys — and, for a purl an earlier source
+     * of the same process already asked about, the objects that source took (`answeredThisProcess`).
      *
      * An optimisation, not a second cache: the SQLite row remains the durable copy and this map
      * dies with the run. It exists because phase 3 otherwise re-reads what phase 2 built seconds
@@ -317,14 +341,15 @@ export interface BulkResolveOutcome {
      * entries already sitting in memory.
      */
     libs: Map<string, LibraryInfo>
-    /** How many distinct purls were actually asked about, after dedupe and the cache check. */
+    /** How many distinct purls were actually asked about, after dedupe, the cache check and the purls already asked this process. */
     requested: number
     /** How many of those came back `resolved`. */
     resolved: number
 }
 
 /**
- * Phase 2: one bulk call for the whole run, written into the same cache phase 3 reads.
+ * Phase 2: one ask of the resolver for every purl the cache cannot answer, written into the same
+ * cache phase 3 reads. Each purl is asked once per process, however many sources name it.
  *
  * The map is global on purpose. A purl identifies a library-version the same way whichever plugin
  * found it, so `sbom-java` reading a Trivy and a Syft SBOM of the same repository, or twenty projects sharing a
@@ -332,10 +357,10 @@ export interface BulkResolveOutcome {
  * every cache key that purl belongs to — the key is per ecosystem, and two plugins can share one —
  * so `cacheHit` in phase 3 finds it and the registrar is never called. Everything else (`pending`,
  * `not_found`, `invalid`, or a resolver that never answered) is left alone and falls through to
- * the registrar chain, the miss cache and the retries exactly as before.
+ * the registrar chain and the miss cache exactly as before.
  *
  * Answers arrive as a stream, and each one is written as it arrives rather than after the last:
- * the phase returns once the stream has ended and every write it started has finished.
+ * the phase returns once the stream has ended and every advisory lookup it started has finished.
  *
  * `resolve` is a parameter so the phase can be tested without a server.
  */
@@ -369,12 +394,29 @@ export async function bulkResolve(
         }
     }
 
-    // FLOW 2b — drop the purls the local cache already covers; what is left is the ask list.
+    // FLOW 2b — drop the purls this process already asked about, and those the local cache already
+    // covers; what is left is the ask list.
     const written = new Set<string>()
     const libs = new Map<string, LibraryInfo>()
+    const reused: {cacheKey: string, plugin: Plugin, lib: LibraryInfo, updatedAt: number}[] = []
     const wanted: string[] = []
     let expired = 0
+    let alreadyAsked = 0
     for (const [purl, entries] of byPurl) {
+        if (askedThisProcess.has(purl)) {
+            // An earlier source asked, and the server's answer — or its silence — stands for the
+            // process. What it answered is handed on under every key this source owns it by.
+            count('resolver:already-asked')
+            alreadyAsked++
+            for (const {plugin, dep} of entries) {
+                const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
+                const earlier = answeredThisProcess.get(cacheKey)
+                if (!earlier || libs.has(cacheKey)) continue
+                libs.set(cacheKey, earlier.lib)
+                reused.push({cacheKey, plugin, ...earlier})
+            }
+            continue
+        }
         const keys = new Set(entries.map(it => `${ecosystemOf(it.plugin)}:${it.dep.name}`))
         // Already cached under every key it would fill: phase 3 will hit the cache and never reach
         // a registry, so there is nothing to ask for. `--refresh` wants fresh facts, and the
@@ -392,13 +434,15 @@ export async function bulkResolve(
     }
     if (wanted.length > 0) {
         log.info(`Asking the resolver about ${wanted.length} purl(s): `
-            + `${wanted.length - expired} not cached${options.refresh ? ' (--refresh)' : ''}, ${expired} expired`)
+            + `${wanted.length - expired} not cached${options.refresh ? ' (--refresh)' : ''}, ${expired} expired`
+            + `${alreadyAsked ? `; ${alreadyAsked} already asked this run` : ''}`)
+    } else {
+        log.info(alreadyAsked
+            ? `Nothing to resolve in bulk: every dependency is in the local cache or was already asked this run (${alreadyAsked})`
+            : 'Nothing to resolve in bulk: every dependency is already in the local cache')
     }
-
-    if (wanted.length === 0) {
-        log.info('Nothing to resolve in bulk: every dependency is already in the local cache')
-        return {written, libs, requested: 0, resolved: 0}
-    }
+    // Marked before the ask, not after it: whatever the server makes of them, they are not asked again.
+    for (const purl of wanted) askedThisProcess.add(purl)
 
     // FLOW 2c — THE SERVER CALL: resolver/client.ts POSTs these purls to <resolver-url>/resolve, in
     // chunks, all at once, and reads each answer as a stream. Every usable answer is taken and
@@ -451,12 +495,21 @@ export async function bulkResolve(
             // of the database a moment later. The `cache.set` above is what makes it durable and
             // what every later run reads.
             libs.set(cacheKey, lib)
-            const advisoryEcosystem = plugin.checker?.githubSecurityAdvisoryEcosystem
-            if (advisoryEcosystem && githubToken && advisoriesRead.has(cacheKey)) {
-                lookups.push({cacheKey, advisoryEcosystem, lib, updatedAt})
-            }
+            answeredThisProcess.set(cacheKey, {lib, updatedAt})
+            queueLookup(cacheKey, plugin, lib, updatedAt, githubToken)
         }
         pump()
+    }
+
+    // An advisory lookup, when phase 3 will read its result: the plugin has a GitHub advisory
+    // ecosystem, there is a token, some project of this source without scan findings uses the
+    // library, and the object has no advisories yet — an answer reused from an earlier source may
+    // have been taken where every project had scan findings, and so never looked up.
+    function queueLookup(cacheKey: string, plugin: Plugin, lib: LibraryInfo, updatedAt: number, githubToken: boolean): void {
+        const advisoryEcosystem = plugin.checker?.githubSecurityAdvisoryEcosystem
+        if (!advisoryEcosystem || !githubToken || !advisoriesRead.has(cacheKey)) return
+        if (lib.vulnerabilities !== undefined) return
+        lookups.push({cacheKey, advisoryEcosystem, lib, updatedAt})
     }
 
     // A cache whose `set` is asynchronous still gets its write awaited before the phase ends, and
@@ -510,14 +563,20 @@ export async function bulkResolve(
         }
     }
 
-    const answers = await resolve(config, wanted, log, take)
-    // The map holds every answer the stream delivered, so this only catches one `onItem` did not
-    // see; `take` ignores a purl it has already had.
-    for (const [purl, answer] of answers) take(purl, answer)
+    for (const {cacheKey, plugin, lib, updatedAt} of reused) queueLookup(cacheKey, plugin, lib, updatedAt, !!process.env.GH_TOKEN)
+    pump()
+
+    if (wanted.length > 0) {
+        const answers = await resolve(config, wanted, log, take)
+        // The map holds every answer the stream delivered, so this only catches one `onItem` did
+        // not see; `take` ignores a purl it has already had.
+        for (const [purl, answer] of answers) take(purl, answer)
+    }
     // The phase ends when the stream has AND every write and lookup it started has: phase 3 must
     // not read a key while its advisories are still being added.
     while (workers.size > 0) await Promise.all(workers)
     if (writeFailure) throw writeFailure.error
+    if (wanted.length === 0) return {written, libs, requested: 0, resolved: 0}
     count('resolver:cache-write', written.size)
     log.info(`Resolver filled ${written.size} cache entries from ${resolved} of ${wanted.length} requested package(s)`)
     return {written, libs, requested: wanted.length, resolved}
@@ -701,6 +760,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
     if (useCache) log.info(`Cache max age: ${formatDuration(maxAgeSeconds)} (entries written before ${new Date(cutoffMs).toISOString()} are expired)`)
 
     resetResolverClient()
+    resetBulkResolve()
     const configured = resolverConfig(options)
     const resolver = configured && {...configured, freshAfterMs: options.refresh ? runStartMs : cutoffMs}
     if (resolver) log.info(`Bulk resolver: ${resolver.url}, waiting at most ${Math.round(resolver.maxWaitMs / 1000)}s for it`)
@@ -766,7 +826,10 @@ export async function runAnalysis(files: string[], plugins: Plugin[], resultFold
     // Phase 1b — the purl for every dependency: the SBOM's own, else the checker's spelling of it.
     const named = assignPurls(pluginProjects)
 
-    // FLOW 2 — bulkResolve (see above): ONE server call for the whole run; it only fills the cache.
+    // FLOW 2 — bulkResolve (see above): the main flow is local cache → our server → registries. What
+    // the cache cannot answer is asked of the server ONCE per purl per process, every chunk at once
+    // and bounded by the deadline, with no retries; whatever has no usable answer by then goes to the
+    // registrars in phase 3. It only fills the cache (and hands phase 3 what it took).
     // Phase 2 — the bulk resolver, when one is configured. It fills the local cache; it never
     // touches the dependencies, so nothing below can tell where an entry came from.
     const bulk: BulkResolveOutcome = resolver

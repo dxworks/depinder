@@ -129,6 +129,7 @@ Registry answers go to `~/.dxw/depinder/cache/depinder.sqlite`; failed lookups t
 An answer older than `--cache-max-age` (default `1d`) is expired and fetched again, the resolver
 first. `--refresh` bypasses both. See [cache](cache.md#expiry).
 
-With a [bulk resolver](../configuration.md#bulk-resolver) configured, every purl this run needs is
-asked for in one call after parsing and before enrichment, and what comes back fills that same
-cache. Anything it cannot answer goes to the registries as usual.
+With a [bulk resolver](../configuration.md#bulk-resolver) configured, every purl the cache cannot
+answer is asked for after parsing and before enrichment — once per run, even when a Trivy and a Syft
+source both name it, and with no retries — and what comes back fills that same cache. Anything it
+does not answer before its deadline goes to the registries as usual.
