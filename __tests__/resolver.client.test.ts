@@ -65,6 +65,7 @@ const ndjson = (lines: object[]) => lines.map(it => JSON.stringify(it) + '\n').j
 interface Call {
     url: string
     auth: string
+    acceptEncoding: string
     method: string
     purls: string[]
     body: any
@@ -106,7 +107,10 @@ function respond(answer: Exclude<Answer, Error>): Response {
 
 function record(url: string, init: any): Call {
     const body = JSON.parse(init.body)
-    return {url: String(url), auth: init.headers.Authorization, method: init.method, purls: body.purls, body}
+    return {
+        url: String(url), auth: init.headers.Authorization, acceptEncoding: init.headers['Accept-Encoding'],
+        method: init.method, purls: body.purls, body,
+    }
 }
 
 /**
@@ -199,6 +203,8 @@ describe('the resolver client', () => {
         expect(calls[0].url).toBe('https://resolver.example/resolve')
         expect(calls[0].method).toBe('POST')
         expect(calls[0].auth).toBe('Bearer secret')
+        // Asked for explicitly: undici decodes br, but on its own only offers gzip and deflate.
+        expect(calls[0].acceptEncoding).toBe('br, gzip')
         expect(calls[0].body.wait_ms).toBeUndefined()
         expect(calls[0].body.deadline_ms).toBeGreaterThan(59_000)
         expect(calls[0].body.deadline_ms).toBeLessThanOrEqual(MAX_DEADLINE_MS)
