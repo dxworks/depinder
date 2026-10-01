@@ -333,6 +333,12 @@ export async function bulkResolve(
 ): Promise<BulkResolveOutcome> {
     // FLOW 2a — every purl in the run, deduped, with the (plugin, dep) pairs that own it.
     const byPurl = new Map<string, {plugin: Plugin, dep: DepinderDependency}[]>()
+    // The cache keys whose advisories phase 3 will actually read: those with at least one dependency
+    // in a project no SBOM scan answered for (`exactVersionVulnerabilities` unset, see
+    // `plugins/sbom/index.ts`). A project the scanners covered takes its findings from the scan and
+    // never looks at `lib.vulnerabilities`, so a GitHub call for it would be paid and thrown away.
+    // The flag is set while parsing, in phase 1, so it is already known here.
+    const advisoriesRead = new Set<string>()
     for (const {plugin, projects} of pluginProjects) {
         for (const project of projects) {
             for (const dep of Object.values(project.dependencies)) {
@@ -343,6 +349,7 @@ export async function bulkResolve(
                 const entries = byPurl.get(dep.purl)
                 if (entries) entries.push({plugin, dep})
                 else byPurl.set(dep.purl, [{plugin, dep}])
+                if (!project.exactVersionVulnerabilities) advisoriesRead.add(`${ecosystemOf(plugin)}:${dep.name}`)
             }
         }
     }
@@ -379,18 +386,26 @@ export async function bulkResolve(
     }
 
     // FLOW 2c — THE SERVER CALL: resolver/client.ts POSTs these purls to <resolver-url>/resolve, in
-    // chunks, and reads each answer as a stream. Every usable answer is taken the moment its line
-    // arrives (FLOW 2d), and its advisory lookup and cache write start then (FLOW 2e), while the
-    // server is still fetching the packages it did not know. Waiting for the last chunk first used
-    // to put all of that work after the slowest package of the run.
+    // chunks, all at once, and reads each answer as a stream. Every usable answer is taken and
+    // written to the cache the moment its line arrives (FLOW 2d), while the server is still fetching
+    // the packages it did not know; the advisory lookups that are worth making follow behind it
+    // (FLOW 2e). Waiting for the last chunk first used to put all of that work after the slowest
+    // package of the run.
     let resolved = 0
     const taken = new Set<string>()
-    const writes: {cacheKey: string, plugin: Plugin, pkg: PackageRecord}[] = []
-    let nextWrite = 0
+    const lookups: {cacheKey: string, advisoryEcosystem: string, lib: LibraryInfo}[] = []
+    let nextLookup = 0
     const workers = new Set<Promise<void>>()
     let writeFailure: {error: unknown} | undefined
 
-    // FLOW 2d — each resolved answer → one cache write per (ecosystem, library) key it belongs to.
+    // FLOW 2d — each usable answer → one cache write per (ecosystem, library) key it belongs to,
+    // there and then. `take` runs inside the client's line handler, so the row is written — one
+    // autocommit statement in SQLite — before the next line is even parsed: a run killed halfway
+    // through the stream keeps every answer that had arrived. For the same reason it must not
+    // throw: an exception here would read to the client as a broken stream.
+    //
+    // Each key gets its own LibraryInfo: two plugins can share a purl and not an advisory
+    // ecosystem, so they must not share one object to write vulnerabilities into.
     const take = (purl: string, answer: ResolvedEntry): void => {
         if (taken.has(purl)) return
         taken.add(purl)
@@ -401,58 +416,76 @@ export async function bulkResolve(
         const usable = answer.status === 'resolved' || (answer.status === 'refreshing' && !options.refresh)
         if (!usable || !answer.package) return
         resolved++
+        const githubToken = !!process.env.GH_TOKEN
         for (const {plugin, dep} of byPurl.get(purl) ?? []) {
             const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
             if (written.has(cacheKey)) continue
             written.add(cacheKey)
-            writes.push({cacheKey, plugin, pkg: answer.package})
+            const lib = toLibraryInfo(answer.package)
+            try {
+                track(cache.set(cacheKey, lib))
+            } catch (error) {
+                writeFailure ??= {error}
+                continue
+            }
+            // Handed to phase 3 as it is, so the entry written here is not read straight back out
+            // of the database a moment later. The `cache.set` above is what makes it durable and
+            // what every later run reads.
+            libs.set(cacheKey, lib)
+            const advisoryEcosystem = plugin.checker?.githubSecurityAdvisoryEcosystem
+            if (advisoryEcosystem && githubToken && advisoriesRead.has(cacheKey)) {
+                lookups.push({cacheKey, advisoryEcosystem, lib})
+            }
         }
         pump()
     }
 
-    // Up to REGISTRY_CONCURRENCY workers drain the queue; one that finds it empty ends, and the next
-    // answer starts a new one. A worker that ends pumps once more, for a write queued in the moment
-    // between its last look at the queue and its leaving the set.
+    // A cache whose `set` is asynchronous still gets its write awaited before the phase ends, and
+    // its failure reported the same way as a synchronous one.
+    function track(write: void | Promise<void>): void {
+        if (!write) return
+        const worker: Promise<void> = Promise.resolve(write)
+            .catch(error => { writeFailure ??= {error} })
+            .finally(() => { workers.delete(worker) })
+        workers.add(worker)
+    }
+
+    // Up to REGISTRY_CONCURRENCY workers drain the lookup queue; one that finds it empty ends, and
+    // the next answer starts a new one. A worker that ends pumps once more, for a lookup queued in
+    // the moment between its last look at the queue and its leaving the set.
+    let lookupWorkers = 0
     function pump(): void {
-        while (workers.size < REGISTRY_CONCURRENCY && nextWrite < writes.length) {
+        while (lookupWorkers < REGISTRY_CONCURRENCY && nextLookup < lookups.length) {
+            lookupWorkers++
             const worker: Promise<void> = drain()
                 .catch(error => { writeFailure ??= {error} })
                 .finally(() => {
                     workers.delete(worker)
+                    lookupWorkers--
                     pump()
                 })
             workers.add(worker)
         }
     }
 
-    // The advisory lookup the registrar path does, on the same terms, because a resolved package
-    // is a cache hit in phase 3 and a cache hit has never fetched advisories. Without it a cold
-    // run with GH_TOKEN would write entries with no vulnerabilities and empty the
-    // vulnerability columns for everything the resolver answered. It is one GraphQL call per cache
-    // key — exactly what the same cold run costs today — eight at a time, and a failure keeps the
-    // registry data rather than discarding it. The resolver serves registry facts only; GHSA is
-    // still depinder's to ask for.
-    //
-    // Each key gets its own LibraryInfo: two plugins can share a purl and not an advisory
-    // ecosystem, so they must not share one object to write vulnerabilities into.
-    // FLOW 2e — GHSA advisories per key, then cache.set: the server returns registry facts only.
+    // FLOW 2e — GHSA advisories, per key, and a second write with them filled in: the server returns
+    // registry facts only. The registrar path does the same lookup, on the same terms, because a
+    // resolved package is a cache hit in phase 3 and a cache hit has never fetched advisories:
+    // without it a cold run with GH_TOKEN would empty the vulnerability columns of every project no
+    // scanner covered. It is one GraphQL call per cache key, eight at a time, and only for a key
+    // phase 3 will read advisories from (`advisoriesRead`). A failed lookup keeps the row already
+    // written. The cost of writing first: a run killed between the two writes leaves a row with no
+    // advisories, which only matters when no scanner ran.
     async function drain(): Promise<void> {
-        while (nextWrite < writes.length) {
-            const {cacheKey, plugin, pkg} = writes[nextWrite++]
-            const lib = toLibraryInfo(pkg)
-            const advisoryEcosystem = plugin.checker?.githubSecurityAdvisoryEcosystem
-            if (advisoryEcosystem && process.env.GH_TOKEN) {
-                try {
-                    lib.vulnerabilities = await getVulnerabilitiesFromGithub(advisoryEcosystem, lib.name)
-                } catch (e: any) {
-                    log.warn(`Vulnerability lookup failed for ${lib.name}: ${e.message ?? e}`)
-                }
+        while (nextLookup < lookups.length) {
+            const {cacheKey, advisoryEcosystem, lib} = lookups[nextLookup++]
+            try {
+                lib.vulnerabilities = await getVulnerabilitiesFromGithub(advisoryEcosystem, lib.name)
+            } catch (e: any) {
+                log.warn(`Vulnerability lookup failed for ${lib.name}: ${e.message ?? e}`)
+                continue
             }
             await cache.set(cacheKey, lib)
-            // Handed to phase 3 as it is, so the entry written here is not read straight back
-            // out of the database a moment later. The `cache.set` above is still what makes it
-            // durable and what every later run reads.
-            libs.set(cacheKey, lib)
         }
     }
 
@@ -460,8 +493,8 @@ export async function bulkResolve(
     // The map holds every answer the stream delivered, so this only catches one `onItem` did not
     // see; `take` ignores a purl it has already had.
     for (const [purl, answer] of answers) take(purl, answer)
-    // The phase ends when the stream has AND every write it started has: phase 3 must not look a
-    // key up while it is still being written.
+    // The phase ends when the stream has AND every write and lookup it started has: phase 3 must
+    // not read a key while its advisories are still being added.
     while (workers.size > 0) await Promise.all(workers)
     if (writeFailure) throw writeFailure.error
     count('resolver:cache-write', written.size)

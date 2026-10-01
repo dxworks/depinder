@@ -71,5 +71,7 @@ still fetching, one the registry does not have, or anything at all when the serv
 falls back to the per-package registrars, so a run is never worse than one without it. `--refresh`
 still ignores the local cache, but takes its fresh facts from the resolver first.
 
-The resolver serves registry facts only. GitHub advisories are still fetched per library, on the
-same terms as without it: once per newly cached library, and only with `GH_TOKEN` set.
+Each answer is written to the cache the moment it arrives, so a run stopped halfway keeps what had
+already come back. The resolver serves registry facts only: GitHub advisories are still fetched per
+library with `GH_TOKEN` set, but for a resolver answer only when a project using that library has no
+SBOM scan findings — the only case in which they are read.

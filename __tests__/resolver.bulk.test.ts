@@ -28,12 +28,19 @@ const advisories = getVulnerabilitiesFromGithub as jest.Mock
 
 const config: ResolverConfig = {url: 'https://resolver.example', token: 'secret', maxWaitMs: 60_000, chunkConcurrency: 4}
 
-function fakeCache(): Cache & {entries: Map<string, LibraryInfo>} {
+function fakeCache(): Cache & {entries: Map<string, LibraryInfo>, sets: {key: string, vulnerabilities?: number}[]} {
     const entries = new Map<string, LibraryInfo>()
+    // Every write, with how many advisories it carried at that moment: the row a write leaves is a
+    // snapshot, even though the object it was given may be filled in later.
+    const sets: {key: string, vulnerabilities?: number}[] = []
     return {
         entries,
+        sets,
         get: (key: string) => entries.get(key),
-        set: (key: string, value: LibraryInfo) => { entries.set(key, value) },
+        set: (key: string, value: LibraryInfo) => {
+            sets.push({key, vulnerabilities: value.vulnerabilities?.length})
+            entries.set(key, value)
+        },
         has: (key: string) => entries.has(key),
         load: () => { /* nothing */ },
         flush: () => { /* nothing */ },
@@ -395,6 +402,51 @@ describe('the bulk resolve phase', () => {
             expect(advisories).toHaveBeenCalledTimes(1)
         })
 
+        it('is not called for a library every owning project already has scan findings for', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            const scanned = project('app', [dep('left-pad', '1.0.0')])
+            scanned.exactVersionVulnerabilities = true
+            const projects: PluginProjects[] = [{plugin: npm, projects: [scanned]}]
+            assignPurls(projects)
+            const cache = fakeCache()
+
+            const outcome = await bulkResolve(config, projects, cache, {}, answering({
+                'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+            }).resolve)
+
+            // Phase 3 takes this project's findings from the scan, never from `lib.vulnerabilities`.
+            expect(advisories).not.toHaveBeenCalled()
+            expect(cache.sets).toEqual([{key: 'npm:left-pad', vulnerabilities: undefined}])
+            expect(outcome.libs.get('npm:left-pad')?.vulnerabilities).toBeUndefined()
+        })
+
+        it('is called, and the row written again with the advisories, when one owning project has no findings', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            advisories.mockImplementation(async () => [{severity: 'HIGH', description: 'bad', permalink: 'https://example/1'}])
+            const scanned = project('app', [dep('left-pad', '1.0.0')])
+            scanned.exactVersionVulnerabilities = true
+            // Another version of the same library, in a project no scanner answered for: it reads the
+            // advisories of the same cache key, so the key needs them.
+            const unscanned = project('web', [dep('left-pad', '1.3.0')])
+            const projects: PluginProjects[] = [{plugin: npm, projects: [scanned, unscanned]}]
+            assignPurls(projects)
+            const cache = fakeCache()
+
+            const outcome = await bulkResolve(config, projects, cache, {}, answering({
+                'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+                'pkg:npm/left-pad@1.3.0': record('npm', null, 'left-pad'),
+            }).resolve)
+
+            expect(advisories).toHaveBeenCalledTimes(1)
+            // First the registry facts at once, then the same row with its advisories.
+            expect(cache.sets).toEqual([
+                {key: 'npm:left-pad', vulnerabilities: undefined},
+                {key: 'npm:left-pad', vulnerabilities: 1},
+            ])
+            expect(outcome.libs.get('npm:left-pad')).toBe(cache.entries.get('npm:left-pad'))
+            expect(outcome.libs.get('npm:left-pad')?.vulnerabilities).toHaveLength(1)
+        })
+
         it('keeps the registry data when the lookup fails', async () => {
             process.env.GH_TOKEN = 'a-token'
             advisories.mockImplementation(async () => { throw new Error('401 Bad credentials') })
@@ -487,6 +539,42 @@ describe('the bulk resolve phase', () => {
             expect(cache.entries.size).toBe(2)
         })
 
+        it('writes an answer the moment its line arrives, before its advisory lookup has run', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            let releaseLookups: () => void = () => undefined
+            const lookupsHeld = new Promise<void>(resolve => { releaseLookups = resolve })
+            advisories.mockImplementation(async () => {
+                await lookupsHeld
+                return [{severity: 'HIGH', description: 'bad', permalink: 'https://example/1'}]
+            })
+            const cache = fakeCache()
+            let finish: () => void = () => undefined
+            let writtenAtOnce: boolean | undefined
+            const resolve = jest.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem: ItemHandler) => {
+                const fast: ResolvedEntry = {status: 'resolved', package: record('npm', null, 'fast')}
+                onItem('pkg:npm/fast@1.0.0', fast)
+                // Synchronously, in the same turn as the line: the row is already there.
+                writtenAtOnce = cache.entries.has('npm:fast')
+                // The stream is held open: nothing else has arrived, and the lookup is parked.
+                await new Promise<void>(resolve => { finish = resolve })
+                const slow: ResolvedEntry = {status: 'resolved', package: record('npm', null, 'slow')}
+                onItem('pkg:npm/slow@1.0.0', slow)
+                onItem('pkg:npm/fast@1.1.0', fast)
+                return new Map<string, ResolvedEntry>(purls.map(purl => [purl, purl.includes('slow') ? slow : fast]))
+            }) as any
+
+            const outcome = bulkResolve(config, threeLibs(), cache, {}, resolve)
+            await new Promise(resolve => setTimeout(resolve, 5))
+            expect(writtenAtOnce).toBe(true)
+            expect(cache.sets).toEqual([{key: 'npm:fast', vulnerabilities: undefined}])
+
+            finish()
+            releaseLookups()
+            const result = await outcome
+            expect(result.written.size).toBe(2)
+            expect(cache.sets.filter(it => it.vulnerabilities === 1).map(it => it.key).sort()).toEqual(['npm:fast', 'npm:slow'])
+        })
+
         it('returns only once every write it started has finished', async () => {
             process.env.GH_TOKEN = 'a-token'
             let releaseLookups: () => void = () => undefined
@@ -516,7 +604,7 @@ describe('the bulk resolve phase', () => {
             expect(cache.entries.size).toBe(2)
         })
 
-        it('runs no more than eight writes at once', async () => {
+        it('runs no more than eight advisory lookups at once', async () => {
             process.env.GH_TOKEN = 'a-token'
             let inFlight = 0
             let peak = 0
