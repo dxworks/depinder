@@ -171,6 +171,28 @@ describe('cached packages expire', () => {
             expect(cache.isExpired?.('npm:absent')).toBe(false)
         })
 
+        it('writes a row with the age it is given: one confirmed before the cutoff reads as expired', () => {
+            const cutoff = freshnessCutoffMs(86_400)
+            const cache = sqliteCacheWithCutoff(cutoff)
+            const confirmed = Date.now() - 2 * DAY_MS
+
+            // A resolver answer the server last confirmed two days ago: stored, but not fresh.
+            cache.set('npm:stale', library('stale'), confirmed)
+            cache.set('npm:fresh', library('fresh'), cutoff + 1000)
+            // No age given: now, as for a registry fetch.
+            cache.set('npm:fetched', library('fetched'))
+
+            expect(sharedCacheDb().libUpdatedAt('npm:stale')).toBe(confirmed)
+            expect(cache.has('npm:stale')).toBe(false)
+            expect(cache.get('npm:stale')).toBeUndefined()
+            expect(cache.isExpired?.('npm:stale')).toBe(true)
+            // Still there for `update` and `cache info`, which read any age.
+            expect(sharedCacheDb().getLib('npm:stale')?.name).toBe('stale')
+            expect(cache.has('npm:fresh')).toBe(true)
+            expect(cache.has('npm:fetched')).toBe(true)
+            expect(sharedCacheDb().libUpdatedAt('npm:fetched')).toBeGreaterThanOrEqual(cutoff + DAY_MS)
+        })
+
         it('cache info reports fresh and expired counts at the max age given', () => {
             cachedAgo('npm:old', 2 * DAY_MS)
             cachedAgo('npm:new', 0)

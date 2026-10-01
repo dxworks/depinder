@@ -15,7 +15,7 @@ depinder cache import <dir>    pull a libs.json / misses.json folder into SQLite
 
 | Table | Holds |
 |---|---|
-| `libs` | Registry answer per `<ecosystem>:<name>`: versions with dates, licences, homepage, and `updated_at`, when it was written |
+| `libs` | Registry answer per `<ecosystem>:<name>`: versions with dates, licences, homepage, and `updated_at`, when its facts were last confirmed against the registry |
 | `misses` | Failed lookups, forgotten after 24 hours; HTTP 429 is never recorded |
 
 `DEPINDER_CACHE_DB=<file>` points a run at another database. `--refresh` bypasses `libs` and
@@ -23,10 +23,16 @@ depinder cache import <dir>    pull a libs.json / misses.json folder into SQLite
 
 ### Expiry
 
-A `libs` row written more than the **cache max age** ago is expired: `analyse` treats it as
+A `libs` row confirmed more than the **cache max age** ago is expired: `analyse` treats it as
 missing, asks the bulk resolver and then the registry for it, and rewrites it with a new age. If
 nothing answers, the dependency gets no library data, as if it had never been cached. The cutoff is
-taken once at the start of a run, so whatever the run writes stays fresh for the rest of it.
+taken once at the start of a run, so whatever the run fetches from a registry stays fresh for the
+rest of it.
+
+A row's age is when its facts were last confirmed, not when depinder wrote it. A registry fetch is
+confirmed the moment it lands; a bulk resolver answer carries the server's own confirmation time.
+An answer the resolver could not reconfirm within the max age (`refreshing`) is still used by the run
+that received it, but is written already expired, so the next run asks for it again.
 
 | Setting | Meaning | Default |
 |---|---|---|

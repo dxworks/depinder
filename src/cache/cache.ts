@@ -2,7 +2,14 @@ import {LibraryInfo} from '../extension-points/registrar'
 
 export interface Cache {
     get: (key: string) => LibraryInfo | Promise<LibraryInfo> | undefined | any
-    set: (key: string, value: LibraryInfo) => void | Promise<void>
+    /**
+     * Writes `value` under `key`. `updatedAt` (epoch milliseconds) is the moment its facts were last
+     * known to match the registry, which is what the max age is measured from; it defaults to now,
+     * which is right for anything fetched from the registry a moment ago. A resolver answer passes
+     * the server's own `confirmed_at` instead, so facts the server has held for a while are not made
+     * to look fresh by having just been copied here.
+     */
+    set: (key: string, value: LibraryInfo, updatedAt?: number) => void | Promise<void>
     has: (key: string) => boolean | Promise<boolean>
     /**
      * True when an entry exists under `key` but is past the cache max age, so `has` and `get`
@@ -28,7 +35,7 @@ export const noCache: Cache = {
     get(key: string): LibraryInfo | undefined {
         return undefined
     },
-    set(key: string, value: LibraryInfo): void {
+    set(key: string, value: LibraryInfo, updatedAt?: number): void {
 
     },
     has(key: string): boolean {

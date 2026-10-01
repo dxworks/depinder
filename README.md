@@ -246,7 +246,8 @@ slowest kind. `--refresh` bypasses both. A rate-limited (429) lookup is never re
 
 Every cached library has an age. One younger than the **cache max age** is answered locally; an
 older one is expired and counts as missing: the bulk resolver is asked for it, then its registry,
-and the answer is written back with a new age. An expired library that nothing answers for is
+and the answer is written back with a new age — when the registry last confirmed it, which for a
+resolver answer is the server's confirmation time, not the moment it was copied. An expired library that nothing answers for is
 left without data, like one never cached. The max age is `--cache-max-age <duration>` (`90s`,
 `30m`, `12h`, `7d`; a bare number is seconds), else `DEPINDER_CACHE_MAX_AGE`, else `1d`. The
 24-hour miss TTL is separate and unchanged.

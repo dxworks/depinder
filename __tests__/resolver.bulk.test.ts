@@ -1,7 +1,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {assignPurls, bulkResolve, PluginProjects} from '../src/commands/analyse'
+import {assignPurls, bulkResolve, confirmedAtMs, PluginProjects} from '../src/commands/analyse'
 import {Cache} from '../src/cache/cache'
 import {resetSharedCacheDb, sharedCacheDb, sqliteCacheWithCutoff} from '../src/cache/sqlite-cache'
 import {freshnessCutoffMs} from '../src/cache/max-age'
@@ -658,7 +658,7 @@ describe('the bulk resolve phase', () => {
 /**
  * The bulk phase asks about expired entries too, not only missing ones: an entry past the cache
  * max age reads as absent through the analyse cache, so its purl lands in the ask list, and the
- * answer rewrites the row with a new age.
+ * answer rewrites the row with the age the server vouches for: its `confirmed_at`.
  */
 describe('the bulk resolve phase with a cache max age', () => {
     let tmp: string
@@ -690,15 +690,74 @@ describe('the bulk resolve phase with a cache max age', () => {
             projects: [project('app', [dep('left-pad', '1.0.0'), dep('right-pad', '2.0.0')])],
         }]
         assignPurls(projects)
-        const server = answering({'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad')})
+        const confirmedAt = new Date(runStart - 5000).toISOString()
+        const server = answering({'pkg:npm/left-pad@1.0.0': {...record('npm', null, 'left-pad'), confirmed_at: confirmedAt}})
 
         const outcome = await bulkResolve(config, projects, cache, {}, server.resolve)
 
         expect(server.asked[0]).toEqual(['pkg:npm/left-pad@1.0.0'])
         expect(outcome.written.has('npm:left-pad')).toBe(true)
         expect(sharedCacheDb().getLib('npm:left-pad')?.description).toBe('a package')
-        expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBeGreaterThanOrEqual(runStart)
+        // Stamped with the server's confirmation, not with the moment it was copied here.
+        expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBe(Date.parse(confirmedAt))
+        expect(await cache.has('npm:left-pad')).toBe(true)
         expect(sharedCacheDb().getLib('npm:right-pad')?.description).toBe('cached')
+    })
+
+    it('stores a refreshing answer already expired, and still hands it to phase 3', async () => {
+        const runStart = Date.now()
+        const cache = sqliteCacheWithCutoff(freshnessCutoffMs(86_400, runStart))
+        const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('old-pkg', '1.0.0')])]}]
+        assignPurls(projects)
+        // The server last confirmed it three days ago and could not refetch it in time.
+        const confirmedAt = new Date(runStart - 3 * 86_400_000).toISOString()
+        const resolve = jest.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem?: ItemHandler) => {
+            const entry: ResolvedEntry = {status: 'refreshing', package: {...record('npm', null, 'old-pkg'), confirmed_at: confirmedAt}}
+            onItem?.(purls[0], entry)
+            return new Map([[purls[0], entry]])
+        }) as any
+
+        const outcome = await bulkResolve(config, projects, cache, {}, resolve)
+
+        // This run uses it...
+        expect(outcome.libs.get('npm:old-pkg')?.description).toBe('a package')
+        // ...and the next one asks for it again: the row is there, but expired.
+        expect(sharedCacheDb().libUpdatedAt('npm:old-pkg')).toBe(Date.parse(confirmedAt))
+        expect(await cache.has('npm:old-pkg')).toBe(false)
+        expect(await cache.isExpired?.('npm:old-pkg')).toBe(true)
+    })
+
+    it('keeps the confirmation time when the advisories are written in afterwards', async () => {
+        const savedToken = process.env.GH_TOKEN
+        process.env.GH_TOKEN = 'a-token'
+        advisories.mockImplementation(async () => [{severity: 'HIGH', description: 'bad', permalink: 'https://example/1'}])
+        try {
+            const cache = sqliteCacheWithCutoff(freshnessCutoffMs(86_400))
+            const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('left-pad', '1.0.0')])]}]
+            assignPurls(projects)
+            const confirmedAt = new Date(Date.now() - 60_000).toISOString()
+
+            await bulkResolve(config, projects, cache, {}, answering({
+                'pkg:npm/left-pad@1.0.0': {...record('npm', null, 'left-pad'), confirmed_at: confirmedAt},
+            }).resolve)
+
+            expect(sharedCacheDb().getLib('npm:left-pad')?.vulnerabilities).toHaveLength(1)
+            expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBe(Date.parse(confirmedAt))
+        } finally {
+            advisories.mockImplementation(async () => [])
+            if (savedToken === undefined) delete process.env.GH_TOKEN
+            else process.env.GH_TOKEN = savedToken
+        }
+    })
+
+    it('reads confirmed_at as epoch milliseconds: missing or unreadable is 0, and never later than now', () => {
+        const now = Date.parse('2026-10-01T12:00:00Z')
+        expect(confirmedAtMs('2026-10-01T11:00:00Z', now)).toBe(Date.parse('2026-10-01T11:00:00Z'))
+        expect(confirmedAtMs('2026-10-01T13:00:00Z', now)).toBe(now)
+        expect(confirmedAtMs(null, now)).toBe(0)
+        expect(confirmedAtMs(undefined, now)).toBe(0)
+        expect(confirmedAtMs('', now)).toBe(0)
+        expect(confirmedAtMs('yesterday-ish', now)).toBe(0)
     })
 
     it('leaves an expired row untouched when the resolver cannot answer, for the registrar to try', async () => {

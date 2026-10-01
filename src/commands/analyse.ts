@@ -288,6 +288,21 @@ async function anyExpired(cache: Cache, keys: Set<string>): Promise<boolean> {
     return false
 }
 
+/**
+ * The `updated_at` a resolver answer is cached with: the server's `confirmed_at`, the latest
+ * instant it can show the facts matched the registry, in epoch milliseconds.
+ *
+ * Stamping "now" instead made a package the server had last confirmed days ago — every
+ * `refreshing` one, by definition — look fresh locally for a full max age, so the stale facts were
+ * reused run after run without the server ever being asked again. Absent, `null` or unparseable
+ * means "no proof of when", which is `0`: written already expired. Never later than now, in case
+ * the server's clock runs ahead of this one.
+ */
+export function confirmedAtMs(confirmedAt: string | null | undefined, now = Date.now()): number {
+    const ms = confirmedAt ? Date.parse(confirmedAt) : NaN
+    return Number.isFinite(ms) ? Math.min(ms, now) : 0
+}
+
 /** What the bulk phase left behind for phase 3: the cache keys it filled, and a count or two. */
 export interface BulkResolveOutcome {
     /** Cache keys written from resolver answers, `${ecosystem}:${library}`. */
@@ -393,7 +408,7 @@ export async function bulkResolve(
     // package of the run.
     let resolved = 0
     const taken = new Set<string>()
-    const lookups: {cacheKey: string, advisoryEcosystem: string, lib: LibraryInfo}[] = []
+    const lookups: {cacheKey: string, advisoryEcosystem: string, lib: LibraryInfo, updatedAt: number}[] = []
     let nextLookup = 0
     const workers = new Set<Promise<void>>()
     let writeFailure: {error: unknown} | undefined
@@ -417,13 +432,17 @@ export async function bulkResolve(
         if (!usable || !answer.package) return
         resolved++
         const githubToken = !!process.env.GH_TOKEN
+        // When the server last confirmed these facts, not when they reached us: a `refreshing`
+        // answer is older than the cutoff, so its row is written already expired. This run still
+        // uses it, from `libs`; the next run asks the server for it again.
+        const updatedAt = confirmedAtMs(answer.package.confirmed_at)
         for (const {plugin, dep} of byPurl.get(purl) ?? []) {
             const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
             if (written.has(cacheKey)) continue
             written.add(cacheKey)
             const lib = toLibraryInfo(answer.package)
             try {
-                track(cache.set(cacheKey, lib))
+                track(cache.set(cacheKey, lib, updatedAt))
             } catch (error) {
                 writeFailure ??= {error}
                 continue
@@ -434,7 +453,7 @@ export async function bulkResolve(
             libs.set(cacheKey, lib)
             const advisoryEcosystem = plugin.checker?.githubSecurityAdvisoryEcosystem
             if (advisoryEcosystem && githubToken && advisoriesRead.has(cacheKey)) {
-                lookups.push({cacheKey, advisoryEcosystem, lib})
+                lookups.push({cacheKey, advisoryEcosystem, lib, updatedAt})
             }
         }
         pump()
@@ -478,14 +497,16 @@ export async function bulkResolve(
     // advisories, which only matters when no scanner ran.
     async function drain(): Promise<void> {
         while (nextLookup < lookups.length) {
-            const {cacheKey, advisoryEcosystem, lib} = lookups[nextLookup++]
+            const {cacheKey, advisoryEcosystem, lib, updatedAt} = lookups[nextLookup++]
             try {
                 lib.vulnerabilities = await getVulnerabilitiesFromGithub(advisoryEcosystem, lib.name)
             } catch (e: any) {
                 log.warn(`Vulnerability lookup failed for ${lib.name}: ${e.message ?? e}`)
                 continue
             }
-            await cache.set(cacheKey, lib)
+            // Same `updated_at` as the first write: the advisories are not a reconfirmation of the
+            // registry facts.
+            await cache.set(cacheKey, lib, updatedAt)
         }
     }
 

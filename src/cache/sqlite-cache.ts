@@ -75,7 +75,7 @@ export class CacheDb {
     // --- libs -------------------------------------------------------------------------------
 
     /**
-     * The entry under `key`. With `cutoffMs`, only a fresh one — written at or after the cutoff
+     * The entry under `key`. With `cutoffMs`, only a fresh one — confirmed at or after the cutoff
      * (see `max-age.ts`); an expired row reads as absent. Without it, any row, whatever its age.
      */
     getLib(key: string, cutoffMs?: number): LibraryInfo | undefined {
@@ -94,15 +94,25 @@ export class CacheDb {
         ) !== undefined
     }
 
-    /** When the entry under `key` was last written (epoch milliseconds), or `undefined` if there is none. */
+    /**
+     * When the facts under `key` were last confirmed against the registry (epoch milliseconds), or
+     * `undefined` if there is none. Usually the moment the row was written; for a resolver answer,
+     * the server's `confirmed_at`.
+     */
     libUpdatedAt(key: string): number | undefined {
         const row = this.db.prepare('SELECT updated_at FROM libs WHERE key = ?').get(key) as {updated_at: number} | undefined
         return row ? Number(row.updated_at) : undefined
     }
 
-    setLib(key: string, value: LibraryInfo): void {
+    /**
+     * Writes the entry under `key`, stamped `updatedAt`: when its facts were last confirmed against
+     * the registry (epoch milliseconds). Now, for a registrar fetch or `update`; the server's
+     * `confirmed_at` for a resolver answer, which may be older than the run's cutoff — such a row is
+     * written already expired, and the next run asks for it again.
+     */
+    setLib(key: string, value: LibraryInfo, updatedAt = Date.now()): void {
         this.db.prepare('INSERT OR REPLACE INTO libs (key, value, updated_at) VALUES (?, ?, ?)')
-            .run(key, JSON.stringify(value), Date.now())
+            .run(key, JSON.stringify(value), updatedAt)
     }
 
     /** In insertion order (rowid), the order `libs.json` had. */
@@ -110,12 +120,12 @@ export class CacheDb {
         return (this.db.prepare('SELECT key FROM libs ORDER BY rowid').all() as {key: string}[]).map(it => it.key)
     }
 
-    /** Keys last written before `ms` (epoch milliseconds), in insertion order: what `update` refreshes. */
+    /** Keys last confirmed before `ms` (epoch milliseconds), in insertion order: what `update` refreshes. */
     libKeysUpdatedBefore(ms: number): string[] {
         return (this.db.prepare('SELECT key FROM libs WHERE updated_at < ? ORDER BY rowid').all(ms) as {key: string}[]).map(it => it.key)
     }
 
-    /** How many entries were last written before `ms`: the expired ones, at that cutoff. */
+    /** How many entries were last confirmed before `ms`: the expired ones, at that cutoff. */
     countLibsUpdatedBefore(ms: number): number {
         return Number((this.db.prepare('SELECT count(*) AS n FROM libs WHERE updated_at < ?').get(ms) as {n: number}).n)
     }
@@ -249,17 +259,20 @@ export function resetSharedCacheDb(): void {
 }
 
 /**
- * The `Cache` an analyse run uses: it sees only entries written at or after `cutoffMs`, so an
+ * The `Cache` an analyse run uses: it sees only entries confirmed at or after `cutoffMs`, so an
  * expired entry reads as missing and is fetched again. `set` stamps `updated_at` with the current
- * time, so whatever the run writes is fresh for the rest of it. Every `set` is durable on its own.
+ * time unless told otherwise, so whatever the run fetches from a registry is fresh for the rest of
+ * it; a resolver answer carries the server's `confirmed_at`, and one older than the cutoff (a
+ * `refreshing` package) is written already expired — used by this run from memory, asked for again
+ * by the next. Every `set` is durable on its own.
  */
 export function sqliteCacheWithCutoff(cutoffMs: number | undefined): Cache {
     return {
         get(key: string): LibraryInfo | undefined {
             return sharedCacheDb().getLib(key, cutoffMs)
         },
-        set(key: string, value: LibraryInfo): void {
-            sharedCacheDb().setLib(key, value)
+        set(key: string, value: LibraryInfo, updatedAt?: number): void {
+            sharedCacheDb().setLib(key, value, updatedAt)
         },
         has(key: string): boolean {
             return sharedCacheDb().hasLib(key, cutoffMs)

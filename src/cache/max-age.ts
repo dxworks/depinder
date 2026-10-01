@@ -3,11 +3,18 @@ import {log} from '../utils/logging'
 /**
  * How old a cached package may be before it counts as missing.
  *
- * Every row of the `libs` table carries `updated_at`, the moment it was last written. A row
- * written at or after the run's cutoff (`run start − max age`) is fresh and answered locally; an
- * older one is expired: it is asked for again — the resolver in bulk first, then the registrar —
- * and whatever answers rewrites it with a new `updated_at`. An expired row that nothing answers
- * for is treated exactly like a row that was never cached.
+ * Every row of the `libs` table carries `updated_at`, the moment its facts were last confirmed
+ * against the registry: when depinder fetched them itself, the moment it wrote the row; when the
+ * resolver answered, the server's own `confirmed_at`, which can be much older. A row confirmed at or
+ * after the run's cutoff (`run start − max age`) is fresh and answered locally; an older one is
+ * expired: it is asked for again — the resolver in bulk first, then the registrar — and whatever
+ * answers rewrites it. An expired row that nothing answers for is treated exactly like a row that
+ * was never cached.
+ *
+ * So a `refreshing` resolver answer — facts the server could not reconfirm within the max age — is
+ * written already expired. This run still uses it (phase 3 reads the bulk phase's answers from
+ * memory first), and the next run asks the server for it again rather than trusting it for another
+ * full max age because it happened to be copied here recently.
  *
  * `--cache-max-age <duration>` overrides `DEPINDER_CACHE_MAX_AGE`; both take `<n>[s|m|h|d]`, a
  * bare number being seconds. The resolver is held to the same cutoff: every request carries
