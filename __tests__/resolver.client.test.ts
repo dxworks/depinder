@@ -1,4 +1,4 @@
-import {CHUNK_SIZE, PackageRecord, resetResolverClient, resolvePurls, resolverUnavailable} from '../src/resolver/client'
+import {CHUNK_SIZE, maxAgeFor, PackageRecord, resetResolverClient, resolvePurls, resolverUnavailable} from '../src/resolver/client'
 import {RESOLVER_CHUNK_CONCURRENCY, ResolverConfig} from '../src/resolver/config'
 
 /**
@@ -51,6 +51,7 @@ interface Call {
     method: string
     purls: string[]
     waitMs?: number
+    maxAge?: number
 }
 
 type Answer = {status?: number, body?: any} | Error
@@ -70,6 +71,7 @@ function serve(handler: (call: Call, index: number) => Answer) {
             method: init.method,
             purls: body.purls,
             waitMs: body.wait_ms,
+            maxAge: body.max_age,
         }
         const index = calls.length
         calls.push(call)
@@ -218,6 +220,60 @@ describe('the resolver client', () => {
         expect(calls[1].waitMs).toBeUndefined()
         expect(answers.get('pkg:npm/new@1.0.0')?.status).toBe('resolved')
         expect(answers.get('pkg:npm/gone@1.0.0')?.status).toBe('not_found')
+    })
+
+    it('takes a refreshing package with its last facts, and re-asks it until the refetch lands', async () => {
+        const calls = serve((call, index) => {
+            if (index === 0) return {
+                body: {
+                    results: [{purl: 'pkg:npm/old@1.0.0', package_key: 'pkg:npm/old', status: 'refreshing', requested_version: null}],
+                    packages: {'pkg:npm/old': pkg('old')},
+                },
+            }
+            return {body: resolvedBody(call.purls)}
+        })
+
+        const answers = await resolvePurls(config, ['pkg:npm/old@1.0.0'], quiet, fast)
+
+        expect(calls).toHaveLength(2)
+        expect(calls[1].purls).toEqual(['pkg:npm/old@1.0.0'])
+        expect(answers.get('pkg:npm/old@1.0.0')).toMatchObject({status: 'resolved', package: {name: 'old'}})
+    })
+
+    it('keeps the last facts of a package still refreshing when the wait budget runs out', async () => {
+        serve(call => ({
+            body: {
+                results: call.purls.map(purl => ({purl, package_key: 'pkg:npm/old', status: 'refreshing', requested_version: null})),
+                packages: {'pkg:npm/old': pkg('old')},
+            },
+        }))
+
+        const answers = await resolvePurls({...config, maxWaitMs: 30}, ['pkg:npm/old@1.0.0'], quiet, {reAskIntervalMs: 10})
+
+        expect(answers.get('pkg:npm/old@1.0.0')).toMatchObject({status: 'refreshing', package: {name: 'old'}})
+        expect(quiet.info).toHaveBeenCalledWith(expect.stringMatching(/1 refreshing/))
+    })
+
+    it('sends max_age as the seconds since the run\'s cutoff, worked out again for each post', async () => {
+        const calls = serve(call => ({body: resolvedBody(call.purls)}))
+        const freshAfterMs = Date.now() - 86_400_000
+
+        await resolvePurls({...config, freshAfterMs}, ['pkg:npm/left-pad@1.0.0'], quiet, fast)
+
+        expect(calls[0].maxAge).toBeGreaterThanOrEqual(86_400)
+        expect(calls[0].maxAge).toBeLessThan(86_410)
+    })
+
+    it('leaves max_age to the server when the run names no cutoff', async () => {
+        const calls = serve(call => ({body: resolvedBody(call.purls)}))
+        await resolvePurls(config, ['pkg:npm/left-pad@1.0.0'], quiet, fast)
+        expect(calls[0].maxAge).toBeUndefined()
+    })
+
+    it('floors max_age, and never sends a negative one', () => {
+        expect(maxAgeFor(10_000, 10_999)).toBe(0)
+        expect(maxAgeFor(10_000, 11_000)).toBe(1)
+        expect(maxAgeFor(10_000, 5_000)).toBe(0)
     })
 
     it('stops re-asking when the wait budget runs out, and returns what it has', async () => {

@@ -10,9 +10,9 @@ import {log} from '../utils/logging'
  * for is treated exactly like a row that was never cached.
  *
  * `--cache-max-age <duration>` overrides `DEPINDER_CACHE_MAX_AGE`; both take `<n>[s|m|h|d]`, a
- * bare number being seconds. The value is held in whole seconds, the unit the resolver's wire
- * already uses for instants, so the same max age maps onto a request's `expiresAt` as the cutoff
- * instant in epoch seconds (`Math.floor(cutoffMs / 1000)`).
+ * bare number being seconds. The resolver is held to the same cutoff: every request carries
+ * `max_age`, the seconds from the cutoff to the moment of the post (`maxAgeFor` in
+ * `resolver/client.ts`), and the server answers what it has not confirmed since as `refreshing`.
  *
  * Separate from the miss TTL (`MISS_TTL_HOURS`) on purpose: that one decides how soon a lookup
  * that FAILED is retried, and a long max age should not mean a 404 is never retried.

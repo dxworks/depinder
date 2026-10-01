@@ -17,6 +17,12 @@ export interface ResolverConfig {
     maxWaitMs: number
     /** How many chunks of one ask are posted at the same time. */
     chunkConcurrency: number
+    /**
+     * The run's freshness cutoff (epoch milliseconds): a package the server has not confirmed since
+     * then comes back `refreshing`. Sent as `max_age`, worked out per post (`maxAgeFor` in
+     * `client.ts`). Absent means the server's own default, a day.
+     */
+    freshAfterMs?: number
 }
 
 /** The resolver options `analyse` declares. */

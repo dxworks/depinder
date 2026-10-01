@@ -276,6 +276,28 @@ describe('the bulk resolve phase', () => {
         expect(cache.entries.size).toBe(0)
     })
 
+    it('writes a refreshing package\'s last facts, unless the run said --refresh', async () => {
+        const projects = (): PluginProjects[] => {
+            const p: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('old-pkg', '1.0.0')])]}]
+            assignPurls(p)
+            return p
+        }
+        const resolve = jest.fn(async (_config: ResolverConfig, purls: string[]) => new Map<string, ResolvedEntry>([
+            [purls[0], {status: 'refreshing', package: record('npm', null, 'old-pkg')}],
+        ])) as any
+
+        const kept = fakeCache()
+        const outcome = await bulkResolve(config, projects(), kept, {}, resolve)
+        expect([...outcome.written]).toEqual(['npm:old-pkg'])
+        expect(await kept.has('npm:old-pkg')).toBe(true)
+
+        // --refresh asked for nothing older than the run: the registrar gets it instead.
+        const refreshed = fakeCache()
+        const refreshOutcome = await bulkResolve(config, projects(), refreshed, {refresh: true}, resolve)
+        expect(refreshOutcome.written.size).toBe(0)
+        expect(refreshed.entries.size).toBe(0)
+    })
+
     it('does nothing at all when every dependency is already cached', async () => {
         const cache = fakeCache()
         cache.set('npm:left-pad', {name: 'left-pad', licenses: [], versions: []})

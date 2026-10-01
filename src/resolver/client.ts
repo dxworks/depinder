@@ -17,8 +17,12 @@ import {ResolverConfig} from './config'
  * `error` is the server's fifth status: it could not read the registry after three tries. Like
  * `not_found` and `invalid` it carries no package, so it falls through to the registrar chain —
  * but it has to be counted, or the summary line silently loses purls.
+ *
+ * `refreshing` is a package the server holds but has not confirmed within the `max_age` it was
+ * sent: it comes with its last known facts, and the server is refetching it. It is asked for again
+ * like `pending`, and what it carries is the answer if the refetch does not land in time.
  */
-export type ResolveStatus = 'resolved' | 'not_found' | 'pending' | 'invalid' | 'error'
+export type ResolveStatus = 'resolved' | 'refreshing' | 'not_found' | 'pending' | 'invalid' | 'error'
 
 export interface ResolvedVersionRecord {
     version: string
@@ -58,10 +62,12 @@ export interface PackageRecord {
     latest_prerelease: {version: string, released_at: string | null} | null
     /** Every version the registry has, never a subset, ordered released_at asc (nulls first). */
     versions: CompactVersion[]
-    /** Freshness: the feed cursor time (feed mode) or the last successful poll (poll mode). */
+    /** The latest instant the registry itself vouched for these facts (a fetch, or a maven/cargo 304). */
     as_of: string | null
     source: string
     fetched_at: string
+    /** The latest instant the server can show these facts matched the registry; what `max_age` is measured from. */
+    confirmed_at?: string | null
 }
 
 export interface FeedRecord {
@@ -84,7 +90,7 @@ interface ResolveResponse {
     feeds?: {[type: string]: FeedRecord}
 }
 
-/** What one purl came back as. `package` is present only for `resolved`. */
+/** What one purl came back as. `package` is present only for `resolved` and `refreshing`. */
 export interface ResolvedEntry {
     status: ResolveStatus
     package?: PackageRecord
@@ -153,10 +159,24 @@ class HttpStatusError extends Error {
     }
 }
 
+/**
+ * The `max_age` of one post: the seconds since the run's cutoff, worked out again for every post.
+ *
+ * The server measures a duration from its own clock, and the run means an instant. Sending the
+ * distance to that instant each time — floored, so nothing confirmed before it is ever accepted —
+ * keeps every re-ask meaning the same thing. A fixed duration would not: under `--refresh` it would
+ * be `0`, and a package the server refetched a second ago would be stale again on the next ask,
+ * refreshing for ever.
+ */
+export function maxAgeFor(freshAfterMs: number, now = Date.now()): number {
+    return Math.max(0, Math.floor((now - freshAfterMs) / 1000))
+}
+
 async function postOnce(config: ResolverConfig, purls: string[], waitMs: number): Promise<ResolveResponse> {
     count('resolver:request')
-    const body: {purls: string[], wait_ms?: number} = {purls}
+    const body: {purls: string[], wait_ms?: number, max_age?: number} = {purls}
     if (waitMs > 0) body.wait_ms = waitMs
+    if (config.freshAfterMs !== undefined) body.max_age = maxAgeFor(config.freshAfterMs)
     const response = await fetch(`${config.url}/resolve`, {
         method: 'POST',
         headers: {
@@ -207,7 +227,9 @@ function absorb(response: ResolveResponse, into: Map<string, ResolvedEntry>): vo
         // is the only field guaranteed to match what the caller asked for.
         into.set(result.purl, {
             status: result.status,
-            package: result.status === 'resolved' ? packages[result.package_key] : undefined,
+            package: result.status === 'resolved' || result.status === 'refreshing'
+                ? packages[result.package_key]
+                : undefined,
             requestedVersion: result.requested_version ?? undefined,
             reason: result.reason,
         })
@@ -284,25 +306,34 @@ export async function resolvePurls(
 
     await ask(purls, FIRST_WAIT_MS)
 
-    // Re-ask only what is still being filled. Everything else is final: `not_found` and `invalid`
-    // will not change within a run, and `resolved` is already in hand.
-    let pending = purls.filter(purl => entries.get(purl)?.status === 'pending')
+    // Re-ask only what is still being filled — new packages, and stale ones the server is
+    // refetching. Everything else is final: `not_found` and `invalid` will not change within a run,
+    // and `resolved` is already in hand. A `refreshing` purl keeps the facts it last came with, so
+    // running out of time costs it freshness, not its answer.
+    const unsettled = (purl: string) => {
+        const status = entries.get(purl)?.status
+        return status === 'pending' || status === 'refreshing'
+    }
+    let pending = purls.filter(unsettled)
     while (pending.length > 0 && !unavailable && Date.now() + reAskIntervalMs < deadline) {
         await delay(reAskIntervalMs)
         await ask(pending, 0)
-        pending = pending.filter(purl => entries.get(purl)?.status === 'pending')
+        pending = pending.filter(unsettled)
     }
 
     const resolved = tally(entries, 'resolved')
+    const refreshing = tally(entries, 'refreshing')
     const stillPending = tally(entries, 'pending')
     const notFound = tally(entries, 'not_found')
     const invalid = tally(entries, 'invalid')
     const errored = tally(entries, 'error')
     count('resolver:resolved', resolved)
+    count('resolver:refreshing', refreshing)
     count('resolver:pending', stillPending)
     count('resolver:not-found', notFound)
     count('resolver:error', errored)
-    log.info(`Resolver answered for ${purls.length} purl(s): ${resolved} resolved, ${stillPending} pending, `
+    log.info(`Resolver answered for ${purls.length} purl(s): ${resolved} resolved, `
+        + `${refreshing ? `${refreshing} refreshing (last known facts), ` : ''}${stillPending} pending, `
         + `${notFound} not found${invalid ? `, ${invalid} invalid` : ''}`
         + `${errored ? `, ${errored} error` : ''}`
         + `${entries.size < purls.length ? `, ${purls.length - entries.size} unanswered` : ''}`)

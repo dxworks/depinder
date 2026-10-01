@@ -381,7 +381,11 @@ export async function bulkResolve(
     let resolved = 0
     const writes: {cacheKey: string, plugin: Plugin, pkg: PackageRecord}[] = []
     for (const [purl, answer] of answers) {
-        if (answer.status !== 'resolved' || !answer.package) continue
+        // A package still `refreshing` when the client stopped asking carries facts older than this
+        // run's cutoff. They are better than nothing — unless the run said `--refresh`, which is
+        // exactly a request for nothing older than the run, and the registrar chain gets it.
+        const usable = answer.status === 'resolved' || (answer.status === 'refreshing' && !options.refresh)
+        if (!usable || !answer.package) continue
         resolved++
         for (const {plugin, dep} of byPurl.get(purl) ?? []) {
             const cacheKey = `${ecosystemOf(plugin)}:${dep.name}`
@@ -599,15 +603,18 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
 
     // Read before the parse rather than after it, so a missing token is reported in the first
     // second of a run instead of the tenth minute.
-    resetResolverClient()
-    const resolver = resolverConfig(options)
-    if (resolver) log.info(`Bulk resolver: ${resolver.url}, waiting at most ${Math.round(resolver.maxWaitMs / 1000)}s for it`)
-
     // One cutoff for the whole run, taken before anything is fetched: every row written by this
-    // run is fresh for the rest of it, and the resolver can later be sent the very same instant.
+    // run is fresh for the rest of it, and the resolver is sent the very same instant. `--refresh`
+    // wants nothing older than the run itself, from the resolver as from the registries.
+    const runStartMs = Date.now()
     const maxAgeSeconds = cacheMaxAgeSeconds(options)
-    const cutoffMs = freshnessCutoffMs(maxAgeSeconds)
+    const cutoffMs = freshnessCutoffMs(maxAgeSeconds, runStartMs)
     if (useCache) log.info(`Cache max age: ${formatDuration(maxAgeSeconds)} (entries written before ${new Date(cutoffMs).toISOString()} are expired)`)
+
+    resetResolverClient()
+    const configured = resolverConfig(options)
+    const resolver = configured && {...configured, freshAfterMs: options.refresh ? runStartMs : cutoffMs}
+    if (resolver) log.info(`Bulk resolver: ${resolver.url}, waiting at most ${Math.round(resolver.maxWaitMs / 1000)}s for it`)
 
     const prep = await prepareSbomScans(runs, options)
     const session = await openCacheSession(useCache, cutoffMs)
