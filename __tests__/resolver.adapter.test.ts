@@ -1,5 +1,5 @@
 import {CompactVersion, PackageRecord} from '../src/resolver/client'
-import {registryNameOf, toLibraryInfo} from '../src/resolver/adapter'
+import {componentLinkOf, registryNameOf, toLibraryInfo} from '../src/resolver/adapter'
 import {LibraryInfo} from '../src/extension-points/registrar'
 import {newerVersionCounts} from '../src/blackduck/versions'
 import {comparatorForPurlType} from '../src/blackduck/model'
@@ -92,6 +92,31 @@ describe('the resolver package record adapter', () => {
             ],
         }))
         expect(info.versions.map(it => it.version)).toEqual(['1.0.0', '2.0.0-rc.1'])
+    })
+
+    describe('the component link', () => {
+        const urls = {homepage_url: 'https://laravel.com', repo_url: 'https://github.com/laravel/framework'}
+
+        it.each(['composer', 'cargo'])('prefers the repository for %s, where Black Duck holds it', type => {
+            // laravel/framework on packagist: `homepage` https://laravel.com, `source.url` the GitHub repo.
+            expect(componentLinkOf({type, ...urls})).toBe('https://github.com/laravel/framework')
+            expect(componentLinkOf({type, ...urls, repo_url: null})).toBe('https://laravel.com')
+        })
+
+        it.each(['npm', 'nuget', 'maven', 'pypi', 'gem', 'golang'])('prefers the homepage for %s, falling back to the repository', type => {
+            expect(componentLinkOf({type, ...urls})).toBe('https://laravel.com')
+            expect(componentLinkOf({type, ...urls, homepage_url: null})).toBe('https://github.com/laravel/framework')
+            expect(componentLinkOf({type, ...urls, homepage_url: ' '})).toBe('https://github.com/laravel/framework')
+        })
+
+        it('is empty when the server has neither', () => {
+            expect(componentLinkOf({type: 'npm', homepage_url: null, repo_url: null})).toBe('')
+        })
+
+        it('is what toLibraryInfo hands on as homepageUrl', () => {
+            expect(toLibraryInfo(record({type: 'composer', ...urls})).homepageUrl).toBe('https://github.com/laravel/framework')
+            expect(toLibraryInfo(record({type: 'npm', homepage_url: null})).homepageUrl).toBe('https://github.com/example/left-pad')
+        })
     })
 
     it('expands a three-element tuple to the package-level licenses', () => {

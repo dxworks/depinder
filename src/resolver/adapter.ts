@@ -34,6 +34,22 @@ function timestampOf(releasedAt: number | null): number {
     return releasedAt === null ? NaN : releasedAt * 1000
 }
 
+/**
+ * `homepageUrl` is what the Black Duck export writes as `Component Link`, so it carries the URL
+ * each registrar put there before the resolver existed, chosen from the two the server sends.
+ * Composer and cargo prefer the repository: Black Duck holds the source repository for them
+ * (packagist `source.url` matched 40% against 4% for `homepage`; a crate's `homepage` is usually
+ * its docs site). Every other ecosystem prefers the declared homepage and falls back to the
+ * repository, as the npm registrar does with `homepage` and `repository`.
+ */
+export function componentLinkOf(pkg: Pick<PackageRecord, 'type' | 'homepage_url' | 'repo_url'>): string {
+    const homepage = pkg.homepage_url?.trim() || ''
+    const repo = pkg.repo_url?.trim() || ''
+    return REPOSITORY_FIRST.has(pkg.type) ? repo || homepage : homepage || repo
+}
+
+const REPOSITORY_FIRST = new Set(['composer', 'cargo'])
+
 export function toLibraryInfo(pkg: PackageRecord): LibraryInfo {
     // A three-element tuple means "this version's licenses are the package's licenses"; the
     // server only spends the bytes on a fourth element when the two differ, an explicit `[]`
@@ -54,7 +70,7 @@ export function toLibraryInfo(pkg: PackageRecord): LibraryInfo {
                 licenses: licenses ?? packageLicenses,
             })),
         licenses: packageLicenses,
-        homepageUrl: pkg.homepage_url ?? '',
+        homepageUrl: componentLinkOf(pkg),
         reposUrl: pkg.repo_url ? [pkg.repo_url] : [],
         // The resolver serves registry facts only; advisories stay with the GitHub lookup in
         // `analyse`, which is why this is empty rather than absent.
