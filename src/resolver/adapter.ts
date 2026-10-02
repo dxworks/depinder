@@ -59,16 +59,20 @@ export function toLibraryInfo(pkg: PackageRecord): LibraryInfo {
     return {
         name: registryNameOf(pkg),
         description: pkg.description ?? '',
-        // A yanked version is one the registry itself says not to use, so it is not a version
-        // anyone could upgrade to. Same exclusion the crates.io registrar already makes.
-        versions: (pkg.versions ?? [])
-            .filter(([, , flags]) => (flags & VERSION_FLAG_YANKED) === 0)
-            .map(([version, releasedAt, , licenses]) => ({
+        // A yanked version stays in the list, marked: a project can still be pinned to one (an
+        // unlisted NuGet package, a yanked crate), and its row needs that version's release date
+        // and licence. It is never `latest`, and the readers that count versions to upgrade to
+        // leave it out (`availableVersions`).
+        versions: (pkg.versions ?? []).map(([version, releasedAt, flags, licenses]) => {
+            const yanked = (flags & VERSION_FLAG_YANKED) !== 0
+            return {
                 version,
                 timestamp: timestampOf(releasedAt),
-                latest: !!pkg.latest && version === pkg.latest.version,
+                latest: !yanked && !!pkg.latest && version === pkg.latest.version,
                 licenses: licenses ?? packageLicenses,
-            })),
+                ...(yanked ? {yanked: true} : {}),
+            }
+        }),
         licenses: packageLicenses,
         homepageUrl: componentLinkOf(pkg),
         reposUrl: pkg.repo_url ? [pkg.repo_url] : [],

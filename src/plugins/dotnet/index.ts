@@ -50,11 +50,13 @@ export class NugetRegistrar extends AbstractRegistrar {
         return {
             name: versions[0].catalogEntry.id,
             versions: versions?.map(it => {
+                const unlisted = isUnlisted(it.catalogEntry)
                 return {
                     version: it.catalogEntry.version,
                     licenses: `${it.catalogEntry?.licenseExpression || ''} ${it.catalogEntry?.licenseUrl}`.trim(),
-                    timestamp: moment(it.catalogEntry.published).valueOf(),
-                    latest: it.catalogEntry.version === latestVersion,
+                    timestamp: unlisted ? NaN : moment(it.catalogEntry.published).valueOf(),
+                    latest: !unlisted && it.catalogEntry.version === latestVersion,
+                    ...(unlisted ? {yanked: true} : {}),
                 }
             }),
             licenses: [...new Set(versions.map(it => `${it.catalogEntry?.licenseExpression || ''} ${it.catalogEntry?.licenseUrl}`.trim()))],
@@ -65,6 +67,16 @@ export class NugetRegistrar extends AbstractRegistrar {
             requiresLicenseAcceptance: versions.some(it => it.catalogEntry.requireLicenseAcceptance),
         }
     }
+}
+
+/**
+ * An unlisted version is NuGet's withdrawal: still restorable, hidden from search, and its
+ * registration entry says `listed: false` with `published` set to the 1900-01-01 sentinel. The
+ * sentinel is not a release date, so such a version carries none (a blank cell, not "Jan 1900"),
+ * and it is marked `yanked` so it is never counted as a version to upgrade to.
+ */
+function isUnlisted(catalogEntry: any): boolean {
+    return catalogEntry?.listed === false || String(catalogEntry?.published ?? '').startsWith('1900-01-01')
 }
 
 export const dotnetRegistrar: Registrar = new NugetRegistrar(new LibrariesIORegistrar('nuget'))

@@ -45,20 +45,22 @@ export async function retrieveFromCratesIo(name: string): Promise<LibraryInfo> {
     const data = await response.json() as CrateResponse
 
     // A yanked version is one the registry itself says not to use, so it is not a "newer version"
-    // anyone could upgrade to and is left out.
-    const versions = data.versions.filter(it => !it.yanked)
+    // anyone could upgrade to. It is still listed, marked, because a lockfile can pin one and that
+    // row needs its release date and licence.
+    const available = data.versions.filter(it => !it.yanked)
     const latest = data.crate.max_stable_version ?? data.crate.newest_version ?? undefined
-    const newest = versions.find(it => it.num === latest) ?? versions[0]
+    const newest = available.find(it => it.num === latest) ?? available[0]
 
     return {
         name: data.crate.name,
         description: data.crate.description ?? '',
-        versions: versions.map(it => ({
+        versions: data.versions.map(it => ({
             version: it.num,
             timestamp: Date.parse(it.created_at),
-            latest: it.num === latest,
+            latest: !it.yanked && it.num === latest,
             licenses: it.license ? [it.license] : [],
             downloads: it.downloads,
+            ...(it.yanked ? {yanked: true} : {}),
         })),
         // The licence is per version on crates.io; the newest one stands for the crate.
         licenses: newest?.license ? [newest.license] : [],

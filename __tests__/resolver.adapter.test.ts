@@ -68,21 +68,38 @@ describe('the resolver package record adapter', () => {
         expect(info.versions.some(it => it.latest)).toBe(false)
     })
 
-    it('leaves yanked versions out, as the crates.io registrar already does', () => {
+    it('keeps a yanked version, marked, so a project pinned to it still gets its date and licence', () => {
+        // Blazored.LocalStorage 4.5.0 is unlisted on nuget.org and still restored by projects;
+        // dropped here, its row fell back to `moment(undefined)` and reported it released "now".
         const info = toLibraryInfo(record({
+            licenses: ['MIT'],
+            latest: {version: '1.2.1', released_at: '2017-02-01T00:00:00Z'},
             versions: [
                 ['1.2.0', at('2017-01-01T00:00:00Z'), 0],
-                ['1.2.1', at('2017-02-01T00:00:00Z'), 2],
+                ['1.2.1', at('2017-02-01T00:00:00Z'), 2, ['Apache-2.0']],
             ],
         }))
-        expect(info.versions.map(it => it.version)).toEqual(['1.2.0'])
+        expect(info.versions.map(it => it.version)).toEqual(['1.2.0', '1.2.1'])
+        expect(info.versions[1]).toEqual({
+            version: '1.2.1', timestamp: Date.parse('2017-02-01T00:00:00Z'),
+            latest: false, licenses: ['Apache-2.0'], yanked: true,
+        })
+        // Not marked yanked at all when it is not: the cached shape of every other version is unchanged.
+        expect('yanked' in info.versions[0]).toBe(false)
     })
 
-    it('reads the flag bits one at a time: prerelease kept, yanked dropped, both dropped', () => {
+    it('never marks a yanked version latest, even when the server names it', () => {
+        const info = toLibraryInfo(record({
+            latest: {version: '1.2.1', released_at: '2017-02-01T00:00:00Z'},
+            versions: [['1.2.0', at('2017-01-01T00:00:00Z'), 0], ['1.2.1', at('2017-02-01T00:00:00Z'), 2]],
+        }))
+        expect(info.versions.some(it => it.latest)).toBe(false)
+    })
+
+    it('reads the flag bits one at a time: prerelease is not yanked, yanked is, both is', () => {
         // Bit 0 is prerelease and bit 1 is yanked, so 3 is both. `LibraryInfo` has nowhere to put
         // "prerelease", and the registrars that produce it do not mark one either, so a
-        // prerelease is carried like any other version — but a withdrawn one is not a version
-        // anybody could upgrade to, whether or not it is also a prerelease.
+        // prerelease is carried like any other version.
         const info = toLibraryInfo(record({
             versions: [
                 ['1.0.0', at('2020-01-01T00:00:00Z'), 0],
@@ -91,7 +108,9 @@ describe('the resolver package record adapter', () => {
                 ['2.0.0-rc.2', at('2021-03-01T00:00:00Z'), 3],
             ],
         }))
-        expect(info.versions.map(it => it.version)).toEqual(['1.0.0', '2.0.0-rc.1'])
+        expect(info.versions.map(it => [it.version, !!it.yanked])).toEqual([
+            ['1.0.0', false], ['2.0.0-rc.1', false], ['1.0.1', true], ['2.0.0-rc.2', true],
+        ])
     })
 
     describe('the component link', () => {
@@ -230,6 +249,7 @@ describe('the readers of an expanded record, against the shape they used to get'
         name: 'left-pad',
         description: 'pads on the left',
         versions: [
+            {version: '0.9.9', timestamp: Date.parse('2019-06-01T00:00:00Z'), latest: false, licenses: ['MIT'], yanked: true},
             {version: '1.0.0', timestamp: Date.parse('2020-01-01T00:00:00Z'), latest: false, licenses: ['MIT']},
             {version: '1.1.0', timestamp: Date.parse('2021-01-01T00:00:00Z'), latest: false, licenses: ['Apache-2.0']},
             {version: '2.0.0-rc.1', timestamp: Date.parse('2021-06-01T00:00:00Z'), latest: false, licenses: ['MIT']},
@@ -250,9 +270,20 @@ describe('the readers of an expanded record, against the shape they used to get'
         const expanded = newerVersionCounts(toLibraryInfo(compact).versions, '1.0.0', compare)
 
         // Three versions were released after 1.0.0 and three are numbered above it; the yanked
-        // 0.9.9 is in neither count because it is not in the list at all.
+        // 0.9.9 is older anyway, and would be in neither count regardless.
         expect(expanded).toEqual({byDate: '3', bySemver: '3'})
         expect(expanded).toEqual(newerVersionCounts(oldShape.versions, '1.0.0', compare))
+    })
+
+    it('finds a yanked resolved version but never counts a yanked one as newer', () => {
+        const withYanked = toLibraryInfo(record({
+            versions: [
+                ['1.0.0', at('2020-01-01T00:00:00Z'), 2],                    // the one in use, withdrawn
+                ['1.0.1', at('2020-02-01T00:00:00Z'), 2],                    // withdrawn: nothing to upgrade to
+                ['1.1.0', at('2021-01-01T00:00:00Z'), 0],
+            ],
+        }))
+        expect(newerVersionCounts(withYanked.versions, '1.0.0', compare)).toEqual({byDate: '1', bySemver: '1'})
     })
 
     it('leaves the counts empty for a version with no date, as it always did', () => {

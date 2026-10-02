@@ -54,3 +54,20 @@ describe('paged registration index', () => {
         }
     })
 })
+
+describe('unlisted versions', () => {
+    it('keeps an unlisted version, marked yanked, without the 1900 sentinel as its date', () => {
+        // Blazored.LocalStorage on nuget.org, trimmed: 4.5.0 is unlisted, and its registration
+        // entry says so with `listed: false` and `published` 1900-01-01.
+        const index = {items: [{items: [
+            {catalogEntry: {id: 'Blazored.LocalStorage', version: '4.4.0', published: '2023-07-31T20:39:39.37+00:00', listed: true}},
+            {catalogEntry: {id: 'Blazored.LocalStorage', version: '4.5.0', published: '1900-01-01T00:00:00+00:00', listed: false}},
+            {catalogEntry: {id: 'Blazored.LocalStorage', version: '5.0.0', published: '2025-12-26T21:39:00+00:00', listed: true}},
+        ]}]}
+        const info = new NugetRegistrar().parseData(index)
+        expect(info.versions.map(it => [it.version, it.latest, !!it.yanked]))
+            .toEqual([['5.0.0', true, false], ['4.4.0', false, false], ['4.5.0', false, true]])
+        expect(Number.isNaN(info.versions[2].timestamp)).toBe(true)
+        expect(info.versions[1].timestamp).toBe(Date.parse('2023-07-31T20:39:39.37Z'))
+    })
+})

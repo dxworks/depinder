@@ -7,7 +7,7 @@ import {SbomDescription} from '../plugins/sbom/describe'
 import {deferSbomFindings} from '../plugins/sbom'
 import {ScannerPreflight, scannerSummaryLine, writeScanProvenance} from '../plugins/sbom/local-scan'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
-import {LibraryInfo} from '../extension-points/registrar'
+import {availableVersions, LibraryInfo} from '../extension-points/registrar'
 import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
 import {Range} from 'semver'
 import _ from 'lodash'
@@ -126,11 +126,26 @@ function extractLicenses(dep: DepinderDependency) {
     })
 }
 
+/**
+ * The release moment of a version, or `undefined` when there is none: the version is not in the
+ * registry's list, or the registry has no date for it (`NaN`). `moment(undefined)` is *now* and
+ * `moment(NaN)` formats as "Invalid date", so every date column goes through here and a missing
+ * date becomes a blank cell rather than this month or a string nobody can sort on.
+ */
+function releaseMoment(timestamp: number | undefined): moment.Moment | undefined {
+    return timestamp !== undefined && Number.isFinite(timestamp) ? moment(timestamp) : undefined
+}
+
+/** Whole months from `earlier` to `later`; `undefined` (a blank cell) when either date is missing. */
+function monthsBetween(later: moment.Moment | undefined, earlier: moment.Moment | undefined): number | undefined {
+    return later && earlier ? later.diff(earlier, 'months') : undefined
+}
+
 export function convertDepToRow(proj: DepinderProject, dep: DepinderDependency): string {
     const latestVersion = dep.libraryInfo?.versions.find(it => it.latest)
     const currentVersion = dep.libraryInfo?.versions.find(it => it.version == dep.version.trim())
-    const latestVersionMoment = moment(latestVersion?.timestamp)
-    const currentVersionMoment = moment(currentVersion?.timestamp)
+    const latestVersionMoment = releaseMoment(latestVersion?.timestamp)
+    const currentVersionMoment = releaseMoment(currentVersion?.timestamp)
     const now = moment()
 
     const dateFormat = 'MMM YYYY'
@@ -139,8 +154,8 @@ export function convertDepToRow(proj: DepinderProject, dep: DepinderDependency):
     return csvRow([
         proj.path, proj.name, dep.name, dep.version, latestVersion?.version,
         currentVersionMoment?.format(dateFormat), latestVersionMoment?.format(dateFormat),
-        latestVersionMoment?.diff(currentVersionMoment, 'months'),
-        now?.diff(currentVersionMoment, 'months'), now?.diff(latestVersionMoment, 'months'),
+        monthsBetween(latestVersionMoment, currentVersionMoment),
+        monthsBetween(now, currentVersionMoment), monthsBetween(now, latestVersionMoment),
         dep.vulnerabilities?.length, vulnerabilities, directDep, dep.type, extractLicenses(dep),
     ])
 }
@@ -199,7 +214,7 @@ export function resolveVulnerabilities(project: DepinderProject, dep: DepinderDe
  */
 export function licenseOf(lib: LibraryInfo): string {
     const license = lib.licenses?.find(it => typeof it === 'string' && it)
-        ?? lib.versions.flatMap(it => it.licenses).find(it => typeof it === 'string' && it)
+        ?? availableVersions(lib.versions).flatMap(it => it.licenses).find(it => typeof it === 'string' && it)
     if (!license || typeof license !== 'string')
         return 'unknown'
     if (!licenseIds.includes(license))
@@ -1092,17 +1107,19 @@ export async function runAnalysis(
             const enhancedDeps: DependencyInfo[] = Object.values(proj.dependencies).map(dep => {
                 const latestVersion = dep.libraryInfo?.versions.find(it => it.latest)
                 const currentVersion = dep.libraryInfo?.versions.find(it => it.version == dep.version.trim())
-                const latestVersionMoment = moment(latestVersion?.timestamp)
-                const currentVersionMoment = moment(currentVersion?.timestamp)
+                const latestVersionMoment = releaseMoment(latestVersion?.timestamp)
+                const currentVersionMoment = releaseMoment(currentVersion?.timestamp)
                 const now = moment()
                 const directDep: boolean = !dep.requestedBy || dep.requestedBy.some(it => it.startsWith(`${proj.name}@${proj.version}`))
 
+                // A missing date is NaN here, which no threshold below counts as outdated or out
+                // of support — the same answer the old `moment(undefined)` gave by measuring from now.
                 return {
                     ...dep,
                     direct: directDep,
-                    latest_used: latestVersionMoment.diff(currentVersionMoment, 'months'),
-                    now_used: now.diff(currentVersionMoment, 'months'),
-                    now_latest: now.diff(latestVersionMoment, 'months'),
+                    latest_used: monthsBetween(latestVersionMoment, currentVersionMoment) ?? NaN,
+                    now_used: monthsBetween(now, currentVersionMoment) ?? NaN,
+                    now_latest: monthsBetween(now, latestVersionMoment) ?? NaN,
                 } as DependencyInfo
             })
             const directDeps = enhancedDeps.filter(dep => dep.direct)

@@ -37,7 +37,7 @@ export type ResolveStatus = 'resolved' | 'refreshing' | 'not_found' | 'pending' 
 
 /** `flags` bit 0: the version is a prerelease. Nothing downstream reads it yet. */
 export const VERSION_FLAG_PRERELEASE = 1
-/** `flags` bit 1: the registry withdrew the version. `toLibraryInfo` drops those. */
+/** `flags` bit 1: the registry withdrew the version. `toLibraryInfo` keeps those, marked `yanked`. */
 export const VERSION_FLAG_YANKED = 2
 
 /**
