@@ -1027,6 +1027,11 @@ export async function runAnalysis(
                         // log.info(`Getting remote information on ${dep.name}`)
                         let fetch = inFlight.get(cacheKey)
                         if (!fetch) {
+                            // One per real registry lookup (deps sharing a library share the
+                            // inFlight fetch and are not counted again): with a resolver, these
+                            // are the packages it had no usable answer for in time.
+                            count('registry:fetch')
+                            count(`registry:fetch:${ecosystemOf(plugin)}`)
                             fetch = (async () => {
                                 let fetched: LibraryInfo
                                 try {
