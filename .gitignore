@@ -128,3 +128,6 @@ results
 /cache/
 results-*
 /.blacklist
+
+# graphify knowledge graph output (rebuildable from source, see CLAUDE.md)
+/graphify-out/

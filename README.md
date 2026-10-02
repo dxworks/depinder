@@ -70,14 +70,14 @@ dependency graph.
 
 ```shell
 depinder analyse <sbom-folder...> -r <out> \
-    [--vuln-source trivy,grype,github] [--github-token-file F] [--project-name NAME] [--target DIR]
+    [--vuln-source trivy,grype,github] [--github-token-file F] [--project-name NAME] [--target DIR] \
+    [--cache-max-age 1d] [--refresh]
 ```
 
 Each SBOM is sorted by its content — a Trivy SBOM goes to `<out>/trivy/`, a Syft SBOM to
 `<out>/syft/` — and each subfolder gets the normal depinder CSVs for that source, then the
 Black Duck files on top. You do not name plugins: the ecosystems present in the SBOMs select
-the `sbom-*` plugins for you. Native input, when present, goes to `<out>/depinder/` with the
-`<plugin>-*.csv` triples only.
+the `sbom-*` plugins for you. Files that are not CycloneDX SBOMs are counted and ignored.
 
 | File | One row per | Notes |
 |---|---|---|
@@ -211,67 +211,53 @@ Pre-releases are recommended only when nothing stable clears the findings. No ne
 the version list is the one the analysis already fetched, so an empty list (a registry that did not
 answer) means an empty recommendation.
 
-## Preprocess data
-If you want to run `Depinder` on a project that has not been processed by `Depminer` before, 
-you need to run the following command to generate the folder structure:
+## Input
+
+Depinder reads CycloneDX SBOMs only, written by Syft or Trivy — DepMiner produces both. Lockfiles
+and manifests are not parsed any more; generate an SBOM for the project instead:
 
 ```shell
-dxw depminer construct <path-to-dx-dependencies-folder> <path-to-exported-folder>
+syft dir:<repo> -o cyclonedx-json=<repo>.cdx.json
+trivy fs <repo> --format cyclonedx --output <repo>.trivy.cdx.json
 ```
-
-After doing this, some package managers will require some more post-processing, in order to generate the `dependency tree` or the `lock file`.
-
-### Maven
-To generate the `dependency tree` for a maven project, run the following command in each project (or root project in case they contain modules):
-
-```shell
-mvn dependency:tree -DoutputFile=deptree.txt
-```
-This command should create a `deptree.txt` file next to each `pom.xml` file.
-This file will be processed by MavenMiner to generate the a `pom.json` file, that corresponds to the expectations that the `Depinder` Java plugin has.
-
-
-### Gradle
-To generate the `dependency tree` for a gradle project, run the following command in each project (or root project in case they contain modules):
-
-```shell
-gradle dependencies --configuration compileClasspath > deptree.txt
-```
-This command should create a `deptree.txt` file next to each `build.gradle` file.
-This file will be processed by GradleMiner to generate the a `gradle.json` file, that corresponds to the expectations that the `Depinder` Java plugin has.
 
 ## Usage
 The following commands can be used either as standalone, or with the `dxw` prefix ahead.
 
 ### Cache command
 
-Registry answers are cached in one of two places: a **SQLite database global to the machine**,
-`~/.dxw/depinder/cache/depinder.sqlite`, through Node's own `node:sqlite` (no native addon), or
-MongoDB when its container is running.
+Registry answers are cached in a **SQLite database global to the machine**,
+`~/.dxw/depinder/cache/depinder.sqlite`, through Node's own `node:sqlite` (no native addon). Each
+machine has its own.
 
 ```shell
-depinder cache               # where the SQLite cache is and what it holds; is Mongo running?
+depinder cache               # where the SQLite cache is, what it holds and how much of it has expired
 depinder cache import <dir>  # pull a libs.json / misses.json folder into it
-depinder cache init          # write the MongoDB docker-compose files to ~/.dxw/depinder/cache/
-depinder cache up            # start MongoDB (alias: start)
-depinder cache down          # stop it (alias: stop)
+depinder update [date] [plugins...]  # re-fetch the entries last written before date (default: the expired ones)
 ```
-
-To see what is in MongoDB, visit the [Mongo Express Dashboard](http://localhost:8002/).
 
 ### The library cache
 
-Without MongoDB, registry answers are kept in the `libs` table of the SQLite database, so a second
+Registry answers are kept in the `libs` table of the SQLite database, so a second
 run over the same libraries — from any working directory — makes no registry calls. Lookups that
 *failed* are kept too, in `misses`, for 24 hours: a library a registry cannot find — or a registry
 that does not answer — would otherwise be asked again on every run, and a failed lookup is the
 slowest kind. `--refresh` bypasses both. A rate-limited (429) lookup is never remembered as a miss.
+
+Every cached library has an age. One younger than the **cache max age** is answered locally; an
+older one is expired and counts as missing: the bulk resolver is asked for it, then its registry,
+and the answer is written back with a new age — when the registry last confirmed it, which for a
+resolver answer is the server's confirmation time, not the moment it was copied. An expired library that nothing answers for is
+left without data, like one never cached. The max age is `--cache-max-age <duration>` (`90s`,
+`30m`, `12h`, `7d`; a bare number is seconds), else `DEPINDER_CACHE_MAX_AGE`, else `1d`. The
+24-hour miss TTL is separate and unchanged.
 Every row is committed as it is written, so the 60-second checkpoint costs nothing; the previous
 `cache/libs.json` (94 MB on the twelve-repository run) was serialised whole at every one.
 
 `DEPINDER_CACHE_DB=<file>` points a run at another database. The previous per-directory layout
 (`cache/libs.json`, `misses.json`) is not read by a run any more;
-`depinder cache import cache` copies it into the database, keeping rows already there.
+`depinder cache import cache` copies it into the database, keeping rows already there. Imported
+libraries are as old as `libs.json`, so an old file's entries are expired and fetched on the next run.
 
 Add `--profile` to `analyse` to get, at the end of the run, the wall-clock
 of each phase (parse, scans, registry enrichment, CSV writing), the cache hit/miss counts and the
@@ -284,14 +270,21 @@ To analyse a project, run the following command:
 depinder analyse <paths-to-analysed-project-folders> ... -r <path-to-results-folder>
 ```
 This command gets as an argument multiple fully qualified folder paths, sorts every file it finds
-by content — Trivy SBOM, Syft SBOM, or native manifest — and writes one subfolder per source under
-`results`: `trivy/` and `syft/` with the `sbom-*` CSVs and the Black Duck-shaped files, `depinder/`
-with the native plugins' CSVs. See [Black Duck-shaped exports](#black-duck-shaped-exports).
+by content — Trivy SBOM or Syft SBOM; anything else is ignored — and writes one subfolder per
+source under `results`: `trivy/` and `syft/`, each with the `sbom-*` CSVs and the Black Duck-shaped
+files. See [Black Duck-shaped exports](#black-duck-shaped-exports).
+
+Cached registry answers are reused for one day, then fetched again. Change the window with
+`--cache-max-age` or `DEPINDER_CACHE_MAX_AGE` (see [The library cache](#the-library-cache)):
+
+```shell
+depinder analyse <paths...> -r <results> --cache-max-age 7d   # reuse answers for a week
+depinder analyse <paths...> -r <results> --cache-max-age 0    # fetch everything again now
+```
 
 ## Acknowledgements
 
 Packagist api calls were inspired by [packagist-api-client](https://www.npmjs.com/package/packagist-api-client).
-Depinder also uses some libraries from `Snyk.io` to parse dependency files.
 
 ## Contributing
 

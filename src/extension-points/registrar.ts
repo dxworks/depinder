@@ -20,6 +20,18 @@ interface LibraryVersion {
     licenses?: string | string[]
     downloads?: number
     latest: boolean
+    /**
+     * The registry withdrew this version (a yanked crate, an unlisted NuGet package, a resolver
+     * version flagged yanked). It stays in the list because a project can still be pinned to it,
+     * and that project's row needs its release date and licence; it is never `latest` and never
+     * counted as a newer version anyone could upgrade to. Absent means not withdrawn.
+     */
+    yanked?: boolean
+}
+
+/** The versions a project could move to: every version the registry has not withdrawn. */
+export function availableVersions<T extends {yanked?: boolean}>(versions: T[]): T[] {
+    return versions.filter(it => !it.yanked)
 }
 
 export interface LibraryInfo {

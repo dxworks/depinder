@@ -1,45 +1,13 @@
 import {Command} from 'commander'
-import {execSync} from 'child_process'
 import chalk from 'chalk'
-import fs from 'fs'
-import {getAssetFile, getHomeDir} from '../utils/utils'
 import path from 'path'
 import {log} from '../utils/logging'
 import {defaultCacheDbFile, sharedCacheDb} from '../cache/sqlite-cache'
-
-export async function cacheUpAction(): Promise<void> {
-    execSync('docker-compose up -d', {cwd: path.resolve(getHomeDir(), 'cache'), stdio: 'inherit'})
-}
-
-export async function cacheDownAction(): Promise<void> {
-    execSync('docker-compose down', {cwd: path.resolve(getHomeDir(), 'cache'), stdio: 'inherit'})
-}
-
-export function getMongoDockerContainerStatus(): string | null {
-    try {
-        const output = execSync('docker inspect depinder-mongo').toString()
-        const result: any[] = JSON.parse(output)
-        if (result.length == 0) {
-            log.error('Mongo is not running')
-            return null
-        }
-        return result[0].State.Status
-    } catch (e) {
-        return null
-    }
-
-}
+import {CacheMaxAgeOptions, cacheMaxAgeSeconds, formatDuration, freshnessCutoffMs} from '../cache/max-age'
 
 function formatBytes(bytes: number): string {
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-/** The local SQLite cache: where it is and what it holds. Printed by every `cache info`. */
-export function sqliteCacheInfoAction(): void {
-    const stats = sharedCacheDb().stats()
-    log.info(`Local cache: ${chalk.yellow(stats.file)} (${formatBytes(stats.bytes)})`)
-    log.info(`  ${stats.libs} libraries, ${stats.misses} misses`)
 }
 
 /**
@@ -51,50 +19,30 @@ export function cacheImportAction(dir: string): void {
     const counts = sharedCacheDb().importLegacy(path.resolve(dir))
     log.info(`Imported from ${chalk.yellow(path.resolve(dir))} into ${defaultCacheDbFile()}:`)
     log.info(`  ${counts.libs} libraries, ${counts.misses} misses (existing rows kept)`)
+    // Imported rows carry libs.json's mtime as their age, so an old file imports as expired.
+    if (counts.libs > 0) log.info('  Imported libraries are as old as libs.json: those past the cache max age are fetched again on the next analyse')
 }
 
-export function cacheInfoAction(): void {
-    sqliteCacheInfoAction()
-    const status = getMongoDockerContainerStatus()
-    if (status == null) {
-        log.error('Mongo is not running')
-        log.info(`To start Mongo cache run: ${chalk.yellow('depinder cache up')}`)
-        return
-    }
-    if (status == 'running') {
-        log.info(chalk.green('Mongo cache is up and running'))
-    } else {
-        log.info(`Mongo is ${status}`)
-        log.info(`To start Mongo cache run: ${chalk.yellow('depinder cache up')}`)
-    }
+/** The local SQLite cache: where it is and what it holds. */
+export function cacheInfoAction(options: CacheMaxAgeOptions = {}): void {
+    const db = sharedCacheDb()
+    const stats = db.stats()
+    const maxAgeSeconds = cacheMaxAgeSeconds(options)
+    const expired = db.countLibsUpdatedBefore(freshnessCutoffMs(maxAgeSeconds))
+    log.info(`Local cache: ${chalk.yellow(stats.file)} (${formatBytes(stats.bytes)})`)
+    log.info(`  ${stats.libs} libraries (${stats.libs - expired} fresh, ${expired} expired at max age `
+        + `${formatDuration(maxAgeSeconds)}), ${stats.misses} misses`)
 }
 
-export function cacheInitAction(): void {
-    if (!fs.existsSync(path.join(getHomeDir(), 'cache', 'docker-compose.yml'))) {
-        fs.mkdirSync(path.join(getHomeDir(), 'cache'), {recursive: true})
-        fs.copyFileSync(getAssetFile('depinder.docker-compose.yml'), path.join(getHomeDir(), 'cache', 'docker-compose.yml'))
-        fs.copyFileSync(getAssetFile('init-mongo.js'), path.join(getHomeDir(), 'cache', 'init-mongo.js'))
-    }
-}
-
-export const cacheUpCommand = new Command()
-    .name('up')
-    .alias('start')
-    .action(cacheUpAction)
-
-export const cacheDownCommand = new Command()
-    .name('down')
-    .alias('stop')
-    .action(cacheDownAction)
+const maxAgeOption = ['--cache-max-age <duration>',
+    'Count libraries older than this as expired: <n>[s|m|h|d]; DEPINDER_CACHE_MAX_AGE when unset, else 1d'] as const
 
 export const cacheInfoCommand = new Command()
     .name('info')
     .alias('i')
+    .description('Show where the local SQLite cache is and what it holds')
+    .option(...maxAgeOption)
     .action(cacheInfoAction)
-
-export const cacheInitCommand = new Command()
-    .name('init')
-    .action(cacheInitAction)
 
 export const cacheImportCommand = new Command()
     .name('import')
@@ -104,11 +52,7 @@ export const cacheImportCommand = new Command()
 
 export const cacheCommand = new Command()
     .name('cache')
+    .option(...maxAgeOption)
     .action(cacheInfoAction)
-    .addCommand(cacheUpCommand)
-    .addCommand(cacheDownCommand)
     .addCommand(cacheInfoCommand)
-    .addCommand(cacheInitCommand)
     .addCommand(cacheImportCommand)
-
-

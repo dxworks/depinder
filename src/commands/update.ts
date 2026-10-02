@@ -1,18 +1,22 @@
 import {Command} from 'commander'
 import chalk from 'chalk'
-import {getMongoDockerContainerStatus} from './cache'
-import {LibraryInfoModel, mongoCache} from '../cache/mongo-cache'
-import moment, {Moment} from 'moment'
+import {sharedCacheDb, sqliteCache} from '../cache/sqlite-cache'
+import moment from 'moment'
 import {getPluginsFromNames} from '../plugins'
 import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
 import {Presets, SingleBar} from 'cli-progress'
 import {ecosystemOf, Plugin} from '../extension-points/plugin'
 import {log} from '../utils/logging'
+import {CacheMaxAgeOptions, cacheMaxAgeSeconds, formatDuration, freshnessCutoffMs} from '../cache/max-age'
 
 export const updateCommand = new Command()
     .name('update')
-    .argument('[updated_before]', 'Update all libs that were updated before this date')
+    .description('Re-fetch the local cache\'s libraries last written before a date, by default the expired ones')
+    .argument('[updated_before]', 'Update all libs that were updated before this date; '
+        + 'when omitted, the ones older than the cache max age')
     .argument('[plugins...]', 'A list of plugins to update database libs for')
+    .option('--cache-max-age <duration>',
+        'Without a date, re-fetch the libraries older than this: <n>[s|m|h|d]; DEPINDER_CACHE_MAX_AGE when unset, else 1d')
     .action(updateLibs)
 
 async function updateLibrariesAndLogProcess(idsToUpdate: string[], selectedPlugins: Plugin[]) {
@@ -24,20 +28,20 @@ async function updateLibrariesAndLogProcess(idsToUpdate: string[], selectedPlugi
     progressBar.stop()
 }
 
-export async function updateLibs(updated_before: string, plugins: string[]): Promise<void> {
-
-    const status = getMongoDockerContainerStatus()
-    if (status !== 'running') {
-        log.info(chalk.red('Mongo Cache is not running properly.'))
-        log.info(`To start Mongo cache run: ${chalk.yellow('depinder cache up')}`)
-        return
+export async function updateLibs(updated_before: string, plugins: string[], options: CacheMaxAgeOptions = {}): Promise<void> {
+    // No date: exactly the entries an analyse run would treat as expired.
+    let before: number
+    if (updated_before) {
+        before = moment(updated_before).valueOf()
+    } else {
+        const maxAgeSeconds = cacheMaxAgeSeconds(options)
+        before = freshnessCutoffMs(maxAgeSeconds)
+        log.info(`Updating the libraries older than the cache max age, ${formatDuration(maxAgeSeconds)}`)
     }
 
-
-    const lastUpdateMoment = updated_before ? moment(updated_before) : moment().subtract(1, 'month')
-
-    mongoCache.load()
-    const ids = await getLibraryIdsToUpdate(lastUpdateMoment)
+    const db = sharedCacheDb()
+    log.info(`Local cache: ${chalk.yellow(db.file)}`)
+    const ids = db.libKeysUpdatedBefore(before)
 
     const selectedPlugins = getPluginsFromNames(plugins)
 
@@ -48,25 +52,12 @@ export async function updateLibs(updated_before: string, plugins: string[]): Pro
     } else {
         log.info('No libraries to update.')
     }
-
-    mongoCache.write()
-}
-
-async function getLibraryIdsToUpdate(lastUpdateMoment: Moment): Promise<string[]> {
-    try {
-        const query = {updatedAt: {$lt: lastUpdateMoment.toDate()}}
-
-        const docs = await LibraryInfoModel.find(query, '_id')
-        return docs.map(doc => doc._id.toString())
-    } catch (err) {
-        log.error('Error while searching for libraries to update in cache: ', err)
-        return []
-    }
 }
 
 async function updateLibrariesFor(selectedPlugins: Plugin[], idsToUpdate: string[], progressBar: SingleBar) {
-    // One plugin per ecosystem: plugins sharing an ecosystem (java / sbom-java) share cache ids,
-    // so iterating all of them would refresh every id once per plugin claiming that prefix.
+    // One plugin per ecosystem: plugins sharing an ecosystem (a plugins.json plugin reusing a
+    // default one's) share cache ids, so iterating all of them would refresh every id once per
+    // plugin claiming that prefix.
     const byEcosystem = new Map<string, Plugin>()
     for (const plugin of selectedPlugins) {
         if (!byEcosystem.has(ecosystemOf(plugin))) byEcosystem.set(ecosystemOf(plugin), plugin)
@@ -84,7 +75,7 @@ async function updateLibrariesFor(selectedPlugins: Plugin[], idsToUpdate: string
                     if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
                         lib.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, lib.name)
                     }
-                    await mongoCache.set(id, lib)
+                    sqliteCache.set(id, lib)
                 } catch (e: any) {
                     log.warn(`Exception getting remote info for ${libraryName}`)
                     log.error(e)

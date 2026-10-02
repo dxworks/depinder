@@ -6,12 +6,16 @@ No configuration file: command-line options, environment variables, and a few fi
 
 | Variable | Meaning |
 |---|---|
-| `GH_TOKEN` | GitHub token for the native route and `update`; also a pool of one for `github` |
+| `GH_TOKEN` | GitHub token for per-library advisory lookups (when no SBOM scan answered) and `update`; also a pool of one for `github` |
 | `GH_TOKEN_1`, `GH_TOKEN_2`, … | The token pool for `github-advisories`; usually in `.github-tokens` instead |
 | `LIBRARIES_IO_API_KEY` | Optional fallback for release dates and versions |
 | `DEPINDER_CACHE_DB` | SQLite cache path. Default `~/.dxw/depinder/cache/depinder.sqlite` |
-| `MONGO_URI`, `MONGO_USER`, `MONGO_PASSWORD` | MongoDB cache. Default `mongodb://localhost:27018/depinder`, `root` |
+| `DEPINDER_CACHE_MAX_AGE` | How old a cached library may be before it is fetched again. Same as `--cache-max-age`. Default `1d` |
 | `DEPINDER_PROFILE` | `1` for the same output as `--profile` |
+| `DEPINDER_RESOLVER_URL` | Base URL of a bulk purl resolver. Same as `--resolver-url`; off when unset |
+| `DEPINDER_RESOLVER_TOKEN` | Bearer token for it. Required with the URL: without it the resolver is skipped |
+| `DEPINDER_RESOLVER_MAX_WAIT_MS` | How long one run waits for the resolver in total. Default `60000` |
+| `DEPINDER_RESOLVER_CONCURRENCY` | Caps how many 2000-purl chunks are posted at once. Default: all of them |
 | `TRIVY_BIN`, `GRYPE_BIN` | Scanner binaries when not on `PATH` |
 
 ## Files
@@ -19,7 +23,6 @@ No configuration file: command-line options, environment variables, and a few fi
 | Path | What |
 |---|---|
 | `~/.dxw/depinder/cache/depinder.sqlite` | The registry cache: `libs`, `misses` |
-| `~/.dxw/depinder/cache/docker-compose.yml` | MongoDB setup, written by `cache init` |
 | `./cache/github-advisories/<ecosystem>.json` | The advisory cache |
 | `./.github-tokens` | The token pool: `GH_TOKEN_1=…`, contiguous from 1 |
 | `./plugins.json` | Extra plugins: `[{"path": "<module>", "field": "<export>"}]` |
@@ -37,19 +40,38 @@ No configuration file: command-line options, environment variables, and a few fi
 | `grype` | `grype` on `PATH` or `GRYPE_BIN` |
 | `github` | A token: `GH_TOKEN` in the environment or `.github-tokens` in the working directory. The advisories download on the run, or ahead of it with [`github-advisories download`](commands/github-advisories.md) |
 
-## Native route prep
+## Bulk resolver
 
-=== "Maven"
+Optional. A resolver service answers thousands of package URLs in one call, from its own store of
+registry facts, instead of depinder asking each registry package by package.
 
-    ```bash
-    mvn dependency:tree -DoutputFile=deptree.txt
-    ```
+```bash
+export DEPINDER_RESOLVER_URL=https://resolver.internal
+export DEPINDER_RESOLVER_TOKEN=…
+depinder analyse ./repo
+```
 
-=== "Gradle"
+| Setting | Meaning |
+|---|---|
+| `--resolver-url <url>` / `DEPINDER_RESOLVER_URL` | Where the resolver is. Nothing set, nothing changes |
+| `DEPINDER_RESOLVER_TOKEN` | Mandatory with the URL; a missing token warns and skips the resolver |
+| `DEPINDER_RESOLVER_MAX_WAIT_MS` | Budget for the whole bulk phase; each request sends what is left of it as `deadline_ms` (at most 60 s). Default `60000` |
+| `DEPINDER_RESOLVER_CONCURRENCY` | Caps the chunks in flight at once. Default: every chunk at once; `1` posts one chunk at a time |
+| `--no-resolver` | Skip it for this run |
 
-    ```bash
-    gradle dependencies --configuration compileClasspath > deptree.txt
-    ```
+Every chunk is posted at once, with one deadline for all of them, so no chunk waits behind another
+and each has the whole budget to fetch what the server does not know yet. Each is posted once: there
+are no retries. What has not answered by the deadline goes to the registries, and a request that
+fails — an error status, a dropped connection, a stream cut short — keeps what it delivered and
+turns the resolver off for the rest of the run, with one warning.
 
-Run in each project, or the root project when it has modules. Or skip the native route: a
-[DepMiner](https://dxworks.org/depminer/) run produces SBOMs for every ecosystem.
+Every project is parsed first, every dependency's purl is collected into one list, and the answers
+land in the same local cache the registrars fill. What the resolver does not know — a package it is
+still fetching, one the registry does not have, or anything at all when the server is unreachable —
+falls back to the per-package registrars, so a run is never worse than one without it. `--refresh`
+still ignores the local cache, but takes its fresh facts from the resolver first.
+
+Each answer is written to the cache the moment it arrives, so a run stopped halfway keeps what had
+already come back. The resolver serves registry facts only: GitHub advisories are still fetched per
+library with `GH_TOKEN` set, but for a resolver answer only when a project using that library has no
+SBOM scan findings — the only case in which they are read.

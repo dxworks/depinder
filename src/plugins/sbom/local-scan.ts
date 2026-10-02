@@ -476,15 +476,47 @@ async function probeTrivy(): Promise<ScannerStatus> {
         status.installed = true
         // A stub or an older CLI may not honour `--format json`; the binary still exists and can
         // still scan, so a version we cannot read degrades to "unknown", not to "missing".
-        const report = JSON.parse(stdout) as {Version?: string, VulnerabilityDB?: {Version?: number, UpdatedAt?: string}}
+        const report = JSON.parse(stdout) as TrivyVersionReport
         status.version = report.Version
-        status.dbVersion = report.VulnerabilityDB?.Version !== undefined ? String(report.VulnerabilityDB.Version) : undefined
-        status.dbBuiltAt = report.VulnerabilityDB?.UpdatedAt
+        setTrivyDb(status, report)
     } catch (e: any) {
         if (!status.installed) status.error = probeFailure('trivy', bin, e)
     }
     status.versionMatchesPin = status.version === status.pinnedVersion
     return status
+}
+
+type TrivyVersionReport = {Version?: string, VulnerabilityDB?: {Version?: number, UpdatedAt?: string}}
+
+function setTrivyDb(status: ScannerStatus, report: TrivyVersionReport): void {
+    status.dbVersion = report.VulnerabilityDB?.Version !== undefined ? String(report.VulnerabilityDB.Version) : undefined
+    status.dbBuiltAt = report.VulnerabilityDB?.UpdatedAt
+}
+
+/** Grype keeps the DB build date in a separate command from its version. */
+async function readGrypeDb(status: ScannerStatus): Promise<void> {
+    const {stdout} = await execFileAsync(status.bin, ['db', 'status', '-o', 'json'])
+    const db = JSON.parse(stdout) as {schemaVersion?: string, built?: string}
+    status.dbVersion = db.schemaVersion
+    status.dbBuiltAt = db.built
+}
+
+/**
+ * Reads a scanner's DB build again, after `warmScannerDatabases` refreshed it: the preflight probed
+ * the build that was on disk BEFORE the refresh, and provenance must name the build the scans
+ * actually read. A failed re-read keeps what the preflight saw.
+ */
+async function rereadDb(status: ScannerStatus): Promise<void> {
+    try {
+        if (status.tool === 'trivy') {
+            const {stdout} = await execFileAsync(status.bin, ['--version', '--format', 'json'])
+            setTrivyDb(status, JSON.parse(stdout) as TrivyVersionReport)
+        } else {
+            await readGrypeDb(status)
+        }
+    } catch {
+        // Left as the preflight recorded it.
+    }
 }
 
 async function probeGrype(): Promise<ScannerStatus> {
@@ -504,10 +536,7 @@ async function probeGrype(): Promise<ScannerStatus> {
         // Grype keeps the DB build date in a separate command; a missing DB must not read as a
         // missing scanner, since grype downloads it on first scan.
         try {
-            const {stdout} = await execFileAsync(bin, ['db', 'status', '-o', 'json'])
-            const db = JSON.parse(stdout) as {schemaVersion?: string, built?: string}
-            status.dbVersion = db.schemaVersion
-            status.dbBuiltAt = db.built
+            await readGrypeDb(status)
         } catch {
             // Left undefined — reported as "DB unknown" rather than treated as an error.
         }
@@ -651,6 +680,7 @@ export const PROVENANCE_FILE = 'sbom-scan-provenance.json'
  */
 export async function writeScanProvenance(
     resultFolder: string, hasGithubToken: boolean, sboms?: SbomDescription[],
+    fallback?: {reason: string},
 ): Promise<string> {
     const preflight = await preflightScanners()
     // One provenance file per source subfolder: only that source's files, in scan order, each
@@ -664,6 +694,8 @@ export async function writeScanProvenance(
     const provenance = {
         generatedAt: new Date().toISOString(),
         ...(sboms?.length ? {source: sboms[0].producer} : {}),
+        // Only when a vulnerability server was asked and failed: the local scan stood in for it.
+        ...(fallback ? {vulnerabilitySource: 'local', fallbackReason: fallback.reason} : {}),
         pinnedVersions: PINNED_SCANNER_VERSIONS,
         scanners: {
             trivy: preflight.trivy,
@@ -747,6 +779,10 @@ export function warmScannerDatabases(): Promise<void> {
                     const elapsed = (Date.now() - started) / 1000
                     // Worth a line only when it actually fetched something; a no-op stays silent.
                     if (elapsed > 2) log.info(`${tool} vulnerability DB refreshed in ${elapsed.toFixed(1)}s`)
+                    // The preflight's status object is what provenance writes, so it is updated in
+                    // place. One extra process per tool: whether the refresh fetched anything is
+                    // not something either tool reports reliably.
+                    await rereadDb(status)
                 } catch (e: any) {
                     log.warn(`${tool} vulnerability DB refresh failed: ${scannerFailureReason(e)}`)
                     log.warn(`  ${tool} scans continue against whatever database is already on disk`)

@@ -1,7 +1,7 @@
 site_name: Depinder
 site_description: >-
-  Depinder — dependency analysis for CycloneDX SBOMs and native manifests: licences, newer
-  versions, vulnerabilities, and Black Duck-shaped CSV exports.
+  Depinder — dependency analysis for CycloneDX SBOMs: licences, newer versions,
+  vulnerabilities, and Black Duck-shaped CSV exports.
 
 # The published location (GitHub Pages via the org's dxworks.org domain). Required for a
 # populated sitemap.xml, canonical links, and Material's navigation.instant — all of which

@@ -6,8 +6,8 @@
 |---|---|---|
 | [`analyse`](analyse.md) | Dependencies, licences, versions, vulnerabilities; writes the CSVs, and the Black Duck files for SBOM input | Registries, first run only |
 | [`github-advisories`](github-advisories.md) | Local cache of GitHub reviewed advisories | GitHub API |
-| [`cache`](cache.md) | Inspect the SQLite cache; start and stop MongoDB | Docker |
-| [`update`](cache.md#update) | Refresh stale libraries in MongoDB | Registries |
+| [`cache`](cache.md) | Inspect the SQLite cache; import legacy JSON | — |
+| [`update`](cache.md#update) | Refresh stale libraries in the SQLite cache | Registries |
 | [`transformBlackDuckReports`](blackduck-reports.md) | Reshape a raw Black Duck export | None |
 | [`addCategoriesToBlackDuckReports`](blackduck-reports.md) | Add repository categories to it | None |
 | [`extractFrameworkVersion`](extract-framework-version.md) | .NET and Java versions per manifest, to CSV | None |

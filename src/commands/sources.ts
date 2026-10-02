@@ -9,7 +9,7 @@ import {log} from '../utils/logging'
  * A folder can hold anything — DepMiner writes Trivy SBOMs, Syft SBOMs and harvested lockfiles
  * side by side — so the file's own content decides, never the folder it was found in or the
  * name it was saved under: a CycloneDX file crediting Trivy is Trivy's, one crediting Syft is
- * Syft's, and everything else is the native plugins' input.
+ * Syft's, and everything else is ignored. CycloneDX SBOMs are depinder's only input.
  */
 
 /** The SBOMs one producer wrote, in walk order. */
@@ -20,21 +20,16 @@ export interface SbomSource {
 }
 
 export interface InputSources {
-    /** Every file that is not a CycloneDX SBOM — the native plugins' pool. */
-    native: string[]
     /** Ordered as `KNOWN_PRODUCERS` lists them: trivy, then syft. */
     sbom: SbomSource[]
 }
 
-/** The results subfolder the native route writes into. */
-export const NATIVE_SOURCE = 'depinder'
-
 export function classifyInputs(files: string[]): InputSources {
-    const native: string[] = []
+    let ignored = 0
     const byProducer = new Map<string, SbomDescription[]>(KNOWN_PRODUCERS.map(it => [it, []]))
     for (const file of files) {
         if (!isSbomFile(file)) {
-            native.push(file)
+            ignored++
             continue
         }
         let sbom: SbomDescription
@@ -58,7 +53,8 @@ export function classifyInputs(files: string[]): InputSources {
         .map(name => ({name, sboms: byProducer.get(name) ?? []}))
         .filter(it => it.sboms.length > 0)
     for (const source of sbom) warnDuplicateRepos(source)
-    return {native, sbom}
+    if (ignored > 0) log.info(`Ignored ${ignored} file(s) that are not CycloneDX SBOMs`)
+    return {sbom}
 }
 
 /**

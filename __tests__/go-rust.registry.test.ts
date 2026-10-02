@@ -105,13 +105,16 @@ describe('the crates.io registrar', () => {
         ],
     }
 
-    it('folds one response into versions, licence and links, dropping yanked versions', async () => {
+    it('folds one response into versions, licence and links, marking yanked versions', async () => {
         respondWith({'/crates/aho-corasick': {body: JSON.stringify(crate)}})
 
         const info = await retrieveFromCratesIo('aho-corasick')
 
-        expect(info.versions.map(it => [it.version, it.latest])).toEqual([['1.1.4', true], ['1.1.2', false]])
-        expect(info.versions[1].timestamp).toBe(Date.parse('2023-10-09T00:00:00Z'))
+        // A yanked version stays, marked, so a lockfile pinned to it still gets its date.
+        expect(info.versions.map(it => [it.version, it.latest, !!it.yanked]))
+            .toEqual([['1.1.4', true, false], ['1.1.3', false, true], ['1.1.2', false, false]])
+        expect(info.versions[1].timestamp).toBe(Date.parse('2024-03-20T00:00:00Z'))
+        expect(info.versions[2].timestamp).toBe(Date.parse('2023-10-09T00:00:00Z'))
         expect(info.versions[0].licenses).toEqual(['Unlicense OR MIT'])
         expect(info.licenses).toEqual(['Unlicense OR MIT'])
         expect(info.homepageUrl).toBe('https://github.com/BurntSushi/aho-corasick')

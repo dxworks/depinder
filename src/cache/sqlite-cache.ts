@@ -12,9 +12,8 @@ import {depinderFolder} from '../utils/utils'
  * two costs that grew with every run: `libs.json` reached 94 MB on a twelve-repository run and
  * was serialised WHOLE at every checkpoint, blocking the event loop for seconds; and a cache per
  * working directory meant the same packument was fetched once per project folder. This database
- * is written per row, so a checkpoint is free, and it lives in `~/.dxw/depinder/cache/` — the
- * folder `depinder cache init` already owns — so every run on the machine shares it, the way the
- * MongoDB cache does. The MongoDB cache is untouched: it is still chosen when its container runs.
+ * is written per row, so a checkpoint is free, and it lives in `~/.dxw/depinder/cache/`, so every
+ * run on the machine shares it. It is the only cache: each machine has its own.
  *
  * `node:sqlite` is Node's own module (stable API, `ExperimentalWarning` still printed on Node 24;
  * `index.ts` silences that one warning). No native addon, nothing to compile per platform.
@@ -75,23 +74,60 @@ export class CacheDb {
 
     // --- libs -------------------------------------------------------------------------------
 
-    getLib(key: string): LibraryInfo | undefined {
-        const row = this.db.prepare('SELECT value FROM libs WHERE key = ?').get(key) as {value: string} | undefined
+    /**
+     * The entry under `key`. With `cutoffMs`, only a fresh one — confirmed at or after the cutoff
+     * (see `max-age.ts`); an expired row reads as absent. Without it, any row, whatever its age.
+     */
+    getLib(key: string, cutoffMs?: number): LibraryInfo | undefined {
+        const row = (cutoffMs === undefined
+            ? this.db.prepare('SELECT value FROM libs WHERE key = ?').get(key)
+            : this.db.prepare('SELECT value FROM libs WHERE key = ? AND updated_at >= ?').get(key, cutoffMs)
+        ) as {value: string} | undefined
         return row ? JSON.parse(row.value) as LibraryInfo : undefined
     }
 
-    hasLib(key: string): boolean {
-        return this.db.prepare('SELECT 1 FROM libs WHERE key = ?').get(key) !== undefined
+    /** Same freshness rule as `getLib`. */
+    hasLib(key: string, cutoffMs?: number): boolean {
+        return (cutoffMs === undefined
+            ? this.db.prepare('SELECT 1 FROM libs WHERE key = ?').get(key)
+            : this.db.prepare('SELECT 1 FROM libs WHERE key = ? AND updated_at >= ?').get(key, cutoffMs)
+        ) !== undefined
     }
 
-    setLib(key: string, value: LibraryInfo): void {
+    /**
+     * When the facts under `key` were last confirmed against the registry (epoch milliseconds), or
+     * `undefined` if there is none. Usually the moment the row was written; for a resolver answer,
+     * the server's `confirmed_at`.
+     */
+    libUpdatedAt(key: string): number | undefined {
+        const row = this.db.prepare('SELECT updated_at FROM libs WHERE key = ?').get(key) as {updated_at: number} | undefined
+        return row ? Number(row.updated_at) : undefined
+    }
+
+    /**
+     * Writes the entry under `key`, stamped `updatedAt`: when its facts were last confirmed against
+     * the registry (epoch milliseconds). Now, for a registrar fetch or `update`; the server's
+     * `confirmed_at` for a resolver answer, which may be older than the run's cutoff — such a row is
+     * written already expired, and the next run asks for it again.
+     */
+    setLib(key: string, value: LibraryInfo, updatedAt = Date.now()): void {
         this.db.prepare('INSERT OR REPLACE INTO libs (key, value, updated_at) VALUES (?, ?, ?)')
-            .run(key, JSON.stringify(value), Date.now())
+            .run(key, JSON.stringify(value), updatedAt)
     }
 
     /** In insertion order (rowid), the order `libs.json` had. */
     libKeys(): string[] {
         return (this.db.prepare('SELECT key FROM libs ORDER BY rowid').all() as {key: string}[]).map(it => it.key)
+    }
+
+    /** Keys last confirmed before `ms` (epoch milliseconds), in insertion order: what `update` refreshes. */
+    libKeysUpdatedBefore(ms: number): string[] {
+        return (this.db.prepare('SELECT key FROM libs WHERE updated_at < ? ORDER BY rowid').all(ms) as {key: string}[]).map(it => it.key)
+    }
+
+    /** How many entries were last confirmed before `ms`: the expired ones, at that cutoff. */
+    countLibsUpdatedBefore(ms: number): number {
+        return Number((this.db.prepare('SELECT count(*) AS n FROM libs WHERE updated_at < ?').get(ms) as {n: number}).n)
     }
 
     /** Every entry, parsed, in insertion order. A twelve-repository run is ~90 MB of JSON; call it once. */
@@ -144,6 +180,11 @@ export class CacheDb {
      * Imports the JSON files of the previous cache layout from `dir`, if any: `libs.json` and
      * `misses.json`. A row already in the database is kept — an import never overwrites an entry
      * a later run already refreshed. The files are left as they are.
+     *
+     * An imported library's age is the age of the file it came from: `updated_at` is `libs.json`'s
+     * mtime. A file older than the cache max age therefore imports as expired, and the next
+     * analyse asks for those libraries again; a recent one stays fresh for what is left of its
+     * window. Misses keep the timestamps `misses.json` recorded.
      */
     importLegacy(dir: string): ImportCounts {
         const counts: ImportCounts = {libs: 0, misses: 0}
@@ -217,25 +258,42 @@ export function resetSharedCacheDb(): void {
     shared = undefined
 }
 
-/** The `Cache` a run picks when MongoDB is not running. Every `set` is durable on its own. */
-export const sqliteCache: Cache = {
-    get(key: string): LibraryInfo | undefined {
-        return sharedCacheDb().getLib(key)
-    },
-    set(key: string, value: LibraryInfo): void {
-        sharedCacheDb().setLib(key, value)
-    },
-    has(key: string): boolean {
-        return sharedCacheDb().hasLib(key)
-    },
-    load() {
-        sharedCacheDb()
-    },
-    // Each row is committed when it is set, so a checkpoint has nothing left to make durable.
-    flush() {
-        // durable already
-    },
-    write() {
-        // durable already; the connection stays open for the process
-    },
+/**
+ * The `Cache` an analyse run uses: it sees only entries confirmed at or after `cutoffMs`, so an
+ * expired entry reads as missing and is fetched again. `set` stamps `updated_at` with the current
+ * time unless told otherwise, so whatever the run fetches from a registry is fresh for the rest of
+ * it; a resolver answer carries the server's `confirmed_at`, and one older than the cutoff (a
+ * `refreshing` package) is written already expired — used by this run from memory, asked for again
+ * by the next. Every `set` is durable on its own.
+ */
+export function sqliteCacheWithCutoff(cutoffMs: number | undefined): Cache {
+    return {
+        get(key: string): LibraryInfo | undefined {
+            return sharedCacheDb().getLib(key, cutoffMs)
+        },
+        set(key: string, value: LibraryInfo, updatedAt?: number): void {
+            sharedCacheDb().setLib(key, value, updatedAt)
+        },
+        has(key: string): boolean {
+            return sharedCacheDb().hasLib(key, cutoffMs)
+        },
+        isExpired(key: string): boolean {
+            if (cutoffMs === undefined) return false
+            const updatedAt = sharedCacheDb().libUpdatedAt(key)
+            return updatedAt !== undefined && updatedAt < cutoffMs
+        },
+        load() {
+            sharedCacheDb()
+        },
+        // Each row is committed when it is set, so a checkpoint has nothing left to make durable.
+        flush() {
+            // durable already
+        },
+        write() {
+            // durable already; the connection stays open for the process
+        },
+    }
 }
+
+/** The cache with no age limit: every row, however old. What `update` reads and writes through. */
+export const sqliteCache: Cache = sqliteCacheWithCutoff(undefined)

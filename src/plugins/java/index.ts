@@ -1,73 +1,11 @@
-import {DependencyFileContext, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
-// @ts-ignore
 import path from 'path'
 import {AbstractRegistrar, LibrariesIORegistrar, LibraryInfo} from '../../extension-points/registrar'
 import {VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
-import {Plugin} from '../../extension-points/plugin'
 import fs from 'fs'
 import {depinderTempFolder} from '../../utils/utils'
-import {parseMavenDependencyTree} from './parsers/maven'
 import {log} from '../../utils/logging'
 
 import {XMLParser} from 'fast-xml-parser'
-
-const extractor: Extractor = {
-    files: ['pom.xml', 'build.gradle', 'build.gradle.kts'],
-    createContexts: files => {
-
-        const pomContexts = files.filter(it => it.endsWith('pom.xml')).map(it => ({
-            root: path.dirname(it),
-            lockFile: 'deptree.txt',
-            type: 'maven',
-        } as DependencyFileContext))
-
-        const gradleContexts = files.filter(it => it.endsWith('build.gradle') || it.endsWith('build.gradle.kts')).map(it => ({
-            root: path.dirname(it),
-            manifestFile: path.basename(it),
-            lockFile: 'gradle.json',
-            type: 'gradle',
-        }) as DependencyFileContext)
-
-        return [...pomContexts, ...gradleContexts]
-    },
-}
-
-const parser: Parser = {
-    parseDependencyTree: parseLockFile,
-}
-
-function parseLockFile(context: DependencyFileContext): DepinderProject {
-    if(context.type === 'maven') {
-        if(!fs.existsSync(path.resolve(context.root, context.lockFile))) {
-            throw new Error(`Dependency tree file not found: ${path.resolve(context.root, context.lockFile)}`)
-        }
-        const depTreeContent = fs.readFileSync(path.resolve(context.root, context.lockFile)).toString()
-
-        const depinderProject = parseMavenDependencyTree(depTreeContent)
-        depinderProject.path = path.resolve(context.root, context.manifestFile??'pom.xml')
-        return depinderProject
-    }
-    else if(context.type === 'gradle') {
-        throw new Error(`Unsupported context type: ${context.type}. Gradle is not supported yet!`)
-    }
-    // if (context.type === 'maven-with-dep-tree') {
-    //     return JSON.parse(fs.readFileSync(path.resolve(context.root, context.lockFile)).toString()) as DepinderProject
-    // }
-    //
-    // if (context.type === 'gradle') {
-    //     if (fs.existsSync(path.resolve(context.root, context.lockFile))) {
-    //         const proj = JSON.parse(fs.readFileSync(path.resolve(context.root, context.lockFile)).toString()) as DepinderProject
-    //         return {
-    //             ...proj,
-    //             dependencies: Object.entries(proj.dependencies).filter(([, value]) =>
-    //                 value.requestedBy.includes(`${proj.name}@${proj.version}`)
-    //             ).reduce((acc, [key, value]) => ({...acc, [key]: value}), {}),
-    //         }
-    //     }
-    // }
-
-    throw new Error(`Unsupported context type: ${context.type}`)
-}
 
 function parsePomFile(pomFile: string): any {
     return {pomObject: new XMLParser().parse(fs.readFileSync(pomFile, 'utf-8'))}
@@ -136,7 +74,7 @@ async function getLatestAvailablePom(groupId: string, artifactId: string, docs: 
     }
 }
 
-const checker: VulnerabilityChecker = {
+export const javaChecker: VulnerabilityChecker = {
     githubSecurityAdvisoryEcosystem: 'MAVEN',
     getPURL: (lib, ver) => `pkg:maven/${lib.replace(':', '/')}@${ver}`,
 }
@@ -199,6 +137,7 @@ export class MavenCentralRegistrar extends AbstractRegistrar {
         const pomResponse = await getLatestAvailablePom(groupId, artifactId, docs)
         const pomData = await pomResponse.text()
 
+        fs.mkdirSync(depinderTempFolder, {recursive: true})
         const pomFile = path.resolve(depinderTempFolder, `${libraryName}.pom`)
         fs.writeFileSync(pomFile, pomData)
 
@@ -300,13 +239,3 @@ export class MavenRepositoryRegistrar extends AbstractRegistrar {
 }
 
 export const javaRegistrar = new MavenRepositoryRegistrar(new MavenCentralRegistrar(new LibrariesIORegistrar('maven')))
-
-export const java: Plugin = {
-    name: 'java',
-    aliases: ['maven', 'gradle'],
-    extractor,
-    parser,
-    registrar: javaRegistrar,
-    checker,
-}
-

@@ -1,4 +1,5 @@
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
+import {availableVersions} from '../extension-points/registrar'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {ecosystemForPurlType} from '../vuln-sources/github/ecosystems'
 import {comparatorFor, VersionComparator} from '../vuln-sources/github/versions'
@@ -209,7 +210,8 @@ function toComponent(origin: Origin, purlType: string, id: string, dependency: D
         newerVersionsSemver: newer.bySemver,
         homepageUrl: library?.homepageUrl || undefined,
         vulnerabilities: [...(dependency.vulnerabilities ?? [])],
-        registryVersions: versions.map(it => it.version).sort(compare),
+        // The versions upgrade guidance may recommend: a withdrawn one is not among them.
+        registryVersions: availableVersions(versions).map(it => it.version).sort(compare),
         compare,
     }
 }

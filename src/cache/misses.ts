@@ -13,6 +13,11 @@ import {MISS_TTL_HOURS, sharedCacheDb} from './sqlite-cache'
  * A miss expires after `MISS_TTL_HOURS`, so a library published after the failure is picked up
  * within a day, and `--refresh` bypasses it entirely. A rate limit (429) is never recorded: that
  * says nothing about the library.
+ *
+ * This TTL is deliberately not the cache max age (`--cache-max-age`, `max-age.ts`). The max age
+ * says how long a library's facts may be reused; this says how soon a lookup that failed is tried
+ * again. Sharing one value would make a long max age stop retrying 404s for as long, and a zero
+ * one retry every failure on every run — what `--refresh` is for.
  */
 
 export {MISS_TTL_HOURS}

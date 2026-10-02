@@ -278,6 +278,39 @@ describe('the export model', () => {
         expect(without.newerVersionsSemver).toBe('1')
     })
 
+    it('dates a yanked resolved version but neither counts nor recommends a yanked one', () => {
+        // The project is pinned to 6.10.2, which the registry has since withdrawn, and 6.10.3 was
+        // withdrawn too: the row keeps 6.10.2's own date, and only 6.11.0 is a version to move to.
+        const yanked = dependency({
+            libraryInfo: {
+                name: 'qs',
+                licenses: ['BSD-3-Clause'],
+                versions: [
+                    {version: '6.10.2', timestamp: Date.parse('2021-10-06T00:00:00Z'), latest: false, yanked: true},
+                    {version: '6.10.3', timestamp: Date.parse('2022-01-01T00:00:00Z'), latest: false, yanked: true},
+                    {version: '6.11.0', timestamp: Date.parse('2022-06-01T00:00:00Z'), latest: true},
+                ],
+            },
+        } as never)
+        const [component] = buildModel('p', [ecosystem(yanked)], []).components
+        expect(component.releaseDate).toBe('2021-10-06')
+        expect(component.newerVersions).toBe('1')
+        expect(component.newerVersionsSemver).toBe('1')
+        expect(component.registryVersions).toEqual(['6.11.0'])
+    })
+
+    it('leaves the release date empty, not today, when the version has no date', () => {
+        const dateless = dependency({
+            libraryInfo: {
+                name: 'qs',
+                licenses: ['BSD-3-Clause'],
+                versions: [{version: '6.10.2', timestamp: NaN, latest: true}],
+            },
+        } as never)
+        expect(buildModel('p', [ecosystem(dateless)], []).components[0].releaseDate).toBe('')
+        expect(buildModel('p', [ecosystem(dependency({version: '6.10.1'} as never))], []).components[0].releaseDate).toBe('')
+    })
+
     it('leaves the date count empty when the resolved version is not in the registry list', () => {
         const unknown = dependency({version: '6.10.1'} as never)
         const [component] = buildModel('p', [ecosystem(unknown)], []).components

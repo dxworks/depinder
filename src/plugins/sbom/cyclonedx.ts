@@ -3,6 +3,7 @@ import path from 'path'
 import {SemVer} from 'semver'
 import {DepinderDependency, DepinderProject} from '../../extension-points/extract'
 import {log} from '../../utils/logging'
+import {normalizePurl} from './purl'
 
 /**
  * Parses CycloneDX SBOMs produced offline by Syft and Trivy into DepinderProjects.
@@ -644,6 +645,9 @@ export function parseCycloneDxFile(sbomFile: string, purlType: string): Depinder
                 version: parsed.version,
                 semver: toSemVer(parsed.version),
                 requestedBy: [],
+                // The SBOM's own purl, normalised so Syft and Trivy spell one package identically.
+                // Only the first copy of a duplicated id sets it; the merge path above leaves it be.
+                purl: normalizePurl(component?.purl, component),
                 // `type` (dev/test/provided) is deliberately absent: neither Syft nor Trivy emits
                 // dependency scope in any format, so there is nothing to fill it from.
                 libraryInfo: license ? {
