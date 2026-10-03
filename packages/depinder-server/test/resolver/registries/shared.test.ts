@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest'
-import {parsePurl} from '../../../src/shared/purl.js'
+import {parsePurl} from '@depinder/core'
 import {FIRST_CHECK_MARGIN_MS, modified, notModified} from '../../../src/resolver/registries/shared.js'
 import type {PollTarget} from '../../../src/resolver/registries/types.js'
 

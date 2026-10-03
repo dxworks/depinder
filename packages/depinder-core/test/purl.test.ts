@@ -7,7 +7,7 @@ import {
     SUPPORTED_TYPES,
     tryParsePurl,
     versionPurl,
-} from '../../src/shared/purl.js'
+} from '../src/purl.js'
 
 describe('parsePurl', () => {
     const cases: [string, {type: string; namespace: string | null; name: string; version: string | null; packageKey: string}][] = [

@@ -1,6 +1,6 @@
 import {XMLParser} from 'fast-xml-parser'
 import {HttpError} from '../http.js'
-import type {ParsedPurl} from '../../../shared/purl.js'
+import type {ParsedPurl} from '@depinder/core'
 import {stringOrUndefined, toDate} from '../shared.js'
 import type {FetchContext, FetchedVersion} from '../types.js'
 

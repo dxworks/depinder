@@ -1,5 +1,5 @@
 import {statfs} from 'node:fs/promises'
-import {createLogger, errorMessage, type Logger} from '../shared/log.js'
+import {createLogger, errorMessage, type Logger} from '@depinder/core'
 import {loadVulnConfigOrExit, type VulnConfig} from './config.js'
 import {createDatabaseInfo, grypeStatusCommand, readGrypeBuild, readTrivyBuild} from './databases.js'
 import {createScanLimiter} from './limiter.js'

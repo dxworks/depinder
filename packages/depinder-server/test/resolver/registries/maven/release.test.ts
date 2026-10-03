@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import {computeLatest, isPrerelease} from '../../../../src/resolver/registries/latest.js'
-import {parsePurl} from '../../../../src/shared/purl.js'
+import {parsePurl} from '@depinder/core'
 import {mavenRegistry} from '../../../../src/resolver/registries/maven/index.js'
 import {parseListing, parseMetadata, trustedRelease} from '../../../../src/resolver/registries/maven/metadata.js'
 import {pomCandidates} from '../../../../src/resolver/registries/maven/pom.js'

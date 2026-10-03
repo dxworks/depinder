@@ -1,7 +1,7 @@
 import pg from 'pg'
 import type {Config} from '../config.js'
 import type {ResolverEvents} from '../events.js'
-import {errorMessage, type Logger} from '../../shared/log.js'
+import {errorMessage, type Logger} from '@depinder/core'
 
 /**
  * `ResolverEvents` across processes: the same two signals, carried by Postgres `LISTEN/NOTIFY`.

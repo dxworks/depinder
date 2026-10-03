@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest'
 import {POLL_INTERVAL_MS} from '../../../src/resolver/api/resolve/types.js'
 import {createServer} from '../../../src/resolver/api/server.js'
 import type {ResolveStore} from '../../../src/resolver/api/store.js'
-import {nullLogger, type Logger} from '../../../src/shared/log.js'
+import {nullLogger, type Logger} from '@depinder/core'
 import type {PackageVersionsRow, QueueStats, RegistryFeedRow, ResolvePackageRow} from '../../../src/resolver/db/rows.js'
 import {auth, config, db, feedRow, knownRow, ndjson, store} from './server.helpers.js'
 

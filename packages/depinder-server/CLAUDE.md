@@ -9,7 +9,7 @@ agreements (commits, secrets, sizes, the resolver database) are in the root `CLA
 
 ```
 src/main.ts      ROLE switch: api, worker, all, vuln
-src/shared/      config, errors, logging, purl, the fastify plumbing both servers use
+src/shared/      config, errors, the fastify plumbing both servers use (purls and logging: @depinder/core)
 src/resolver/    api/, db/, registries/, worker/ (Postgres-backed)
 src/vuln/        POST /vulnerabilities: Trivy + Grype, no Postgres
 test/            mirrors src/; recorded registry answers in test/fixtures/

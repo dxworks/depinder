@@ -6,21 +6,26 @@ FROM anchore/grype:v0.118.0@sha256:8a93fc48da96bd6ec5981279d099b69de11541dc68fdf
 
 # The build context is the monorepo root (the root .dockerignore lets in only what is copied here).
 # npm ci needs every workspace's package.json to match the root lockfile; it installs only the
-# server's dependencies.
+# server's dependencies, @depinder/core (a workspace link) and core's own dependencies.
 
 # Build stage: dev dependencies and the TypeScript compiler, none of which ship.
 FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/depinder-cli/package.json packages/depinder-cli/
+COPY packages/depinder-core/package.json packages/depinder-core/
 COPY packages/depinder-server/package.json packages/depinder-server/
 COPY bench/package.json bench/
 RUN npm ci --workspace depinder-server
+COPY packages/depinder-core/tsconfig.json packages/depinder-core/tsconfig.build.json packages/depinder-core/
+COPY packages/depinder-core/src packages/depinder-core/src
+RUN npm run build --workspace @depinder/core
 COPY packages/depinder-server/tsconfig.json packages/depinder-server/tsconfig.build.json packages/depinder-server/
 COPY packages/depinder-server/src packages/depinder-server/src
 RUN npm run build --workspace depinder-server
 
-# Runtime stage: production dependencies, the compiled output, the migrations and the two scanners.
+# Runtime stage: production dependencies, the compiled server and core, the migrations and the two
+# scanners.
 # The resolver roles never call the scanners; one image for every role is simpler than two.
 FROM node:24-alpine AS runtime
 ENV NODE_ENV=production
@@ -31,9 +36,12 @@ COPY --from=grype /grype /usr/local/bin/grype
 
 COPY package.json package-lock.json ./
 COPY packages/depinder-cli/package.json packages/depinder-cli/
+COPY packages/depinder-core/package.json packages/depinder-core/
 COPY packages/depinder-server/package.json packages/depinder-server/
 COPY bench/package.json bench/
 RUN npm ci --omit=dev --workspace depinder-server && npm cache clean --force
+# node_modules/@depinder/core links here: the compiled core, no sources.
+COPY --from=build /app/packages/depinder-core/dist packages/depinder-core/dist
 
 WORKDIR /app/packages/depinder-server
 COPY --from=build /app/packages/depinder-server/dist ./dist

@@ -9,12 +9,13 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "dev": "tsx watch src/main.ts",
+    "dev": "tsx watch --conditions=depinder-source src/main.ts",
     "start": "node dist/main.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@depinder/core": "0.0.0",
     "@fastify/compress": "^9.2.0",
     "fast-xml-parser": "^5.11.1",
     "fastify": "^5.0.0",

@@ -1,7 +1,7 @@
 import {isDeadlock, type Db} from '../db/db.js'
 import type {ResolverEvents} from '../events.js'
 import {CHANNEL_QUEUED, CHANNEL_WANTED} from '../db/notify.js'
-import type {ParsedPurl} from '../../shared/purl.js'
+import type {ParsedPurl} from '@depinder/core'
 import {enqueue, PRIORITY, sortedUnique} from '../db/queue.js'
 import type {PackageVersionsRow, QueueStats, RegistryFeedRow, ResolvePackageRow} from '../db/rows.js'
 

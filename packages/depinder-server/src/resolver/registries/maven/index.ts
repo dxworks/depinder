@@ -1,6 +1,6 @@
 import {HttpError} from '../http.js'
 import {isPrerelease} from '../latest.js'
-import {registryName} from '../../../shared/purl.js'
+import {registryName} from '@depinder/core'
 import {modified, notModified} from '../shared.js'
 import type {FetchContext, FetchedVersion, PollResult, PollTarget, Registry} from '../types.js'
 import {artifactBase, fetchReleaseDates, parseMetadata, SOURCE, trustedRelease} from './metadata.js'

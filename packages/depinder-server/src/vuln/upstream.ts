@@ -1,4 +1,4 @@
-import {errorMessage} from '../shared/log.js'
+import {errorMessage} from '@depinder/core'
 
 /**
  * "Is there a newer build?", asked of the publishers directly, with one small HTTP read each.

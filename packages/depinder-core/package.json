@@ -1,0 +1,32 @@
+{
+  "name": "@depinder/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "What the depinder CLI and the resolver server share: registry fetchers, the HTTP client, purls, logging, the latest rule and the wire PackageRecord",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "depinder-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./fixtures/*": "./test/fixtures/*"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.11.1",
+    "packageurl-js": "^2.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {parsePurl} from '../../../../src/shared/purl.js'
+import {parsePurl} from '@depinder/core'
 import {mavenRegistry} from '../../../../src/resolver/registries/maven/index.js'
 import {parseListing, parseMetadata} from '../../../../src/resolver/registries/maven/metadata.js'
 import {parsePom} from '../../../../src/resolver/registries/maven/pom.js'

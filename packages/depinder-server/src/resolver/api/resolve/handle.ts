@@ -1,4 +1,4 @@
-import {isSupportedType, tryParsePurl, type ParsedPurl} from '../../../shared/purl.js'
+import {isSupportedType, tryParsePurl, type ParsedPurl} from '@depinder/core'
 import type {ResolvePackageRow} from '../../db/rows.js'
 import {Abandoned, emit, send, stopIfGone, type Open, type ResolveContext, type Wanted} from './context.js'
 import {iso} from './payload.js'

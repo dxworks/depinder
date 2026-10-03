@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url'
 import pg from 'pg'
 import type {PoolClient, QueryResultRow} from 'pg'
 import type {Config} from '../config.js'
-import {nullLogger, type Logger} from '../../shared/log.js'
+import {nullLogger, type Logger} from '@depinder/core'
 
 const {Pool} = pg
 

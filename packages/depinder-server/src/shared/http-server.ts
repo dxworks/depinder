@@ -3,7 +3,7 @@ import {constants as zlib} from 'node:zlib'
 import compress from '@fastify/compress'
 import type {FastifyError, FastifyInstance, FastifyReply, FastifyRequest} from 'fastify'
 import {BadRequestError} from './errors.js'
-import {errorMessage, type Logger} from './log.js'
+import {errorMessage, type Logger} from '@depinder/core'
 
 /**
  * The HTTP plumbing every server in this repo shares: compression, the bearer token, and how a

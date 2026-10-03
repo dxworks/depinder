@@ -3,7 +3,7 @@ import {handleResolve} from '../../../../src/resolver/api/resolve/handle.js'
 import type {ResolveOutcome} from '../../../../src/resolver/api/resolve/types.js'
 import {createVersionCache} from '../../../../src/resolver/api/version-cache.js'
 import {createResolverEvents} from '../../../../src/resolver/events.js'
-import {nullLogger, type Logger} from '../../../../src/shared/log.js'
+import {nullLogger, type Logger} from '@depinder/core'
 import {ask, Collector, fakeClock, FakeStore, packageRow, tick, version} from './resolve.helpers.js'
 
 /**

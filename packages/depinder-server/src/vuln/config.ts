@@ -1,6 +1,6 @@
 import {availableParallelism, tmpdir} from 'node:os'
 import {ConfigError, requireLogLevel, requirePort, requireToken, str} from '../shared/config.js'
-import type {LogLevel} from '../shared/log.js'
+import type {LogLevel} from '@depinder/core'
 import {normalizeRepository} from './upstream.js'
 
 /** Trivy's own default since 0.6x: Google's mirror, because anonymous pulls from ghcr are rate-limited. */

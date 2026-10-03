@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {nullLogger} from '../../../src/shared/log.js'
+import {nullLogger} from '@depinder/core'
 import {registries} from '../../../src/resolver/registries/index.js'
 import {firstRunDelayMs, POLL_FIRST_SWEEP_MS} from '../../../src/resolver/worker/feeds.js'
 import {startLoop} from '../../../src/resolver/worker/loop.js'

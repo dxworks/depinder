@@ -1,5 +1,5 @@
 import {rm} from 'node:fs/promises'
-import {errorMessage, type Logger} from '../shared/log.js'
+import {errorMessage, type Logger} from '@depinder/core'
 import type {DatabaseBuild} from './databases.js'
 import type {ScannerName} from './scanners.js'
 import type {Store} from './store.js'

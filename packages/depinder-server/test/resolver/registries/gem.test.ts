@@ -1,8 +1,7 @@
 import {readFileSync} from 'node:fs'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import {createHttpClient, resetLimiters, type FetchRecord} from '../../../src/resolver/registries/http.js'
-import type {Logger} from '../../../src/shared/log.js'
-import {parsePurl} from '../../../src/shared/purl.js'
+import {type Logger, parsePurl} from '@depinder/core'
 import {gemRegistry, parseCompactIndex} from '../../../src/resolver/registries/gem.js'
 import type {FetchContext} from '../../../src/resolver/registries/types.js'
 

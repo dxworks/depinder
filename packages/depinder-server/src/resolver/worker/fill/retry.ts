@@ -1,6 +1,6 @@
 import type {Db} from '../../db/db.js'
 import type {FetchRecord} from '../../registries/http.js'
-import type {Logger} from '../../../shared/log.js'
+import type {Logger} from '@depinder/core'
 import {CHANNEL_QUEUED} from '../../db/notify.js'
 import {PRIORITY} from '../../db/queue.js'
 import type {FetchQueueRow} from '../../db/rows.js'

@@ -1,6 +1,6 @@
 import {readFile, stat} from 'node:fs/promises'
 import {join} from 'node:path'
-import {errorMessage} from '../shared/log.js'
+import {errorMessage} from '@depinder/core'
 import type {VulnConfig} from './config.js'
 import {grypeEnv, runScanner, ScanError} from './scanners.js'
 

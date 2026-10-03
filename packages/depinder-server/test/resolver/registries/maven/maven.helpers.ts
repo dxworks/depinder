@@ -1,8 +1,7 @@
 import {readFileSync} from 'node:fs'
 import {vi} from 'vitest'
 import {createHttpClient, resetLimiters, type FetchRecord} from '../../../../src/resolver/registries/http.js'
-import {nullLogger} from '../../../../src/shared/log.js'
-import {parsePurl} from '../../../../src/shared/purl.js'
+import {nullLogger, parsePurl} from '@depinder/core'
 import type {FetchContext, PollTarget} from '../../../../src/resolver/registries/types.js'
 
 /** What the maven tests share: the Central fixtures, a stubbed `fetch` that records each call, and the URLs. */

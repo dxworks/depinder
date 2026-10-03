@@ -1,5 +1,5 @@
 import {HttpError} from '../http.js'
-import {errorMessage} from '../../../shared/log.js'
+import {errorMessage} from '@depinder/core'
 import {normaliseLicenses, normaliseRepoUrl, stringOrUndefined} from '../shared.js'
 import type {FetchContext, FetchedVersion} from '../types.js'
 import {artifactBase, child, list, seg, SOURCE, textOf, trustedRelease, xml} from './metadata.js'

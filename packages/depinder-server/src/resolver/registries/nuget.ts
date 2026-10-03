@@ -1,7 +1,6 @@
 import {HttpError} from './http.js'
 import {highest, isPrerelease} from './latest.js'
-import {errorMessage} from '../../shared/log.js'
-import {fromRegistryName, registryName} from '../../shared/purl.js'
+import {errorMessage, fromRegistryName, registryName} from '@depinder/core'
 import {normaliseLicenses, normaliseRepoUrl, stringOrUndefined, toDate} from './shared.js'
 import type {FeedEvent, FeedResult, FetchContext, FetchedPackage, FetchedVersion, Registry} from './types.js'
 

@@ -1,7 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest'
 import {createResolveStore, FEEDS_TTL_MS} from '../../../src/resolver/api/store.js'
 import {DEADLOCK_DETECTED, type Db, type Queryable} from '../../../src/resolver/db/db.js'
-import {parsePurl} from '../../../src/shared/purl.js'
+import {parsePurl} from '@depinder/core'
 import {PRIORITY} from '../../../src/resolver/db/queue.js'
 
 /**

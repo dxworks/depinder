@@ -1,4 +1,4 @@
-import type {ParsedPurl} from '../../../shared/purl.js'
+import type {ParsedPurl} from '@depinder/core'
 import type {CompactVersion, ResolvePackageRow} from '../../db/rows.js'
 import type {ResolveStore} from '../store.js'
 import {toPackagePayload} from './payload.js'

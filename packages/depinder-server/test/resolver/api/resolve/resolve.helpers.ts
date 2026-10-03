@@ -11,7 +11,7 @@ import {
     type ResolveTrailer,
 } from '../../../../src/resolver/api/resolve/types.js'
 import type {ResolveStore} from '../../../../src/resolver/api/store.js'
-import type {ParsedPurl} from '../../../../src/shared/purl.js'
+import type {ParsedPurl} from '@depinder/core'
 import type {
     CompactVersion,
     PackageVersionsRow,

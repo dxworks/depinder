@@ -1,8 +1,7 @@
 import {readFileSync} from 'node:fs'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import {createHttpClient, resetLimiters, type FetchRecord} from '../../../src/resolver/registries/http.js'
-import {nullLogger} from '../../../src/shared/log.js'
-import {parsePurl} from '../../../src/shared/purl.js'
+import {nullLogger, parsePurl} from '@depinder/core'
 import {
     classifierLicenses,
     packageFromProject,

@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest'
 import {handleResolve} from '../../../../src/resolver/api/resolve/handle.js'
-import {nullLogger, type Logger} from '../../../../src/shared/log.js'
+import {nullLogger, type Logger} from '@depinder/core'
 import {ask, Collector, fakeClock, FakeStore, packageRow, resolve, version} from './resolve.helpers.js'
 
 describe('handleResolve', () => {

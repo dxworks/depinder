@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import {resetLimiters, sleep} from '../../../../src/resolver/registries/http.js'
-import {nullLogger} from '../../../../src/shared/log.js'
+import {nullLogger} from '@depinder/core'
 import {createResolverEvents} from '../../../../src/resolver/events.js'
 import {runOnce} from '../../../../src/resolver/worker/fill/pool.js'
 import {MAX_ATTEMPTS} from '../../../../src/resolver/worker/fill/retry.js'

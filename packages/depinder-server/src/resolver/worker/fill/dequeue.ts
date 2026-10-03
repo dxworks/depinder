@@ -1,6 +1,6 @@
 import type {Db} from '../../db/db.js'
 import {fetchSlots} from '../../registries/http.js'
-import {SUPPORTED_TYPES} from '../../../shared/purl.js'
+import {SUPPORTED_TYPES} from '@depinder/core'
 import type {FetchQueueRow} from '../../db/rows.js'
 
 /**

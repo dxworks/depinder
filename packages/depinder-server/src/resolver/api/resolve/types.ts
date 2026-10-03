@@ -1,5 +1,5 @@
 import type {ResolverEvents} from '../../events.js'
-import type {Logger} from '../../../shared/log.js'
+import type {Logger} from '@depinder/core'
 import type {CompactVersion} from '../../db/rows.js'
 import type {ResolveStore} from '../store.js'
 import type {VersionCache} from '../version-cache.js'

@@ -9,8 +9,7 @@ what the fetch queue guarantees.
 src/
   main.ts                  boot by ROLE, migrations, graceful shutdown
   shared/                  used by both roles; imports nothing from resolver/ or vuln/
-    config.ts  log.ts        env parsing helpers; the logger
-    purl.ts                  parse/canonicalise -> packageKey, registryName, versionPurl
+    config.ts                env parsing helpers (the logger and purls come from @depinder/core)
     http-server.ts           auth, compression, error handler, body limit, clientGone
     errors.ts                BadRequestError, answered as a 400
   resolver/                ROLE=api|worker|all

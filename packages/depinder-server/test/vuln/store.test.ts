@@ -2,7 +2,7 @@ import {access, mkdir, mkdtemp, readdir, readFile, rm, writeFile} from 'node:fs/
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {afterEach, beforeEach, describe, expect, it} from 'vitest'
-import {nullLogger} from '../../src/shared/log.js'
+import {nullLogger} from '@depinder/core'
 import type {ScannerName} from '../../src/vuln/scanners.js'
 import {type BuildRecord, buildFolderName, createStore, type Store} from '../../src/vuln/store.js'
 

@@ -3,7 +3,7 @@ import {afterAll, beforeAll, describe, expect, it} from 'vitest'
 import type {FastifyInstance} from 'fastify'
 import {COMPRESS_THRESHOLD_BYTES} from '../../../src/shared/http-server.js'
 import {createServer} from '../../../src/resolver/api/server.js'
-import {nullLogger} from '../../../src/shared/log.js'
+import {nullLogger} from '@depinder/core'
 import {auth, config, db, ndjson, store, TOKEN} from './server.helpers.js'
 
 let app: FastifyInstance

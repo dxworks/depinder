@@ -1,6 +1,6 @@
 import {access, mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile} from 'node:fs/promises'
 import {join} from 'node:path'
-import {errorMessage, type Logger} from '../shared/log.js'
+import {errorMessage, type Logger} from '@depinder/core'
 import type {ScannerName} from './scanners.js'
 import {describeBuild, type LeaseResult, type StaleHours} from './source.js'
 

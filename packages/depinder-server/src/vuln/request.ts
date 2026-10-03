@@ -1,6 +1,6 @@
 import {PackageURL} from 'packageurl-js'
 import {BadRequestError} from '../shared/errors.js'
-import {isSupportedType, tryParsePurl} from '../shared/purl.js'
+import {isSupportedType, tryParsePurl} from '@depinder/core'
 
 /**
  * The body of `POST /vulnerabilities`, validated and sorted into what can be scanned and what

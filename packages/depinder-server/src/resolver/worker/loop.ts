@@ -1,4 +1,4 @@
-import {errorMessage, type Logger} from '../../shared/log.js'
+import {errorMessage, type Logger} from '@depinder/core'
 
 /**
  * A cancellable "run this every N ms" loop. Ticks never overlap: the next one is scheduled after

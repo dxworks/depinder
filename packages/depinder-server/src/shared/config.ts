@@ -1,4 +1,4 @@
-import type {LogLevel} from './log.js'
+import type {LogLevel} from '@depinder/core'
 
 /**
  * The environment parsing both roles share: the resolver's `loadConfig`

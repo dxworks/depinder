@@ -1,5 +1,5 @@
 import {bool, ConfigError, requireLogLevel, requirePort, requireToken, str} from '../shared/config.js'
-import type {LogLevel} from '../shared/log.js'
+import type {LogLevel} from '@depinder/core'
 
 export type Role = 'api' | 'worker' | 'all'
 
