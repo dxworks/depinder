@@ -16,6 +16,9 @@ const REGISTRY_URL = 'https://registry.npmjs.org'
 const SOURCE = 'registry.npmjs.org'
 
 interface PackumentVersion {
+    version?: string
+    homepage?: unknown
+    repository?: unknown
     license?: unknown
     licenses?: unknown
     deprecated?: string
@@ -79,13 +82,41 @@ export function packageFromPackument(doc: Packument): FetchedPackage {
 
     return {
         description: stringOrUndefined(doc.description),
-        homepageUrl: stringOrUndefined(doc.homepage),
+        homepageUrl: npmProjectLink(doc),
         repoUrl: normaliseRepoUrl(doc.repository),
         licenses: packageLicenses,
         versions,
         registryLatest,
         sources: [SOURCE],
     }
+}
+
+/**
+ * The npm Component Link, as the CLI tuned it against Black Duck (D9): the top-level `homepage`,
+ * else the newest version that declares a `homepage` or a `repository`, homepage first. The
+ * repository is kept as declared (`git+https://….git` included), as the CLI wrote it.
+ */
+export function npmProjectLink(doc: Packument): string | undefined {
+    const topLevel = stringOrUndefined(doc.homepage)
+    if (topLevel) return topLevel
+    for (const versionDoc of versionsNewestFirst(doc)) {
+        const link = stringOrUndefined(versionDoc?.homepage) ?? declaredRepository(versionDoc?.repository)
+        if (link) return link
+    }
+    return undefined
+}
+
+function versionsNewestFirst(doc: Packument): PackumentVersion[] {
+    const time = doc.time ?? {}
+    const publishedAt = (versionDoc: PackumentVersion) => Date.parse(time[versionDoc?.version ?? ''] ?? '') || 0
+    return Object.values(doc.versions ?? {}).sort((a, b) => publishedAt(b) - publishedAt(a))
+}
+
+/** `repository` is either a plain string or `{type, url}`. */
+function declaredRepository(repository: unknown): string | undefined {
+    if (typeof repository === 'string') return stringOrUndefined(repository)
+    if (repository && typeof repository === 'object') return stringOrUndefined((repository as {url?: unknown}).url)
+    return undefined
 }
 
 function pickPackageLicenses(
