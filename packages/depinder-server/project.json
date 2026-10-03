@@ -1,0 +1,43 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "depinder-server",
+  "projectType": "application",
+  "sourceRoot": "packages/depinder-server/src",
+  "tags": ["scope:server"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-script",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {"script": "build"}
+    },
+    "typecheck": {
+      "executor": "nx:run-script",
+      "options": {"script": "typecheck"}
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "eslint src"}
+    },
+    "test": {
+      "executor": "nx:run-script",
+      "options": {"script": "test"}
+    },
+    "test-integration": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "vitest run",
+        "env": {"TEST_DATABASE_URL": "postgresql://postgres:depinder@127.0.0.1:55432/depinder"}
+      }
+    },
+    "docker-build": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "cwd": "{workspaceRoot}",
+        "command": "docker build -f packages/depinder-server/Dockerfile -t depinder-server:0.2.0 ."
+      }
+    }
+  }
+}
