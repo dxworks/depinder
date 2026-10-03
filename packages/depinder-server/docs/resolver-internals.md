@@ -21,7 +21,7 @@ src/
     db/fetch-log.ts          every upstream request, for provenance
     api/                     fastify server, /resolve, /feeds, /health
     registries/<type>-feed.ts  one change feed per ecosystem (maven-poll.ts, cargo-poll.ts poll
-                             instead); fetching a package is @depinder/core's fetchPackage
+                             instead); fetching a package is @depinder/core's fetchPackage, latest rule included
     registries/http.ts       the server's limits, limiter order and fetch recording around core's client
     worker/fill/             the demand-fill queue consumer: fetch, write, retry, backoff, sweeper
     worker/feeds.ts          per-registry change feeds and conditional-GET polling

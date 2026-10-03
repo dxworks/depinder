@@ -37,6 +37,14 @@ export interface FetchedPackage {
     recheckAt?: Date
 }
 
+/** A fetched package with the latest rule applied: what every caller of `fetchPackage` gets. */
+export interface ResolvedPackage extends FetchedPackage {
+    /** The version depinder calls latest. See `computeLatest` in `latest.ts`. */
+    latest?: string
+    /** The newest version overall, only when it differs from `latest`. */
+    latestPrerelease?: string
+}
+
 export interface FetchContext {
     /** Timeout, User-Agent and the caller's per-ecosystem limiter. Never call `fetch`. */
     http: HttpClient

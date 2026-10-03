@@ -91,7 +91,8 @@ The server's half, from `src/resolver/registries/types.ts`, is the `FeedSpec` de
   core's `test/registries/latest.test.ts` — maven and composer already have one.
 - Do **not** compute `latest` yourself. Set `registryLatest` when the registry designates one
   (npm `dist-tags.latest`, pypi `info.version`, gem `gems/<g>.json .version`, golang `@latest`,
-  cargo `max_stable_version`) and leave it undefined otherwise; the worker calls `computeLatest`.
+  cargo `max_stable_version`) and leave it undefined otherwise; core's `fetchPackage` applies
+  `computeLatest` to every fetch, so no caller can skip it.
 - Licenses: run whatever the registry gave you through `normaliseLicenses` from
   `./normalise.ts`. It flattens strings, `{type}` objects and arrays, and leaves SPDX expressions
   (`"MIT OR Apache-2.0"`) whole. `toDate` and `normaliseRepoUrl` are there for the same reason —

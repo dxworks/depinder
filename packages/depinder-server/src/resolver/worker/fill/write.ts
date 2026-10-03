@@ -2,7 +2,7 @@ import type {Config} from '../../config.js'
 import type {Db, Queryable} from '../../db/db.js'
 import type {ResolverEvents} from '../../events.js'
 import type {FetchRecord} from '../../registries/http.js'
-import {computeLatest, versionPurl, type FetchedPackage, type FetchedVersion, type Logger, type ParsedPurl} from '@depinder/core'
+import {versionPurl, type FetchedVersion, type Logger, type ParsedPurl, type ResolvedPackage} from '@depinder/core'
 import {CHANNEL_SETTLED} from '../../db/notify.js'
 import type {FetchQueueRow} from '../../db/rows.js'
 import {insertFetchLog} from '../../db/fetch-log.js'
@@ -53,7 +53,7 @@ export async function writeResult(
     job: JobContext,
     row: FetchQueueRow,
     key: ParsedPurl,
-    fetched: FetchedPackage | null,
+    fetched: ResolvedPackage | null,
     records: readonly FetchRecord[],
     fetchedAt: Date,
 ): Promise<void> {
@@ -61,9 +61,8 @@ export async function writeResult(
         if (!fetched) {
             await markNotFound(tx, key, fetchedAt, row.requests)
         } else {
-            const latest = computeLatest(key.type, fetched.versions, fetched.registryLatest)
             const source = fetched.sources.join(', ')
-            await upsertResolved(tx, key, fetched, latest, source, fetchedAt, row.requests)
+            await upsertResolved(tx, key, fetched, source, fetchedAt, row.requests)
             await replaceVersions(tx, key, fetched, source, fetchedAt)
         }
         await insertFetchLog(tx, key.packageKey, records)
@@ -125,8 +124,7 @@ async function markNotFound(tx: Queryable, key: ParsedPurl, fetchedAt: Date, req
 async function upsertResolved(
     tx: Queryable,
     key: ParsedPurl,
-    fetched: FetchedPackage,
-    latest: {latest?: string; latestPrerelease?: string},
+    fetched: ResolvedPackage,
     source: string,
     fetchedAt: Date,
     requests: number,
@@ -162,8 +160,8 @@ async function upsertResolved(
             fetched.homepageUrl ?? null,
             fetched.repoUrl ?? null,
             fetched.licenses,
-            latest.latest ?? null,
-            latest.latestPrerelease ?? null,
+            fetched.latest ?? null,
+            fetched.latestPrerelease ?? null,
             source,
             fetchedAt,
             requests,
@@ -185,7 +183,7 @@ async function upsertResolved(
 async function replaceVersions(
     tx: Queryable,
     key: ParsedPurl,
-    fetched: FetchedPackage,
+    fetched: ResolvedPackage,
     source: string,
     fetchedAt: Date,
 ): Promise<void> {
@@ -230,7 +228,7 @@ interface VersionRow extends FetchedVersion {
  * `on conflict do update` refuses to touch a row twice in one statement; the delete-then-insert
  * this replaced let the second one fall through `do nothing`, so the first still wins.
  */
-function versionRows(key: ParsedPurl, fetched: FetchedPackage): VersionRow[] {
+function versionRows(key: ParsedPurl, fetched: ResolvedPackage): VersionRow[] {
     const rows: VersionRow[] = []
     const seen = new Set<string>()
     for (const version of fetched.versions) {
