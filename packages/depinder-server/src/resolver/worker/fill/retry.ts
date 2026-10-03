@@ -13,7 +13,7 @@ const BACKOFF_MS = [30_000, 120_000, 600_000]
 const ERROR_RETRY = "interval '1 hour'"
 
 /** A failed attempt: back off, or give up once the attempts are spent. */
-// [9] Failure: BACKOFF_MS [30s, 2m, 10m], 3 attempts, then giveUp() stores 'error'. Next stop [10], in registries/types.ts.
+// [9] Failure: BACKOFF_MS [30s, 2m, 10m], 3 attempts, then giveUp() stores 'error'. Next stop [10], in core's registries/types.ts.
 export async function recordFailure(
     job: JobContext,
     row: FetchQueueRow,

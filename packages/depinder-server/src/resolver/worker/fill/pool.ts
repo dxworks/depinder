@@ -2,9 +2,8 @@ import type {Config} from '../../config.js'
 import type {Db} from '../../db/db.js'
 import type {ResolverEvents} from '../../events.js'
 import {createRegistryClient, URGENT_RANK, type FetchRecord, type Rank} from '../../registries/http.js'
-import {errorMessage, type Logger, type ParsedPurl, parsePurl} from '@depinder/core'
+import {canFetch, errorMessage, fetchPackage, parsePurl, type Logger, type ParsedPurl} from '@depinder/core'
 import type {FetchQueueRow} from '../../db/rows.js'
-import {registryFor} from '../../registries/index.js'
 import {startLoop, type Loop} from '../loop.js'
 import {dequeue, quotas, renewLeases} from './dequeue.js'
 import {giveUp, recordFailure, sweepRetries} from './retry.js'
@@ -265,7 +264,7 @@ export function fetchRank(urgency: Urgency, priority: number, now: () => number 
     return () => (urgency.until > now() ? URGENT_RANK : priority)
 }
 
-// [7] One row, one package: parse key → registry.fetchPackage → write. Throwing here means retry, not crash.
+// [7] One row, one package: parse key → core's fetchPackage → write. Throwing here means retry, not crash.
 async function processRow(row: FetchQueueRow, job: JobContext, urgency: Urgency = urgencyOf(row)): Promise<void> {
     let key: ParsedPurl
     try {
@@ -275,8 +274,7 @@ async function processRow(row: FetchQueueRow, job: JobContext, urgency: Urgency 
         return
     }
 
-    const registry = registryFor(key.type)
-    if (!registry) {
+    if (!canFetch(key.type)) {
         // Never fires in practice: all eight supported types have a registry. One row's error, not a crash.
         await giveUp(job, row, `no registry implemented for type "${key.type}"`, [])
         return
@@ -294,7 +292,7 @@ async function processRow(row: FetchQueueRow, job: JobContext, urgency: Urgency 
     const startedAt = new Date()
 
     try {
-        const fetched = await registry.fetchPackage(key, {
+        const fetched = await fetchPackage(key, {
             http,
             log,
             options: {mavenPerVersionLicenses: job.config.mavenPerVersionLicenses},

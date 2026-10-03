@@ -10,9 +10,9 @@ agreements (commits, secrets, sizes, the resolver database) are in the root `CLA
 ```
 src/main.ts      ROLE switch: api, worker, all, vuln
 src/shared/      config, errors, the fastify plumbing both servers use (purls and logging: @depinder/core)
-src/resolver/    api/, db/, registries/, worker/ (Postgres-backed)
+src/resolver/    api/, db/, registries/ (feeds, polls, limits), worker/ (Postgres-backed)
 src/vuln/        POST /vulnerabilities: Trivy + Grype, no Postgres
-test/            mirrors src/; recorded registry answers in test/fixtures/
+test/            mirrors src/; recorded feed answers in test/fixtures/ (the fetchers' are in core)
 bench/micro/     the server's micro benches (the end-to-end bench is the root bench/ project)
 deploy/          the deploy kit (Hetzner, compose.server.yml); the server address only from
                  DEPINDER_SERVER_IP or --ip, never in a file

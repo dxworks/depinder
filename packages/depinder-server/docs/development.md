@@ -18,8 +18,9 @@ npm run dev -w depinder-server           # tsx watch
 Inside `packages/depinder-server`, `npm test`, `npm run typecheck`, `npm run build` and `npm run dev`
 work too.
 
-Tests never hit the network: registry tests stub `fetch` with recorded fixtures, and the API tests
-use a stubbed store. Keep it that way.
+Tests never hit the network: feed tests stub `fetch` with recorded fixtures (the fetchers' own
+tests and recorded answers are in `packages/depinder-core`), and the API tests use a stubbed store.
+Keep it that way.
 
 `test/resolver/db/db.integration.test.ts` runs the real SQL — migrations, the queue, the feed
 cursors, the migration backfill — and is skipped unless you point it at a throwaway database:

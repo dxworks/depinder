@@ -17,7 +17,6 @@
   "dependencies": {
     "@depinder/core": "0.0.0",
     "@fastify/compress": "^9.2.0",
-    "fast-xml-parser": "^5.11.1",
     "fastify": "^5.0.0",
     "packageurl-js": "^2.0.1",
     "pg": "^8.13.0"

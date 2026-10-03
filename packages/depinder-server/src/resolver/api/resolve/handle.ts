@@ -55,7 +55,7 @@ interface FirstRead {
     unknown: ParsedPurl[]
 }
 
-// [0] TRAIL A→Z, 15 stops: api/resolve/ → worker/fill/ → registries/types.ts → registries/npm.ts
+// [0] TRAIL A→Z, 15 stops: api/resolve/ → worker/fill/ → core registries/types.ts → registries/types.ts → core npm.ts → registries/npm-feed.ts
 // [1] IN: {purls: string[], deadline_ms?, max_age?} and nothing else — parseResolveRequest in request.ts is the entire shape check.
 /**
  * The steps, in order: group the purls by package ({@link createContext}), read what is known

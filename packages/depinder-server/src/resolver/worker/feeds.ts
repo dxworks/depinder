@@ -1,10 +1,10 @@
 import type {Config} from '../config.js'
 import type {Db} from '../db/db.js'
 import {createRegistryClient, type FetchRecord} from '../registries/http.js'
-import {errorMessage, type Logger, parsePurl} from '@depinder/core'
+import {errorMessage, parsePurl, type FetchContext, type Logger} from '@depinder/core'
 import {enqueue, PRIORITY} from '../db/queue.js'
 import {registries} from '../registries/index.js'
-import type {FeedSpec, FetchContext, Registry} from '../registries/types.js'
+import type {FeedSpec, Registry} from '../registries/types.js'
 import {insertFetchLog} from '../db/fetch-log.js'
 import {startLoop, type Loop} from './loop.js'
 

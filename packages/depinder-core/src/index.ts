@@ -35,3 +35,9 @@ export {
     type RequestLimiter,
     type WaiterPicker,
 } from './http/limiter.js'
+export {mapWithConcurrency} from './concurrency.js'
+export {canFetch, fetchPackage} from './fetch-package.js'
+export {mavenMetadataUrl} from './registries/maven/index.js'
+export {stringOrUndefined, toDate} from './registries/normalise.js'
+export type {FetchContext, FetchedPackage, FetchedVersion, RegistryOptions} from './registries/types.js'
+export {computeLatest} from './registries/latest.js'

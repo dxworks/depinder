@@ -20,10 +20,9 @@ src/
     db/notify.ts             the same as events.ts, between processes, over LISTEN/NOTIFY
     db/fetch-log.ts          every upstream request, for provenance
     api/                     fastify server, /resolve, /feeds, /health
-    registries/<type>(.ts|/) one per ecosystem (all eight; maven/ and pypi/ are folders), plus
-                             deps-dev.ts for go licenses
-    registries/http.ts       timeout, User-Agent, per-ecosystem limiter, fetch recording
-    registries/latest.ts     the latest-version policy
+    registries/<type>-feed.ts  one change feed per ecosystem (maven-poll.ts, cargo-poll.ts poll
+                             instead); fetching a package is @depinder/core's fetchPackage
+    registries/http.ts       the server's limits, limiter order and fetch recording around core's client
     worker/fill/             the demand-fill queue consumer: fetch, write, retry, backoff, sweeper
     worker/feeds.ts          per-registry change feeds and conditional-GET polling
   vuln/                    ROLE=vuln: POST /vulnerabilities, no Postgres; imports nothing from resolver/

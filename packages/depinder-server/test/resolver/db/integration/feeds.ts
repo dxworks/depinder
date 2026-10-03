@@ -4,7 +4,7 @@ import type {Config} from '../../../../src/resolver/config.js'
 import type {Db} from '../../../../src/resolver/db/db.js'
 import {nullLogger} from '@depinder/core'
 import {PRIORITY} from '../../../../src/resolver/db/queue.js'
-import {npmRegistry} from '../../../../src/resolver/registries/npm.js'
+import {registries} from '../../../../src/resolver/registries/index.js'
 import type {Registry} from '../../../../src/resolver/registries/types.js'
 import type {FetchQueueRow, PackageRow} from '../../../../src/resolver/db/rows.js'
 import {ensureFeedRows, runFeedOnce} from '../../../../src/resolver/worker/feeds.js'
@@ -30,7 +30,7 @@ export function feedTests(postgres: () => Postgres): void {
             expect(feed).toMatchObject({type: 'npm', mode: 'feed'})
 
             vi.stubGlobal('fetch', () => Promise.resolve(json({results: [], last_seq: 31000000})))
-            await runFeedOnce(npmRegistry, {db, log: nullLogger, config})
+            await runFeedOnce(registries.npm!, {db, log: nullLogger, config})
             const [started] = await db.query<{cursor: string; covered_since: Date | null}>(
                 "select cursor, covered_since from registry_feed where type = 'npm'",
             )
@@ -39,7 +39,7 @@ export function feedTests(postgres: () => Postgres): void {
             expect(started!.covered_since).toBeInstanceOf(Date)
 
             vi.stubGlobal('fetch', () => Promise.resolve(json(changes)))
-            await runFeedOnce(npmRegistry, {db, log: nullLogger, config})
+            await runFeedOnce(registries.npm!, {db, log: nullLogger, config})
 
             const after = await db.query<{cursor: string; cursor_time: Date; last_error: string | null}>(
                 "select cursor, cursor_time, last_error from registry_feed where type = 'npm'",
@@ -80,7 +80,6 @@ export function feedTests(postgres: () => Postgres): void {
             const seen: {packageKey: string; etag: string | null; fetchedAt: Date | null}[] = []
             const pollRegistry: Registry = {
                 type: 'maven',
-                fetchPackage: async () => null,
                 feed: {
                     mode: 'poll',
                     intervalMs: 1000,
@@ -136,7 +135,7 @@ export function feedTests(postgres: () => Postgres): void {
 
         it('records a feed failure without losing the cursor', async () => {
             vi.stubGlobal('fetch', () => Promise.resolve(json({error: 'nope'}, 503)))
-            await runFeedOnce(npmRegistry, {db, log: nullLogger, config})
+            await runFeedOnce(registries.npm!, {db, log: nullLogger, config})
 
             const [row] = await db.query<{cursor: string; last_error: string}>(
                 "select cursor, last_error from registry_feed where type = 'npm'",

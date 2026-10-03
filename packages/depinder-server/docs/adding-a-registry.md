@@ -1,32 +1,35 @@
 # Adding a registry
 
-One file per ecosystem: `src/resolver/registries/<purl-type>.ts`, exporting a `Registry`, registered in
-`src/resolver/registries/index.ts`. `src/resolver/registries/npm.ts` is the reference implementation — read it first,
-it is short.
+An ecosystem has two halves, each one file (or folder) per purl type:
+
+- **fetching** lives in `@depinder/core`, shared with the depinder CLI:
+  `packages/depinder-core/src/registries/<purl-type>.ts`, exporting a `PackageFetcher`, registered in
+  `packages/depinder-core/src/registries/index.ts`. Core's `npm.ts` is the reference implementation —
+  read it first, it is short.
+- **keeping fresh** lives in this server: `src/resolver/registries/<purl-type>-feed.ts` (or
+  `-poll.ts`), exporting a `FeedSpec`, registered in `src/resolver/registries/index.ts`.
 
 All eight ecosystems depinder analyses (npm, maven, pypi, nuget, composer, gem, golang, cargo) are
 implemented, so this is the guide for adding a ninth, and the contract to hold to when changing one
 of the eight. The table at the end says what each existing registry reads.
 
-Nothing outside your file and the one line in `index.ts` should need to change — a purl type that
-is not one of the eight also needs a line in `SUPPORTED_TYPES` in `src/shared/purl.ts`. If anything else
-does, say so rather than reaching into the worker or the API.
+Nothing outside your two files and the line in each `index.ts` should need to change — a purl type
+that is not one of the eight also needs a line in `SUPPORTED_TYPES` in core's `src/purl.ts`. If
+anything else does, say so rather than reaching into the worker or the API.
 
 ## The interface
 
-From `src/resolver/registries/types.ts`:
+From core's `src/registries/types.ts`:
 
 ```ts
-export interface Registry {
-    /** purl type, e.g. `npm`. Must match the key in the `registries` map. */
+export interface PackageFetcher {
+    /** purl type, e.g. `npm`. Must match the key in the `fetchers` map. */
     type: string
     /**
-     * All facts about one package. `null` means the registry answered "no such package" (404),
-     * which is stored as `not_found` and retried in 24 h. Anything else — a 5xx, a timeout, a
-     * malformed body — must throw, so the queue retries with backoff.
+     * All facts about one package. `null` means the registry answered "no such package" (404).
+     * Anything else — a 5xx, a timeout, a malformed body — must throw, so the caller can retry.
      */
     fetchPackage(key: ParsedPurl, ctx: FetchContext): Promise<FetchedPackage | null>
-    feed: FeedSpec
 }
 
 export interface FetchedPackage {
@@ -56,16 +59,23 @@ export interface FetchedVersion {
 }
 
 export interface FetchContext {
-    /** Timeout, User-Agent, per-ecosystem limiter and fetch_log recording. Never call `fetch`. */
+    /** Timeout, User-Agent and the caller's per-ecosystem limiter. Never call `fetch`. */
     http: HttpClient
     log: Logger
     options: RegistryOptions // { mavenPerVersionLicenses: boolean }
 }
 ```
 
+Nobody calls a fetcher directly: callers go through core's `fetchPackage(key, ctx)`, which picks
+the fetcher for the purl type. In this server that is the demand-fill worker: a `null` is stored as
+`not_found` and retried in 24 h, a throw is retried by the queue with backoff.
+
+The server's half, from `src/resolver/registries/types.ts`, is the `FeedSpec` described under
+[Feeds](#feeds).
+
 ## fetchPackage
 
-- The name the registry wants is `registryName(key)` from `src/shared/purl.ts`: maven gets
+- The name the registry wants is `registryName(key)` from core's `src/purl.ts`: maven gets
   `group:artifact`, npm `@scope/name`, composer `vendor/pkg`, golang the full module path,
   everything else the bare name. Do not reassemble it yourself, and URL-encode whatever the
   registry's URL scheme needs.
@@ -76,14 +86,14 @@ export interface FetchContext {
   request a day and costing three an hour.
 - Return every version the registry lists, in the registry's own order (oldest first is what the
   latest-version tie-breaker assumes when release dates are missing).
-- `prerelease` comes from `isPrerelease(type, version)` in `src/resolver/registries/latest.ts`.
+- `prerelease` comes from `isPrerelease(type, version)` in core's `src/registries/latest.ts`.
   Use it rather than inventing a rule; if your ecosystem needs a carve-out, add it there with a test in
-  `test/resolver/registries/latest.test.ts` — maven and composer already have one.
+  core's `test/registries/latest.test.ts` — maven and composer already have one.
 - Do **not** compute `latest` yourself. Set `registryLatest` when the registry designates one
   (npm `dist-tags.latest`, pypi `info.version`, gem `gems/<g>.json .version`, golang `@latest`,
   cargo `max_stable_version`) and leave it undefined otherwise; the worker calls `computeLatest`.
 - Licenses: run whatever the registry gave you through `normaliseLicenses` from
-  `./shared.ts`. It flattens strings, `{type}` objects and arrays, and leaves SPDX expressions
+  `./normalise.ts`. It flattens strings, `{type}` objects and arrays, and leaves SPDX expressions
   (`"MIT OR Apache-2.0"`) whole. `toDate` and `normaliseRepoUrl` are there for the same reason —
   so that eight registries agree on what a date and a repository URL look like.
 - When a registry has no per-version license (maven without `MAVEN_PER_VERSION_LICENSES`), fall
@@ -97,17 +107,18 @@ export interface FetchContext {
 
 ## HTTP
 
-Everything goes through `ctx.http` — `get(url, opts)` and `request(url, opts)`. It applies the
-15 s timeout, the `depinder-server-side/0.1 (+…)` User-Agent that crates.io and others require,
-and the per-ecosystem limiter, and it records every request so the worker can write `fetch_log`
-rows. **Never call global `fetch`**: a request that bypasses `ctx.http` bypasses politeness and
-provenance both.
+Everything goes through `ctx.http` — `get(url, opts)` and `request(url, opts)`, core's client. It
+applies the timeout, the User-Agent that crates.io and others require, and the caller's
+per-ecosystem limiter. **Never call global `fetch`**: a request that bypasses `ctx.http` bypasses
+politeness and provenance both.
 
 Responses are already buffered: `response.status`, `response.ok` (200–299, so a 304 is *not* ok),
 `response.headers`, `response.text`, `response.json<T>()`. gzip/br is decoded by undici — do not
 set `accept-encoding` yourself.
 
-Concurrency and pacing live in one table in `src/resolver/registries/http.ts`:
+Core has no numbers of its own: every caller passes its limits. This server's live in
+`src/resolver/registries/http.ts`, which also ranks waiting requests (urgent fetches first) and
+records every request for `fetch_log`:
 
 ```ts
 export const RATE_LIMITS: Record<string, LimitSpec> = {
@@ -118,7 +129,7 @@ export const RATE_LIMITS: Record<string, LimitSpec> = {
 export const DEFAULT_LIMIT: LimitSpec = {concurrency: 8, minIntervalMs: 0}
 ```
 
-If your registry publishes a rate limit, add a row there. That is the only place it belongs.
+If your registry publishes a rate limit, add a row there (and to the CLI's limits).
 
 ## Feeds
 
@@ -170,7 +181,7 @@ matches what upstream actually offers. See [Freshness](resolver-api.md#freshness
 - Make a conditional GET on the cheapest thing that changes when the package changes
   (`maven-metadata.xml`, the crates.io sparse index entry) with `If-None-Match` / 
   `If-Modified-Since` from `target.etag` / `target.lastModified`.
-- Answer with the helpers in `shared.ts`, as maven and cargo do: `notModified(target)` for a 304,
+- Answer with the helpers in `poll-validators.ts`, as maven and cargo do: `notModified(target)` for a 304,
   `modified(target, response.headers)` for a 200, `{changed: false, confirmed: false}` for anything
   that says nothing either way (a 404 on a file that should be there). They hold the rules below,
   which are what make a 304 safe to believe.
@@ -194,17 +205,18 @@ matches what upstream actually offers. See [Freshness](resolver-api.md#freshness
 ## Registering it
 
 ```ts
-// src/resolver/registries/index.ts — the eight that are there today, plus yours
-export const registries: Record<string, Registry> = {
-    npm: npmRegistry,
-    pypi: pypiRegistry,
-    nuget: nugetRegistry,
-    composer: composerRegistry,
-    gem: gemRegistry,
-    golang: golangRegistry,
-    maven: mavenRegistry,
-    cargo: cargoRegistry,
-    swift: swiftRegistry, // <- your line
+// packages/depinder-core/src/registries/index.ts — the eight that are there today, plus yours
+export const fetchers: Readonly<Record<string, PackageFetcher>> = {
+    npm: npmFetcher,
+    // ...
+    swift: swiftFetcher, // <- your line
+}
+
+// src/resolver/registries/index.ts
+const feeds: Record<string, FeedSpec> = {
+    npm: npmFeed,
+    // ...
+    swift: swiftFeed, // <- your line
 }
 ```
 
@@ -218,21 +230,23 @@ file is being written.
 
 ## Tests
 
-`test/resolver/registries/<type>.test.ts`, no network. The pattern is in
-`test/resolver/registries/npm.test.ts`:
+No network. The fetcher's tests are core's `test/registries/<type>.test.ts`, the pattern is in
+core's `test/registries/npm.test.ts`:
 
-- put a trimmed real response in `test/fixtures/<type>-<thing>.json` and read it with
-  `readFileSync(new URL('../../fixtures/x.json', import.meta.url))`;
+- put a trimmed real response in core's `test/fixtures/<type>-<thing>.json` and read it with
+  `fixtureJson` / `fixtureText` from `test/registries/registry.helpers.ts`;
 - `vi.stubGlobal('fetch', ...)` returning `new Response(JSON.stringify(body), {status})`, and
   `vi.unstubAllGlobals()` in `afterEach`;
-- call `resetLimiters()` in `beforeEach` so tests do not inherit a queue;
-- build a `FetchContext` with `createHttpClient({type, recorder})` and `nullLogger`.
+- build the `FetchContext` with `testContext(records)`, which records every request.
 
 Cover at least: the happy path mapping (versions, dates, licenses, `registryLatest`), each license
-spelling your registry uses, 404 → `null`, 5xx → throws, the URL you build for an awkward name
-(scope, group, module path), and both feed methods.
+spelling your registry uses, 404 → `null`, 5xx → throws, and the URL you build for an awkward name
+(scope, group, module path).
 
-`npx nx run-many -t typecheck lint test -p depinder-server` must pass before you hand back.
+The feed's tests are this server's `test/resolver/registries/<type>-feed.test.ts` (fixtures in
+`test/fixtures/`, helpers in `feed.helpers.ts`). Cover both feed methods.
+
+`npx nx run-many -t typecheck lint test -p depinder-core depinder-server` must pass before you hand back.
 
 ## What the registries look like (probed 2026-09-16)
 

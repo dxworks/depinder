@@ -1,40 +1,10 @@
-import type {HttpClient, Logger, ParsedPurl} from '@depinder/core'
+import type {FetchContext, ParsedPurl} from '@depinder/core'
 
 /**
- * The contract every ecosystem implements. One file per purl type in this folder, registered in
- * `index.ts`. See `docs/adding-a-registry.md`.
+ * The server's half of an ecosystem: how it learns that a package changed. The fetch half is
+ * core's `PackageFetcher`. One file per purl type in this folder, registered in `index.ts`. See
+ * `docs/adding-a-registry.md`.
  */
-
-export interface FetchedVersion {
-    /** Exactly as the registry spells it. Not normalised, not stripped of a leading `v`. */
-    version: string
-    releasedAt: Date | null
-    /** SPDX-ish strings, already normalised by the registry file. `[]` when unknown. */
-    licenses: string[]
-    prerelease: boolean
-    /** Yanked (cargo), unlisted (nuget), withdrawn (pypi). Excluded from `latest`. */
-    yanked: boolean
-}
-
-export interface FetchedPackage {
-    description?: string
-    homepageUrl?: string
-    repoUrl?: string
-    /** Library-level licenses. `[]` when the registry publishes none. */
-    licenses: string[]
-    versions: FetchedVersion[]
-    /** The registry's own "latest" designation, if it has one. */
-    registryLatest?: string
-    /** Hosts the facts came from, e.g. `['registry.npmjs.org']`. Stored as provenance. */
-    sources: string[]
-    /**
-     * Set when these facts are known to be incomplete for now, and when to fetch the package
-     * again. Stored as `next_retry_at`, which the sweeper re-queues once it is due. golang uses it
-     * for a new version deps.dev has not scanned yet. Absent means the facts are as complete as
-     * the registry can make them.
-     */
-    recheckAt?: Date
-}
 
 /** A package the feed says changed. `at` is the event time when the feed carries one. */
 export type FeedEvent = {packageKey: string; at: Date | null}
@@ -65,7 +35,7 @@ export interface PollResult {
     /**
      * true => the registry vouched that nothing changed since the last full fetch, and the
      * package's `as_of` moves up to the time of this check. A 304, or a first check whose
-     * `Last-Modified` predates the fetch. See `notModified` and `modified` in `shared.ts`.
+     * `Last-Modified` predates the fetch. See `notModified` and `modified` in `poll-validators.ts`.
      */
     confirmed: boolean
     /** Validators to store for the next round. Omit to keep what is stored; null clears one. */
@@ -73,7 +43,7 @@ export interface PollResult {
     lastModified?: string | null
 }
 
-// [11] Freshness, two shapes: 'feed' = upstream has a change stream, 'poll' = it has none (maven, cargo). Next [12], npm.ts.
+// [11] Freshness, two shapes: 'feed' = upstream has a change stream, 'poll' = it has none (maven, cargo). Next [12], core's npm.ts.
 export type FeedSpec =
     | {
           mode: 'feed'
@@ -89,26 +59,9 @@ export type FeedSpec =
           check(target: PollTarget, ctx: FetchContext): Promise<PollResult>
       }
 
-export interface FetchContext {
-    /** Timeout, User-Agent, per-ecosystem limiter and fetch_log recording. Never call `fetch`. */
-    http: HttpClient
-    log: Logger
-    options: RegistryOptions
-}
-
-export interface RegistryOptions {
-    mavenPerVersionLicenses: boolean
-}
-
-// [10] THE CONTRACT [7] calls. An ecosystem is exactly these three members — one file per purl type.
+/** An ecosystem as the feed loops see it: its purl type and its feed. */
 export interface Registry {
     /** purl type, e.g. `npm`. Must match the key in the `registries` map. */
     type: string
-    /**
-     * All facts about one package. `null` means the registry answered "no such package" (404),
-     * which is stored as `not_found` and retried in 24 h. Anything else — a 5xx, a timeout, a
-     * malformed body — must throw, so the queue retries with backoff.
-     */
-    fetchPackage(key: ParsedPurl, ctx: FetchContext): Promise<FetchedPackage | null>
     feed: FeedSpec
 }

@@ -11,7 +11,9 @@ full upstream latency on every run. This service answers thousands of purls in o
 itself on demand, keeps what it holds fresh from each registry's change feed, and records where
 every fact came from and how old it is.
 
-All eight registries are implemented — one file or folder each under `src/resolver/registries/`; see
+All eight registries are implemented. How a package is fetched lives in `@depinder/core`
+(`packages/depinder-core/src/registries/`, shared with the depinder CLI); how it is kept fresh — one
+feed or poll file each — under `src/resolver/registries/`. See
 [docs/adding-a-registry.md](docs/adding-a-registry.md) for the contract they share.
 
 ## Roles
