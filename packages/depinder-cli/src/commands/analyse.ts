@@ -9,6 +9,7 @@ import {ScannerPreflight, scannerSummaryLine, writeScanProvenance} from '../plug
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
 import {availableVersions, LibraryInfo} from '../extension-points/library-info'
 import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
+import {attachGithubAdvisories} from '../utils/library-advisories'
 import {Range} from 'semver'
 import _ from 'lodash'
 import spdxCorrect from 'spdx-correct'
@@ -1039,15 +1040,7 @@ export async function runAnalysis(
                                     if (!isRateLimit(e)) session.misses.set(cacheKey)
                                     throw e
                                 }
-                                if (plugin.checker?.githubSecurityAdvisoryEcosystem && process.env.GH_TOKEN) {
-                                    // A failed advisory lookup must not discard the registry data
-                                    // already fetched — degrade to no vulnerabilities instead.
-                                    try {
-                                        fetched.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, fetched.name)
-                                    } catch (e: any) {
-                                        log.warn(`Vulnerability lookup failed for ${fetched.name}: ${e.message ?? e}`)
-                                    }
-                                }
+                                await attachGithubAdvisories(fetched, plugin)
                                 await session.cache.set(cacheKey, fetched)
                                 if (options.refresh) refreshedLibs.push(dep.name)
                                 await session.checkpointIfDue()

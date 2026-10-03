@@ -59,7 +59,7 @@ depinder update [updated_before] [plugins...]
 
 Re-fetches the `libs` rows last written before `updated_before` (default: the expired ones, older
 than `--cache-max-age`) for the plugins named (default all), by name or
-[alias](../index.md#ecosystems): `sbom-java` and `java` both refresh the `java:` entries. Needs `GH_TOKEN` for the advisories. To bypass the cache for a
+[alias](../index.md#ecosystems): `sbom-java` and `java` both refresh the `java:` entries. With `GH_TOKEN` set, GitHub advisories are fetched too; a failed advisory lookup still keeps the registry data. To bypass the cache for a
 single run instead, use `analyse --refresh`.
 
 Each row is fetched the way `analyse` fetches a package the resolver did not answer: from its

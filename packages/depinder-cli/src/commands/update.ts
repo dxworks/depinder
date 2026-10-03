@@ -5,7 +5,7 @@ import {sharedCacheDb, sqliteCache} from '../cache/sqlite-cache'
 import moment from 'moment'
 import {getPluginsFromNames} from '../plugins'
 import {registryTypeOfPlugin} from '../plugins/sbom'
-import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
+import {attachGithubAdvisories} from '../utils/library-advisories'
 import {Presets, SingleBar} from 'cli-progress'
 import {ecosystemOf, Plugin} from '../extension-points/plugin'
 import {log} from '../utils/logging'
@@ -90,9 +90,7 @@ async function updateLibrariesFor(selectedPlugins: Plugin[], idsToUpdate: string
 async function updateLibrary(plugin: Plugin, pkg: {type: string, name: string}, id: string, registries: RegistryFallback) {
     try {
         const lib = await registries.lookup(pkg)
-        if (plugin.checker?.githubSecurityAdvisoryEcosystem) {
-            lib.vulnerabilities = await getVulnerabilitiesFromGithub(plugin.checker.githubSecurityAdvisoryEcosystem, lib.name)
-        }
+        await attachGithubAdvisories(lib, plugin)
         sqliteCache.set(id, lib)
     } catch (e: any) {
         log.warn(`Exception getting remote info for ${pkg.name}`)
