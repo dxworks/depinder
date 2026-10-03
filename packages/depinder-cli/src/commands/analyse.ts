@@ -42,6 +42,8 @@ import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/
 import {ResolverConfig, ResolverOptions, resolverConfig} from '../resolver/config'
 import {PackageRecord, ResolvedEntry, resetResolverClient, resolvePurls} from '../resolver/client'
 import {toLibraryInfo} from '../resolver/adapter'
+import {createRegistryFallback, isRateLimit, RegistryFallback} from '../fallback/registry-fallback'
+import {REGISTRY_LIMITS_ENV, resolveRegistryLimits} from '../fallback/registry-limits'
 import {fixedReportNow, REPORT_NOW_ENV, reportNow} from '../utils/report-clock'
 import {usesVulnServer, vulnServerConfig, VulnServerConfig} from '../vuln-sources/server'
 import {
@@ -76,6 +78,8 @@ export interface AnalyseOptions extends ResolverOptions, CacheMaxAgeOptions {
     target?: string
     /** `false` for `--no-vuln-server`, `true` for `--vuln-server` (kept on under `--no-resolver`), else unset. */
     vulnServer?: boolean
+    /** `npm=16,cargo=1:1000`: per-ecosystem registry limits over `DEPINDER_REGISTRY_LIMITS` and the defaults. */
+    registryLimits?: string
 }
 
 /** A factory rather than a single instance, so tests can parse arguments from a clean slate. */
@@ -115,6 +119,9 @@ export function createAnalyseCommand(): Command {
             'Ask the resolver\'s server for vulnerabilities even with --no-resolver, which otherwise turns both off')
         .option('--no-vuln-server',
             'Scan the SBOMs with the local Trivy and Grype even when the resolver\'s server can answer vulnerabilities')
+        .option('--registry-limits <limits>',
+            'Registry requests at once per ecosystem, with an optional gap in ms: npm=16,cargo=1:1000; '
+            + 'over DEPINDER_REGISTRY_LIMITS and the defaults')
         .option('--profile', 'Print a phase timing and request count summary at the end', false)
         .action(analyseFiles)
 }
@@ -232,31 +239,14 @@ async function cacheHit(cache: Cache, cacheKey: string, dep: DepinderDependency,
     return cache.has(cacheKey)
 }
 
-const REGISTRY_CONCURRENCY = 8
+/** GitHub advisory lookups at once for answers the resolver gave. */
+const ADVISORY_LOOKUP_CONCURRENCY = 8
 /**
  * How often the caches are flushed mid-run, so a crash loses at most this much work. Time-based
  * rather than every N lookups because a flush serialises the whole positive cache (tens of MB),
  * and doing that every 50 lookups on a cold run cost more than the lookups it protected.
  */
 const CACHE_CHECKPOINT_MS = 60_000
-const RATE_LIMIT_RETRY_DELAYS_MS = [2000, 4000, 8000]
-
-function isRateLimit(e: any): boolean {
-    return e?.response?.status === 429 || e?.status === 429
-}
-
-async function retrieveWithRetry(plugin: Plugin, name: string): Promise<LibraryInfo> {
-    for (let attempt = 0; ; attempt++) {
-        try {
-            return await plugin.registrar.retrieve(name)
-        } catch (e: any) {
-            if (!isRateLimit(e) || attempt >= RATE_LIMIT_RETRY_DELAYS_MS.length) throw e
-            const delay = RATE_LIMIT_RETRY_DELAYS_MS[attempt]
-            log.warn(`Rate limited (429) retrieving ${name}, retrying in ${delay}ms`)
-            await new Promise(resolve => setTimeout(resolve, delay))
-        }
-    }
-}
 
 /**
  * What one plugin's pass produced: the purl type its components carry, and the projects it
@@ -576,12 +566,12 @@ export async function bulkResolve(
         workers.add(worker)
     }
 
-    // Up to REGISTRY_CONCURRENCY workers drain the lookup queue; one that finds it empty ends, and
+    // Up to ADVISORY_LOOKUP_CONCURRENCY workers drain the lookup queue; one that finds it empty ends, and
     // the next answer starts a new one. A worker that ends pumps once more, for a lookup queued in
     // the moment between its last look at the queue and its leaving the set.
     let lookupWorkers = 0
     function pump(): void {
-        while (lookupWorkers < REGISTRY_CONCURRENCY && nextLookup < lookups.length) {
+        while (lookupWorkers < ADVISORY_LOOKUP_CONCURRENCY && nextLookup < lookups.length) {
             lookupWorkers++
             const worker: Promise<void> = drain()
                 .catch(error => { writeFailure ??= {error} })
@@ -852,6 +842,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
     // Read first, so a malformed fixed date stops the run before any work is done.
     const fixedNow = fixedReportNow()
     if (fixedNow) log.info(`Report date fixed at ${fixedNow.toISOString()} (${REPORT_NOW_ENV}); ages in the CSVs are measured from it`)
+    const registries = createRegistryFallback(resolveRegistryLimits({flag: options.registryLimits, env: process.env[REGISTRY_LIMITS_ENV]}))
     const resultRoot = path.resolve(process.cwd(), options.results || 'results')
     const allFiles = folders.flatMap(it => walkDir(it))
     const selected = getPluginsFromNames(options.plugins)
@@ -886,7 +877,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
     let vulnOutcome: VulnOutcome | undefined
     try {
         for (const run of runs) {
-            const analysed = await runAnalysis(run.files, run.plugins, run.folder, options, session, resolver, prep?.vulnerabilities)
+            const analysed = await runAnalysis(run.files, run.plugins, run.folder, options, session, resolver, prep?.vulnerabilities, registries)
             if (run.sboms) {
                 // Already settled: `runAnalysis` waited for it before reading any finding.
                 vulnOutcome = prep?.vulnerabilities ? await prep.vulnerabilities : undefined
@@ -933,6 +924,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
 export async function runAnalysis(
     files: string[], plugins: Plugin[], resultFolder: string, options: AnalyseOptions, session: CacheSession,
     resolver?: ResolverConfig, vulnerabilities?: Promise<unknown>,
+    registries: RegistryFallback = createRegistryFallback(resolveRegistryLimits({env: process.env[REGISTRY_LIMITS_ENV]})),
 ): Promise<AnalysisResult[]> {
     if (!fs.existsSync(resultFolder)) {
         fs.mkdirSync(resultFolder, {recursive: true})
@@ -977,17 +969,16 @@ export async function runAnalysis(
     // back to is waited for.
     if (vulnerabilities) await timePhase('vuln:server-wait', () => vulnerabilities)
 
-    // FLOW 3 — enrich: per dep, cache → miss cache → registrar. Whatever phase 2 wrote is a plain cache hit here.
-    // Phase 3 — enrichment, unchanged. The plugins run side by side. Each talks to its own
-    // registry, so six at once put no more than REGISTRY_CONCURRENCY requests on any one of them,
-    // and a registry that stalls — Maven Central's search API, for one — no longer holds the
-    // others up. Whatever phase 2 cached is a cache hit here, and never reaches a registry.
+    // FLOW 3 — enrich: per dep, cache → miss cache → registry fallback. Whatever phase 2 wrote is a plain cache hit here.
+    // Phase 3 — enrichment. The plugins run side by side, each registry behind its ecosystem's
+    // limits (`registries`), so a registry that stalls no longer holds the others up. Whatever phase 2 cached is a cache hit here, and never reaches a registry.
     const results = await Promise.all(pluginProjects.map(async ({plugin, projects}): Promise<AnalysisResult | undefined> => {
         // A library the resolver just refreshed counts as refreshed: without this, `--refresh`
         // would discard the answer that was fetched seconds ago and go back to the registry.
         const keyPrefix = `${ecosystemOf(plugin)}:`
         const refreshedLibs = [...bulkWritten].filter(it => it.startsWith(keyPrefix)).map(it => it.slice(keyPrefix.length))
         const inFlight = new Map<string, Promise<LibraryInfo>>()
+        const registryType = purlTypeOfPlugin(plugin) ?? ecosystemOf(plugin)
 
         const projectsBar = progress.create(projects.length, 0, {name: 'Projects', state: 'Analysing'})
 
@@ -1043,7 +1034,7 @@ export async function runAnalysis(
                             fetch = (async () => {
                                 let fetched: LibraryInfo
                                 try {
-                                    fetched = await retrieveWithRetry(plugin, dep.name)
+                                    fetched = await registries.lookup({type: registryType, name: dep.name})
                                 } catch (e: any) {
                                     if (!isRateLimit(e)) session.misses.set(cacheKey)
                                     throw e
@@ -1082,7 +1073,7 @@ export async function runAnalysis(
 
             let nextDepIndex = 0
             await Promise.all(Array.from(
-                {length: Math.min(REGISTRY_CONCURRENCY, filteredDependencies.length)},
+                {length: Math.min(registries.packagesAtOnce(registryType), filteredDependencies.length)},
                 async () => {
                     while (nextDepIndex < filteredDependencies.length) {
                         const dep = filteredDependencies[nextDepIndex++]

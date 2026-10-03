@@ -25,6 +25,7 @@ any mix, and both sources are optional: depinder processes whatever it finds.
 | `--resolver-url <url>` | A [bulk purl resolver](../configuration.md#bulk-resolver) to ask before the registries; needs `DEPINDER_RESOLVER_TOKEN` | `DEPINDER_RESOLVER_URL` |
 | `--no-resolver` | Skip the bulk resolver even when one is configured; also skips its vulnerability server unless `--vuln-server` | off |
 | `--vuln-server` | With `--no-resolver`: still ask the server for vulnerabilities (the bench's no-server cell) | off |
+| `--registry-limits <limits>` | Registry requests at once per ecosystem, with an optional gap in ms: `npm=16,cargo=1:1000`; see [registry fallback](../configuration.md#registry-fallback) | `DEPINDER_REGISTRY_LIMITS`, else 8 at once (`golang` 64, `nuget` 32) |
 | `--profile` | Phase timings, cache hits, requests per host | off |
 
 ## Sources
@@ -122,6 +123,9 @@ depinder analyse ./sboms -r results --cache-max-age 0
 
 # The same window for every run in this shell
 export DEPINDER_CACHE_MAX_AGE=12h
+
+# No resolver: twice the npm requests at once, crates.io one request a second
+depinder analyse ./sboms -r results --no-resolver --registry-limits npm=16,cargo=1:1000
 ```
 
 ## Cache
@@ -133,4 +137,6 @@ first. `--refresh` bypasses both. See [cache](cache.md#expiry).
 With a [bulk resolver](../configuration.md#bulk-resolver) configured, every purl the cache cannot
 answer is asked for after parsing and before enrichment — once per run, even when a Trivy and a Syft
 source both name it, and with no retries — and what comes back fills that same cache. Anything it
-does not answer before its deadline goes to the registries as usual.
+does not answer before its deadline goes to the registries as usual, through the
+[registry fallback](../configuration.md#registry-fallback): the server's own fetch code, then
+Libraries.io for maven, pypi, nuget and composer when `LIBRARIES_IO_API_KEY` is set.

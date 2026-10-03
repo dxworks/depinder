@@ -210,7 +210,7 @@ describe('cached packages expire', () => {
     })
 
     /**
-     * Phase 3 with no resolver: an expired entry is a miss, goes to the registrar, and whatever
+     * Phase 3 with no resolver: an expired entry is a miss, goes to the registry fallback, and whatever
      * comes back rewrites the row; when nothing comes back, the dependency is left without library
      * info, exactly like a library that was never cached.
      */
@@ -224,8 +224,11 @@ describe('cached packages expire', () => {
         // `runAnalysis` returns results for `sbom-*` plugins only, so the test keeps its own handle on
         // the dependency the parser hands out.
         let leftPad: DepinderDependency
+        // Stands in for the registry fallback: the test's plugin answers what core would fetch.
+        let registry: (name: string) => Promise<LibraryInfo>
 
         function fakePlugin(retrieve: (name: string) => Promise<LibraryInfo>): Plugin {
+            registry = retrieve
             leftPad = {id: 'left-pad@1.0.0', name: 'left-pad', version: '1.0.0', semver: null, requestedBy: []}
             return {
                 name: 'fake',
@@ -237,7 +240,7 @@ describe('cached packages expire', () => {
                         dependencies: {'left-pad@1.0.0': leftPad},
                     }),
                 },
-                registrar: {retrieve},
+                registrar: {retrieve: () => { throw new Error('analyse must not call the plugin registrar') }},
             }
         }
 
@@ -248,7 +251,8 @@ describe('cached packages expire', () => {
                 checkpointIfDue: async () => { /* nothing to checkpoint */ },
                 close: async () => { /* nothing to close */ },
             }
-            await runAnalysis([input()], [plugin], path.join(tmp, 'out'), {results: 'out', refresh: false}, session)
+            const registries = {lookup: ({name}: {name: string}) => registry(name), packagesAtOnce: () => 8}
+            await runAnalysis([input()], [plugin], path.join(tmp, 'out'), {results: 'out', refresh: false}, session, undefined, undefined, registries)
             return leftPad
         }
 
@@ -262,7 +266,7 @@ describe('cached packages expire', () => {
             expect(dep?.libraryInfo?.description).toBe('cached')
         })
 
-        it('sends an expired entry to the registrar and rewrites it with a new age', async () => {
+        it('sends an expired entry to the registry fallback and rewrites it with a new age', async () => {
             cachedAgo('npm:left-pad', 2 * DAY_MS, library('left-pad', 'cached'))
             const runStart = Date.now()
             const retrieve = vi.fn(async () => library('left-pad', 'from the registry'))
