@@ -1,4 +1,6 @@
-# depinder-server-side
+# depinder-server
+
+The `depinder-server` project of the depinder monorepo (`packages/depinder-server`).
 
 A purl resolver. It owns one problem: **the facts about a package** — its versions, their release
 dates and their licenses — for the eight ecosystems depinder analyses (maven, npm, pypi, nuget,
@@ -47,8 +49,8 @@ request's `max_age` is met, and `lag_seconds` — including the caveat for npm a
 
 ```bash
 cp .env.example .env          # set DATABASE_URL and RESOLVER_API_TOKEN
-npm install
-npm run dev                   # migrations run at boot
+npm ci                        # once, at the monorepo root
+npm run dev                   # in packages/depinder-server; migrations run at boot
 
 curl -s localhost:8080/health
 curl -sN --compressed -X POST localhost:8080/resolve \

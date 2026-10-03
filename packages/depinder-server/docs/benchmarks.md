@@ -1,13 +1,13 @@
 # Benchmarks
 
 For whoever measures the service: where the end-to-end bench lives, and how to run the micro benches
-in `bench/micro/`.
+in `bench/micro/` (this project's folder; the end-to-end bench is the monorepo's root `bench/`).
 
 ## End-to-end bench
 
-`npm run bench` runs depinder against this server and records how long it takes and who fetched
-what; `npm run bench:compare` compares two runs. Everything about it is in
-[bench/README.md](../bench/README.md).
+`npm run bench` (at the monorepo root) runs depinder against this server and records how long it
+takes and who fetched what; `npm run bench:compare` compares two runs. Everything about it is in
+the root [bench/README.md](../../../bench/README.md).
 
 ## Micro benches
 

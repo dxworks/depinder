@@ -3,12 +3,20 @@
 For contributors: running the server locally, the tests (including the Postgres integration test),
 the typecheck and the build.
 
+The server is the Nx project `depinder-server`. From the monorepo root (after `npm ci` there):
+
 ```bash
-npm run dev         # tsx watch
-npm test            # vitest; no network, no database
-npm run typecheck
-npm run build       # -> dist/
+npx nx test depinder-server              # vitest; no network, no database
+npx nx typecheck depinder-server
+npx nx lint depinder-server              # function sizes
+npx nx build depinder-server             # -> packages/depinder-server/dist/
+npx nx test-integration depinder-server  # the tests plus the Postgres ones, on depinder-pg (below)
+npx nx docker-build depinder-server      # the image, from the monorepo root
+npm run dev -w depinder-server           # tsx watch
 ```
+
+Inside `packages/depinder-server`, `npm test`, `npm run typecheck`, `npm run build` and `npm run dev`
+work too.
 
 Tests never hit the network: registry tests stub `fetch` with recorded fixtures, and the API tests
 use a stubbed store. Keep it that way.
@@ -19,5 +27,6 @@ cursors, the migration backfill — and is skipped unless you point it at a thro
 ```bash
 docker run -d --rm --name depinder-pg -e POSTGRES_PASSWORD=depinder -e POSTGRES_DB=depinder \
   -p 55432:5432 postgres:16-alpine
-TEST_DATABASE_URL=postgresql://postgres:depinder@127.0.0.1:55432/depinder npm test
+npx nx test-integration depinder-server
+# the same as: TEST_DATABASE_URL=postgresql://postgres:depinder@127.0.0.1:55432/depinder npm test
 ```

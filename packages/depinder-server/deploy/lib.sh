@@ -4,7 +4,9 @@
 set -euo pipefail
 
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(dirname "$DEPLOY_DIR")"
+# packages/depinder-server, and the monorepo root the image is built from.
+SERVER_DIR="$(dirname "$DEPLOY_DIR")"
+MONOREPO_DIR="$(cd "$SERVER_DIR/../.." && pwd)"
 ENV_FILE="${DEPINDER_ENV_FILE:-$DEPLOY_DIR/.depinder.server.env}"
 
 die() { echo "error: $*" >&2; exit 1; }

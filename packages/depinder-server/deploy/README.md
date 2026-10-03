@@ -3,7 +3,7 @@
 All commands run on your Mac, from this folder:
 
 ```bash
-cd ~/Work/Endava/ImproveDepinder/depinder-server-side/deploy
+cd ~/Work/Endava/ImproveDepinder/depinder/packages/depinder-server/deploy
 ```
 
 ## Before you start
@@ -22,7 +22,7 @@ cd ~/Work/Endava/ImproveDepinder/depinder-server-side/deploy
    ```
    Any script also takes `--ip <server ip>`, which wins over `DEPINDER_SERVER_IP`. A script stops
    and says so when either is missing.
-5. **Only one stack per database**: stop any other one (e.g. on your Mac: `docker compose down` in `depinder-server-side`).
+5. **Only one stack per database**: stop any other one (e.g. on your Mac: `docker compose down` in `packages/depinder-server`).
 
 ## Deploy a new server
 

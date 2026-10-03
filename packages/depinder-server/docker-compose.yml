@@ -7,8 +7,11 @@
 # `environment:` win over .env, so ROLE, PORT and the vuln settings are decided here.
 services:
   resolver:
-    build: .
-    image: depinder-server-side:0.2.0
+    # The context is the monorepo root: the image takes the root lockfile (Dockerfile).
+    build:
+      context: ../..
+      dockerfile: packages/depinder-server/Dockerfile
+    image: depinder-server:0.2.0
     env_file: .env
     environment:
       ROLE: all
@@ -18,7 +21,7 @@ services:
     restart: unless-stopped
 
   vuln:
-    image: depinder-server-side:0.2.0
+    image: depinder-server:0.2.0
     env_file: .env
     environment:
       ROLE: vuln

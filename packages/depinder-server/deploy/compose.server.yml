@@ -1,7 +1,7 @@
 # The production stack. 07-upload.sh copies it to APP_DIR/compose.yml on the server, next to
 # server.env (the .depinder.server.env from your machine, handed to the containers as written),
 # compose.vars (the few values substituted into this file as ${...}, which 07-upload.sh derives
-# from it) and src/ (the source the image is built from). Same three services as the repo's
+# from it) and src/ (the source the image is built from, laid out as the monorepo). Same three services as the repo's
 # docker-compose.yml, but every setting comes from the env file, and Caddy answers on 80/443 so it
 # can get a certificate for a domain.
 #
@@ -11,8 +11,11 @@ name: depinder
 
 services:
   resolver:
-    build: ./src
-    image: depinder-server-side:server
+    # src/ is laid out as the monorepo (07-upload.sh); its root is the build context.
+    build:
+      context: ./src
+      dockerfile: packages/depinder-server/Dockerfile
+    image: depinder-server:server
     env_file: &app-env
       # raw: every value exactly as written, so a `$` in a password stays a `$`
       - path: server.env
@@ -25,7 +28,7 @@ services:
     restart: unless-stopped
 
   vuln:
-    image: depinder-server-side:server
+    image: depinder-server:server
     # Built by the resolver service above; never pulled.
     pull_policy: never
     env_file: *app-env
@@ -52,7 +55,7 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./src/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./src/packages/depinder-server/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:

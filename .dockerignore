@@ -1,0 +1,24 @@
+# Build context of packages/depinder-server/Dockerfile, which is the monorepo root: an allowlist,
+# so env files, node_modules, bench runs and the other projects' sources never reach the image.
+*
+!package.json
+!package-lock.json
+!tsconfig.base.json
+# Every workspace's package.json (the Dockerfile lists the same ones; no wildcards in folder names,
+# the classic builder would not look inside an excluded folder for them).
+!packages/depinder-cli/package.json
+!packages/depinder-server/package.json
+!bench/package.json
+!packages/depinder-server/tsconfig.json
+!packages/depinder-server/tsconfig.build.json
+!packages/depinder-server/src
+!packages/depinder-server/migrations
+
+# Never, even inside an allowed folder.
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+**/*.env
+**/*.env.*
+**/.DS_Store

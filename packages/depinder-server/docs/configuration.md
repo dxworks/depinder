@@ -73,8 +73,13 @@ pooler's Pool Size too. `.env` is gitignored.
 
 ```bash
 cp .env.example .env
-docker compose up --build
+docker compose up --build      # in packages/depinder-server
 ```
+
+The image is built from the monorepo root (`build.context: ../..` in `docker-compose.yml`), because
+it installs from the root lockfile; the root `.dockerignore` lets in only the workspace manifests and
+the server's `src/`, `migrations/` and tsconfigs. `npx nx docker-build depinder-server` builds the
+same image without compose.
 
 Three services, one address (`localhost:8080`, or `PUBLIC_PORT`), one token:
 

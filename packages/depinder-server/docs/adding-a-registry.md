@@ -232,7 +232,7 @@ Cover at least: the happy path mapping (versions, dates, licenses, `registryLate
 spelling your registry uses, 404 → `null`, 5xx → throws, the URL you build for an awkward name
 (scope, group, module path), and both feed methods.
 
-`npm run typecheck && npm test` must pass before you hand back.
+`npx nx run-many -t typecheck lint test -p depinder-server` must pass before you hand back.
 
 ## What the registries look like (probed 2026-09-16)
 

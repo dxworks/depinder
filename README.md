@@ -8,6 +8,8 @@ This repository is an [Nx](https://nx.dev) monorepo (npm workspaces, Node 24):
 | Project | Path | What it is |
 |---|---|---|
 | `depinder-cli` | [`packages/depinder-cli`](packages/depinder-cli) | The `depinder` command line tool, published to npm as [`@dxworks/depinder`](https://www.npmjs.com/package/@dxworks/depinder). Usage: [its README](packages/depinder-cli/README.md) and the [documentation site](https://dxworks.org/depinder/). |
+| `depinder-server` | [`packages/depinder-server`](packages/depinder-server) | The purl resolver and vulnerability server depinder calls: Docker image and deploy kit. Not published to npm. [Its README](packages/depinder-server/README.md). |
+| `depinder-bench` | [`bench`](bench) | End-to-end bench: runs the CLI against the server and compares CSV outputs. [Its README](bench/README.md). |
 | `workspace-checks` | [`tools/workspace-checks`](tools/workspace-checks) | Repo-wide guards: file and function sizes, one version of every dependency. |
 
 ## Install
@@ -25,6 +27,9 @@ npm ci
 npx nx run-many -t typecheck lint test build size-guard dependency-check   # what CI runs (npm run check)
 npx nx build depinder-cli     # packages/depinder-cli/dist
 npx nx run depinder-cli:docs  # MkDocs site, needs `pip install -r packages/depinder-cli/requirements-docs.txt`
+npx nx test-integration depinder-server   # server tests plus Postgres ones, on the depinder-pg container
+npx nx docker-build depinder-server       # the server image (build context: this root)
+npm run bench -- --target dev --label <name>   # end-to-end bench, see bench/README.md
 ```
 
 Size limits for new and moved code: files ~350 lines (hard 400), tests ~500 (hard 550),

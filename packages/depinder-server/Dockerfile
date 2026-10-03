@@ -4,14 +4,21 @@
 FROM aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 AS trivy
 FROM anchore/grype:v0.118.0@sha256:8a93fc48da96bd6ec5981279d099b69de11541dc68fdf222fb9161f8ff284af7 AS grype
 
+# The build context is the monorepo root (the root .dockerignore lets in only what is copied here).
+# npm ci needs every workspace's package.json to match the root lockfile; it installs only the
+# server's dependencies.
+
 # Build stage: dev dependencies and the TypeScript compiler, none of which ship.
 FROM node:24-alpine AS build
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
-COPY tsconfig.json tsconfig.build.json ./
-COPY src ./src
-RUN npm run build
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages/depinder-cli/package.json packages/depinder-cli/
+COPY packages/depinder-server/package.json packages/depinder-server/
+COPY bench/package.json bench/
+RUN npm ci --workspace depinder-server
+COPY packages/depinder-server/tsconfig.json packages/depinder-server/tsconfig.build.json packages/depinder-server/
+COPY packages/depinder-server/src packages/depinder-server/src
+RUN npm run build --workspace depinder-server
 
 # Runtime stage: production dependencies, the compiled output, the migrations and the two scanners.
 # The resolver roles never call the scanners; one image for every role is simpler than two.
@@ -23,10 +30,14 @@ COPY --from=trivy /usr/local/bin/trivy /usr/local/bin/trivy
 COPY --from=grype /grype /usr/local/bin/grype
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+COPY packages/depinder-cli/package.json packages/depinder-cli/
+COPY packages/depinder-server/package.json packages/depinder-server/
+COPY bench/package.json bench/
+RUN npm ci --omit=dev --workspace depinder-server && npm cache clean --force
 
-COPY --from=build /app/dist ./dist
-COPY migrations ./migrations
+WORKDIR /app/packages/depinder-server
+COPY --from=build /app/packages/depinder-server/dist ./dist
+COPY packages/depinder-server/migrations ./migrations
 
 # ROLE=vuln keeps its databases in VULN_DATA_DIR, a volume mounted here. The folder exists in the
 # image, owned by `node`, so that an empty named volume takes that owner the first time it mounts.

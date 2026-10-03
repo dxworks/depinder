@@ -1,19 +1,25 @@
 #!/usr/bin/env bash
 # Copies to APP_DIR on the server: the source the image is built from (your working tree, so
-# uncommitted changes go too), compose.yml, and server.env (this env file, readable by root only).
-# Also installs `depinder`, a shortcut for compose with those files. To ship new code later: run
-# this again, then 08-start.sh.
+# uncommitted changes go too, laid out as in the monorepo, whose root is the build context),
+# compose.yml, and server.env (this env file, readable by root only). Also installs `depinder`, a
+# shortcut for compose with those files. To ship new code later: run this again, then 08-start.sh.
 source "$(dirname "$0")/lib.sh"
 
-cd "$REPO_DIR"
+# What the Dockerfile copies (it lists every workspace's package.json), plus the Caddyfile.
+SERVER=packages/depinder-server
+SOURCES=(package.json package-lock.json tsconfig.base.json .dockerignore
+  packages/depinder-cli/package.json bench/package.json
+  "$SERVER/package.json" "$SERVER/Dockerfile" "$SERVER/tsconfig.json" "$SERVER/tsconfig.build.json"
+  "$SERVER/src" "$SERVER/migrations" "$SERVER/Caddyfile")
+
+cd "$MONOREPO_DIR"
 version="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
-git diff --quiet HEAD -- src migrations Dockerfile package.json package-lock.json 2>/dev/null || version="$version+dirty"
+git diff --quiet HEAD -- "${SOURCES[@]}" 2>/dev/null || version="$version+dirty"
 
 step "source $version -> $SERVER_IP:$APP_DIR/src"
 remote "rm -rf '$APP_DIR/src' && mkdir -p '$APP_DIR/src'"
 # No macOS metadata (xattrs, ._ files): GNU tar on the server would warn about every file.
-COPYFILE_DISABLE=1 tar --no-xattrs -czf - Dockerfile .dockerignore package.json package-lock.json \
-  tsconfig.json tsconfig.build.json src migrations Caddyfile \
+COPYFILE_DISABLE=1 tar --no-xattrs -czf - "${SOURCES[@]}" \
   | remote "tar --warning=no-unknown-keyword -xzf - -C '$APP_DIR/src' && echo '$version' > '$APP_DIR/src/VERSION'"
 
 step "compose.yml, server.env, compose.vars"
