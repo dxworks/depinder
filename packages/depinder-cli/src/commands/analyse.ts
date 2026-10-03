@@ -2,7 +2,7 @@ import {Command} from 'commander'
 import fs from 'fs'
 import path from 'path'
 import {getPluginsFromNames} from '../plugins'
-import {purlTypeOfPlugin, sbomFilesToParse, sbomPluginsForPurlTypes} from '../plugins/sbom'
+import {purlTypeOfPlugin, registryTypeOfPlugin, sbomFilesToParse, sbomPluginsForPurlTypes} from '../plugins/sbom'
 import {SbomDescription} from '../plugins/sbom/describe'
 import {deferSbomFindings} from '../plugins/sbom'
 import {ScannerPreflight, scannerSummaryLine, writeScanProvenance} from '../plugins/sbom/local-scan'
@@ -978,7 +978,7 @@ export async function runAnalysis(
         const keyPrefix = `${ecosystemOf(plugin)}:`
         const refreshedLibs = [...bulkWritten].filter(it => it.startsWith(keyPrefix)).map(it => it.slice(keyPrefix.length))
         const inFlight = new Map<string, Promise<LibraryInfo>>()
-        const registryType = purlTypeOfPlugin(plugin) ?? ecosystemOf(plugin)
+        const registryType = registryTypeOfPlugin(plugin)
 
         const projectsBar = progress.create(projects.length, 0, {name: 'Projects', state: 'Analysing'})
 

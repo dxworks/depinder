@@ -61,3 +61,16 @@ Re-fetches the `libs` rows last written before `updated_before` (default: the ex
 than `--cache-max-age`) for the plugins named (default all), by name or
 [alias](../index.md#ecosystems): `sbom-java` and `java` both refresh the `java:` entries. Needs `GH_TOKEN` for the advisories. To bypass the cache for a
 single run instead, use `analyse --refresh`.
+
+Each row is fetched the way `analyse` fetches a package the resolver did not answer: from its
+registry through the [registry fallback](../configuration.md#registry-fallback), Libraries.io
+included, with the same per-ecosystem limits.
+
+| Option | Meaning | Default |
+|---|---|---|
+| `--cache-max-age <duration>` | Without a date, re-fetch the rows older than this; see [expiry](#expiry) | `DEPINDER_CACHE_MAX_AGE`, else `1d` |
+| `--registry-limits <limits>` | Registry requests at once per ecosystem, with an optional gap in ms: `npm=16,cargo=1:1000` | `DEPINDER_REGISTRY_LIMITS`, else 8 at once (`golang` 64, `nuget` 32) |
+
+```bash
+depinder update --registry-limits maven=4:250 java
+```

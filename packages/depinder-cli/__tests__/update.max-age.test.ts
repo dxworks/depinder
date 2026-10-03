@@ -5,14 +5,16 @@ import {updateLibs} from '../src/commands/update'
 import {resetSharedCacheDb, sharedCacheDb} from '../src/cache/sqlite-cache'
 import {LibraryInfo} from '../src/extension-points/registrar'
 
-const retrieve = vi.fn(async (name: string): Promise<LibraryInfo> => ({name, description: 'updated', licenses: [], versions: []}))
+const lookup = vi.fn(async ({name}: {type: string, name: string}): Promise<LibraryInfo> => ({name, description: 'updated', licenses: [], versions: []}))
 
-// No real registrar: `update` would otherwise go to npm for every expired row.
+// No real registries: `update` would otherwise go to npm for every expired row.
+vi.mock('../src/fallback/registry-fallback', () => ({
+    createRegistryFallback: () => ({lookup: (pkg: {type: string, name: string}) => lookup(pkg), packagesAtOnce: () => 8}),
+}))
 vi.mock('../src/plugins', () => ({
     getPluginsFromNames: () => [{
         name: 'fake', ecosystem: 'npm',
         extractor: {files: [], createContexts: () => []},
-        registrar: {retrieve: (name: string) => retrieve(name)},
     }],
 }))
 
@@ -20,7 +22,7 @@ describe('update with no date', () => {
     let tmp: string
 
     beforeEach(() => {
-        retrieve.mockClear()
+        lookup.mockClear()
         tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder-update-age-'))
         process.env.DEPINDER_CACHE_DB = path.join(tmp, 'depinder.sqlite')
         resetSharedCacheDb()
@@ -43,7 +45,7 @@ describe('update with no date', () => {
 
         await updateLibs('', [])
 
-        expect(retrieve.mock.calls).toEqual([['old']])
+        expect(lookup.mock.calls).toEqual([[{type: 'npm', name: 'old'}]])
         expect(sharedCacheDb().getLib('npm:old')?.description).toBe('updated')
         expect(sharedCacheDb().getLib('npm:new')?.description).toBe('cached')
     })
@@ -54,7 +56,7 @@ describe('update with no date', () => {
 
         await updateLibs('', [], {cacheMaxAge: '30s'})
 
-        expect(retrieve.mock.calls.map(it => it[0]).sort()).toEqual(['new', 'old'])
+        expect(lookup.mock.calls.map(it => it[0].name).sort()).toEqual(['new', 'old'])
     })
 
     it('still lets an explicit date win', async () => {
@@ -62,6 +64,12 @@ describe('update with no date', () => {
 
         await updateLibs('2000-01-01', [])
 
-        expect(retrieve).not.toHaveBeenCalled()
+        expect(lookup).not.toHaveBeenCalled()
+    })
+})
+
+describe('update registry limits', () => {
+    it('rejects a bad --registry-limits before reading the cache', async () => {
+        await expect(updateLibs('', [], {registryLimits: 'npm=0'})).rejects.toThrow(/--registry-limits/)
     })
 })

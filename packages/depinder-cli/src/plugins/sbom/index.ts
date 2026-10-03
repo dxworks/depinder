@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import {minimatch} from 'minimatch'
 import {DependencyFileContext, DepinderDependency, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
-import {Plugin} from '../../extension-points/plugin'
+import {ecosystemOf, Plugin} from '../../extension-points/plugin'
 import {Registrar} from '../../extension-points/registrar'
 import {Vulnerability, VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
 import {parseCycloneDxFile} from './cyclonedx'
@@ -294,6 +294,11 @@ export function sbomFilesToParse(plugins: Plugin[], files: string[]): string[] {
  */
 export function purlTypeOfPlugin(plugin: Plugin): string | undefined {
     return plugin.aliases?.find(it => it.startsWith('sbom-'))?.slice('sbom-'.length)
+}
+
+/** The purl type a plugin's packages are looked up under; a plugins.json plugin falls back to its ecosystem. */
+export function registryTypeOfPlugin(plugin: Plugin): string {
+    return purlTypeOfPlugin(plugin) ?? ecosystemOf(plugin)
 }
 
 /**

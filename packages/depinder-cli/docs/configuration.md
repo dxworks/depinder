@@ -83,7 +83,7 @@ SBOM scan findings — the only case in which they are read.
 Every package neither the cache nor the resolver answered (or every package, with
 `--no-resolver`) is fetched from its registry by the same code the resolver's server runs, so a
 package gets the same facts whichever road it came by. The answer is cached locally like a
-resolver answer.
+resolver answer. `depinder update` re-fetches cached rows the same way.
 
 When the registry has no such package or fails, and `LIBRARIES_IO_API_KEY` is set, a **maven**,
 **pypi**, **nuget** or **composer** package is asked of [Libraries.io](https://libraries.io)
@@ -108,5 +108,5 @@ export DEPINDER_REGISTRY_LIMITS=npm=16,maven=4
 depinder analyse ./repo --registry-limits cargo=1:1000
 ```
 
-Raising a type's limit above 8 also lets `analyse` look up that many of its packages at once. A bad
-entry stops the run before anything is fetched, naming the entry and the valid types.
+Raising a type's limit above 8 also lets `analyse` and `update` look up that many of its packages
+at once. A bad entry stops the run before anything is fetched, naming the entry and the valid types.
