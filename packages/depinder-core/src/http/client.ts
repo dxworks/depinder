@@ -70,7 +70,17 @@ export interface HttpClientOptions {
      * meanwhile. Off: the 429 is returned like any other answer.
      */
     retryRateLimited?: boolean
+    /**
+     * Retries once, after about a second, a request that failed on the way (network error,
+     * timeout) or got a 502/503/504, keeping its limiter slot meanwhile. Off: the first outcome stands.
+     */
+    retryTransient?: boolean
 }
+
+/** The wait before retrying a transient failure; a little jitter keeps a failed burst from retrying in step. */
+export const TRANSIENT_RETRY_DELAY_MS = 1_000
+export const TRANSIENT_RETRY_JITTER_MS = 250
+const TRANSIENT_STATUSES = new Set([502, 503, 504])
 
 export function createHttpClient(options: HttpClientOptions): HttpClient {
     const settings: SendSettings = {
@@ -79,11 +89,23 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
         onRequest: options.onRequest,
     }
 
+    async function sendOrRetryTransient(url: string, requestOptions: RequestOptions): Promise<HttpResponse> {
+        if (!options.retryTransient) return send(url, requestOptions, settings)
+        try {
+            const response = await send(url, requestOptions, settings)
+            if (!TRANSIENT_STATUSES.has(response.status)) return response
+        } catch (e) {
+            if (!(e instanceof HttpError)) throw e
+        }
+        await sleep(TRANSIENT_RETRY_DELAY_MS + Math.random() * TRANSIENT_RETRY_JITTER_MS)
+        return send(url, requestOptions, settings)
+    }
+
     async function attempt(url: string, requestOptions: RequestOptions): Promise<HttpResponse> {
-        const response = await send(url, requestOptions, settings)
+        const response = await sendOrRetryTransient(url, requestOptions)
         if (response.status !== 429 || !options.retryRateLimited) return response
         await sleep(retryAfterMs(response.headers.get('retry-after')))
-        return send(url, requestOptions, settings)
+        return sendOrRetryTransient(url, requestOptions)
     }
 
     async function request(url: string, requestOptions: RequestOptions = {}): Promise<HttpResponse> {

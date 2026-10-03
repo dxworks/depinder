@@ -33,6 +33,8 @@ export function createRegistryClients(options: RegistryClientsOptions): Registry
                     onRequest: options.onRequest,
                     // A 429 is waited out once, so a higher CLI limit cannot turn into missing data.
                     retryRateLimited: true,
+                    // A dropped connection or a 5xx blip is asked again once instead of becoming a missing package.
+                    retryTransient: true,
                 })
                 clients.set(type, client)
             }

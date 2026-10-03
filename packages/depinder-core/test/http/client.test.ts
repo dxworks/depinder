@@ -1,5 +1,11 @@
 import {afterEach, describe, expect, it, vi} from 'vitest'
-import {createHttpClient, DEFAULT_USER_AGENT, type RequestEvent} from '../../src/http/client.js'
+import {
+    createHttpClient,
+    DEFAULT_USER_AGENT,
+    TRANSIENT_RETRY_DELAY_MS,
+    TRANSIENT_RETRY_JITTER_MS,
+    type RequestEvent,
+} from '../../src/http/client.js'
 import {createLimiter} from '../../src/http/limiter.js'
 import {DEFAULT_RETRY_AFTER_MS, MAX_RETRY_AFTER_MS, retryAfterMs} from '../../src/http/retry-after.js'
 
@@ -117,6 +123,72 @@ describe('a 429 answer', () => {
         const pending = createHttpClient({limiter: open(), retryRateLimited: true}).get('https://x.test/')
         await vi.runAllTimersAsync()
         expect((await pending).status).toBe(429)
+    })
+})
+
+describe('a transient failure', () => {
+    const fullDelay = TRANSIENT_RETRY_DELAY_MS + TRANSIENT_RETRY_JITTER_MS
+
+    /** fetch that plays `outcomes` in order: a status, 'reset' (network error) or 'hang' (until aborted). */
+    function fetchPlaying(...outcomes: (number | 'reset' | 'hang')[]): string[] {
+        const calls: string[] = []
+        vi.stubGlobal('fetch', (url: string, init: RequestInit) => {
+            const outcome = outcomes[calls.length] ?? 200
+            calls.push(url)
+            if (outcome === 'reset') return Promise.reject(new TypeError('fetch failed'))
+            if (outcome === 'hang') {
+                return new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(new Error('aborted'))))
+            }
+            return Promise.resolve(new Response('{}', {status: outcome}))
+        })
+        return calls
+    }
+
+    const retrying = () => createHttpClient({limiter: open(), retryTransient: true, timeoutMs: 10})
+
+    it('is retried once after a network error, a timeout or a 503', async () => {
+        vi.useFakeTimers()
+        for (const failure of ['reset', 'hang', 503] as const) {
+            const calls = fetchPlaying(failure, 200)
+            const pending = retrying().get('https://proxy.golang.org/x/@v/list')
+            await vi.advanceTimersByTimeAsync(TRANSIENT_RETRY_DELAY_MS - 1)
+            expect(calls).toHaveLength(1)
+            await vi.advanceTimersByTimeAsync(fullDelay)
+            expect((await pending).status).toBe(200)
+            expect(calls).toHaveLength(2)
+        }
+    })
+
+    it('fails when the retry fails too', async () => {
+        vi.useFakeTimers()
+        const calls = fetchPlaying('reset', 'reset', 200)
+        const pending = retrying().get('https://x.test/')
+        const outcome = expect(pending).rejects.toThrow(/failed: fetch failed/)
+        await vi.advanceTimersByTimeAsync(fullDelay)
+        await outcome
+        expect(calls).toHaveLength(2)
+    })
+
+    it('hands back the second 5xx as the answer', async () => {
+        vi.useFakeTimers()
+        fetchPlaying(502, 504)
+        const pending = retrying().get('https://x.test/')
+        await vi.advanceTimersByTimeAsync(fullDelay)
+        expect((await pending).status).toBe(504)
+    })
+
+    it('is not retried unless the caller asked for it', async () => {
+        const calls = fetchPlaying('reset', 200)
+        await expect(createHttpClient({limiter: open()}).get('https://x.test/')).rejects.toThrow(/fetch failed/)
+        fetchPlaying(503, 200)
+        expect((await createHttpClient({limiter: open()}).get('https://x.test/')).status).toBe(503)
+        expect(calls).toHaveLength(1)
+    })
+
+    it('leaves other answers alone', async () => {
+        const calls = fetchPlaying(404, 200)
+        expect((await retrying().get('https://x.test/')).status).toBe(404)
+        expect(calls).toHaveLength(1)
     })
 })
 
