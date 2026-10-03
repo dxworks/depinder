@@ -1,0 +1,34 @@
+{
+  "name": "depinder-server-side",
+  "version": "0.2.0",
+  "private": true,
+  "description": "purl resolver service: facts per package (versions, release dates, licenses) filled on demand and kept fresh from registry change feeds",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "bench": "tsx bench/run.ts",
+    "bench:compare": "tsx bench/compare.ts",
+    "bench:reset": "tsx bench/reset.ts"
+  },
+  "dependencies": {
+    "@fastify/compress": "^9.2.0",
+    "fast-xml-parser": "^5.0.0",
+    "fastify": "^5.0.0",
+    "packageurl-js": "^2.0.1",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

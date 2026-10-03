@@ -1,0 +1,14 @@
+# Override for `npm run bench -- --target deploy`: the local stack, but on the deployed server's
+# database and settings (deploy/.depinder.server.env) instead of the dev ones in .env. Used as
+#   docker compose -f docker-compose.yml -f bench/compose.deploy-db.yml up -d
+# Paths are relative to the first file's folder, the repo root. `raw`, as on the server
+# (deploy/compose.server.yml): every value exactly as written, so a `$` in a password stays a `$`.
+services:
+  resolver:
+    env_file: !override
+      - path: deploy/.depinder.server.env
+        format: raw
+  vuln:
+    env_file: !override
+      - path: deploy/.depinder.server.env
+        format: raw

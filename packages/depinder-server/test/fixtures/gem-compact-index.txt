@@ -1,0 +1,5 @@
+rack-proxy 2.0.1 bae022beab9a4ed3c53360b9a3be7b92
+devise_masquerade 2.1.6 832f2475f40a4c21399b7056e1cd4966
+rack-proxy -2.0.1 5d41402abc4b2a76b9719d911017c592
+spec_ai 0.1.0,0.1.1 470a1a3ce0b719eabfedcb8c02ac9159
+half-written-gem 0.0

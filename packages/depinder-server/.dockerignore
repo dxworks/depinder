@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+test
+docs
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+.depinder.server.env
+deploy
+*.log
+.DS_Store
+bench
+scripts

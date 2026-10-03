@@ -1,0 +1,9 @@
+{
+  "results": [
+    {"seq": 31000001, "id": "express", "changes": [{"rev": "412-abc"}]},
+    {"seq": 31000002, "id": "@babel/core", "changes": [{"rev": "88-def"}]},
+    {"seq": 31000003, "id": "_design/scratch", "changes": [{"rev": "1-ghi"}]},
+    {"seq": 31000004, "id": "Left-Pad", "changes": [{"rev": "3-jkl"}], "deleted": true}
+  ],
+  "last_seq": 31000004
+}

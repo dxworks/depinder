@@ -1,0 +1,272 @@
+{
+ "SchemaVersion": 2,
+ "Trivy": {
+  "Version": "0.74.0"
+ },
+ "ReportID": "01a0f847-ae19-73a1-85e9-441c260e8257",
+ "CreatedAt": "2026-10-01T19:24:02.329241+03:00",
+ "ArtifactName": "/tmp/depinder-vuln-fixture/sbom.json",
+ "ArtifactType": "cyclonedx",
+ "Results": [
+  {
+   "Target": "",
+   "Class": "lang-pkgs",
+   "Type": "gobinary",
+   "Vulnerabilities": [
+    {
+     "VulnerabilityID": "CVE-2026-56864",
+     "VendorIDs": [
+      "GO-2026-6180"
+     ],
+     "PkgID": "golang.org/x/mod@v0.37.0",
+     "PkgName": "golang.org/x/mod",
+     "PkgIdentifier": {
+      "PURL": "pkg:golang/golang.org/x/mod@v0.37.0",
+      "UID": "1ccbf06b8955a98e",
+      "BOMRef": "c2"
+     },
+     "InstalledVersion": "v0.37.0",
+     "FixedVersion": "0.40.0",
+     "Status": "fixed",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-56864",
+     "DataSource": {
+      "ID": "govulndb",
+      "Name": "The Go Vulnerability Database",
+      "URL": "https://pkg.go.dev/vuln/"
+     },
+     "Fingerprint": "sha256:7f7d1f397db64aed01175ab3fc9641246d68ad20b15eb22ebb3fea598039fb61",
+     "Title": "golang.org/x/mod/sumdb: golang.org/x/mod/sumdb: Integrity bypass via malicious GOSUMDB",
+     "Description": "A malicious GOSUMDB was capable of serving arbitrary module content not contained within the transparency log. This attack allows for a coordinating GOPROXY and GOSUMDB to serve a client malicious module content that cannot be detected by evaluating the transparency log. In order to determine if you have been affected:   rm -r go.sum go.work.sum vendor/ && go mod tidy",
+     "Severity": "HIGH",
+     "CweIDs": [
+      "CWE-347"
+     ],
+     "VendorSeverity": {
+      "amazon": 3,
+      "bitnami": 3,
+      "photon": 3,
+      "redhat": 3
+     },
+     "CVSS": {
+      "bitnami": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+       "V3Score": 7.5
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:N",
+       "V3Score": 8.1
+      }
+     },
+     "References": [
+      "https://access.redhat.com/security/cve/CVE-2026-56864",
+      "https://go.dev/cl/815000",
+      "https://go.dev/cl/815020",
+      "https://go.dev/issue/80745",
+      "https://groups.google.com/g/golang-announce/c/94pEornpRlI",
+      "https://nvd.nist.gov/vuln/detail/CVE-2026-56864",
+      "https://pkg.go.dev/vuln/GO-2026-6180",
+      "https://www.cve.org/CVERecord?id=CVE-2026-56864"
+     ],
+     "PublishedDate": "2026-08-13T22:17:22.677Z",
+     "LastModifiedDate": "2026-09-03T16:37:52.17Z"
+    },
+    {
+     "VulnerabilityID": "CVE-2026-56865",
+     "VendorIDs": [
+      "GO-2026-6179"
+     ],
+     "PkgID": "golang.org/x/mod@v0.37.0",
+     "PkgName": "golang.org/x/mod",
+     "PkgIdentifier": {
+      "PURL": "pkg:golang/golang.org/x/mod@v0.37.0",
+      "UID": "1ccbf06b8955a98e",
+      "BOMRef": "c2"
+     },
+     "InstalledVersion": "v0.37.0",
+     "FixedVersion": "0.40.0",
+     "Status": "fixed",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-56865",
+     "DataSource": {
+      "ID": "govulndb",
+      "Name": "The Go Vulnerability Database",
+      "URL": "https://pkg.go.dev/vuln/"
+     },
+     "Fingerprint": "sha256:1d6918f57b57cef2abe36296d412bf274ca8a67e3d3b35383e752d27cc9782c7",
+     "Title": "golang.org/x/mod/sumdb/tlog: golang.org/x/mod/sumdb/tlog: Supply chain compromise via transparency log tile verification bypass",
+     "Description": "A malicious GOPROXY was previously capable of forging up to two sumdb tiles that allow for a requested module to bypass the GOSUMDB check and persist attacker-controlled module content to a local Go module cache. This attack allows for a malicious GOPROXY to serve malicious module content that cannot be detected by evaluating the transparency log. All tiles are now correctly verified against their parents. In order to determine if you have been affected:   rm -r go.sum go.work.sum vendor/ && go mod tidy",
+     "Severity": "HIGH",
+     "CweIDs": [
+      "CWE-347"
+     ],
+     "VendorSeverity": {
+      "amazon": 3,
+      "azure": 3,
+      "bitnami": 3,
+      "photon": 3,
+      "redhat": 3
+     },
+     "CVSS": {
+      "bitnami": {
+       "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+       "V3Score": 8.4
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H",
+       "V3Score": 8.8
+      }
+     },
+     "References": [
+      "https://access.redhat.com/security/cve/CVE-2026-56865",
+      "https://go.dev/cl/814960",
+      "https://go.dev/cl/815020",
+      "https://go.dev/issue/80744",
+      "https://groups.google.com/g/golang-announce/c/94pEornpRlI",
+      "https://nvd.nist.gov/vuln/detail/CVE-2026-56865",
+      "https://pkg.go.dev/vuln/GO-2026-6179",
+      "https://www.cve.org/CVERecord?id=CVE-2026-56865"
+     ],
+     "PublishedDate": "2026-08-13T22:17:22.797Z",
+     "LastModifiedDate": "2026-09-03T16:37:52.17Z"
+    }
+   ]
+  },
+  {
+   "Target": "Java",
+   "Class": "lang-pkgs",
+   "Type": "jar",
+   "Vulnerabilities": [
+    {
+     "VulnerabilityID": "CVE-2025-48924",
+     "VendorIDs": [
+      "GHSA-j288-q9x7-2f5v"
+     ],
+     "PkgID": "commons-lang:commons-lang:2.6",
+     "PkgName": "commons-lang:commons-lang",
+     "PkgIdentifier": {
+      "PURL": "pkg:maven/commons-lang/commons-lang@2.6",
+      "UID": "fb5372966d18afb3",
+      "BOMRef": "c1"
+     },
+     "InstalledVersion": "2.6",
+     "Status": "affected",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-48924",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory Maven",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+     },
+     "Fingerprint": "sha256:f046e706e6af0a73505cd56cda7e41255fc897b17860907105f73d47a98a6b6a",
+     "Title": "commons-lang/commons-lang: org.apache.commons/commons-lang3: Uncontrolled Recursion vulnerability in Apache Commons Lang",
+     "Description": "Uncontrolled Recursion vulnerability in Apache Commons Lang.\n\nThis issue affects Apache Commons Lang: Starting with\u00a0commons-lang:commons-lang\u00a02.0 to 2.6, and, from org.apache.commons:commons-lang3 3.0 before\u00a03.18.0.\n\nThe methods ClassUtils.getClass(...) can throw\u00a0StackOverflowError on very long inputs. Because an Error is usually not handled by applications and libraries, a \nStackOverflowError could\u00a0cause an application to stop.\n\nUsers are recommended to upgrade to version 3.18.0, which fixes the issue.",
+     "Severity": "MEDIUM",
+     "CweIDs": [
+      "CWE-674"
+     ],
+     "VendorSeverity": {
+      "amazon": 1,
+      "azure": 2,
+      "cbl-mariner": 2,
+      "ghsa": 2,
+      "redhat": 1,
+      "ubuntu": 2
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N",
+       "V3Score": 6.5
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+       "V3Score": 3.7
+      }
+     },
+     "References": [
+      "http://www.openwall.com/lists/oss-security/2025/07/11/1",
+      "https://access.redhat.com/security/cve/CVE-2025-48924",
+      "https://github.com/apache/commons-lang",
+      "https://github.com/apache/commons-lang/commit/b424803abdb2bec818e4fbcb251ce031c22aca53",
+      "https://lists.apache.org/thread/bgv0lpswokgol11tloxnjfzdl7yrc1g1",
+      "https://lists.debian.org/debian-lts-announce/2025/08/msg00000.html",
+      "https://lists.debian.org/debian-lts-announce/2025/08/msg00026.html",
+      "https://lists.debian.org/debian-lts-announce/2025/09/msg00032.html",
+      "https://lists.debian.org/debian-lts-announce/2025/09/msg00036.html",
+      "https://nvd.nist.gov/vuln/detail/CVE-2025-48924",
+      "https://ubuntu.com/security/notices/USN-8364-1",
+      "https://www.cve.org/CVERecord?id=CVE-2025-48924",
+      "https://www.openwall.com/lists/oss-security/2025/07/11/1"
+     ],
+     "PublishedDate": "2025-07-11T15:15:24.347Z",
+     "LastModifiedDate": "2026-06-17T09:30:29.473Z"
+    }
+   ]
+  },
+  {
+   "Target": "Node.js",
+   "Class": "lang-pkgs",
+   "Type": "node-pkg",
+   "Vulnerabilities": [
+    {
+     "VulnerabilityID": "CVE-2026-49356",
+     "VendorIDs": [
+      "GHSA-4x5r-pxfx-6jf8"
+     ],
+     "PkgID": "@babel/core@7.12.9",
+     "PkgName": "@babel/core",
+     "PkgIdentifier": {
+      "PURL": "pkg:npm/%40babel/core@7.12.9",
+      "UID": "6f69e4f7c941af76",
+      "BOMRef": "c0"
+     },
+     "InstalledVersion": "7.12.9",
+     "FixedVersion": "8.0.0-rc.6, 7.29.6",
+     "Status": "fixed",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-49356",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory npm",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+     },
+     "Fingerprint": "sha256:d133832dd4688d2cf1b6d12267877882a95947ad4af7397f8145b4f46201c1fa",
+     "Title": "@babel/core: @babel/core: Arbitrary file read via sourceMappingURL comment",
+     "Description": "Babel is a compiler for writing next generation JavaScript. Prior to 8.0.0-rc.6 and 7.29.6, @babel/core affected by an arbitrary file read via a sourceMappingURL comment. Using @babel/core to compile maliciously crafted code can allow an attacker to read any source map from the system that is running Babel, if the attacker controls the input source code, can read the output source code, and knows the path of the source map file that they want to read. This vulnerability is fixed in 8.0.0-rc.6 and 7.29.6.",
+     "Severity": "LOW",
+     "CweIDs": [
+      "CWE-22",
+      "CWE-200"
+     ],
+     "VendorSeverity": {
+      "ghsa": 1,
+      "nvd": 1,
+      "redhat": 1
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:C/C:L/I:N/A:N",
+       "V3Score": 3.2
+      },
+      "nvd": {
+       "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:C/C:L/I:N/A:N",
+       "V3Score": 3.6
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:C/C:L/I:N/A:N",
+       "V3Score": 3.6
+      }
+     },
+     "References": [
+      "https://access.redhat.com/security/cve/CVE-2026-49356",
+      "https://babeljs.io/docs/options#inputsourcemap",
+      "https://github.com/babel/babel",
+      "https://github.com/babel/babel/security/advisories/GHSA-4x5r-pxfx-6jf8",
+      "https://nvd.nist.gov/vuln/detail/CVE-2026-49356",
+      "https://www.cve.org/CVERecord?id=CVE-2026-49356"
+     ],
+     "PublishedDate": "2026-06-22T18:16:41.107Z",
+     "LastModifiedDate": "2026-06-26T20:04:23.897Z"
+    }
+   ]
+  }
+ ]
+}

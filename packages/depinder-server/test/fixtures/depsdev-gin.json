@@ -1,0 +1,16 @@
+{
+    "versionKey": {"system": "GO", "name": "github.com/gin-gonic/gin", "version": "v1.10.0"},
+    "publishedAt": "2024-05-07T03:23:42Z",
+    "isDefault": false,
+    "isDeprecated": false,
+    "licenses": ["MIT"],
+    "advisoryKeys": [],
+    "links": [{"label": "SOURCE_REPO", "url": "https://github.com/gin-gonic/gin"}],
+    "relatedProjects": [
+        {
+            "projectKey": {"id": "github.com/gin-gonic/gin"},
+            "relationProvenance": "GO_ORIGIN",
+            "relationType": "SOURCE_REPO"
+        }
+    ]
+}

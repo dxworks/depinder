@@ -1,0 +1,64 @@
+# Three services, one address: caddy is the only one with a published port, and routes
+# /vulnerabilities to vuln and everything else to resolver (Caddyfile). Both servers check the same
+# RESOLVER_API_TOKEN, so depinder needs one URL and one token.
+#
+# The database is hosted (Supabase), so there is no db service here: DATABASE_URL in .env points
+# at it. Copy .env.example to .env before the first `docker compose up`. The values under
+# `environment:` win over .env, so ROLE, PORT and the vuln settings are decided here.
+services:
+  resolver:
+    build: .
+    image: depinder-server-side:0.2.0
+    env_file: .env
+    environment:
+      ROLE: all
+      PORT: 8080
+    # A /resolve stream lasts up to its deadline_ms (60 s at most); let it finish on shutdown.
+    stop_grace_period: 70s
+    restart: unless-stopped
+
+  vuln:
+    image: depinder-server-side:0.2.0
+    env_file: .env
+    environment:
+      ROLE: vuln
+      PORT: 8080
+      VULN_DATA_DIR: /var/lib/vuln
+      # Set explicitly: inside a container the default (half the cores) reads the host's cores.
+      VULN_MAX_SCANS: 2
+      VULN_MAX_QUEUED: 8
+    volumes:
+      # The databases (~4.4 GB, up to ~9 GB while both download) live here, not in the image, so
+      # restarts and rebuilds serve at once. One vuln container per volume: two would both update it.
+      - vuln-data:/var/lib/vuln
+    # So scanning cannot starve the resolver. Placeholders: tune them on the machine it runs on.
+    cpus: 2
+    mem_limit: 4g
+    healthcheck:
+      # First boot on an empty volume downloads both databases (~75 s on a good line) and /health
+      # answers 503 until they are in. Stale databases still answer 200.
+      start_period: 5m
+    stop_grace_period: 70s
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    environment:
+      # `:8080` is plain HTTP. On a server, a domain name here (and ports 80 and 443 published)
+      # gets a certificate automatically.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:8080}
+    ports:
+      - "${PUBLIC_PORT:-8080}:8080"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    # Started after both, not after vuln is healthy: the resolver must answer during vuln's first
+    # download.
+    depends_on:
+      - resolver
+      - vuln
+    restart: unless-stopped
+
+volumes:
+  vuln-data:
+  caddy-data:

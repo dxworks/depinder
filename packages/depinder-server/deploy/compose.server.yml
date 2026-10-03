@@ -1,0 +1,66 @@
+# The production stack. 07-upload.sh copies it to APP_DIR/compose.yml on the server, next to
+# server.env (the .depinder.server.env from your machine, handed to the containers as written),
+# compose.vars (the few values substituted into this file as ${...}, which 07-upload.sh derives
+# from it) and src/ (the source the image is built from). Same three services as the repo's
+# docker-compose.yml, but every setting comes from the env file, and Caddy answers on 80/443 so it
+# can get a certificate for a domain.
+#
+# On the server, `depinder <compose command>` runs compose with the right files (07-upload.sh
+# installs it): `depinder ps`, `depinder logs -f resolver`, `depinder restart`.
+name: depinder
+
+services:
+  resolver:
+    build: ./src
+    image: depinder-server-side:server
+    env_file: &app-env
+      # raw: every value exactly as written, so a `$` in a password stays a `$`
+      - path: server.env
+        format: raw
+    environment:
+      ROLE: all
+      PORT: 8080
+    # A /resolve stream lasts up to its deadline_ms (60 s at most); let it finish on shutdown.
+    stop_grace_period: 70s
+    restart: unless-stopped
+
+  vuln:
+    image: depinder-server-side:server
+    # Built by the resolver service above; never pulled.
+    pull_policy: never
+    env_file: *app-env
+    environment:
+      ROLE: vuln
+      PORT: 8080
+      VULN_DATA_DIR: /var/lib/vuln
+    volumes:
+      - vuln-data:/var/lib/vuln
+    cpus: ${VULN_CPUS:-1.5}
+    mem_limit: ${VULN_MEM_LIMIT:-2500m}
+    healthcheck:
+      # The first boot on an empty volume downloads both databases; /health is 503 until then.
+      start_period: 10m
+    stop_grace_period: 70s
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./src/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - resolver
+      - vuln
+    restart: unless-stopped
+
+volumes:
+  vuln-data:
+  caddy-data:
+  caddy-config:
