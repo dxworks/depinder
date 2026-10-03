@@ -25,7 +25,7 @@
     },
     "lint": {
       "cache": true,
-      "inputs": ["default", "{workspaceRoot}/tools/size-guard/**/*"]
+      "inputs": ["default", "{workspaceRoot}/tools/workspace-checks/size-baseline.json"]
     },
     "test": {
       "cache": true,

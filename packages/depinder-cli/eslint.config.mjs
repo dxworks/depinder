@@ -1,5 +1,14 @@
 import eslint from '@eslint/js'
 import tseslint from 'typescript-eslint'
+import {readFileSync} from 'node:fs'
+
+// Functions stay under 100 lines (NX_MIGRATION.md D10); files that already had longer ones only warn.
+const sizeBaseline = JSON.parse(readFileSync(new URL('../../tools/workspace-checks/size-baseline.json', import.meta.url), 'utf8'))
+const projectPrefix = 'packages/depinder-cli/'
+const filesWithLongFunctions = sizeBaseline.longFunctions
+    .filter(file => file.startsWith(projectPrefix))
+    .map(file => file.slice(projectPrefix.length))
+const functionLength = {max: 100, skipBlankLines: true, skipComments: true}
 
 export default tseslint.config(
     eslint.configs.recommended,
@@ -37,7 +46,13 @@ export default tseslint.config(
             'no-case-declarations': 'off',
             'no-async-promise-executor': 'off',
             'prefer-const': 'off',
+
+            'max-lines-per-function': ['error', functionLength],
         },
+    },
+    {
+        files: filesWithLongFunctions,
+        rules: {'max-lines-per-function': ['warn', functionLength]},
     },
     {
         ignores: ['dist/**', 'node_modules/**', '**/*.js'],

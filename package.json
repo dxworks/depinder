@@ -15,7 +15,7 @@
     "test": "nx run-many -t test",
     "lint": "nx run-many -t lint",
     "typecheck": "nx run-many -t typecheck",
-    "check": "nx run-many -t typecheck lint test build"
+    "check": "nx run-many -t typecheck lint test build size-guard dependency-check"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
