@@ -14,12 +14,18 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./testing": {
+      "depinder-source": "./src/testing/index.ts",
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    },
     "./fixtures/*": "./test/fixtures/*"
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "record-fixture-case": "tsx scripts/record-fixture-case.ts"
   },
   "dependencies": {
     "fast-xml-parser": "^5.11.1",

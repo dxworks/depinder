@@ -16,7 +16,7 @@
     },
     "lint": {
       "executor": "nx:run-commands",
-      "options": {"cwd": "{projectRoot}", "command": "eslint src test"}
+      "options": {"cwd": "{projectRoot}", "command": "eslint src test scripts"}
     },
     "test": {
       "executor": "nx:run-script",

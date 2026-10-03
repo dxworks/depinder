@@ -1,0 +1,19 @@
+{
+  "purl": "pkg:pypi/pluggy",
+  "ecosystem": "pypi",
+  "pattern": "pypi: every file of release 1.1.0 is yanked: true (with a yanked_reason); it must count as yanked",
+  "expect": "found",
+  "recordedAt": "2026-10-03T13:08:30.828Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://pypi.org/pypi/pluggy/json",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "etag": "\"xcfFkN80ramd0KCHJU/sig\""
+      },
+      "body": "project.json"
+    }
+  ]
+}

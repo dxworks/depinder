@@ -1,0 +1,19 @@
+{
+  "purl": "pkg:pypi/iniconfig",
+  "ecosystem": "pypi",
+  "pattern": "pypi: info.license_expression is MIT while info.license is null; licenses must come from license_expression",
+  "expect": "found",
+  "recordedAt": "2026-10-03T13:08:30.282Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://pypi.org/pypi/iniconfig/json",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "etag": "\"bcFUJLTfFEGuNpICpeOtcw\""
+      },
+      "body": "project.json"
+    }
+  ]
+}

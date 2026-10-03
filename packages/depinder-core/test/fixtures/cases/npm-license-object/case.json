@@ -1,0 +1,20 @@
+{
+  "purl": "pkg:npm/policyfile",
+  "ecosystem": "npm",
+  "pattern": "npm: license is an object {type: MIT, url} at the top level and on the latest version 0.0.6; licenses must be MIT",
+  "expect": "found",
+  "recordedAt": "2026-10-03T13:08:29.230Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://registry.npmjs.org/policyfile",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "etag": "W/\"0a190818fa893070d065d9bb701d9579\"",
+        "last-modified": "Fri, 24 Jun 2022 06:33:26 GMT"
+      },
+      "body": "packument.json"
+    }
+  ]
+}

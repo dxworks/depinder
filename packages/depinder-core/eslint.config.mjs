@@ -2,6 +2,6 @@ import {functionSizeConfig} from '../../tools/workspace-checks/function-size.esl
 import {moduleBoundariesConfig} from '../../tools/workspace-checks/module-boundaries.eslint.mjs'
 
 export default [
-    ...functionSizeConfig('packages/depinder-core/', ['src/**/*.ts']),
-    ...moduleBoundariesConfig(['src/**/*.ts', 'test/**/*.ts']),
+    ...functionSizeConfig('packages/depinder-core/', ['src/**/*.ts', 'scripts/**/*.ts']),
+    ...moduleBoundariesConfig(['src/**/*.ts', 'test/**/*.ts', 'scripts/**/*.ts']),
 ]

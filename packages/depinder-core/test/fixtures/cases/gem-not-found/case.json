@@ -1,0 +1,18 @@
+{
+  "purl": "pkg:gem/depinder-fixture-no-such-gem-7f3c9a",
+  "ecosystem": "gem",
+  "pattern": "gem: 404 for an unknown gem; both roads must say not found",
+  "expect": "not_found",
+  "recordedAt": "2026-10-03T13:08:38.874Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://rubygems.org/api/v1/versions/depinder-fixture-no-such-gem-7f3c9a.json",
+      "status": 404,
+      "headers": {
+        "content-type": "text/plain; charset=utf-8"
+      },
+      "body": "error-404.txt"
+    }
+  ]
+}
