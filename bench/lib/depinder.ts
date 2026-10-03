@@ -1,5 +1,5 @@
 import {spawn} from 'node:child_process'
-import {closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync} from 'node:fs'
+import {closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import {childEnv} from './env.js'
@@ -91,6 +91,15 @@ export interface RunResult {
     strippedEnv: string[]
     profile: Profile | null
     picks: Picks
+}
+
+/** A run's SQLite cache with its WAL sidecars copied to a new file, so the original stays as that run left it. */
+export function copyCache(from: string, to: string): void {
+    if (!existsSync(from)) throw new Error(`cache to copy is missing: ${from}`)
+    for (const suffix of ['', '-wal', '-shm']) {
+        rmSync(to + suffix, {force: true})
+        if (existsSync(from + suffix)) copyFileSync(from + suffix, to + suffix)
+    }
 }
 
 /** One `depinder analyse`, stdout and stderr to the log file (a full run outgrows any pipe buffer). */

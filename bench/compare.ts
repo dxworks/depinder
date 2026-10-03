@@ -3,7 +3,7 @@ import path from 'node:path'
 import {parseArgs} from 'node:util'
 import {DifferenceClassifier, referenceFacts, type DiffClass} from './lib/allowed-differences.js'
 import {compareDirs, describeClasses, formatComparison, zeroByClass} from './lib/csv-compare.js'
-import {pairComparisons, parsePair, sameCellComparisons, type Comparison} from './lib/pairs.js'
+import {pairComparisons, parsePair, sameCellComparisons, selfComparisons, type Comparison} from './lib/pairs.js'
 import {median} from './lib/profile.js'
 import {groupRuns, type RunRecord} from './lib/summary.js'
 import {RUNS_DIR} from './lib/targets.js'
@@ -11,7 +11,8 @@ import {RUNS_DIR} from './lib/targets.js'
 /**
  * Two bench runs side by side: timings per cell and producer, the counters that moved in the warm
  * cells, and the CSV output of the first run of each cell compared row by row. `--pair` compares
- * one cell with another instead (A and B may be the same run).
+ * one cell with another instead (A and B may be the same run); the same run twice without
+ * `--pair` runs its self-checks (cold then warm on one cache, determinism).
  *
  *   npm run bench:compare -- <runDirA> <runDirB> [--pair <cellA>[@N]:<cellB>[@N]]...
  *
@@ -138,12 +139,16 @@ function main(): void {
         + 'and the Out of Support counts can differ by age alone')
     console.log()
 
+    // A run against itself without --pair: its cold-then-warm and determinism checks.
+    const selfCheck = pairs.length === 0 && path.resolve(dirA) === path.resolve(dirB)
+    if (selfCheck) console.log('A and B are the same run: each cold cell vs its warm rerun, and repeat 1 vs the later repeats\n')
     const comparisons = pairs.length
         ? pairs.flatMap(pair => pairComparisons(pair, a, b))
-        : sameCellComparisons(a, b)
+        : selfCheck ? selfComparisons(a) : sameCellComparisons(a, b)
     const worst = timings(comparisons)
     // Counters of two different cells differ by design; a pair compare is judged on its CSVs.
-    const moved = pairs.length ? 0 : counters(groupRuns(a), groupRuns(b))
+    const paired = pairs.length > 0 || selfCheck
+    const moved = paired ? 0 : counters(groupRuns(a), groupRuns(b))
     const byClass = outputs(dirA, dirB, comparisons, ignoreClock)
     const regressions = byClass.regression
     const allowed = byClass['newer-release'] + byClass['vuln-db']
@@ -151,7 +156,7 @@ function main(): void {
     const csv = regressions + allowed + signOff === 0
         ? `CSV identical${ignoreClock ? ' (ignoring clock columns)' : ''}`
         : `CSV: ${describeClasses(byClass)}`
-    const ctr = pairs.length ? 'counters not compared (--pair)' : moved === 0 ? 'warm counters identical' : `${moved} warm counter(s) differ`
+    const ctr = paired ? 'counters not compared (pairs)' : moved === 0 ? 'warm counters identical' : `${moved} warm counter(s) differ`
     const time = `largest timing change ${worst >= 0 ? '+' : ''}${worst.toFixed(0)}%`
     if (comparisons.length === 0) {
         console.log('VERDICT: nothing compared — no cell (or --pair) ran in both')

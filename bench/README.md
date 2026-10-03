@@ -33,8 +33,8 @@ Long waits print a progress line at least every minute, so it is safe to run in 
 |---|---|---|
 | `--target dev\|deploy\|hosted` | `dev` | see below |
 | `--producers` | `trivy,syft` | the SBOM folders under the input dir, run one after the other |
-| `--cells` | `empty,warm-server,warm-both,no-server` | always run in this order |
-| `--repeats N` | 3 | runs per warm and no-server cell; summary shows the median |
+| `--cells` | `empty,warm-after-empty,warm-server,warm-both,no-server,warm-after-no-server` | always run in this order |
+| `--repeats N` | 3 | runs per repeated cell (all but empty and warm-after-empty); summary shows the median |
 | `--label` | `run` | the run folder is `<YYYY-MM-DD_HHMM>-<label>` |
 | `--now <ISO>` | the bench's start | the date every depinder run measures ages from (below) |
 | `--yes` | | skip the typed confirmation before a wipe; required when stdin is not a terminal (a wipe without it then stops before touching anything) |
@@ -116,6 +116,16 @@ Per producer, trivy first, then syft:
    to the resolver, so it does not change the server's database. Repeated N times. summary.md adds
    its registry lookups and enrich time per ecosystem.
 
+**Cold then warm on one local cache** (plan phase 6, step 5): a cold run followed by a warm run on
+its SQLite cache must give identical CSVs. Each warm-after cell reruns depinder normally (resolver
+on) on a **copy** of its cold cell's cache, so the cold cache stays as it was for the compare:
+
+- **warm-after-empty** — runs once, right after the empty cell has drained, on the empty run's
+  cache (mixed answers: server where it had them in time, fallback for the rest).
+- **warm-after-no-server** — repeat *i* on no-server repeat *i*'s cache (fallback answers only).
+
+Each needs its cold cell in `--cells`.
+
 ## What a run folder holds
 
 ```
@@ -176,6 +186,11 @@ bench/runs/2026-10-02_1430-baseline/
 on the first run unless `@N` names a repeat (timings then use that repeat alone). A and B may be the
 same run: `--pair warm-server@1:warm-server@2` checks determinism, `--pair no-server:warm-server`
 shows what depinder's own fallback gets differently. Counters are not compared for a pair.
+
+The same run twice without `--pair` (`npm run bench:compare -- <A> <A>`) runs its **self-checks**:
+each cold cell against its warm rerun (`empty:warm-after-empty`,
+`no-server@i:warm-after-no-server@i`; must be identical) and repeat 1 against every later repeat of
+each repeated cell (determinism).
 
 A is the reference. Every CSV difference is sorted by the regression rules of the monorepo plan
 (`NX_MIGRATION.md`, section 6), in `lib/allowed-differences.ts`:

@@ -1,4 +1,4 @@
-import {CELLS, type Cell, type RunRecord} from './summary.js'
+import {CELLS, ONCE_CELLS, WARM_AFTER_COLD, type Cell, type RunRecord} from './summary.js'
 
 /**
  * Which runs of A are compared with which runs of B. By default every cell with itself; with
@@ -32,7 +32,7 @@ function parseRef(text: string): CellRef {
     if (repeat === undefined) return {cell: cell as Cell, repeat: null}
     const n = Number(repeat)
     if (!Number.isInteger(n) || n < 1) throw new Error(`--pair: "${text}" needs a repeat number >= 1 after @`)
-    if (cell === 'empty') throw new Error('--pair: the empty cell runs once and has no repeats')
+    if (ONCE_CELLS.includes(cell as Cell)) throw new Error(`--pair: the ${cell} cell runs once and has no repeats`)
     return {cell: cell as Cell, repeat: n}
 }
 
@@ -42,8 +42,8 @@ export function parsePair(text: string): CellPair {
     return {a: parseRef(sides[0]), b: parseRef(sides[1])}
 }
 
-function outputId(ref: CellRef, producer: string): string {
-    return ref.cell === 'empty' ? `empty-${producer}` : `${ref.cell}-${producer}-${ref.repeat ?? 1}`
+export function outputId(ref: CellRef, producer: string): string {
+    return ONCE_CELLS.includes(ref.cell) ? `${ref.cell}-${producer}` : `${ref.cell}-${producer}-${ref.repeat ?? 1}`
 }
 
 function matches(run: RunRecord, ref: CellRef, producer: string): boolean {
@@ -70,4 +70,18 @@ export function pairComparisons(pair: CellPair, a: RunRecord[], b: RunRecord[]):
         outA: outputId(pair.a, producer),
         outB: outputId(pair.b, producer),
     }))
+}
+
+/**
+ * A run against itself: each cold cell against its warm rerun on the same local cache (must be
+ * identical), and repeat 1 against every later repeat of each repeated cell (determinism).
+ */
+export function selfComparisons(records: RunRecord[]): Comparison[] {
+    const repeatsOf = (cell: Cell) => [...new Set(records.filter(r => r.cell === cell && r.repeat !== null).map(r => r.repeat as number))].sort((x, y) => x - y)
+    const coldWarm = WARM_AFTER_COLD.flatMap(({cold, warm}): CellPair[] => ONCE_CELLS.includes(cold)
+        ? [{a: {cell: cold, repeat: null}, b: {cell: warm, repeat: null}}]
+        : repeatsOf(warm).map(i => ({a: {cell: cold, repeat: i}, b: {cell: warm, repeat: i}})))
+    const determinism: CellPair[] = CELLS.filter(c => !ONCE_CELLS.includes(c))
+        .flatMap(cell => repeatsOf(cell).slice(1).map(i => ({a: {cell, repeat: 1}, b: {cell, repeat: i}})))
+    return [...coldWarm, ...determinism].flatMap(pair => pairComparisons(pair, records, records))
 }

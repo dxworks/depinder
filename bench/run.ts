@@ -4,26 +4,27 @@ import path from 'node:path'
 import {setTimeout as sleep} from 'node:timers/promises'
 import {parseArgs} from 'node:util'
 import {byStatus, counts, fetchedIn, formatCounts, isDrained, openDb, type BenchDb} from './lib/db.js'
-import {depinderPreflight, EXPECTED_BRANCH, gitInfo, runDepinder} from './lib/depinder.js'
+import {copyCache, depinderPreflight, EXPECTED_BRANCH, gitInfo, runDepinder} from './lib/depinder.js'
 import {apiToken, maskedDbHost, readEnvFile, scrubDbDetails} from './lib/env.js'
 import {imageCreated, imageStaleness, stackUp, waitHealthy} from './lib/stack.js'
-import {buildSummary, CELLS, describeVulnDbs, type Cell, type RunRecord, type ServerStats} from './lib/summary.js'
+import {buildSummary, CELLS, describeVulnDbs, WARM_AFTER_COLD, type Cell, type RunRecord, type ServerStats} from './lib/summary.js'
 import {INPUT_DIR, MONOREPO_DIR, resolveTarget, RUNS_DIR, type Target} from './lib/targets.js'
 import {checkWipeAllowed, confirmWipe, wipe} from './lib/wipe.js'
 
 /**
- * The end-to-end benchmark: depinder against the resolver and vuln server, per producer, in four
- * cells — empty server, warm server with a cold local cache, both warm, and no server at all
- * (depinder's own registry fallback). See bench/README.md.
+ * The end-to-end benchmark: depinder against the resolver and vuln server, per producer, in the
+ * cells — empty server, warm server with a cold local cache, both warm, no server at all
+ * (depinder's own registry fallback), and the warm reruns on the empty and no-server runs' local
+ * caches (cold then warm). See bench/README.md.
  *
  *   npm run bench -- [--target dev|deploy|hosted] [--producers trivy,syft]
- *                    [--cells empty,warm-server,warm-both,no-server] [--repeats 3] [--label name] [--now ISO]
+ *                    [--cells empty,warm-after-empty,warm-server,warm-both,no-server,warm-after-no-server] [--repeats 3] [--label name] [--now ISO]
  *                    [--yes] [--allow-wipe-nondev] [--keep-caches] [--rebuild] [--build-depinder]
  *                    [--drain-timeout-min 20] [--run-timeout-min 45]
  */
 
 const USAGE = 'usage: npm run bench -- [--target dev|deploy|hosted] [--producers trivy,syft] '
-    + '[--cells empty,warm-server,warm-both,no-server] [--repeats N] [--label name] [--now ISO] [--yes] '
+    + '[--cells <list>] [--repeats N] [--label name] [--now ISO] [--yes] '
     + '[--allow-wipe-nondev] [--keep-caches] [--rebuild] [--build-depinder] [--drain-timeout-min N] [--run-timeout-min N]'
 
 /** What depinder accepts in DEPINDER_REPORT_NOW: a date, optionally with a time and an offset. */
@@ -80,6 +81,9 @@ function parseOptions(): Options {
     const cells = CELLS.filter(c => asked.includes(c))
     if (cells.includes('warm-both') && !cells.includes('warm-server')) {
         throw new Error('warm-both reruns on the caches warm-server leaves: add warm-server to --cells')
+    }
+    for (const {cold, warm} of WARM_AFTER_COLD) {
+        if (cells.includes(warm) && !cells.includes(cold)) throw new Error(`${warm} reruns on the cache ${cold} leaves: add ${cold} to --cells`)
     }
     const repeats = Number(values.repeats)
     if (!Number.isInteger(repeats) || repeats < 1) throw new Error('--repeats must be a whole number >= 1')
@@ -184,10 +188,24 @@ async function emptyCell(ctx: Ctx, producer: string): Promise<void> {
     save(ctx, {...record, server})
 }
 
+/**
+ * Cold then warm on one local cache: reruns depinder, resolver on, on a copy of the cache its cold
+ * cell left (empty: mixed server and fallback answers; no-server: fallback only). The copy keeps
+ * the cold cache as it was, for the compare.
+ */
+async function warmAfterCold(ctx: Ctx, cell: Cell, producer: string, repeat: number | null): Promise<RunRecord> {
+    const cold = WARM_AFTER_COLD.find(c => c.warm === cell)!.cold
+    const suffix = repeat === null ? producer : `${producer}-${repeat}`
+    const cache = path.join(ctx.runDir, 'caches', `${cell}-${suffix}.sqlite`)
+    copyCache(path.join(ctx.runDir, 'caches', `${cold}-${suffix}.sqlite`), cache)
+    return runOne(ctx, cell, producer, repeat, cache, false)
+}
+
 async function producerCells(ctx: Ctx, producer: string): Promise<void> {
     console.log(`\n== ${producer}`)
     const cache = (i: number) => path.join(ctx.runDir, 'caches', `warm-server-${producer}-${i}.sqlite`)
     if (ctx.opts.cells.includes('empty')) await emptyCell(ctx, producer)
+    if (ctx.opts.cells.includes('warm-after-empty')) save(ctx, await warmAfterCold(ctx, 'warm-after-empty', producer, null))
     for (let i = 1; ctx.opts.cells.includes('warm-server') && i <= ctx.opts.repeats; i++) {
         save(ctx, await runOne(ctx, 'warm-server', producer, i, cache(i), true))
     }
@@ -199,6 +217,9 @@ async function producerCells(ctx: Ctx, producer: string): Promise<void> {
     const noServerCache = (i: number) => path.join(ctx.runDir, 'caches', `no-server-${producer}-${i}.sqlite`)
     for (let i = 1; ctx.opts.cells.includes('no-server') && i <= ctx.opts.repeats; i++) {
         save(ctx, await runOne(ctx, 'no-server', producer, i, noServerCache(i), true))
+    }
+    for (let i = 1; ctx.opts.cells.includes('warm-after-no-server') && i <= ctx.opts.repeats; i++) {
+        save(ctx, await warmAfterCold(ctx, 'warm-after-no-server', producer, i))
     }
 }
 

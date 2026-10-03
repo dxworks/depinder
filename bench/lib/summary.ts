@@ -6,8 +6,16 @@ import {ECOSYSTEM_TO_TYPE, median, type Picks} from './profile.js'
  * the same records, so a field renamed here must be renamed there.
  */
 
-export type Cell = 'empty' | 'warm-server' | 'warm-both' | 'no-server'
-export const CELLS: readonly Cell[] = ['empty', 'warm-server', 'warm-both', 'no-server']
+export type Cell = 'empty' | 'warm-after-empty' | 'warm-server' | 'warm-both' | 'no-server' | 'warm-after-no-server'
+/** Run order: each cell may need what an earlier one left (a filled server, a local cache). */
+export const CELLS: readonly Cell[] = ['empty', 'warm-after-empty', 'warm-server', 'warm-both', 'no-server', 'warm-after-no-server']
+/** Cells that run once per producer and have no repeats. */
+export const ONCE_CELLS: readonly Cell[] = ['empty', 'warm-after-empty']
+/** Cold then warm on the same local cache: each warm cell reruns (resolver on) on a copy of its cold cell's cache. */
+export const WARM_AFTER_COLD: readonly {cold: Cell, warm: Cell}[] = [
+    {cold: 'empty', warm: 'warm-after-empty'},
+    {cold: 'no-server', warm: 'warm-after-no-server'},
+]
 
 /** What the server did around an empty-cell run, from its database. */
 export interface ServerStats {
@@ -26,7 +34,7 @@ export interface RunRecord {
     id: string
     cell: Cell
     producer: string
-    /** 1..N for the repeated cells, null for empty (which runs once). */
+    /** 1..N for the repeated cells, null for the ONCE_CELLS. */
     repeat: number | null
     start: string
     end: string
