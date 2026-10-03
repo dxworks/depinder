@@ -10,7 +10,7 @@ site_url: https://dxworks.org/depinder/
 
 repo_url: https://github.com/dxworks/depinder
 repo_name: dxworks/depinder
-edit_uri: edit/main/docs/
+edit_uri: edit/main/packages/depinder-cli/docs/
 
 copyright: Copyright &copy; DxWorks
 

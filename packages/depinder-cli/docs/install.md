@@ -107,9 +107,10 @@ The `github` source needs no binary, only [`github-advisories download`](command
 ```bash
 git clone https://github.com/dxworks/depinder
 cd depinder
-npm install
-npm run build
-npm link
+npm ci
+npx nx build depinder-cli
+cd packages/depinder-cli && npm link
 ```
 
-On Windows, `npm run clean:modules` and `npm run refresh` need Git Bash or WSL.
+The repository is an Nx monorepo; the CLI lives in `packages/depinder-cli` and builds to its
+`dist/`.

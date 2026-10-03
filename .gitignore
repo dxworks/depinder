@@ -137,3 +137,8 @@ results-*
 
 # graphify knowledge graph output (rebuildable from source, see CLAUDE.md)
 /graphify-out/
+
+# Nx cache and workspace data
+/.nx/
+# MkDocs output of the docs target
+site/
