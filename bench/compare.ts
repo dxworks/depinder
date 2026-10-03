@@ -2,7 +2,7 @@ import {existsSync, readFileSync} from 'node:fs'
 import path from 'node:path'
 import {parseArgs} from 'node:util'
 import {DifferenceClassifier, referenceFacts, type DiffClass} from './lib/allowed-differences.js'
-import {compareDirs, describeClasses, formatComparison} from './lib/csv-compare.js'
+import {compareDirs, describeClasses, formatComparison, zeroByClass} from './lib/csv-compare.js'
 import {pairComparisons, parsePair, sameCellComparisons, type Comparison} from './lib/pairs.js'
 import {median} from './lib/profile.js'
 import {groupRuns, type RunRecord} from './lib/summary.js'
@@ -97,7 +97,7 @@ function outputs(dirA: string, dirB: string, comparisons: Comparison[], ignoreCl
         console.log(`  newer release = a version B's cache dates after A started (${facts.startedAt.toISOString()}); `
             + `vulnerability databases ${facts.vulnDbsDiffer ? 'DIFFER between A and B' : 'are the same builds'}`)
     }
-    const total: Record<DiffClass, number> = {'regression': 0, 'newer-release': 0, 'vuln-db': 0}
+    const total = zeroByClass()
     for (const cmp of comparisons) {
         // warm-both reruns on the cache its warm-server repeat left
         const cacheB = cmp.outB.replace(/^warm-both-/, 'warm-server-')
@@ -105,7 +105,7 @@ function outputs(dirA: string, dirB: string, comparisons: Comparison[], ignoreCl
         const c = compareDirs(path.join(dirA, 'out', cmp.outA), path.join(dirB, 'out', cmp.outB), ignoreClock, classifier)
         classifier.close()
         for (const k of Object.keys(total) as DiffClass[]) total[k] += c.byClass[k]
-        const noCache = classifier.canTellNewerReleases ? '' : ' (no B cache kept: newer releases cannot be told apart)'
+        const noCache = classifier.canTellNewerReleases ? '' : ' (no B cache kept: newer releases cannot be told apart, and every changed npm Component Link counts as D9)'
         console.log(`${cmp.outA === cmp.outB ? cmp.outA : `${cmp.outA} vs ${cmp.outB}`}: `
             + (c.differences === 0 ? 'identical' : `${c.differences} difference(s): ${describeClasses(c.byClass)}${noCache}`))
         if (c.differences) for (const line of formatComparison(c)) console.log(line)
@@ -147,7 +147,8 @@ function main(): void {
     const byClass = outputs(dirA, dirB, comparisons, ignoreClock)
     const regressions = byClass.regression
     const allowed = byClass['newer-release'] + byClass['vuln-db']
-    const csv = regressions + allowed === 0
+    const signOff = byClass['expected-d9']
+    const csv = regressions + allowed + signOff === 0
         ? `CSV identical${ignoreClock ? ' (ignoring clock columns)' : ''}`
         : `CSV: ${describeClasses(byClass)}`
     const ctr = pairs.length ? 'counters not compared (--pair)' : moved === 0 ? 'warm counters identical' : `${moved} warm counter(s) differ`
@@ -156,7 +157,9 @@ function main(): void {
         console.log('VERDICT: nothing compared — no cell (or --pair) ran in both')
         return
     }
-    const verdict = regressions > 0 || moved > 0 ? 'DIFFERENT' : allowed > 0 ? 'allowed differences only' : 'identical'
+    const verdict = regressions > 0 || moved > 0 ? 'DIFFERENT'
+        : signOff > 0 ? "allowed and expected D9 differences only (D9 needs Alex's sign-off)"
+            : allowed > 0 ? 'allowed differences only' : 'identical'
     console.log(`VERDICT: ${verdict} — ${csv}; ${ctr}; ${time}`)
 }
 

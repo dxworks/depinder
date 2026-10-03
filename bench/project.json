@@ -12,6 +12,10 @@
     "lint": {
       "executor": "nx:run-commands",
       "options": {"cwd": "{projectRoot}", "command": "eslint ."}
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "vitest run"}
     }
   }
 }

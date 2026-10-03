@@ -188,11 +188,17 @@ A is the reference. Every CSV difference is sorted by the regression rules of th
 - **vulnerability database** — a vulnerability column, or a row of `security.csv`,
   `_vulnerability_details.csv` or `_upgrade_guidance.csv`, when the two runs' vuln databases (the
   `built_at` of each in run.json) differ.
+- **expected D9 (needs Alex's sign-off)** — a `_dependencies.csv` row of an npm component that
+  differs only in Component Link, where A's link is blank or the package's repository (from B's
+  cache): what the server wrote for a package without a top-level homepage before core took over
+  the CLI's npm link rule (plan decision D9). Neither allowed nor a regression; the verdict names it.
+  Without B's cache every changed npm Component Link counts.
 - **regression** — everything else, listed first in each column's examples.
 
 The last line is the verdict: `VERDICT: identical — ...` when the CSVs and the warm counters match,
 `VERDICT: allowed differences only — ...` when every CSV difference is a newer release or a
-vulnerability database change, `VERDICT: DIFFERENT — ...` otherwise (timings are reported, never
+vulnerability database change, `VERDICT: allowed and expected D9 differences only ...` when some
+are expected D9 and none a regression, `VERDICT: DIFFERENT — ...` otherwise (timings are reported, never
 judged: the largest change in percent is on the line). A run can be named by its folder name alone
 (looked up under `bench/runs/`). The exit code is always 0.
 

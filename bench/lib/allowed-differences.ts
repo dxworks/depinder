@@ -1,6 +1,6 @@
 import {existsSync, readFileSync} from 'node:fs'
 import path from 'node:path'
-import {DatabaseSync} from 'node:sqlite'
+import {KeptCache} from './kept-cache.js'
 
 /**
  * Sorts the CSV differences between a reference run (A) and a later run (B) by the regression
@@ -11,11 +11,21 @@ import {DatabaseSync} from 'node:sqlite'
  *   Versions, the risk built on them). An ecosystem's project stats follow when it has such rows,
  *   its license list when such rows changed a library's licenses.
  * - `vuln-db`: a vulnerability column or file, when A and B scanned with different database builds.
+ * - `expected-d9`: an npm row that differs only in Component Link, where A's link is what the
+ *   server gave a package without a top-level homepage before D9 (blank, or its repository). Neither
+ *   allowed nor a regression: it needs Alex's sign-off.
  * - `regression`: everything else.
  */
 
-export type DiffClass = 'newer-release' | 'vuln-db' | 'regression'
-export const DIFF_CLASSES: readonly DiffClass[] = ['regression', 'newer-release', 'vuln-db']
+export type DiffClass = 'newer-release' | 'vuln-db' | 'expected-d9' | 'regression'
+export const DIFF_CLASSES: readonly DiffClass[] = ['regression', 'expected-d9', 'newer-release', 'vuln-db']
+
+/** One differing cell of a row present in both runs. */
+export interface CellChange {
+    column: string
+    a: string
+    b: string
+}
 
 const NEWER_RELEASE_COLUMNS = new Set([
     'Latest Version', 'Latest Version Release Date', 'Latest-Used', 'Now-latest',
@@ -29,6 +39,8 @@ const VULN_COLUMN = /vulnerab|security risk/i
 
 const SUMMARY_FILE = /^sbom-(\w+)-(project-stats|licenses)\.csv$/
 const LIBS_FILE = /^sbom-(\w+)-libs\.csv$/
+const DEPENDENCIES_FILE = '_dependencies.csv'
+const COMPONENT_LINK = 'Component Link'
 
 /** Black Duck origin names → depinder's cache ecosystems; unknown origins search every ecosystem. */
 const ORIGIN_ECOSYSTEMS: Readonly<Record<string, string>> = {
@@ -63,37 +75,6 @@ function readRunJson(dir: string): RunJson | null {
     return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) as RunJson : null
 }
 
-/** Release dates from B's kept SQLite cache (`--keep-caches`), looked up once per library. */
-class ReleaseDates {
-    private readonly db: DatabaseSync
-    private readonly memo = new Map<string, boolean>()
-
-    constructor(cacheFile: string, private readonly cutoffMs: number) {
-        this.db = new DatabaseSync(cacheFile, {readOnly: true})
-    }
-
-    /** Whether any version of the library was published after the cutoff. */
-    hasReleaseAfterCutoff(ecosystems: readonly string[], name: string): boolean {
-        const memoKey = `${ecosystems.join(',')}|${name}`
-        const known = this.memo.get(memoKey)
-        if (known !== undefined) return known
-        const found = ecosystems.some(eco => [name, name.toLowerCase()].some(n => this.releasedAfter(`${eco}:${n}`)))
-        this.memo.set(memoKey, found)
-        return found
-    }
-
-    private releasedAfter(key: string): boolean {
-        const row = this.db.prepare('SELECT value FROM libs WHERE key = ?').get(key) as {value: string} | undefined
-        if (!row) return false
-        const versions = (JSON.parse(row.value) as {versions?: {timestamp?: number}[]}).versions ?? []
-        return versions.some(v => (v.timestamp ?? 0) > this.cutoffMs)
-    }
-
-    close(): void {
-        this.db.close()
-    }
-}
-
 /**
  * Classifies the differences of one folder pair. Row files must be classified before summary
  * files (see `isSummaryFile`), since a summary follows its ecosystem's rows.
@@ -102,16 +83,17 @@ export class DifferenceClassifier {
     private readonly ecosystemsWithNewerReleases = new Set<string>()
     private readonly ecosystemsWithNewerReleaseLicenses = new Set<string>()
 
-    constructor(private readonly facts: ReferenceFacts | null, private readonly releases: ReleaseDates | null) {}
+    constructor(private readonly facts: ReferenceFacts | null, private readonly cacheB: KeptCache | null) {}
 
     /** `cacheFileB` is B's SQLite cache for this cell; without it no row can count as a newer release. */
     static open(facts: ReferenceFacts | null, cacheFileB: string): DifferenceClassifier {
-        const releases = facts && existsSync(cacheFileB) ? new ReleaseDates(cacheFileB, facts.startedAt.getTime()) : null
-        return new DifferenceClassifier(facts, releases)
+        const cacheB = facts && existsSync(cacheFileB) ? new KeptCache(cacheFileB, facts.startedAt.getTime()) : null
+        return new DifferenceClassifier(facts, cacheB)
     }
 
+    /** Without B's cache no row is a newer release, and an npm link change counts as D9 on its ecosystem alone. */
     get canTellNewerReleases(): boolean {
-        return this.releases !== null
+        return this.cacheB !== null
     }
 
     /** A row present in one run only. */
@@ -119,9 +101,10 @@ export class DifferenceClassifier {
         return this.facts?.vulnDbsDiffer && VULN_FILES.has(path.basename(file)) ? 'vuln-db' : 'regression'
     }
 
-    /** A row present in both runs whose `columns` differ. */
-    changedRow(file: string, header: string[], row: string[], columns: string[]): DiffClass {
+    /** A row present in both runs; `header` and `row` are B's. */
+    changedRow(file: string, header: string[], row: string[], changes: CellChange[]): DiffClass {
         const base = path.basename(file)
+        const columns = changes.map(c => c.column)
         if (this.facts?.vulnDbsDiffer && (VULN_FILES.has(base) || columns.every(c => VULN_COLUMN.test(c)))) return 'vuln-db'
         const summary = base.match(SUMMARY_FILE)
         if (summary) {
@@ -132,7 +115,8 @@ export class DifferenceClassifier {
             || (c === LATEST_VERSION_LICENSES && columns.includes('Latest Version'))
             || (this.facts?.vulnDbsDiffer && VULN_COLUMN.test(c)))
         const library = libraryOf(base, header, row)
-        if (!allowed || !library || !this.releases?.hasReleaseAfterCutoff(library.ecosystems, library.name)) return 'regression'
+        if (library && this.isExpectedD9(base, library, changes)) return 'expected-d9'
+        if (!allowed || !library || !this.cacheB?.hasReleaseAfterCutoff(library.ecosystems, library.name)) return 'regression'
         for (const eco of library.ecosystems) {
             this.ecosystemsWithNewerReleases.add(eco)
             if (columns.includes(LATEST_VERSION_LICENSES)) this.ecosystemsWithNewerReleaseLicenses.add(eco)
@@ -140,14 +124,38 @@ export class DifferenceClassifier {
         return 'newer-release'
     }
 
-    close(): void {
-        this.releases?.close()
+    /**
+     * D9: only the npm Component Link moved, and A's link is the pre-D9 answer for a package with
+     * no top-level homepage, i.e. blank or its repository (from B's cache). Without the cache, any
+     * changed npm link counts.
+     */
+    private isExpectedD9(file: string, library: Library, changes: CellChange[]): boolean {
+        const [change] = changes
+        if (file !== DEPENDENCIES_FILE || changes.length !== 1 || change?.column !== COMPONENT_LINK) return false
+        if (library.ecosystems.length !== 1 || library.ecosystems[0] !== 'npm') return false
+        if (!this.cacheB) return true
+        const repository = this.cacheB.repositoryOf('npm', library.name)
+        return repository !== undefined && ['', webForm(repository)].includes(webForm(change.a))
     }
+
+    close(): void {
+        this.cacheB?.close()
+    }
+}
+
+/** A repository URL as the export's Component Link writes it (the CLI's `canonicalProjectUrl`, in short). */
+export function webForm(url: string): string {
+    return url.trim().replace(/^git\+/, '').replace(/\.git(?=$|[#?])/, '')
+}
+
+interface Library {
+    ecosystems: string[]
+    name: string
 }
 
 export const isSummaryFile = (file: string): boolean => SUMMARY_FILE.test(path.basename(file))
 
-function libraryOf(file: string, header: string[], row: string[]): {ecosystems: string[], name: string} | null {
+function libraryOf(file: string, header: string[], row: string[]): Library | null {
     const cell = (column: string) => {
         const i = header.indexOf(column)
         return i < 0 ? '' : row[i] ?? ''
