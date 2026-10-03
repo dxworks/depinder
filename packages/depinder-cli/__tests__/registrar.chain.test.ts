@@ -40,7 +40,7 @@ describe('the registrar fallback chain', () => {
 
     it('always uses a fallback that does not say whether it is configured', async () => {
         delete process.env.LIBRARIES_IO_API_KEY
-        const fallback = {retrieve: jest.fn(async (name: string) => ({name, versions: [], licenses: []}))}
+        const fallback = {retrieve: vi.fn(async (name: string) => ({name, versions: [], licenses: []}))}
         await new Failing(fallback).retrieve('x')
         expect(fallback.retrieve).toHaveBeenCalledWith('x')
     })

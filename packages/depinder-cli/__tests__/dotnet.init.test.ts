@@ -1,3 +1,4 @@
+import axios from 'axios'
 import {NugetRegistrar, NUGET_REGISTRATION_URL} from '../src/plugins/dotnet'
 
 describe('default test', () => {
@@ -12,14 +13,13 @@ describe('default test', () => {
 describe('registration hive', () => {
     it('asks the semver2 hive, which lists the versions semver1 hides', async () => {
         const registrar = new NugetRegistrar()
-        const axios = require('axios')
         // A SemVer 2.0.0 version (build metadata) alongside a plain one: the semver1 hive would
         // have dropped the former and the dependency on it would have had no release date.
         const index = {items: [{items: [
             {catalogEntry: {id: 'Meta', version: '1.0.0', published: '2020-01-01T00:00:00Z'}},
             {catalogEntry: {id: 'Meta', version: '1.1.0+build.7', published: '2020-02-01T00:00:00Z'}},
         ]}]}
-        const spy = jest.spyOn(axios, 'get').mockImplementation(async () => ({data: index}))
+        const spy = vi.spyOn(axios, 'get').mockImplementation(async () => ({data: index}))
         try {
             const info = await registrar.retrieveFromRegistry('Meta')
             expect(spy).toHaveBeenCalledWith(`${NUGET_REGISTRATION_URL}/meta/index.json`)
@@ -39,8 +39,7 @@ describe('paged registration index', () => {
 
     it('follows a page that only links its versions', async () => {
         const registrar = new NugetRegistrar()
-        const axios = require('axios')
-        const spy = jest.spyOn(axios, 'get').mockImplementation(async (url: any) => ({
+        const spy = vi.spyOn(axios, 'get').mockImplementation(async (url: any) => ({
             data: url === 'https://example/page2' ? {items: [entry('2', 'https://big.example')]} : {},
         }))
         try {

@@ -1,3 +1,4 @@
+import type {Mock} from 'vitest'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -14,10 +15,10 @@ import {getVulnerabilitiesFromGithub} from '../src/utils/vulnerabilities'
 
 // The blacklist is read from `./.blacklist` at import time, so the only way to exercise the filter
 // is to stand in for that file.
-jest.mock('../src/utils/blacklist', () => ({blacklistedGlobs: ['@internal/*']}))
-jest.mock('../src/utils/vulnerabilities', () => ({getVulnerabilitiesFromGithub: jest.fn(async () => [])}))
+vi.mock('../src/utils/blacklist', () => ({blacklistedGlobs: ['@internal/*']}))
+vi.mock('../src/utils/vulnerabilities', () => ({getVulnerabilitiesFromGithub: vi.fn(async () => [])}))
 
-const advisories = getVulnerabilitiesFromGithub as jest.Mock
+const advisories = getVulnerabilitiesFromGithub as Mock
 
 /**
  * Phase 2 of `analyse`: one question per purl for the whole process, and an answer that lands in
@@ -91,7 +92,7 @@ const record = (type: string, namespace: string | null, name: string): PackageRe
  */
 function answering(packages: {[purl: string]: PackageRecord}) {
     const asked: string[][] = []
-    const resolve = jest.fn(async (_config: ResolverConfig, purls: string[], _log?: unknown, onItem?: ItemHandler) => {
+    const resolve = vi.fn(async (_config: ResolverConfig, purls: string[], _log?: unknown, onItem?: ItemHandler) => {
         asked.push([...purls])
         const answers = new Map<string, ResolvedEntry>(purls.map(purl => [
             purl,
@@ -276,7 +277,7 @@ describe('the bulk resolve phase', () => {
             projects: [project('app', [dep('pending-pkg', '1.0.0'), dep('missing-pkg', '1.0.0'), dep('bad-pkg', '1.0.0')])],
         }]
         assignPurls(projects)
-        const resolve = jest.fn(async (_config: ResolverConfig, purls: string[]) => new Map<string, ResolvedEntry>([
+        const resolve = vi.fn(async (_config: ResolverConfig, purls: string[]) => new Map<string, ResolvedEntry>([
             [purls[0], {status: 'pending'}],
             [purls[1], {status: 'not_found'}],
             [purls[2], {status: 'invalid', reason: 'unparseable purl'}],
@@ -295,7 +296,7 @@ describe('the bulk resolve phase', () => {
             assignPurls(p)
             return p
         }
-        const resolve = jest.fn(async (_config: ResolverConfig, purls: string[]) => new Map<string, ResolvedEntry>([
+        const resolve = vi.fn(async (_config: ResolverConfig, purls: string[]) => new Map<string, ResolvedEntry>([
             [purls[0], {status: 'refreshing', package: record('npm', null, 'old-pkg')}],
         ])) as any
 
@@ -588,7 +589,7 @@ describe('the bulk resolve phase', () => {
             const cache = fakeCache()
             let finish: () => void = () => undefined
             let writtenMidStream: boolean | undefined
-            const resolve = jest.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem: ItemHandler) => {
+            const resolve = vi.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem: ItemHandler) => {
                 const fast: ResolvedEntry = {status: 'resolved', package: record('npm', null, 'fast')}
                 onItem('pkg:npm/fast@1.0.0', fast)
                 // The server is still fetching `slow`: give the write queue time to run.
@@ -623,7 +624,7 @@ describe('the bulk resolve phase', () => {
             const cache = fakeCache()
             let finish: () => void = () => undefined
             let writtenAtOnce: boolean | undefined
-            const resolve = jest.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem: ItemHandler) => {
+            const resolve = vi.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem: ItemHandler) => {
                 const fast: ResolvedEntry = {status: 'resolved', package: record('npm', null, 'fast')}
                 onItem('pkg:npm/fast@1.0.0', fast)
                 // Synchronously, in the same turn as the line: the row is already there.
@@ -702,7 +703,7 @@ describe('the bulk resolve phase', () => {
 
         it('still writes an answer the resolver returned without streaming it', async () => {
             const cache = fakeCache()
-            const silentStream = jest.fn(async (_config: ResolverConfig, purls: string[]) =>
+            const silentStream = vi.fn(async (_config: ResolverConfig, purls: string[]) =>
                 new Map<string, ResolvedEntry>(purls.map(purl => [purl, {status: 'resolved', package: record('npm', null, 'fast')}]))) as any
             const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('fast', '1.0.0')])]}]
             assignPurls(projects)
@@ -728,7 +729,7 @@ describe('the bulk resolve phase', () => {
 
         it('does not ask again about a purl the first one asked about, and reuses its answer', async () => {
             const cache = fakeCache()
-            const resolve = jest.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem?: ItemHandler) => {
+            const resolve = vi.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem?: ItemHandler) => {
                 const answers = new Map<string, ResolvedEntry>(purls.map(purl => [purl,
                     purl === 'pkg:npm/old-pkg@1.0.0'
                         ? {status: 'refreshing' as const, package: {...record('npm', null, 'old-pkg'), confirmed_at: '2020-01-01T00:00:00Z'}}
@@ -819,7 +820,7 @@ describe('the bulk resolve phase', () => {
         const cache = fakeCache()
         const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('left-pad', '1.0.0')])]}]
         assignPurls(projects)
-        const silent = jest.fn(async () => new Map<string, ResolvedEntry>()) as any
+        const silent = vi.fn(async () => new Map<string, ResolvedEntry>()) as any
 
         const outcome = await bulkResolve(config, projects, cache, {}, silent)
 
@@ -886,7 +887,7 @@ describe('the bulk resolve phase with a cache max age', () => {
         assignPurls(projects)
         // The server last confirmed it three days ago and could not refetch it in time.
         const confirmedAt = new Date(runStart - 3 * 86_400_000).toISOString()
-        const resolve = jest.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem?: ItemHandler) => {
+        const resolve = vi.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem?: ItemHandler) => {
             const entry: ResolvedEntry = {status: 'refreshing', package: {...record('npm', null, 'old-pkg'), confirmed_at: confirmedAt}}
             onItem?.(purls[0], entry)
             return new Map([[purls[0], entry]])

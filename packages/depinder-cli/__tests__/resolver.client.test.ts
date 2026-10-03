@@ -31,7 +31,7 @@ const config: ResolverConfig = {
     chunkConcurrency: RESOLVER_CHUNK_CONCURRENCY,
 }
 
-const quiet = {info: jest.fn(), warn: jest.fn()}
+const quiet = {info: vi.fn(), warn: vi.fn()}
 
 const pkg = (name: string): PackageRecord => ({
     type: 'npm', namespace: null, name,
@@ -502,7 +502,7 @@ describe('the resolver client', () => {
         // The clock is held still, so "the same" is exact: the deadline is fixed once, before the
         // first post, and no chunk is sent later than another.
         const now = Date.now()
-        const clock = jest.spyOn(Date, 'now').mockReturnValue(now)
+        const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
         try {
             const calls = serve(call => answerAll(call.purls))
             await resolvePurls({...config, maxWaitMs: 20_000}, manyPurls(4), quiet)

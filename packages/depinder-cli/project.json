@@ -37,7 +37,11 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "{projectRoot}",
-        "command": "tsc -p tsconfig.json"
+        "commands": [
+          "tsc -p tsconfig.build.json --noEmit",
+          "tsc -p tsconfig.json"
+        ],
+        "parallel": false
       }
     },
     "lint": {
@@ -51,7 +55,7 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "{projectRoot}",
-        "command": "jest --passWithNoTests"
+        "command": "vitest run"
       }
     },
     "docs": {

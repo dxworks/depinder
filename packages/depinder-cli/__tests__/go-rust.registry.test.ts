@@ -1,3 +1,4 @@
+import type {Mock} from 'vitest'
 import fetch from 'node-fetch'
 import {escapeModulePath, goChecker, retrieveFromGoProxy} from '../src/plugins/go/registrar'
 import {retrieveFromCratesIo, rustChecker} from '../src/plugins/rust/registrar'
@@ -10,8 +11,8 @@ import {ecosystemOf} from '../src/extension-points/plugin'
  * so what is worth pinning is how their answers are folded into a LibraryInfo, not that they answer.
  */
 
-jest.mock('node-fetch')
-const mockedFetch = fetch as unknown as jest.Mock
+vi.mock('node-fetch', () => ({default: vi.fn()}))
+const mockedFetch = fetch as unknown as Mock
 
 interface CannedResponse {
     status?: number
@@ -32,7 +33,7 @@ function respondWith(routes: {[urlSuffix: string]: CannedResponse}) {
     })
 }
 
-beforeEach(() => mockedFetch.mockReset())
+beforeEach(() => { mockedFetch.mockReset() })
 
 describe('the Go module proxy registrar', () => {
     it('case-encodes module paths the way the proxy requires', () => {

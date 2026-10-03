@@ -384,7 +384,7 @@ echo '{"matches":[]}'
         fs.writeFileSync(callLog, '')
         process.env.TRIVY_BIN = stubTrivyRecording('trivy-failing.sh', callLog, true)
         process.env.GRYPE_BIN = missing('grype')
-        const warn = jest.spyOn(log, 'warn').mockImplementation(() => log)
+        const warn = vi.spyOn(log, 'warn').mockImplementation(() => log)
 
         try {
             const result = await scanSbomFileOnce(sbomFile)

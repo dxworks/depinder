@@ -1,3 +1,4 @@
+import type {MockInstance} from 'vitest'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -17,7 +18,7 @@ import {DepinderDependency} from '../src/extension-points/extract'
 import {Plugin} from '../src/extension-points/plugin'
 import {log} from '../src/utils/logging'
 
-jest.mock('../src/utils/blacklist', () => ({blacklistedGlobs: []}))
+vi.mock('../src/utils/blacklist', () => ({blacklistedGlobs: []}))
 
 const DAY_MS = 86_400_000
 
@@ -45,11 +46,11 @@ describe('parseDuration', () => {
 
 describe('cacheMaxAgeSeconds', () => {
     const saved = process.env.DEPINDER_CACHE_MAX_AGE
-    let warn: jest.SpyInstance
+    let warn: MockInstance
 
     beforeEach(() => {
         delete process.env.DEPINDER_CACHE_MAX_AGE
-        warn = jest.spyOn(log, 'warn').mockImplementation(() => log)
+        warn = vi.spyOn(log, 'warn').mockImplementation(() => log)
     })
     afterEach(() => {
         warn.mockRestore()
@@ -196,7 +197,7 @@ describe('cached packages expire', () => {
         it('cache info reports fresh and expired counts at the max age given', () => {
             cachedAgo('npm:old', 2 * DAY_MS)
             cachedAgo('npm:new', 0)
-            const info = jest.spyOn(log, 'info').mockImplementation(() => log)
+            const info = vi.spyOn(log, 'info').mockImplementation(() => log)
             try {
                 cacheInfoAction()
                 expect(info).toHaveBeenCalledWith(expect.stringContaining('2 libraries (1 fresh, 1 expired at max age 1d)'))
@@ -253,7 +254,7 @@ describe('cached packages expire', () => {
 
         it('answers a fresh entry locally', async () => {
             cachedAgo('npm:left-pad', 60_000, library('left-pad', 'cached'))
-            const retrieve = jest.fn(async () => library('left-pad', 'from the registry'))
+            const retrieve = vi.fn(async () => library('left-pad', 'from the registry'))
 
             const dep = await analyse(fakePlugin(retrieve), 86_400)
 
@@ -264,7 +265,7 @@ describe('cached packages expire', () => {
         it('sends an expired entry to the registrar and rewrites it with a new age', async () => {
             cachedAgo('npm:left-pad', 2 * DAY_MS, library('left-pad', 'cached'))
             const runStart = Date.now()
-            const retrieve = jest.fn(async () => library('left-pad', 'from the registry'))
+            const retrieve = vi.fn(async () => library('left-pad', 'from the registry'))
 
             const dep = await analyse(fakePlugin(retrieve), 86_400)
 
@@ -277,7 +278,7 @@ describe('cached packages expire', () => {
         it('treats an expired entry nobody can answer for as missing, and records the miss', async () => {
             cachedAgo('npm:left-pad', 2 * DAY_MS, library('left-pad', 'cached'))
             const before = sharedCacheDb().libUpdatedAt('npm:left-pad')
-            const retrieve = jest.fn(async () => { throw new Error('404') })
+            const retrieve = vi.fn(async () => { throw new Error('404') })
 
             const dep = await analyse(fakePlugin(retrieve), 86_400)
 
@@ -290,7 +291,7 @@ describe('cached packages expire', () => {
         it('skips an expired entry with a live miss, as it skips any miss', async () => {
             cachedAgo('npm:left-pad', 2 * DAY_MS, library('left-pad', 'cached'))
             missCache.set('npm:left-pad')
-            const retrieve = jest.fn(async () => library('left-pad', 'from the registry'))
+            const retrieve = vi.fn(async () => library('left-pad', 'from the registry'))
 
             const dep = await analyse(fakePlugin(retrieve), 86_400)
 
@@ -300,7 +301,7 @@ describe('cached packages expire', () => {
 
         it('with a zero max age, fetches everything already on disk again', async () => {
             cachedAgo('npm:left-pad', 1000, library('left-pad', 'cached'))
-            const retrieve = jest.fn(async () => library('left-pad', 'from the registry'))
+            const retrieve = vi.fn(async () => library('left-pad', 'from the registry'))
 
             const dep = await analyse(fakePlugin(retrieve), 0)
 

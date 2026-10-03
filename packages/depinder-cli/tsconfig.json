@@ -3,9 +3,11 @@
   "compilerOptions": {
     "lib": ["ES6", "ES2015", "DOM", "ESNext.String", "ES2021.String"],
     "module": "commonjs",
-    "types": ["node", "jest"],
+    "types": ["node", "vitest/globals"],
     "rootDir": ".",
-    "noEmit": true
+    "noEmit": true,
+    // vitest's declarations need a newer module resolution than CommonJS's; tsconfig.build.json checks src with library checks on
+    "skipLibCheck": true
   },
   "include": ["src", "__tests__"]
 }

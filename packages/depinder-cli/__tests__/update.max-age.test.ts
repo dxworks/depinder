@@ -5,10 +5,10 @@ import {updateLibs} from '../src/commands/update'
 import {resetSharedCacheDb, sharedCacheDb} from '../src/cache/sqlite-cache'
 import {LibraryInfo} from '../src/extension-points/registrar'
 
-const retrieve = jest.fn(async (name: string): Promise<LibraryInfo> => ({name, description: 'updated', licenses: [], versions: []}))
+const retrieve = vi.fn(async (name: string): Promise<LibraryInfo> => ({name, description: 'updated', licenses: [], versions: []}))
 
 // No real registrar: `update` would otherwise go to npm for every expired row.
-jest.mock('../src/plugins', () => ({
+vi.mock('../src/plugins', () => ({
     getPluginsFromNames: () => [{
         name: 'fake', ecosystem: 'npm',
         extractor: {files: [], createContexts: () => []},

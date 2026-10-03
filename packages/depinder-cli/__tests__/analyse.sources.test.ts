@@ -1,3 +1,4 @@
+import type {MockInstance} from 'vitest'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -19,8 +20,8 @@ import {log} from '../src/utils/logging'
 let tmpDir: string
 let warnings: string[]
 let infos: string[]
-let warnSpy: jest.SpyInstance
-let infoSpy: jest.SpyInstance
+let warnSpy: MockInstance
+let infoSpy: MockInstance
 
 const trivyTools = {components: [{type: 'application', name: 'trivy', version: '0.72.0'}]}
 const syftTools = {components: [{type: 'application', name: 'syft', version: '1.46.0'}]}
@@ -53,11 +54,11 @@ beforeEach(() => {
     clearSbomFileCache()
     warnings = []
     infos = []
-    warnSpy = jest.spyOn(log, 'warn').mockImplementation(((message: string) => {
+    warnSpy = vi.spyOn(log, 'warn').mockImplementation(((message: string) => {
         warnings.push(message)
         return log
     }) as any)
-    infoSpy = jest.spyOn(log, 'info').mockImplementation(((message: string) => {
+    infoSpy = vi.spyOn(log, 'info').mockImplementation(((message: string) => {
         infos.push(message)
         return log
     }) as any)

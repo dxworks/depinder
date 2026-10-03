@@ -1,7 +1,8 @@
+import type {Mock} from 'vitest'
 import {json} from 'npm-registry-fetch'
 import {retrieveFromNpm} from '../src/plugins/javascript'
 
-jest.mock('npm-registry-fetch', () => ({json: jest.fn()}))
+vi.mock('npm-registry-fetch', () => ({json: vi.fn()}))
 
 const packument = (license?: unknown) => ({
     name: 'cycle',
@@ -13,7 +14,7 @@ const packument = (license?: unknown) => ({
 
 describe('npm registrar licences', () => {
     it('gives [] rather than [undefined] for a package with no licence', async () => {
-        (json as unknown as jest.Mock).mockResolvedValue(packument())
+        (json as unknown as Mock).mockResolvedValue(packument())
         const info = await retrieveFromNpm('cycle')
         expect(info.licenses).toEqual([])
         // What the SQLite cache stores and a warm run reads back: must not become [null].
@@ -21,7 +22,7 @@ describe('npm registrar licences', () => {
     })
 
     it('keeps a declared licence', async () => {
-        (json as unknown as jest.Mock).mockResolvedValue(packument('MIT'))
+        (json as unknown as Mock).mockResolvedValue(packument('MIT'))
         expect((await retrieveFromNpm('cycle')).licenses).toEqual(['MIT'])
     })
 })

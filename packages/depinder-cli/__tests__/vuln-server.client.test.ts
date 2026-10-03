@@ -1,3 +1,4 @@
+import type {MockInstance} from 'vitest'
 import {
     DEFAULT_VULN_MAX_WAIT_MS,
     fetchServerVulnerabilities,
@@ -19,7 +20,7 @@ import {log} from '../src/utils/logging'
  * success maps to.
  */
 
-const quiet = {info: jest.fn(), warn: jest.fn()}
+const quiet = {info: vi.fn(), warn: vi.fn()}
 const resolver: ResolverConfig = {url: 'http://server.example', token: 'secret', maxWaitMs: 60_000, chunkConcurrency: Infinity}
 const config: VulnServerConfig = {url: 'http://server.example', token: 'secret', maxWaitMs: 5_000, chunkSize: 5000}
 
@@ -109,11 +110,11 @@ const purls = (n: number, prefix = 'p') => Array.from({length: n}, (_, i) => `pk
 
 describe('the vulnerability server configuration', () => {
     const saved = {wait: process.env.DEPINDER_VULN_MAX_WAIT_MS, chunk: process.env.DEPINDER_VULN_CHUNK_SIZE}
-    let warn: jest.SpyInstance
+    let warn: MockInstance
     beforeEach(() => {
         delete process.env.DEPINDER_VULN_MAX_WAIT_MS
         delete process.env.DEPINDER_VULN_CHUNK_SIZE
-        warn = jest.spyOn(log, 'warn').mockImplementation((() => log) as any)
+        warn = vi.spyOn(log, 'warn').mockImplementation((() => log) as any)
     })
     afterEach(() => {
         warn.mockRestore()

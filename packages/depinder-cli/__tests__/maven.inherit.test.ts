@@ -19,7 +19,7 @@ describe('pom inheritance', () => {
     const fetched: string[] = []
     beforeEach(() => {
         fetched.length = 0
-        ;(global as any).fetch = jest.fn(async (url: string) => {
+        ;(global as any).fetch = vi.fn(async (url: string) => {
             fetched.push(url)
             const body = url.includes('/parent/3/') ? parent : url.includes('/root/1/') ? root : ''
             return {status: body ? 200 : 404, text: async () => body}

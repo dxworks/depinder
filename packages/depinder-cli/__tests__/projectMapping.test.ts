@@ -1,12 +1,14 @@
+import type {Mock} from 'vitest'
 import { createPathMappings, extractProjectInfo, verifyProjectPath } from '../src/utils/projectMapping';
 import * as fs from 'fs';
 import * as path from 'path';
 
 // Mock fs.existsSync
-jest.mock('fs', () => ({
-  ...jest.requireActual('fs'),
-  existsSync: jest.fn()
-}));
+vi.mock('fs', async importOriginal => {
+  const actual = await importOriginal<typeof import('fs')>();
+  const existsSync = vi.fn();
+  return {...actual, existsSync, default: {...actual, existsSync}};
+});
 
 describe('Project Mapping', () => {
   describe('extractProjectInfo', () => {
@@ -174,12 +176,12 @@ describe('Project Mapping', () => {
   describe('verifyProjectPath', () => {
     beforeEach(() => {
       // Reset mock before each test
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     it('marks an existing full path as exact', () => {
       // Mock fs.existsSync to return true
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.existsSync as Mock).mockReturnValue(true);
       
       const result = verifyProjectPath('some/project/path', '/base/path');
       
@@ -191,7 +193,7 @@ describe('Project Mapping', () => {
 
     it('marks a path as none when verification fails', () => {
       // Mock fs.existsSync to return false
-      (fs.existsSync as jest.Mock).mockReturnValue(false);
+      (fs.existsSync as Mock).mockReturnValue(false);
       
       const result = verifyProjectPath('some/project/path', '/base/path');
       
@@ -206,7 +208,7 @@ describe('Project Mapping', () => {
         const expectedOriginal = path.normalize('/base/path/API/project/path');
         const expectedFallback = path.normalize('/base/path/project/path');
       // Mock fs.existsSync to return false for original path, true for path without first segment
-      (fs.existsSync as jest.Mock).mockImplementation((pathArg: string) => {
+      (fs.existsSync as Mock).mockImplementation((pathArg: string) => {
         console.log('Mock called with:', pathArg);
         if (pathArg === expectedFallback) {
           return true;
@@ -247,12 +249,12 @@ describe('Project Mapping', () => {
   describe('extractProjectInfo with basePath', () => {
     beforeEach(() => {
       // Reset mock before each test
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should verify path when basePath is provided', () => {
       // Mock fs.existsSync to return true
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.existsSync as Mock).mockReturnValue(true);
       
       const result = extractProjectInfo('my-project/-npm/react/17.0.2', 'npmjs', '/base/path');
       
@@ -264,7 +266,7 @@ describe('Project Mapping', () => {
 
     it('uses an existing parent when a missing Maven path ends with its artifact name', () => {
       const expectedParent = path.normalize('/base/path/sample-repo/services');
-      (fs.existsSync as jest.Mock).mockImplementation((pathArg: string) => pathArg === expectedParent);
+      (fs.existsSync as Mock).mockImplementation((pathArg: string) => pathArg === expectedParent);
 
       const result = extractProjectInfo(
         'org.example:sample-service:1.0:sample-repo/services/sample-service:-maven/org.example:sample-library:2.0',
@@ -281,7 +283,7 @@ describe('Project Mapping', () => {
 
     it('does not use a parent when Maven artifact name differs from the last path segment', () => {
       const existingParent = path.normalize('/base/path/sample-repo/services');
-      (fs.existsSync as jest.Mock).mockImplementation((pathArg: string) => pathArg === existingParent);
+      (fs.existsSync as Mock).mockImplementation((pathArg: string) => pathArg === existingParent);
 
       const result = extractProjectInfo(
         'org.example:different-service:1.0:sample-repo/services/sample-service:-maven/org.example:sample-library:2.0',
@@ -296,7 +298,7 @@ describe('Project Mapping', () => {
     it('uses an explicit mapping before an inferred Maven parent', () => {
       const expectedParent = path.normalize('/base/path/sample-repo/services');
       const expectedMapping = path.normalize('/base/path/overrides/sample-service');
-      (fs.existsSync as jest.Mock).mockImplementation(
+      (fs.existsSync as Mock).mockImplementation(
         (pathArg: string) => pathArg === expectedParent || pathArg === expectedMapping
       );
       const mappings = createPathMappings([{

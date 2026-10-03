@@ -1,3 +1,4 @@
+import type {MockInstance} from 'vitest'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -21,8 +22,8 @@ let sbomFile: string
 let callLog: string
 const savedEnv = {TRIVY_BIN: process.env.TRIVY_BIN, GRYPE_BIN: process.env.GRYPE_BIN}
 const realFetch = global.fetch
-let warnSpy: jest.SpyInstance
-let infoSpy: jest.SpyInstance
+let warnSpy: MockInstance
+let infoSpy: MockInstance
 const warnings: string[] = []
 
 const config: VulnServerConfig = {url: 'http://vuln.example:8080', token: 'secret', maxWaitMs: 5_000, chunkSize: 5000}
@@ -94,11 +95,11 @@ beforeEach(() => {
     resetVulnSources()
     deferSbomFindings(true)
     warnings.length = 0
-    warnSpy = jest.spyOn(log, 'warn').mockImplementation(((message: string) => {
+    warnSpy = vi.spyOn(log, 'warn').mockImplementation(((message: string) => {
         warnings.push(message)
         return log
     }) as any)
-    infoSpy = jest.spyOn(log, 'info').mockImplementation((() => log) as any)
+    infoSpy = vi.spyOn(log, 'info').mockImplementation((() => log) as any)
 })
 
 afterEach(() => {
