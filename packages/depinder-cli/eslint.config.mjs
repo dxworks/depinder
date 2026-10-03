@@ -2,6 +2,7 @@ import eslint from '@eslint/js'
 import tseslint from 'typescript-eslint'
 import {readFileSync} from 'node:fs'
 import {moduleBoundariesConfig} from '../../tools/workspace-checks/module-boundaries.eslint.mjs'
+import {registryFetchGuardConfig} from './registry-fetch-guard.eslint.mjs'
 
 // Functions stay under 100 lines (NX_MIGRATION.md D10); files that already had longer ones only warn.
 const sizeBaseline = JSON.parse(readFileSync(new URL('../../tools/workspace-checks/size-baseline.json', import.meta.url), 'utf8'))
@@ -56,6 +57,7 @@ export default tseslint.config(
         rules: {'max-lines-per-function': ['warn', functionLength]},
     },
     ...moduleBoundariesConfig(['src/**/*.ts']),
+    ...registryFetchGuardConfig(['src/**/*.ts']),
     {
         ignores: ['dist/**', 'node_modules/**', '**/*.js'],
     }

@@ -1,0 +1,28 @@
+{
+  "$comment": "The CLI fetches registry data only through core (src/fallback). Read by eslint.config.mjs and __tests__/architecture.registry-fetch.test.ts.",
+  "httpClientFiles": [
+    "src/resolver/**/*.ts",
+    "src/vuln-sources/server.ts",
+    "src/vuln-sources/github/client.ts",
+    "src/utils/vulnerabilities.ts",
+    "src/fallback/libraries-io.ts",
+    "src/utils/profile.ts"
+  ],
+  "httpModules": [
+    "axios", "node-fetch", "npm-registry-fetch", "undici", "got", "ky", "superagent", "request", "cross-fetch",
+    "http", "https", "http2", "node:http", "node:https", "node:http2"
+  ],
+  "coreRegistryFetchers": ["createHttpClient", "fetchPackage", "mavenMetadataUrl"],
+  "registryFetchFiles": ["src/fallback/**/*.ts"],
+  "registryHosts": [
+    "registry.npmjs.org", "registry.yarnpkg.com", "npmjs.com",
+    "maven.org", "repo.maven.apache.org", "central.sonatype.com",
+    "pypi.org", "pythonhosted.org",
+    "rubygems.org",
+    "crates.io",
+    "packagist.org",
+    "nuget.org",
+    "proxy.golang.org", "sum.golang.org", "pkg.go.dev",
+    "deps.dev"
+  ]
+}
