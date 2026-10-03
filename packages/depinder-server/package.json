@@ -7,6 +7,12 @@
   "engines": {
     "node": ">=24.0.0"
   },
+  "exports": {
+    "./in-process": {
+      "depinder-source": "./src/resolver/in-process.ts",
+      "default": "./dist/resolver/in-process.js"
+    }
+  },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "dev": "tsx watch --conditions=depinder-source src/main.ts",

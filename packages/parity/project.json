@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "parity",
+  "projectType": "application",
+  "sourceRoot": "packages/parity/test",
+  "tags": ["scope:test"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "tsc -p tsconfig.json"}
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "eslint test"}
+    },
+    "test-parity": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {"cwd": "{projectRoot}", "command": "vitest run"}
+    }
+  }
+}

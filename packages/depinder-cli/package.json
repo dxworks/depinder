@@ -21,6 +21,13 @@
   },
   "author": "Mario Rivis <mario.rivis@gmail.com>",
   "main": "dist/depinder.js",
+  "exports": {
+    ".": "./dist/depinder.js",
+    "./fallback": {
+      "depinder-source": "./src/fallback/index.ts"
+    },
+    "./*": "./*"
+  },
   "bin": {
     "depinder": "dist/index.js"
   },

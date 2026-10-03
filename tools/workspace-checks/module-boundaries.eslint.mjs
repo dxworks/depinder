@@ -13,8 +13,11 @@ export const DEP_CONSTRAINTS = [
     {sourceTag: 'scope:tooling', onlyDependOnLibsWithTags: ['scope:tooling']},
 ]
 
-/** `files` are globs relative to the project folder that lints them. */
-export function moduleBoundariesConfig(files) {
+/**
+ * `files` are globs relative to the project folder that lints them. `appImports` are the import
+ * paths of an app this project may use anyway; Nx forbids importing apps, and only parity may.
+ */
+export function moduleBoundariesConfig(files, appImports = []) {
     return [
         {
             files,
@@ -23,7 +26,7 @@ export function moduleBoundariesConfig(files) {
             rules: {
                 '@nx/enforce-module-boundaries': [
                     'error',
-                    {enforceBuildableLibDependency: false, allow: [], depConstraints: DEP_CONSTRAINTS},
+                    {enforceBuildableLibDependency: false, allow: appImports, depConstraints: DEP_CONSTRAINTS},
                 ],
             },
         },
