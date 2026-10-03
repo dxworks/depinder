@@ -52,8 +52,8 @@ function positiveFromEnv(name: string, fallback: number, integer: boolean): numb
  * The vulnerability server for this run, or `undefined` to scan locally as before.
  *
  * Same address and token as the resolver, so it exists exactly when the resolver does: no URL, no
- * token or `--no-resolver` means no vulnerability server either. `--no-vuln-server` turns it off
- * alone. Whether the run then uses it also depends on `--vuln-source` (see `usesVulnServer`).
+ * token or `--no-resolver` (without `--vuln-server`) means no vulnerability server either.
+ * `--no-vuln-server` turns it off alone. Whether the run then uses it also depends on `--vuln-source` (see `usesVulnServer`).
  */
 export function vulnServerConfig(resolver: ResolverConfig | undefined, options: {vulnServer?: boolean} = {}): VulnServerConfig | undefined {
     if (!resolver || options.vulnServer === false) return undefined

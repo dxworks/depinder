@@ -74,7 +74,7 @@ export interface AnalyseOptions extends ResolverOptions, CacheMaxAgeOptions {
     projectName?: string
     /** SBOM sources: the scanned repositories, one per SBOM repo name, for Black Duck's `Path` prefix. */
     target?: string
-    /** Commander sets this to `false` for `--no-vuln-server`, and leaves it `true` otherwise. */
+    /** `false` for `--no-vuln-server`, `true` for `--vuln-server` (kept on under `--no-resolver`), else unset. */
     vulnServer?: boolean
 }
 
@@ -111,6 +111,8 @@ export function createAnalyseCommand(): Command {
             'Base URL of a depinder resolver service that answers purls in bulk; '
             + 'DEPINDER_RESOLVER_URL when unset, and DEPINDER_RESOLVER_TOKEN must be set with it')
         .option('--no-resolver', 'Do not call the bulk resolver even when one is configured')
+        .option('--vuln-server',
+            'Ask the resolver\'s server for vulnerabilities even with --no-resolver, which otherwise turns both off')
         .option('--no-vuln-server',
             'Scan the SBOMs with the local Trivy and Grype even when the resolver\'s server can answer vulnerabilities')
         .option('--profile', 'Print a phase timing and request count summary at the end', false)
@@ -874,8 +876,10 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
     const configured = resolverConfig(options)
     const resolver = configured && {...configured, freshAfterMs: options.refresh ? runStartMs : cutoffMs}
     if (resolver) log.info(`Bulk resolver: ${resolver.url}, waiting at most ${Math.round(resolver.maxWaitMs / 1000)}s for it`)
-    // Same server and token as the resolver; `--no-vuln-server` keeps the scan local.
-    const vulnServer = vulnServerConfig(configured, options)
+    // Same server and token as the resolver; `--no-vuln-server` keeps the scan local, and
+    // `--vuln-server` keeps the server's scan when `--no-resolver` turned the resolver off.
+    const vulnServer = vulnServerConfig(
+        configured ?? (options.vulnServer === true ? resolverConfig({...options, resolver: true}) : undefined), options)
 
     const prep = await prepareSbomScans(runs, options, vulnServer)
     const session = await openCacheSession(useCache, cutoffMs)

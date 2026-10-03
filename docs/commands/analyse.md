@@ -23,7 +23,8 @@ any mix, and both sources are optional: depinder processes whatever it finds.
 | `--github-token-file <file>` | Tokens for `github`, relative to the working directory; `GH_TOKEN` from the environment when absent | `.github-tokens` |
 | `--github-max-age <hours>` | Re-download advisories older than this | `24` |
 | `--resolver-url <url>` | A [bulk purl resolver](../configuration.md#bulk-resolver) to ask before the registries; needs `DEPINDER_RESOLVER_TOKEN` | `DEPINDER_RESOLVER_URL` |
-| `--no-resolver` | Skip the bulk resolver even when one is configured | off |
+| `--no-resolver` | Skip the bulk resolver even when one is configured; also skips its vulnerability server unless `--vuln-server` | off |
+| `--vuln-server` | With `--no-resolver`: still ask the server for vulnerabilities (the bench's no-server cell) | off |
 | `--profile` | Phase timings, cache hits, requests per host | off |
 
 ## Sources

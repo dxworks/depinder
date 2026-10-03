@@ -108,5 +108,11 @@ describe('the analyse command line', () => {
             expect(options.resolverUrl).toBe('https://resolver.example')
             expect(options.resolver).toBe(false)
         })
+
+        it('reads --vuln-server as true and --no-vuln-server as false, and leaves it unset otherwise', async () => {
+            expect((await parseArgs('/repo', '--no-resolver', '--vuln-server')).options.vulnServer).toBe(true)
+            expect((await parseArgs('/repo', '--no-vuln-server')).options.vulnServer).toBe(false)
+            expect((await parseArgs('/repo')).options.vulnServer).toBeUndefined()
+        })
     })
 })
