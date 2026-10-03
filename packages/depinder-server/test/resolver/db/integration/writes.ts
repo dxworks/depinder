@@ -180,6 +180,20 @@ export function packageWriteTests(postgres: () => Postgres): void {
             await db.query(`delete from package_version where purl = 'pkg:npm/express@0.0.1'`)
         })
 
+        it('orders versions of the same instant by code point, as core does, whatever the locale', async () => {
+            const tied = ['1.0.0-beta', '1.0.0-RC1', 'a1', 'B1', '1.0.0_x', '1.0.0.1']
+            await db.query(
+                `insert into package_version (purl, package_key, version, released_at, licenses)
+                 select 'pkg:npm/express@' || v, 'pkg:npm/express', v, null, '{MIT}' from unnest($1::text[]) v`,
+                [tied],
+            )
+            const rows = await createResolveStore(db).getVersions(['pkg:npm/express'])
+
+            const undated = rows[0]!.versions.filter(v => v[1] === null).map(v => v[0])
+            expect(undated).toEqual([...tied].sort())
+            await db.query(`delete from package_version where purl like 'pkg:npm/express@%' and released_at is null`)
+        })
+
         it('backs off, then gives up after three attempts without losing good data', async () => {
             vi.stubGlobal('fetch', () => Promise.resolve(json({error: 'boom'}, 500)))
             const [good] = await db.query<PackageRow>('select * from package where package_key = $1', ['pkg:npm/express'])

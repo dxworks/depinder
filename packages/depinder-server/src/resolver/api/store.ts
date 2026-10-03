@@ -58,7 +58,9 @@ export const FEEDS_TTL_MS = 5_000
  * per-version license array is sent only when it differs from the package's own (`is distinct
  * from`, so an explicit `[]` against a package's `["MIT"]` still ships, as `[]`).
  *
- * `p.licenses` needs no `group by`: it is only ever read inside the aggregate.
+ * `p.licenses` needs no `group by`: it is only ever read inside the aggregate. Versions released at
+ * the same instant sort by code point (`collate "C"`), as core's `compactVersions` does, whatever
+ * the database's locale.
  */
 const VERSIONS_SQL = `select v.package_key,
                              json_agg(
@@ -72,7 +74,7 @@ const VERSIONS_SQL = `select v.package_key,
                                                                floor(extract(epoch from v.released_at))::bigint,
                                                                (v.prerelease::int) | (v.yanked::int << 1))
                                          end
-                                     order by v.released_at asc nulls first, v.version asc) as versions
+                                     order by v.released_at asc nulls first, v.version collate "C" asc) as versions
                       from package_version v
                                join package p on p.package_key = v.package_key
                       where v.package_key = any($1::text[])
