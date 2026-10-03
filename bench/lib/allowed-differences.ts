@@ -1,6 +1,7 @@
 import {existsSync, readFileSync} from 'node:fs'
 import path from 'node:path'
 import {KeptCache} from './kept-cache.js'
+import {newerRecommendations, recommendedVersionColumnOf} from './upgrade-guidance.js'
 
 /**
  * Sorts the CSV differences between a reference run (A) and a later run (B) by the regression
@@ -8,7 +9,8 @@ import {KeptCache} from './kept-cache.js'
  *
  * - `newer-release`: the row's library has a version that B's cache dates after A started, and the
  *   row differs only in columns a newer release moves (latest version and its date, Newer
- *   Versions, the risk built on them). An ecosystem's project stats follow when it has such rows,
+ *   Versions, the risk built on them, a Black Duck upgrade recommendation that is such a version
+ *   and the columns that follow it). An ecosystem's project stats follow when it has such rows,
  *   its license list when such rows changed a library's licenses.
  * - `vuln-db`: a vulnerability column or file, when A and B scanned with different database builds.
  * - `expected-d9`: an npm row that differs only in Component Link, where A's link is what the
@@ -111,10 +113,14 @@ export class DifferenceClassifier {
             const followed = summary[2] === 'licenses' ? this.ecosystemsWithNewerReleaseLicenses : this.ecosystemsWithNewerReleases
             return followed.has(summary[1]) ? 'newer-release' : 'regression'
         }
+        const library = libraryOf(base, header, row)
+        const newerRecommended = library
+            ? newerRecommendations(base, changes, version => !!this.cacheB?.isReleasedAfterCutoff(library.ecosystems, library.name, version))
+            : new Set<string>()
         const allowed = columns.every(c => NEWER_RELEASE_COLUMNS.has(c)
             || (c === LATEST_VERSION_LICENSES && columns.includes('Latest Version'))
+            || newerRecommended.has(recommendedVersionColumnOf(base, c) ?? '')
             || (this.facts?.vulnDbsDiffer && VULN_COLUMN.test(c)))
-        const library = libraryOf(base, header, row)
         if (library && this.isExpectedD9(base, library, changes)) return 'expected-d9'
         if (!allowed || !library || !this.cacheB?.hasReleaseAfterCutoff(library.ecosystems, library.name)) return 'regression'
         for (const eco of library.ecosystems) {
@@ -164,6 +170,6 @@ function libraryOf(file: string, header: string[], row: string[]): Library | nul
     if (libs) return cell('Library') ? {ecosystems: [libs[1]], name: cell('Library')} : null
     const name = cell('Component name') || cell('Component Name')
     if (!name) return null
-    const eco = ORIGIN_ECOSYSTEMS[cell('Origin name')]
+    const eco = ORIGIN_ECOSYSTEMS[cell('Origin name') || cell('Component Origin Name')]
     return {ecosystems: eco ? [eco] : ECOSYSTEMS, name}
 }
