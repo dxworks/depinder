@@ -1,0 +1,19 @@
+{
+  "name": "depinder-bench",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end bench: runs the depinder CLI against the resolver and vuln server and compares CSV outputs",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.0"
+  }
+}

@@ -1,11 +1,13 @@
 # bench — end-to-end benchmark
 
-Runs depinder (`../depinder/packages/depinder-cli/dist/`) against this server and records how long it takes and who
-fetched what: depinder's own registry lookups versus the server's. Rerunnable; every run lands in
-its own folder under `bench/runs/` (git-ignored), and two runs can be compared.
+Runs depinder (`packages/depinder-cli/dist/`) against the server (`packages/depinder-server`) and
+records how long it takes and who fetched what: depinder's own registry lookups versus the
+server's. Rerunnable; every run lands in its own folder under `bench/runs/` (git-ignored), and two
+runs can be compared. It is the Nx project `depinder-bench` (tag `scope:bench`); all commands below
+run at the monorepo root.
 
-Nothing here imports from `src/`: the bench talks to the server over HTTP, to its Postgres with
-`pg` and plain SQL, and to Docker / SSH through their CLIs.
+Nothing here imports from `packages/`: the bench runs the CLI as a program, talks to the server over
+HTTP, to its Postgres with `pg` and plain SQL, and to Docker / SSH through their CLIs.
 
 ## Run
 
@@ -43,27 +45,29 @@ Long waits print a progress line at least every minute, so it is safe to run in 
 | `--drain-timeout-min` | 20 | how long to wait for the server's queue after an empty run |
 | `--run-timeout-min` | 45 | a depinder run still going after this is killed (recorded as failed) |
 
-Paths: depinder is the Nx monorepo `../depinder` (the CLI is its project `packages/depinder-cli`) and
-the input `../input_data/zzw-v051-rerun/depminer/results` (`trivy/` and `syft/`), overridable with
-`BENCH_DEPINDER_DIR` (the monorepo root) and `BENCH_INPUT_DIR`.
+Paths: the CLI is `packages/depinder-cli` and the server `packages/depinder-server` of this
+monorepo; the input is `../input_data/zzw-v051-rerun/depminer/results` next to the monorepo (`trivy/`
+and `syft/`), overridable with `BENCH_INPUT_DIR`.
 
 ### Targets
 
 | target | stack | env file (database, token) | wipe needs |
 |---|---|---|---|
-| `dev` | local compose, `http://localhost:8080` | `.env` (dev Supabase) | confirmation |
-| `deploy` | local compose + `bench/compose.deploy-db.yml` | `deploy/.depinder.server.env` | confirmation + `--allow-wipe-nondev` |
-| `hosted` | the server at `BENCH_URL` (required); resolver stopped/started with `ssh depinder depinder stop\|start resolver` | `deploy/.depinder.server.env` | confirmation + `--allow-wipe-nondev` |
+| `dev` | local compose in `packages/depinder-server`, `http://localhost:8080` | `packages/depinder-server/.env` (the dev database) | confirmation |
+| `deploy` | local compose + `bench/compose.deploy-db.yml` | `packages/depinder-server/deploy/.depinder.server.env` | confirmation + `--allow-wipe-nondev` |
+| `hosted` | the server at `BENCH_URL` (required); resolver stopped/started with `ssh depinder depinder stop\|start resolver` | `packages/depinder-server/deploy/.depinder.server.env` | confirmation + `--allow-wipe-nondev` |
 
 For the local targets the bench runs `docker compose up -d` with the target's files first. That is
 idempotent, and recreates the containers when the env file differs from what they run on, so
 switching targets moves the stack to the right database. Then it waits for `/health` and
-`/vuln/health`. It warns (does not fail) when the image is older than the server's HEAD commit or
-anything under `src/`; pass `--rebuild` then. **Only one stack per database**: don't bench `deploy`
+`/vuln/health`. It warns (does not fail) when the image is older than the last commit touching
+`packages/depinder-server` or anything under its `src/`; pass `--rebuild` then. **Only one stack per database**: don't bench `deploy`
 while the hosted server runs on the same database.
 
 Secrets: env files are parsed into an object, never into the bench's environment, and never
-printed. Of `DATABASE_URL` only the host is shown. The token goes only into depinder's environment,
+printed. Of `DATABASE_URL` only a masked host is shown (`dev database (***.example.com)`: the
+target and the host's last two labels), in the output, run.json and summary.md alike; driver errors
+are printed with the host and user masked. The token goes only into depinder's environment,
 as `DEPINDER_RESOLVER_TOKEN`.
 
 ### Preflight
@@ -94,7 +98,7 @@ and warns when they differ.
 
 Per producer, trivy first, then syft:
 
-1. **empty** — the worst case. The bench shows the database host and its counts, (asks once for
+1. **empty** — the worst case. The bench shows the (masked) database host and its counts, (asks once for
    the whole run), stops the resolver, truncates `package`, `package_version`, `fetch_queue`,
    `fetch_log` and `registry_feed`, checks they are empty, starts the resolver (which also drops
    the API's in-memory version cache) and waits until it is healthy. Then one depinder run with an
@@ -116,7 +120,7 @@ Per producer, trivy first, then syft:
 
 ```
 bench/runs/2026-10-02_1430-baseline/
-  run.json        label, target, url, database host, git SHA/branch/dirty of both repos, image
+  run.json        label, target, url, masked database host, git SHA/branch/dirty of the monorepo, image
                   Created, /vuln/health body, node, load average around every run, options,
                   reportNow (the fixed "now")
   results.jsonl   one line per depinder run: wall, exit code, every profile phase and counter,
@@ -194,8 +198,8 @@ judged: the largest change in percent is on the line). A run can be named by its
 
 ## Micro benches
 
-`bench/micro/` holds the narrow benches that came before this one: `bench-stream.cjs` (one
-/resolve read as a stream) with `bench-http.cjs` and `bench-chunks.cjs` on top of it, and the vuln
-server's `vuln-parity.ts`, `vuln-bench.cjs` and `vuln-soak.cjs` (usage in [docs/benchmarks.md](../docs/benchmarks.md)).
-`vuln-parity.ts` is the one file under `bench/` that imports `src/`: it reruns the merge locally
-to check the answer field by field.
+The server's narrow benches stay in its project, `packages/depinder-server/bench/micro/`:
+`bench-stream.cjs` (one /resolve read as a stream) with `bench-http.cjs` and `bench-chunks.cjs` on
+top of it, and the vuln server's `vuln-parity.ts`, `vuln-bench.cjs` and `vuln-soak.cjs` (usage in
+[its docs/benchmarks.md](../packages/depinder-server/docs/benchmarks.md)). `vuln-parity.ts` imports
+the server's `src/vuln/merge/` to check the answer field by field.

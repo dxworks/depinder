@@ -31,7 +31,7 @@ export function checkWipeAllowed(target: Target, guard: WipeGuard): void {
  * answer was anything else.
  */
 export async function confirmWipe(target: Target, host: string, db: BenchDb, guard: WipeGuard, what: string): Promise<boolean> {
-    console.log(`\nDatabase ${host} (target ${target.name}) holds: ${formatCounts(await counts(db))}`)
+    console.log(`\nThe ${host} holds: ${formatCounts(await counts(db))}`)
     console.log(`${what} will TRUNCATE package, package_version, fetch_queue, fetch_log and registry_feed there.`)
     if (guard.yes) {
         console.log('--yes given: not asking.')
@@ -62,7 +62,7 @@ export async function wipe(target: Target, host: string, db: BenchDb): Promise<v
     try {
         await truncateAll(db)
         const after = await counts(db)
-        console.log(`Wiped ${host}: ${formatCounts(after)}`)
+        console.log(`Wiped the ${host}: ${formatCounts(after)}`)
         if (after.packages || after.versions || after.queued || after.fetchLog) {
             throw new Error('rows left after the truncate: something else writes to this database')
         }

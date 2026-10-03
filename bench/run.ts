@@ -5,10 +5,10 @@ import {setTimeout as sleep} from 'node:timers/promises'
 import {parseArgs} from 'node:util'
 import {byStatus, counts, fetchedIn, formatCounts, isDrained, openDb, type BenchDb} from './lib/db.js'
 import {depinderPreflight, EXPECTED_BRANCH, gitInfo, runDepinder} from './lib/depinder.js'
-import {apiToken, dbHost, readEnvFile} from './lib/env.js'
+import {apiToken, maskedDbHost, readEnvFile, scrubDbDetails} from './lib/env.js'
 import {imageCreated, imageStaleness, stackUp, waitHealthy} from './lib/stack.js'
 import {buildSummary, CELLS, describeVulnDbs, type Cell, type RunRecord, type ServerStats} from './lib/summary.js'
-import {DEPINDER_DIR, INPUT_DIR, REPO_DIR, resolveTarget, RUNS_DIR, type Target} from './lib/targets.js'
+import {INPUT_DIR, MONOREPO_DIR, resolveTarget, RUNS_DIR, type Target} from './lib/targets.js'
 import {checkWipeAllowed, confirmWipe, wipe} from './lib/wipe.js'
 
 /**
@@ -104,6 +104,8 @@ interface Ctx {
     records: RunRecord[]
     loads: {id: string, before: number[], after: number[]}[]
     strippedEnv: string[]
+    /** Masks the database's host and user in a driver error before it is printed. */
+    scrub: (message: string) => string
 }
 
 function stamp(d = new Date()): string {
@@ -142,7 +144,7 @@ function save(ctx: Ctx, record: RunRecord): void {
  * Polls until nothing is pending and the queue is empty. A failed poll is a lost sample, not an
  * error: a filling worker can take every slot the session pooler has.
  */
-async function waitDrain(db: BenchDb, timeoutMs: number): Promise<number | null> {
+async function waitDrain(db: BenchDb, timeoutMs: number, scrub: (message: string) => string): Promise<number | null> {
     const started = Date.now()
     let lastLine = 0
     for (;;) {
@@ -154,7 +156,7 @@ async function waitDrain(db: BenchDb, timeoutMs: number): Promise<number | null>
                 lastLine = Date.now()
             }
         } catch (e) {
-            console.log(`    (no database sample: ${(e as Error).message.slice(0, 80)})`)
+            console.log(`    (no database sample: ${scrub((e as Error).message).slice(0, 80)})`)
         }
         if (Date.now() - started > timeoutMs) return null
         await sleep(10_000)
@@ -168,7 +170,7 @@ async function emptyCell(ctx: Ctx, producer: string): Promise<void> {
     const statusAtEnd = await byStatus(ctx.db)
     const inWindow = await fetchedIn(ctx.db, window)
     console.log(`    server fetched ${inWindow.total} package(s) while depinder ran; waiting for the queue to drain`)
-    const drainSeconds = await waitDrain(ctx.db, ctx.opts.drainTimeoutMin * 60_000)
+    const drainSeconds = await waitDrain(ctx.db, ctx.opts.drainTimeoutMin * 60_000, ctx.scrub)
     const drainEnd = new Date()
     const server: ServerStats = {
         window: inWindow,
@@ -204,7 +206,7 @@ async function producerCells(ctx: Ctx, producer: string): Promise<void> {
 async function requireFilled(db: BenchDb, host: string): Promise<void> {
     const c = await counts(db)
     if (c.packages === 0 || c.pending > 0 || c.queued > 0) {
-        throw new Error(`the warm cells need a filled, drained server, and ${host} has ${formatCounts(c)}. `
+        throw new Error(`the warm cells need a filled, drained server, and the ${host} has ${formatCounts(c)}. `
             + 'Add empty to --cells (wipes and fills it), or wait until pending and queued are 0.')
     }
 }
@@ -214,10 +216,11 @@ async function main(): Promise<void> {
     const target = resolveTarget(opts.target)
     const env = readEnvFile(target.envFile, target.envRaw)
     const token = apiToken(env, target.envFile)
-    const host = dbHost(env.DATABASE_URL)
+    const host = maskedDbHost(target.name, env.DATABASE_URL)
+    const scrub = (message: string) => scrubDbDetails(message, env.DATABASE_URL)
     const wiping = opts.cells.includes('empty')
     if (wiping) checkWipeAllowed(target, {yes: opts.yes, allowNonDev: opts.allowWipeNondev})
-    console.log(`Bench "${opts.label}": target ${target.name} (${target.url}), database ${host}, `
+    console.log(`Bench "${opts.label}": target ${target.name} (${target.url}), ${host}, `
         + `producers ${opts.producers.join(',')}, cells ${opts.cells.join(',')}, repeats ${opts.repeats}`)
     console.log(`Ages measured from ${opts.now} (DEPINDER_REPORT_NOW in every depinder run)`)
 
@@ -227,7 +230,7 @@ async function main(): Promise<void> {
         // Before the stack: with credentials the database refuses, the resolver never gets healthy,
         // and the health wait would only say so after ten minutes.
         await db.query('select 1').catch((e: Error) => {
-            throw new Error(`cannot reach the database ${host} with ${target.envFile}: ${e.message}`)
+            throw new Error(`cannot reach the ${host} with ${target.envFile}: ${scrub(e.message)}`)
         })
         stackUp(target, opts.rebuild)
         const vulnHealth = await waitHealthy(target)
@@ -244,13 +247,14 @@ async function main(): Promise<void> {
         }
         const runDir = path.join(RUNS_DIR, `${stamp()}-${opts.label}`)
         mkdirSync(runDir, {recursive: true})
-        const ctx: Ctx = {opts, target, token, host, db, runDir, records: [], loads: [], strippedEnv: []}
-        const depinder = gitInfo(DEPINDER_DIR)
-        const server = gitInfo(REPO_DIR)
+        const ctx: Ctx = {opts, target, token, host, db, runDir, records: [], loads: [], strippedEnv: [], scrub}
+        // CLI and server share the monorepo; run.json keeps both keys so older runs still compare.
+        const depinder = gitInfo(MONOREPO_DIR)
+        const server = depinder
         const runStarted = new Date()
         const meta = (finished: boolean) => ({
             label: opts.label, target: target.name, url: target.url, dbHost: host,
-            depinder: {...depinder, dir: DEPINDER_DIR, expectedBranch: EXPECTED_BRANCH}, server,
+            depinder: {...depinder, dir: MONOREPO_DIR, expectedBranch: EXPECTED_BRANCH}, server,
             imageCreated: created, imageWarning: stale, vulnHealth: vulnHealth.body, inputDir: INPUT_DIR,
             node: process.version, host: os.hostname(), cpus: os.cpus().length,
             ghTokensStripped: true, strippedEnv: ctx.strippedEnv, loads: ctx.loads, options: opts, reportNow: opts.now,

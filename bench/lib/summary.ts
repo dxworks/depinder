@@ -150,7 +150,7 @@ export function buildSummary(h: SummaryHeader, records: RunRecord[]): string {
     const lines = [
         `# Bench ${h.label}`,
         '',
-        `target ${h.target} (${h.url}), database ${h.dbHost}; depinder ${h.depinderSha?.slice(0, 7) ?? '?'}, ` +
+        `target ${h.target} (${h.url}), ${h.dbHost}; depinder ${h.depinderSha?.slice(0, 7) ?? '?'}, ` +
             `server ${h.serverSha?.slice(0, 7) ?? '?'}, image ${h.imageCreated ?? '-'}; ${h.vulnDbs}`,
         '',
         `Ages measured from ${h.reportNow}; a later run compared with this one reuses it: \`--now ${h.reportNow}\``,

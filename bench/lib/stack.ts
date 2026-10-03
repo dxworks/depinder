@@ -2,20 +2,20 @@ import {spawnSync} from 'node:child_process'
 import {readdirSync, statSync} from 'node:fs'
 import path from 'node:path'
 import {setTimeout as sleep} from 'node:timers/promises'
-import {REPO_DIR, type Target} from './targets.js'
+import {MONOREPO_DIR, SERVER_DIR, type Target} from './targets.js'
 
 /**
  * The server side of a run: bringing the local stack up on the target's database, waiting for it to
  * be healthy, stopping and starting the resolver around a wipe, and saying which image it runs.
  */
 
-export const IMAGE = 'depinder-server-side:0.2.0'
+export const IMAGE = 'depinder-server:0.2.0'
 
 /**
  * Runs a command with its output on the bench's terminal; throws if it fails or outlives
  * `timeoutMs` (killed then). stdin is closed: nothing the bench runs may wait for a person.
  */
-export function sh(argv: string[], cwd = REPO_DIR, timeoutMs = 5 * 60_000): void {
+export function sh(argv: string[], cwd = SERVER_DIR, timeoutMs = 5 * 60_000): void {
     const [cmd, ...args] = argv
     const res = spawnSync(cmd, args, {cwd, stdio: ['ignore', 'inherit', 'inherit'], timeout: timeoutMs, killSignal: 'SIGKILL'})
     if (res.error && (res.error as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
@@ -25,7 +25,7 @@ export function sh(argv: string[], cwd = REPO_DIR, timeoutMs = 5 * 60_000): void
 }
 
 /** Runs a command and returns its trimmed stdout, or null if it failed or took over a minute. */
-export function capture(argv: string[], cwd = REPO_DIR): string | null {
+export function capture(argv: string[], cwd = SERVER_DIR): string | null {
     const [cmd, ...args] = argv
     const res = spawnSync(cmd, args, {cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000, killSignal: 'SIGKILL'})
     return res.status === 0 ? res.stdout.trim() : null
@@ -38,8 +38,8 @@ export function capture(argv: string[], cwd = REPO_DIR): string | null {
  */
 export function stackUp(target: Target, rebuild: boolean): void {
     if (!target.composeFiles) return
-    if (rebuild) sh(['docker', 'compose', ...target.composeFiles, 'build'], REPO_DIR, 30 * 60_000)
-    sh(['docker', 'compose', ...target.composeFiles, 'up', '-d'], REPO_DIR, 5 * 60_000)
+    if (rebuild) sh(['docker', 'compose', ...target.composeFiles, 'build'], SERVER_DIR, 30 * 60_000)
+    sh(['docker', 'compose', ...target.composeFiles, 'up', '-d'], SERVER_DIR, 5 * 60_000)
 }
 
 export interface Health {
@@ -112,10 +112,10 @@ export function newestMtime(dir: string): number {
 export function imageStaleness(created: string | null): string | null {
     if (!created) return null
     const builtAt = Date.parse(created)
-    const head = Date.parse(capture(['git', 'log', '-1', '--format=%cI']) ?? '')
-    const src = newestMtime(path.join(REPO_DIR, 'src'))
+    const head = Date.parse(capture(['git', 'log', '-1', '--format=%cI', '--', 'packages/depinder-server'], MONOREPO_DIR) ?? '')
+    const src = newestMtime(path.join(SERVER_DIR, 'src'))
     const reasons: string[] = []
-    if (head > builtAt) reasons.push(`the server HEAD commit (${new Date(head).toISOString()})`)
+    if (head > builtAt) reasons.push(`the last server commit (${new Date(head).toISOString()})`)
     if (src > builtAt) reasons.push(`a file under src/ (${new Date(src).toISOString()})`)
     if (reasons.length === 0) return null
     return `image ${IMAGE} (built ${new Date(builtAt).toISOString()}) is older than ${reasons.join(' and ')}; pass --rebuild`

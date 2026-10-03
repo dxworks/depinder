@@ -5,7 +5,7 @@ import path from 'node:path'
 import {childEnv} from './env.js'
 import {parseProfile, pick, type Picks, type Profile} from './profile.js'
 import {capture, newestMtime, sh} from './stack.js'
-import {DEPINDER_DIR, INPUT_DIR} from './targets.js'
+import {INPUT_DIR, MONOREPO_DIR} from './targets.js'
 
 /**
  * The client side of a run: checking that depinder's dist is the code on its branch, and running
@@ -14,8 +14,8 @@ import {DEPINDER_DIR, INPUT_DIR} from './targets.js'
 
 export const EXPECTED_BRANCH = 'feature/depinder-rework'
 
-/** The CLI's Nx project inside the depinder monorepo; its build lands in dist/. */
-export const DEPINDER_CLI_DIR = path.join(DEPINDER_DIR, 'packages', 'depinder-cli')
+/** The CLI's Nx project in the monorepo; its build lands in dist/. */
+export const DEPINDER_CLI_DIR = path.join(MONOREPO_DIR, 'packages', 'depinder-cli')
 const BUILD_COMMAND = ['npx', 'nx', 'build', 'depinder-cli']
 
 export interface GitInfo {
@@ -41,13 +41,13 @@ export function gitInfo(dir: string): GitInfo {
  */
 export function depinderPreflight(build: boolean): string[] {
     const warnings: string[] = []
-    const git = gitInfo(DEPINDER_DIR)
+    const git = gitInfo(MONOREPO_DIR)
     if (git.branch !== EXPECTED_BRANCH) warnings.push(`depinder is on ${git.branch}, not ${EXPECTED_BRANCH}`)
     if (build) {
-        console.log(`Building depinder (${BUILD_COMMAND.join(' ')} in ${DEPINDER_DIR})`)
-        sh(BUILD_COMMAND, DEPINDER_DIR, 10 * 60_000)
+        console.log(`Building depinder (${BUILD_COMMAND.join(' ')} in ${MONOREPO_DIR})`)
+        sh(BUILD_COMMAND, MONOREPO_DIR, 10 * 60_000)
     }
-    const howToBuild = `run ${BUILD_COMMAND.join(' ')} in ${DEPINDER_DIR}, or pass --build-depinder`
+    const howToBuild = `run ${BUILD_COMMAND.join(' ')} in ${MONOREPO_DIR}, or pass --build-depinder`
     const entry = path.join(DEPINDER_CLI_DIR, 'dist', 'index.js')
     if (!existsSync(entry)) throw new Error(`${entry} is missing: ${howToBuild}`)
     const src = newestMtime(path.join(DEPINDER_CLI_DIR, 'src'))

@@ -1,6 +1,6 @@
 import {parseArgs} from 'node:util'
 import {openDb} from './lib/db.js'
-import {dbHost, readEnvFile} from './lib/env.js'
+import {maskedDbHost, readEnvFile} from './lib/env.js'
 import {resolveTarget} from './lib/targets.js'
 import {checkWipeAllowed, confirmWipe, wipe} from './lib/wipe.js'
 
@@ -24,7 +24,7 @@ async function main(): Promise<void> {
     const guard = {yes: values.yes, allowNonDev: values['allow-wipe-nondev']}
     checkWipeAllowed(target, guard)
     const env = readEnvFile(target.envFile, target.envRaw)
-    const host = dbHost(env.DATABASE_URL)
+    const host = maskedDbHost(target.name, env.DATABASE_URL)
     const db = openDb(env)
     try {
         if (!await confirmWipe(target, host, db, guard, 'This reset')) {

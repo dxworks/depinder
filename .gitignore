@@ -142,3 +142,7 @@ results-*
 /.nx/
 # MkDocs output of the docs target
 site/
+
+# Bench run folders (logs, CSVs, SQLite caches)
+/bench/runs/
+.DS_Store

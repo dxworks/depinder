@@ -35,19 +35,31 @@ export function readEnvFile(file: string, raw: boolean): EnvFile {
 }
 
 /**
- * The host of a connection string, the only part of it the bench ever prints. Supabase's session
- * pooler has one host name for every project in a region, so for it the project ref (the
- * `postgres.<ref>` user name, which is no secret: it is the project's public URL) is added — without
- * it the dev and the deployed database would print the same.
+ * What the bench prints about a database: the target's name and the host with all but its last two
+ * labels masked (`dev database (***.example.com)`). Run logs and run.json never carry the full host
+ * or a project ref; a local host is shown as it is.
  */
-export function dbHost(databaseUrl: string | undefined): string {
-    if (!databaseUrl) return '(DATABASE_URL missing)'
+export function maskedDbHost(target: string, databaseUrl: string | undefined): string {
+    if (!databaseUrl) return `${target} database (DATABASE_URL missing)`
+    try {
+        const host = new URL(databaseUrl).hostname
+        if (!host) return `${target} database (no host)`
+        if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return `${target} database (${host})`
+        return `${target} database (***.${host.split('.').slice(-2).join('.')})`
+    } catch {
+        return `${target} database (unparseable DATABASE_URL)`
+    }
+}
+
+/** A driver error with the database's host and user name masked, so it can be printed. */
+export function scrubDbDetails(message: string, databaseUrl: string | undefined): string {
+    if (!databaseUrl) return message
     try {
         const url = new URL(databaseUrl)
-        const ref = decodeURIComponent(url.username).match(/^postgres\.([a-z0-9]+)$/)?.[1]
-        return (url.hostname || '(no host)') + (ref ? ` [project ${ref}]` : '')
+        const secrets = [url.hostname, decodeURIComponent(url.username)].filter(it => it.length > 3)
+        return secrets.reduce((text, secret) => text.split(secret).join('***'), message)
     } catch {
-        return '(unparseable DATABASE_URL)'
+        return message
     }
 }
 

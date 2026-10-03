@@ -4,19 +4,21 @@ import {fileURLToPath} from 'node:url'
 /**
  * Where the bench points: which stack, which database, and how to stop and start its resolver.
  *
- * The three targets differ in how much damage a wipe can do. `dev` is the scratch database in
- * `.env`; `deploy` and `hosted` are the database the deployed server uses (deploy/.depinder.server.env),
- * so wiping them needs an extra flag on top of the confirmation.
+ * The three targets differ in how much damage a wipe can do. `dev` is the scratch database in the
+ * server's `.env`; `deploy` and `hosted` are the database the deployed server uses
+ * (deploy/.depinder.server.env), so wiping them needs an extra flag on top of the confirmation.
  */
 
-/** depinder-server-side, the folder this bench lives in. */
-export const REPO_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
-/** The workspace holding depinder, depinder-server-side and input_data side by side. */
-export const WORKSPACE_DIR = path.resolve(REPO_DIR, '..')
-export const DEPINDER_DIR = process.env.BENCH_DEPINDER_DIR ?? path.join(WORKSPACE_DIR, 'depinder')
+/** The depinder monorepo: this bench, the CLI and the server. */
+export const MONOREPO_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
+/** The server's project: its compose stack, env files and source. */
+export const SERVER_DIR = path.join(MONOREPO_DIR, 'packages', 'depinder-server')
+/** The folder holding the monorepo and input_data side by side. */
+export const WORKSPACE_DIR = path.resolve(MONOREPO_DIR, '..')
 export const INPUT_DIR = process.env.BENCH_INPUT_DIR
     ?? path.join(WORKSPACE_DIR, 'input_data', 'zzw-v051-rerun', 'depminer', 'results')
-export const RUNS_DIR = path.join(REPO_DIR, 'bench', 'runs')
+export const RUNS_DIR = path.join(MONOREPO_DIR, 'bench', 'runs')
+const DEPLOY_DB_OVERRIDE = path.join(MONOREPO_DIR, 'bench', 'compose.deploy-db.yml')
 
 export type TargetName = 'dev' | 'deploy' | 'hosted'
 export const TARGET_NAMES: readonly TargetName[] = ['dev', 'deploy', 'hosted']
@@ -37,19 +39,19 @@ export interface Target {
 }
 
 const SSH = ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', 'depinder']
-const DEPLOY_ENV = path.join(REPO_DIR, 'deploy', '.depinder.server.env')
+const DEPLOY_ENV = path.join(SERVER_DIR, 'deploy', '.depinder.server.env')
 
 /** Builds a target; `hosted` needs BENCH_URL. Throws with a message for the person running it. */
 export function resolveTarget(name: string): Target {
     if (name === 'dev' || name === 'deploy') {
-        // `-f docker-compose.yml` always, so a stray docker-compose.override.yml is never picked up.
+        // Run in SERVER_DIR; `-f docker-compose.yml` always, so a stray override file is never picked up.
         const composeFiles = name === 'dev'
             ? ['-f', 'docker-compose.yml']
-            : ['-f', 'docker-compose.yml', '-f', path.join('bench', 'compose.deploy-db.yml')]
+            : ['-f', 'docker-compose.yml', '-f', DEPLOY_DB_OVERRIDE]
         return {
             name,
             url: 'http://localhost:8080',
-            envFile: name === 'dev' ? path.join(REPO_DIR, '.env') : DEPLOY_ENV,
+            envFile: name === 'dev' ? path.join(SERVER_DIR, '.env') : DEPLOY_ENV,
             envRaw: name === 'deploy',
             composeFiles,
             guarded: name === 'deploy',
