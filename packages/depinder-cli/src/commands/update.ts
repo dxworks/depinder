@@ -1,4 +1,5 @@
 import {Command} from 'commander'
+import {mapWithConcurrency} from '@depinder/core'
 import chalk from 'chalk'
 import {sharedCacheDb, sqliteCache} from '../cache/sqlite-cache'
 import moment from 'moment'
@@ -78,16 +79,11 @@ async function updateLibrariesFor(selectedPlugins: Plugin[], idsToUpdate: string
     await Promise.all([...idsByPlugin(selectedPlugins, idsToUpdate)].map(async ([plugin, ids]) => {
         const type = registryTypeOfPlugin(plugin)
         const prefixLength = ecosystemOf(plugin).length + 1
-        let next = 0
-        const worker = async () => {
-            while (next < ids.length) {
-                const id = ids[next++]
-                const libraryName = id.substring(prefixLength)
-                await updateLibrary(plugin, {type, name: libraryName}, id, registries)
-                progressBar.increment({library: libraryName, plugin: plugin.name})
-            }
-        }
-        await Promise.all(Array.from({length: Math.min(registries.packagesAtOnce(type), ids.length)}, worker))
+        await mapWithConcurrency(ids, registries.packagesAtOnce(type), async id => {
+            const libraryName = id.substring(prefixLength)
+            await updateLibrary(plugin, {type, name: libraryName}, id, registries)
+            progressBar.increment({library: libraryName, plugin: plugin.name})
+        })
     }))
 }
 
