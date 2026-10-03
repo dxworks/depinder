@@ -13,6 +13,10 @@
       "executor": "nx:run-commands",
       "options": {"cwd": "{projectRoot}", "command": "node src/dependency-check.mts"}
     },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "eslint src __tests__"}
+    },
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {"cwd": "{projectRoot}", "command": "tsc -p tsconfig.json"}
