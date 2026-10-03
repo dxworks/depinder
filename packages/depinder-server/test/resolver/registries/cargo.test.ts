@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {createHttpClient, resetLimiters, type FetchRecord} from '../../../src/resolver/registries/http.js'
+import {createRegistryClient, resetLimiters, type FetchRecord} from '../../../src/resolver/registries/http.js'
 import {computeLatest} from '../../../src/resolver/registries/latest.js'
 import {nullLogger, parsePurl} from '@depinder/core'
 import {cargoRegistry, packageFromCrate, sparseIndexPath} from '../../../src/resolver/registries/cargo.js'
@@ -36,7 +36,7 @@ function body(text: string, status = 200, headers: Record<string, string> = {}):
 
 function context(): FetchContext {
     return {
-        http: createHttpClient({type: 'cargo', recorder: record => records.push(record)}),
+        http: createRegistryClient({type: 'cargo', recorder: record => records.push(record)}),
         log: nullLogger,
         options: {mavenPerVersionLicenses: false},
     }

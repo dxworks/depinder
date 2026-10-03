@@ -1,6 +1,5 @@
-import {HttpError} from './http.js'
+import {HttpError, registryName} from '@depinder/core'
 import {isPrerelease} from './latest.js'
-import {registryName} from '@depinder/core'
 import {modified, normaliseLicenses, normaliseRepoUrl, notModified, stringOrUndefined, toDate} from './shared.js'
 import type {FetchContext, FetchedPackage, FetchedVersion, PollResult, PollTarget, Registry} from './types.js'
 

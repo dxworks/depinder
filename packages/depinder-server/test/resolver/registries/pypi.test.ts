@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {createHttpClient, resetLimiters, type FetchRecord} from '../../../src/resolver/registries/http.js'
+import {createRegistryClient, resetLimiters, type FetchRecord} from '../../../src/resolver/registries/http.js'
 import {nullLogger, parsePurl} from '@depinder/core'
 import {
     classifierLicenses,
@@ -43,7 +43,7 @@ function xml(body: string, status = 200): Response {
 
 function context(): FetchContext {
     return {
-        http: createHttpClient({type: 'pypi', recorder: record => records.push(record)}),
+        http: createRegistryClient({type: 'pypi', recorder: record => records.push(record)}),
         log: nullLogger,
         options: {mavenPerVersionLicenses: false},
     }

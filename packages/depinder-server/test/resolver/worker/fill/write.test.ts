@@ -1,5 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {resetLimiters, sleep} from '../../../../src/resolver/registries/http.js'
+import {setTimeout as sleep} from 'node:timers/promises'
+import {resetLimiters} from '../../../../src/resolver/registries/http.js'
 import {nullLogger} from '@depinder/core'
 import {createResolverEvents} from '../../../../src/resolver/events.js'
 import {runOnce} from '../../../../src/resolver/worker/fill/pool.js'

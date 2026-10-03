@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs'
 import {vi} from 'vitest'
-import {createHttpClient, resetLimiters, type FetchRecord} from '../../../../src/resolver/registries/http.js'
+import {createRegistryClient, resetLimiters, type FetchRecord} from '../../../../src/resolver/registries/http.js'
 import {nullLogger, parsePurl} from '@depinder/core'
 import type {FetchContext, PollTarget} from '../../../../src/resolver/registries/types.js'
 
@@ -87,7 +87,7 @@ export function commonsHandler(overrides: Record<string, () => Response> = {}): 
 
 export function context(mavenPerVersionLicenses = false): FetchContext {
     return {
-        http: createHttpClient({type: 'maven', recorder: record => records.push(record)}),
+        http: createRegistryClient({type: 'maven', recorder: record => records.push(record)}),
         log: nullLogger,
         options: {mavenPerVersionLicenses},
     }

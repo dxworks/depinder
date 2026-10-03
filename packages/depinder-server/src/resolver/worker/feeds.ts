@@ -1,6 +1,6 @@
 import type {Config} from '../config.js'
 import type {Db} from '../db/db.js'
-import {createHttpClient, type FetchRecord} from '../registries/http.js'
+import {createRegistryClient, type FetchRecord} from '../registries/http.js'
 import {errorMessage, type Logger, parsePurl} from '@depinder/core'
 import {enqueue, PRIORITY} from '../db/queue.js'
 import {registries} from '../registries/index.js'
@@ -92,7 +92,7 @@ export async function ensureFeedRows(db: Db): Promise<void> {
 export async function runFeedOnce(registry: Registry, options: FeedWorkerOptions): Promise<void> {
     const records: FetchRecord[] = []
     const ctx: FetchContext = {
-        http: createHttpClient({type: registry.type, recorder: record => records.push(record)}),
+        http: createRegistryClient({type: registry.type, recorder: record => records.push(record)}),
         log: options.log,
         options: {mavenPerVersionLicenses: options.config.mavenPerVersionLicenses},
     }
@@ -227,7 +227,7 @@ async function runPollFeed(registry: Registry, options: FeedWorkerOptions, ctx: 
                 const records: FetchRecord[] = []
                 const perPackage: FetchContext = {
                     ...ctx,
-                    http: createHttpClient({type: registry.type, recorder: r => records.push(r)}),
+                    http: createRegistryClient({type: registry.type, recorder: r => records.push(r)}),
                 }
                 try {
                     const key = parsePurl(row.package_key)

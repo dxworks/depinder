@@ -1,5 +1,4 @@
-import type {HttpClient} from './http.js'
-import type {Logger, ParsedPurl} from '@depinder/core'
+import type {HttpClient, Logger, ParsedPurl} from '@depinder/core'
 
 /**
  * The contract every ecosystem implements. One file per purl type in this folder, registered in

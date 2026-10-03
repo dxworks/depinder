@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {createHttpClient, resetLimiters, type FetchRecord} from '../../../src/resolver/registries/http.js'
+import {createRegistryClient, resetLimiters, type FetchRecord} from '../../../src/resolver/registries/http.js'
 import {nullLogger, parsePurl} from '@depinder/core'
 import {npmRegistry, packageFromPackument} from '../../../src/resolver/registries/npm.js'
 import type {FetchContext} from '../../../src/resolver/registries/types.js'
@@ -33,7 +33,7 @@ function json(body: unknown, status = 200): Response {
 
 function context(): FetchContext {
     return {
-        http: createHttpClient({type: 'npm', recorder: record => records.push(record)}),
+        http: createRegistryClient({type: 'npm', recorder: record => records.push(record)}),
         log: nullLogger,
         options: {mavenPerVersionLicenses: false},
     }

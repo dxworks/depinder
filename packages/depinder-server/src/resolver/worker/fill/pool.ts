@@ -1,7 +1,7 @@
 import type {Config} from '../../config.js'
 import type {Db} from '../../db/db.js'
 import type {ResolverEvents} from '../../events.js'
-import {createHttpClient, URGENT_RANK, type FetchRecord, type Rank} from '../../registries/http.js'
+import {createRegistryClient, URGENT_RANK, type FetchRecord, type Rank} from '../../registries/http.js'
 import {errorMessage, type Logger, type ParsedPurl, parsePurl} from '@depinder/core'
 import type {FetchQueueRow} from '../../db/rows.js'
 import {registryFor} from '../../registries/index.js'
@@ -283,7 +283,7 @@ async function processRow(row: FetchQueueRow, job: JobContext, urgency: Urgency 
     }
 
     const records: FetchRecord[] = []
-    const http = createHttpClient({
+    const http = createRegistryClient({
         type: key.type,
         recorder: record => records.push(record),
         rank: fetchRank(urgency, row.priority),

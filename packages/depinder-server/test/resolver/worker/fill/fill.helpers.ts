@@ -1,7 +1,7 @@
 import {vi} from 'vitest'
 import {loadConfig} from '../../../../src/resolver/config.js'
 import type {Db, Queryable} from '../../../../src/resolver/db/db.js'
-import {sleep} from '../../../../src/resolver/registries/http.js'
+import {setTimeout as sleep} from 'node:timers/promises'
 import type {FetchQueueRow} from '../../../../src/resolver/db/rows.js'
 
 /**

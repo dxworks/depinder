@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {createHttpClient, resetLimiters, type FetchRecord} from '../../../src/resolver/registries/http.js'
+import {createRegistryClient, resetLimiters, type FetchRecord} from '../../../src/resolver/registries/http.js'
 import {type Logger, parsePurl} from '@depinder/core'
 import {gemRegistry, parseCompactIndex} from '../../../src/resolver/registries/gem.js'
 import type {FetchContext} from '../../../src/resolver/registries/types.js'
@@ -63,7 +63,7 @@ const recordingLogger: Logger = {
 
 function context(): FetchContext {
     return {
-        http: createHttpClient({type: 'gem', recorder: record => records.push(record)}),
+        http: createRegistryClient({type: 'gem', recorder: record => records.push(record)}),
         log: recordingLogger,
         options: {mavenPerVersionLicenses: false},
     }

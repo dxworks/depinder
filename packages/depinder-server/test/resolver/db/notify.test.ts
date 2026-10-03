@@ -1,7 +1,7 @@
 import {EventEmitter} from 'node:events'
 import {describe, expect, it} from 'vitest'
 import {createResolverEvents} from '../../../src/resolver/events.js'
-import {sleep} from '../../../src/resolver/registries/http.js'
+import {setTimeout as sleep} from 'node:timers/promises'
 import {nullLogger} from '@depinder/core'
 import {CHANNEL_QUEUED, CHANNEL_SETTLED, CHANNEL_WANTED, startNotifyBridge, type ListenClient} from '../../../src/resolver/db/notify.js'
 

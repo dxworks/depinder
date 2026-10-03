@@ -1,5 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {limiter, resetLimiters, sleep, URGENT_RANK} from '../../../../src/resolver/registries/http.js'
+import {setTimeout as sleep} from 'node:timers/promises'
+import {limiter, resetLimiters, URGENT_RANK} from '../../../../src/resolver/registries/http.js'
 import {nullLogger} from '@depinder/core'
 import {createResolverEvents} from '../../../../src/resolver/events.js'
 import {quotas} from '../../../../src/resolver/worker/fill/dequeue.js'

@@ -1,4 +1,4 @@
-import {HttpError} from './http.js'
+import {HttpError} from '@depinder/core'
 import {normaliseLicenses} from './shared.js'
 import type {FetchContext} from './types.js'
 

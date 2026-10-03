@@ -1,6 +1,5 @@
-import {HttpError} from '../http.js'
+import {fromRegistryName, HttpError, registryName} from '@depinder/core'
 import {isPrerelease} from '../latest.js'
-import {fromRegistryName, registryName} from '@depinder/core'
 import {normaliseLicenses, normaliseRepoUrl, stringOrUndefined, toDate} from '../shared.js'
 import type {FeedEvent, FeedResult, FetchContext, FetchedPackage, FetchedVersion, Registry} from '../types.js'
 import {decodeMethodResponse, encodeMethodCall, type XmlRpcValue} from './xmlrpc.js'
