@@ -1,4 +1,4 @@
-import type {CompactVersion} from '../db/rows.js'
+import type {CompactVersion} from '@depinder/core'
 
 /**
  * The version tuples of recently answered packages, held in this process.

@@ -1,10 +1,8 @@
-import type {CompactVersion, ResolvePackageRow} from '../../db/rows.js'
-import type {PackagePayload} from './types.js'
+import {versionPointer, type CompactVersion, type PackageRecord} from '@depinder/core'
+import type {ResolvePackageRow} from '../../db/rows.js'
 
-export function toPackagePayload(row: ResolvePackageRow, versions: CompactVersion[]): PackagePayload {
-    const releasedAt = (version: string | null): string | null =>
-        version ? isoFromEpoch(versions.find(v => v[0] === version)?.[1] ?? null) : null
-
+/** A stored package as the wire carries it. Core's `toPackageRecord` is the same for a fresh fetch. */
+export function toPackagePayload(row: ResolvePackageRow, versions: CompactVersion[]): PackageRecord {
     return {
         type: row.type,
         namespace: row.namespace,
@@ -13,13 +11,8 @@ export function toPackagePayload(row: ResolvePackageRow, versions: CompactVersio
         homepage_url: row.homepage_url,
         repo_url: row.repo_url,
         licenses: row.licenses ?? [],
-        latest: row.latest_version ? {version: row.latest_version, released_at: releasedAt(row.latest_version)} : null,
-        latest_prerelease: row.latest_prerelease_version
-            ? {
-                  version: row.latest_prerelease_version,
-                  released_at: releasedAt(row.latest_prerelease_version),
-              }
-            : null,
+        latest: versionPointer(row.latest_version, versions),
+        latest_prerelease: versionPointer(row.latest_prerelease_version, versions),
         // Straight through: Postgres built these, and nothing here touches them again.
         versions,
         as_of: iso(row.as_of),
@@ -35,9 +28,4 @@ export function time(date: Date | null): number {
 
 export function iso(date: Date | null | undefined): string | null {
     return date ? date.toISOString() : null
-}
-
-/** Epoch seconds back to the ISO string the package-level fields still carry. */
-function isoFromEpoch(seconds: number | null | undefined): string | null {
-    return seconds === null || seconds === undefined ? null : new Date(seconds * 1000).toISOString()
 }

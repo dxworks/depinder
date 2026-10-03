@@ -1,4 +1,11 @@
-import {fromRegistryName, HttpError, mapWithConcurrency, stringOrUndefined, toDate, type FetchContext} from '@depinder/core'
+import {
+    fromRegistryName,
+    HttpError,
+    mapWithConcurrency,
+    stringOrUndefined,
+    toDate,
+    type FetchContext,
+} from '@depinder/core'
 import type {FeedEvent, FeedResult, FeedSpec} from './types.js'
 
 /** nuget's freshness: the catalog, a time-ordered log of every package commit on nuget.org. */

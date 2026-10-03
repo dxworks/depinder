@@ -1,3 +1,5 @@
+import type {CompactVersion} from '@depinder/core'
+
 /** Row shapes as `pg` returns them: snake_case columns, `timestamptz` as Date, `text[]` as string[]. */
 
 export type PackageStatus = 'pending' | 'resolved' | 'not_found' | 'error'
@@ -53,28 +55,9 @@ export interface PackageVersionRow {
 }
 
 /**
- * A version as `POST /resolve` ships it — a tuple, not an object, and the wire contract both repos
- * implement:
- *
- *     [version, released_at, flags]
- *     [version, released_at, flags, licenses]
- *
- * `released_at` is Unix epoch **seconds** (integer, floored), or `null` when the registry publishes
- * no date. `flags` is a bitfield: 1 = prerelease, 2 = yanked, 0 = neither. The fourth element is
- * present only when this version's license list differs from the package-level one; a three-element
- * tuple means "the same as `package.licenses`", which is what 88-94% of versions are.
- *
- * The shape exists because the version array is 95% of a response: the field names, the ISO strings
- * and the two booleans that this replaces were three quarters of those bytes. Never a subset —
- * every version the registry has is still sent, in the same order as before.
- */
-export type CompactVersion =
-    | [version: string, releasedAt: number | null, flags: number]
-    | [version: string, releasedAt: number | null, flags: number, licenses: string[]]
-
-/**
- * One row of the version query: every version of one package, already aggregated and ordered by
- * Postgres. `versions` arrives parsed, because `pg` decodes `json` for us.
+ * One row of the version query: every version of one package as core's wire `CompactVersion`
+ * tuples, already aggregated and ordered by Postgres. `versions` arrives parsed, because `pg`
+ * decodes `json` for us.
  */
 export interface PackageVersionsRow {
     package_key: string

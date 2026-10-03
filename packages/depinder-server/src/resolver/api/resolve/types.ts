@@ -1,6 +1,5 @@
 import type {ResolverEvents} from '../../events.js'
-import type {Logger} from '@depinder/core'
-import type {CompactVersion} from '../../db/rows.js'
+import type {Logger, PackageRecord} from '@depinder/core'
 import type {ResolveStore} from '../store.js'
 import type {VersionCache} from '../version-cache.js'
 
@@ -48,31 +47,6 @@ export const VERSION_SLICE = 500
 
 export type ResultStatus = 'resolved' | 'refreshing' | 'not_found' | 'pending' | 'invalid' | 'error'
 
-/**
- * One version on the wire. See {@link CompactVersion}: `[version, epochSeconds | null, flags]`,
- * with a fourth `licenses` element only when this version's licenses differ from the package's.
- */
-type VersionPayload = CompactVersion
-
-export interface PackagePayload {
-    type: string
-    namespace: string | null
-    name: string
-    description: string | null
-    homepage_url: string | null
-    repo_url: string | null
-    licenses: string[]
-    latest: {version: string; released_at: string | null} | null
-    latest_prerelease: {version: string; released_at: string | null} | null
-    /** Every version the registry has, oldest first. Never a subset. */
-    versions: VersionPayload[]
-    as_of: string | null
-    source: string | null
-    fetched_at: string | null
-    /** The latest instant we can show these facts matched the registry; `max_age` is measured from it. */
-    confirmed_at: string | null
-}
-
 export interface FeedPayload {
     mode: 'feed' | 'poll'
     lag_seconds: number | null
@@ -87,7 +61,7 @@ export interface ResolveItem {
     purls: string[]
     status: ResultStatus
     /** Present for `resolved` and `refreshing`. */
-    package?: PackagePayload
+    package?: PackageRecord
     /** Present for `error` and `invalid`. */
     reason?: string
 }

@@ -1,5 +1,6 @@
 import type {ParsedPurl} from '@depinder/core'
-import type {CompactVersion, ResolvePackageRow} from '../../db/rows.js'
+import type {CompactVersion} from '@depinder/core'
+import type {ResolvePackageRow} from '../../db/rows.js'
 import type {ResolveStore} from '../store.js'
 import {toPackagePayload} from './payload.js'
 import type {ResolveDeps, ResolveItem, ResolveLine, ResolveRequest, ResolveSink, ResultStatus} from './types.js'

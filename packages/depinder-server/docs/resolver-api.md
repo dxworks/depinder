@@ -125,6 +125,10 @@ were three quarters of the bytes, and 88-94% of versions repeat their package's 
 Package-level dates stay ISO — `latest` and `latest_prerelease` are derived from the tuples on the
 way out. There is no per-purl `requested_version`: the caller finds its version in `versions`.
 
+The package shape is `PackageRecord` in `@depinder/core` (`src/wire/package-record.ts`), defined
+once for this server and the CLI. Core's `toPackageRecord` builds the same record straight from a
+fetch, for the CLI's own fallback.
+
 ### `GET /feeds`
 
 One row per ecosystem, all eight: mode, cursor, cursor time, last run, last success, last error

@@ -40,3 +40,12 @@ export {canFetch, fetchPackage} from './fetch-package.js'
 export {mavenMetadataUrl} from './registries/maven/index.js'
 export {stringOrUndefined, toDate} from './registries/normalise.js'
 export type {FetchContext, FetchedPackage, FetchedVersion, RegistryOptions, ResolvedPackage} from './registries/types.js'
+export {
+    toPackageRecord,
+    VERSION_FLAG_PRERELEASE,
+    VERSION_FLAG_YANKED,
+    versionPointer,
+    type CompactVersion,
+    type PackageRecord,
+    type VersionPointer,
+} from './wire/package-record.js'

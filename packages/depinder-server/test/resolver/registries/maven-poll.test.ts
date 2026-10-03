@@ -40,7 +40,8 @@ const context = () => feedContext('maven')
 const FETCHED_AT = new Date('2026-09-01T00:00:00Z')
 
 function target(overrides: Partial<PollTarget> = {}): PollTarget {
-    return {packageKey: GUAVA, key: parsePurl(GUAVA), etag: null, lastModified: null, fetchedAt: FETCHED_AT, ...overrides}
+    const key = parsePurl(GUAVA)
+    return {packageKey: GUAVA, key, etag: null, lastModified: null, fetchedAt: FETCHED_AT, ...overrides}
 }
 
 beforeEach(() => {

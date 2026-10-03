@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest'
 import {createVersionCache} from '../../../src/resolver/api/version-cache.js'
-import type {CompactVersion} from '../../../src/resolver/db/rows.js'
+import type {CompactVersion} from '@depinder/core'
 
 /**
  * The cache is only ever read against a `package` row read in the same request, so the interesting
