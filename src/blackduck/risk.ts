@@ -1,3 +1,5 @@
+import {reportNow} from '../utils/report-clock'
+
 /**
  * Black Duck's `Operational Risk` column, reproduced for the components Black Duck grades without
  * Open Hub telemetry.
@@ -53,9 +55,9 @@ const MEDIUM_BELOW_YEARS = 4
  *
  * @param releaseDate `YYYY-MM-DD`, the release date of the resolved version
  * @param newerVersions how many newer versions the registrar knows about, as written to the CSV
- * @param asOf the date the report is written for; defaults to now
+ * @param asOf the date the report is written for; defaults to `reportNow()`
  */
-export function operationalRisk(releaseDate: string, newerVersions: string, asOf: Date = new Date()): OperationalRisk | '' {
+export function operationalRisk(releaseDate: string, newerVersions: string, asOf: Date = reportNow()): OperationalRisk | '' {
     const newer = Number(newerVersions)
     if (!newerVersions.trim() || !Number.isFinite(newer)) return ''
 

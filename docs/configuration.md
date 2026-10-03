@@ -16,6 +16,7 @@ No configuration file: command-line options, environment variables, and a few fi
 | `DEPINDER_RESOLVER_TOKEN` | Bearer token for it. Required with the URL: without it the resolver is skipped |
 | `DEPINDER_RESOLVER_MAX_WAIT_MS` | How long one run waits for the resolver in total. Default `60000` |
 | `DEPINDER_RESOLVER_CONCURRENCY` | Caps how many 2000-purl chunks are posted at once. Default: all of them |
+| `DEPINDER_REPORT_NOW` | For tests and benches: an ISO date (`2026-10-03`, `2026-10-03T14:30:00Z`) the report measures ages from (Now-Used, Now-latest, Out of Support, Operational Risk). Cache freshness keeps the real clock. Default: now |
 | `TRIVY_BIN`, `GRYPE_BIN` | Scanner binaries when not on `PATH` |
 
 ## Files

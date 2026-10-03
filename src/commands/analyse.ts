@@ -42,6 +42,7 @@ import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/
 import {ResolverConfig, ResolverOptions, resolverConfig} from '../resolver/config'
 import {PackageRecord, ResolvedEntry, resetResolverClient, resolvePurls} from '../resolver/client'
 import {toLibraryInfo} from '../resolver/adapter'
+import {fixedReportNow, REPORT_NOW_ENV, reportNow} from '../utils/report-clock'
 import {usesVulnServer, vulnServerConfig, VulnServerConfig} from '../vuln-sources/server'
 import {
     collectSbomTargets,
@@ -146,7 +147,7 @@ export function convertDepToRow(proj: DepinderProject, dep: DepinderDependency):
     const currentVersion = dep.libraryInfo?.versions.find(it => it.version == dep.version.trim())
     const latestVersionMoment = releaseMoment(latestVersion?.timestamp)
     const currentVersionMoment = releaseMoment(currentVersion?.timestamp)
-    const now = moment()
+    const now = moment(reportNow())
 
     const dateFormat = 'MMM YYYY'
     const vulnerabilities = dep.vulnerabilities?.map(v => `${v.severity} - ${v.permalink}`).join('\n')
@@ -846,6 +847,9 @@ async function openCacheSession(useCache: boolean, cutoffMs: number): Promise<Ca
  */
 export async function analyseFiles(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
     if (options.profile) enableProfile()
+    // Read first, so a malformed fixed date stops the run before any work is done.
+    const fixedNow = fixedReportNow()
+    if (fixedNow) log.info(`Report date fixed at ${fixedNow.toISOString()} (${REPORT_NOW_ENV}); ages in the CSVs are measured from it`)
     const resultRoot = path.resolve(process.cwd(), options.results || 'results')
     const allFiles = folders.flatMap(it => walkDir(it))
     const selected = getPluginsFromNames(options.plugins)
@@ -1114,7 +1118,7 @@ export async function runAnalysis(
                 const currentVersion = dep.libraryInfo?.versions.find(it => it.version == dep.version.trim())
                 const latestVersionMoment = releaseMoment(latestVersion?.timestamp)
                 const currentVersionMoment = releaseMoment(currentVersion?.timestamp)
-                const now = moment()
+                const now = moment(reportNow())
                 const directDep: boolean = !dep.requestedBy || dep.requestedBy.some(it => it.startsWith(`${proj.name}@${proj.version}`))
 
                 // A missing date is NaN here, which no threshold below counts as outdated or out
