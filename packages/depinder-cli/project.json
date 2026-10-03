@@ -3,33 +3,66 @@
   "name": "depinder-cli",
   "projectType": "application",
   "sourceRoot": "packages/depinder-cli/src",
-  "tags": ["scope:client"],
+  "tags": [
+    "scope:client"
+  ],
   "targets": {
     "build": {
-      "executor": "nx:run-commands",
-      "outputs": ["{projectRoot}/dist"],
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "options": {
-        "cwd": "{projectRoot}",
-        "commands": ["rm -rf dist", "tsc -p tsconfig.build.json"],
-        "parallel": false
+        "main": "packages/depinder-cli/src/index.ts",
+        "additionalEntryPoints": [
+          "packages/depinder-cli/src/depinder.ts"
+        ],
+        "outputPath": "packages/depinder-cli/dist",
+        "tsConfig": "packages/depinder-cli/tsconfig.build.json",
+        "format": [
+          "cjs"
+        ],
+        "platform": "node",
+        "target": "es2022",
+        "bundle": true,
+        "thirdParty": false,
+        "sourcemap": true,
+        "declaration": true,
+        "declarationRootDir": "packages/depinder-cli/src",
+        "generatePackageJson": false,
+        "esbuildConfig": "packages/depinder-cli/esbuild.config.cjs"
       }
     },
     "typecheck": {
       "executor": "nx:run-commands",
-      "options": {"cwd": "{projectRoot}", "command": "tsc -p tsconfig.json"}
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "tsc -p tsconfig.json"
+      }
     },
     "lint": {
       "executor": "nx:run-commands",
-      "options": {"cwd": "{projectRoot}", "command": "eslint src"}
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "eslint src"
+      }
     },
     "test": {
       "executor": "nx:run-commands",
-      "options": {"cwd": "{projectRoot}", "command": "jest --passWithNoTests"}
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "jest --passWithNoTests"
+      }
     },
     "docs": {
       "executor": "nx:run-commands",
-      "outputs": ["{projectRoot}/site"],
-      "options": {"cwd": "{projectRoot}", "command": "mkdocs build --strict --site-dir site"}
+      "outputs": [
+        "{projectRoot}/site"
+      ],
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "mkdocs build --strict --site-dir site"
+      }
     }
   }
 }
