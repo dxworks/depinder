@@ -6,7 +6,9 @@
     "noEmit": false,
     "declaration": true,
     "types": ["node"],
-    "skipLibCheck": false
+    "skipLibCheck": false,
+    // Checks against @depinder/core's compiled declarations, as the bundle reads its dist
+    "customConditions": []
   },
   "include": ["src"]
 }

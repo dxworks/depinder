@@ -1,5 +1,5 @@
 import {LibraryInfo} from '../extension-points/registrar'
-import {PackageRecord, VERSION_FLAG_YANKED} from './client'
+import {type PackageRecord, VERSION_FLAG_YANKED} from '@depinder/core'
 
 /**
  * A resolver `PackageRecord` in the shape the rest of depinder already speaks, `LibraryInfo`.

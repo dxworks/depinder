@@ -83,7 +83,7 @@ const record = (type: string, namespace: string | null, name: string): PackageRe
         ['1.0.0', Math.floor(Date.parse('2023-01-01T00:00:00Z') / 1000), 0],
         ['2.0.0', Math.floor(Date.parse('2024-01-01T00:00:00Z') / 1000), 0],
     ],
-    as_of: null, source: 'test', fetched_at: '2026-09-16T10:00:00Z',
+    as_of: null, source: 'test', fetched_at: '2026-09-16T10:00:00Z', confirmed_at: null,
 })
 
 /**

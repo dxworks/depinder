@@ -40,7 +40,7 @@ const pkg = (name: string): PackageRecord => ({
     latest: {version: '1.0.0', released_at: '2020-01-01T00:00:00Z'},
     latest_prerelease: null,
     versions: [['1.0.0', Math.floor(Date.parse('2020-01-01T00:00:00Z') / 1000), 0]],
-    as_of: '2026-09-16T10:00:00Z', source: 'npm', fetched_at: '2026-09-16T10:00:00Z',
+    as_of: '2026-09-16T10:00:00Z', source: 'npm', fetched_at: '2026-09-16T10:00:00Z', confirmed_at: null,
 })
 
 const FEEDS = {npm: {mode: 'feed', lag_seconds: 12.4, cursor_time: '2026-09-16T10:00:00Z'}}

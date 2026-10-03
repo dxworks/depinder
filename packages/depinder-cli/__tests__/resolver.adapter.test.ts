@@ -36,6 +36,7 @@ const record = (overrides: Partial<PackageRecord>): PackageRecord => ({
     as_of: '2026-09-16T10:00:00Z',
     source: 'npm',
     fetched_at: '2026-09-16T10:00:00Z',
+    confirmed_at: null,
     ...overrides,
 })
 

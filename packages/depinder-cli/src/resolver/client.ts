@@ -1,5 +1,6 @@
 import {log as defaultLog} from '../utils/logging'
 import {count} from '../utils/profile'
+import type {PackageRecord} from '@depinder/core'
 import {ResolverConfig} from './config'
 
 /**
@@ -35,44 +36,8 @@ import {ResolverConfig} from './config'
  */
 export type ResolveStatus = 'resolved' | 'refreshing' | 'not_found' | 'pending' | 'invalid' | 'error'
 
-/** `flags` bit 0: the version is a prerelease. Nothing downstream reads it yet. */
-export const VERSION_FLAG_PRERELEASE = 1
-/** `flags` bit 1: the registry withdrew the version. `toLibraryInfo` keeps those, marked `yanked`. */
-export const VERSION_FLAG_YANKED = 2
-
-/**
- * One version, as the wire carries it: a tuple rather than an object, because a package ships
- * every version it ever had (~137 on average) and the field names were most of the bytes.
- *
- * `released_at` is Unix epoch SECONDS, or `null` when the registry has no date. `flags` is a bit
- * set (see the constants above). The optional fourth element is this version's own license list,
- * present ONLY when it differs from the package-level `licenses` — a three-element tuple means
- * "same as the package", and an explicit `[]` means "this version has none although the package
- * does". `toLibraryInfo` expands both back into the `LibraryInfo` shape downstream already reads.
- */
-export type CompactVersion =
-    | [version: string, releasedAt: number | null, flags: number]
-    | [version: string, releasedAt: number | null, flags: number, licenses: string[]]
-
-export interface PackageRecord {
-    type: string
-    namespace: string | null
-    name: string
-    description: string | null
-    homepage_url: string | null
-    repo_url: string | null
-    licenses: string[]
-    latest: {version: string, released_at: string | null} | null
-    latest_prerelease: {version: string, released_at: string | null} | null
-    /** Every version the registry has, never a subset, ordered released_at asc (nulls first). */
-    versions: CompactVersion[]
-    /** The latest instant the registry itself vouched for these facts (a fetch, or a maven/cargo 304). */
-    as_of: string | null
-    source: string
-    fetched_at: string
-    /** The latest instant the server can show these facts matched the registry; what `max_age` is measured from. */
-    confirmed_at?: string | null
-}
+// The wire shape of one package is core's, the same definition the server sends.
+export {VERSION_FLAG_PRERELEASE, VERSION_FLAG_YANKED, type CompactVersion, type PackageRecord} from '@depinder/core'
 
 export interface FeedRecord {
     mode: 'feed' | 'poll'

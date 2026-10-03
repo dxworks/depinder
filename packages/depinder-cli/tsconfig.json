@@ -1,13 +1,15 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES6", "ES2015", "DOM", "ESNext.String", "ES2021.String"],
-    "module": "commonjs",
+    "lib": ["ES2023", "DOM"],
+    // esbuild builds the CommonJS bundle; tsc only checks, resolving @depinder/core's ESM `exports` as a bundler does
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    // Typecheck and tests read @depinder/core from its TypeScript sources; the build reads its dist
+    "customConditions": ["depinder-source"],
     "types": ["node", "vitest/globals"],
     "rootDir": ".",
-    "noEmit": true,
-    // vitest's declarations need a newer module resolution than CommonJS's; tsconfig.build.json checks src with library checks on
-    "skipLibCheck": true
+    "noEmit": true
   },
   "include": ["src", "__tests__"]
 }

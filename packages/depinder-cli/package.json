@@ -43,12 +43,14 @@
     "moment": "^2.30.0",
     "node-fetch": "^2.7.0",
     "npm-registry-fetch": "^19.0.0",
+    "packageurl-js": "^2.0.1",
     "semver": "^7.7.0",
     "spdx-correct": "^3.1.1",
     "spdx-license-ids": "^3.0.10",
     "winston": "^3.17.0"
   },
   "devDependencies": {
+    "@depinder/core": "0.0.0",
     "@types/cli-progress": "^3.11.0",
     "@types/dockerode": "^4.0.0",
     "@types/fs-extra": "^11.0.0",
