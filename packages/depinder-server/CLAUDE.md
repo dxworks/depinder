@@ -47,6 +47,10 @@ npm run bench -- --target dev --label <name>
 npm run bench:compare -- bench/runs/<A> bench/runs/<B>
 ```
 
+Every registry bug gets a fixture case (`npm run record-fixture-case -w @depinder/core`): the
+parity test (`packages/parity`, `npx nx test-parity parity` with TEST_DATABASE_URL) then guards
+this server and the CLI's fallback at once.
+
 Starting depinder-pg: [docs/development.md](docs/development.md). Bench targets, cells and
 output: the root `bench/README.md`. Run typecheck, lint, both test runs and the build before every
 commit. The local stack runs from this folder: `docker compose up -d` (env from `.env` here).

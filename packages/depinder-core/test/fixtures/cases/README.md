@@ -15,3 +15,7 @@ Check the pattern is still present in the new recording before committing: regis
 Replay a case offline with `replayFetch(loadFixtureCase(dir))` from `@depinder/core/testing`; it
 answers only the recorded URLs and rejects anything else. `test/fixture-cases.test.ts` replays
 every case through `fetchPackage`.
+
+The parity test (`packages/parity`) takes every case down both roads, the server's and the CLI
+fallback's, and needs nothing else: a new case is covered the moment it is committed. Every
+registry bug gets one.
