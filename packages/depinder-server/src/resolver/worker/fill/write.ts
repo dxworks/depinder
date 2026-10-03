@@ -2,7 +2,7 @@ import type {Config} from '../../config.js'
 import type {Db, Queryable} from '../../db/db.js'
 import type {ResolverEvents} from '../../events.js'
 import type {FetchRecord} from '../../registries/http.js'
-import {versionPurl, type FetchedVersion, type Logger, type ParsedPurl, type ResolvedPackage} from '@depinder/core'
+import {distinctVersions, type Logger, type ParsedPurl, type ResolvedPackage} from '@depinder/core'
 import {CHANNEL_SETTLED} from '../../db/notify.js'
 import type {FetchQueueRow} from '../../db/rows.js'
 import {insertFetchLog} from '../../db/fetch-log.js'
@@ -187,7 +187,8 @@ async function replaceVersions(
     source: string,
     fetchedAt: Date,
 ): Promise<void> {
-    const rows = versionRows(key, fetched)
+    // Deduplicated as the wire is: `on conflict do update` refuses to touch a row twice in one statement.
+    const rows = distinctVersions(key.packageKey, fetched.versions)
     const parts = chunk(rows, VERSION_CHUNK)
     if (parts.length === 0) {
         // A registry that now lists no versions at all: nothing to upsert, so the delete goes alone.
@@ -216,28 +217,6 @@ async function replaceVersions(
         if (i === 0) params.push(rows.map(r => r.purl))
         await tx.query(versionsSql(i === 0), params)
     }
-}
-
-/** A version with the purl it is stored under. */
-interface VersionRow extends FetchedVersion {
-    purl: string
-}
-
-/**
- * The rows for one package, deduplicated by purl. A registry can list the same version twice, and
- * `on conflict do update` refuses to touch a row twice in one statement; the delete-then-insert
- * this replaced let the second one fall through `do nothing`, so the first still wins.
- */
-function versionRows(key: ParsedPurl, fetched: ResolvedPackage): VersionRow[] {
-    const rows: VersionRow[] = []
-    const seen = new Set<string>()
-    for (const version of fetched.versions) {
-        const purl = versionPurl(key.packageKey, version.version)
-        if (seen.has(purl)) continue
-        seen.add(purl)
-        rows.push({...version, purl})
-    }
-    return rows
 }
 
 /** {@link replaceVersions}'s statement, with the stale delete on the front for the first chunk. */

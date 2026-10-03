@@ -42,11 +42,13 @@ export {mavenMetadataUrl} from './registries/maven/index.js'
 export {stringOrUndefined, toDate} from './registries/normalise.js'
 export type {FetchContext, FetchedPackage, FetchedVersion, ResolvedPackage} from './registries/types.js'
 export {
+    distinctVersions,
     toPackageRecord,
     VERSION_FLAG_PRERELEASE,
     VERSION_FLAG_YANKED,
     versionPointer,
     type CompactVersion,
+    type DistinctVersion,
     type PackageRecord,
     type VersionPointer,
 } from './wire/package-record.js'

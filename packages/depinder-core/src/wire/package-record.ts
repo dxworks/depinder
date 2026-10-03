@@ -96,23 +96,39 @@ export function toPackageRecord(
     }
 }
 
+/** A version with the purl it is stored and served under. */
+export interface DistinctVersion extends FetchedVersion {
+    purl: string
+}
+
 /**
- * The versions as tuples: one per distinct version purl (the first listing wins, as when stored),
- * undated first, then by release date, then by version.
+ * One version per distinct version purl, in the registry's order: a registry can list the same
+ * version twice, and the first listing wins. The server stores these rows; the wire sends them.
+ */
+export function distinctVersions(packageKey: string, versions: readonly FetchedVersion[]): DistinctVersion[] {
+    const rows: DistinctVersion[] = []
+    const seen = new Set<string>()
+    for (const version of versions) {
+        const purl = versionPurl(packageKey, version.version)
+        if (seen.has(purl)) continue
+        seen.add(purl)
+        rows.push({...version, purl})
+    }
+    return rows
+}
+
+/**
+ * The versions as tuples, one per {@link distinctVersions}: undated first, then by release date,
+ * then by version in code-point order (the server's read sorts with `collate "C"` to match).
  */
 export function compactVersions(
     packageKey: string,
     versions: readonly FetchedVersion[],
     packageLicenses: readonly string[],
 ): CompactVersion[] {
-    const seen = new Set<string>()
-    const distinct = versions.filter(v => {
-        const purl = versionPurl(packageKey, v.version)
-        if (seen.has(purl)) return false
-        seen.add(purl)
-        return true
-    })
-    return distinct.sort(byReleaseThenVersion).map(v => compactVersion(v, packageLicenses))
+    return distinctVersions(packageKey, versions)
+        .sort(byReleaseThenVersion)
+        .map(v => compactVersion(v, packageLicenses))
 }
 
 function compactVersion(v: FetchedVersion, packageLicenses: readonly string[]): CompactVersion {
