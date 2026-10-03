@@ -12,6 +12,7 @@ import {log} from '../utils/logging'
 import {CacheMaxAgeOptions, cacheMaxAgeSeconds, formatDuration, freshnessCutoffMs} from '../cache/max-age'
 import {createRegistryFallback, RegistryFallback} from '../fallback/registry-fallback'
 import {REGISTRY_LIMITS_ENV, resolveRegistryLimits} from '../fallback/registry-limits'
+import {logLookupFailure, refetchLookupName} from '../fallback/lookup-name'
 
 export interface UpdateOptions extends CacheMaxAgeOptions {
     /** `npm=16,cargo=1:1000`: per-ecosystem registry limits over `DEPINDER_REGISTRY_LIMITS` and the defaults. */
@@ -81,7 +82,8 @@ async function updateLibrariesFor(selectedPlugins: Plugin[], idsToUpdate: string
         const prefixLength = ecosystemOf(plugin).length + 1
         await mapWithConcurrency(ids, registries.packagesAtOnce(type), async id => {
             const libraryName = id.substring(prefixLength)
-            await updateLibrary(plugin, {type, name: libraryName}, id, registries)
+            const lookupName = refetchLookupName(type, libraryName, sharedCacheDb().getLib(id)?.name)
+            await updateLibrary(plugin, {type, name: lookupName}, id, registries)
             progressBar.increment({library: libraryName, plugin: plugin.name})
         })
     }))
@@ -93,7 +95,6 @@ async function updateLibrary(plugin: Plugin, pkg: {type: string, name: string}, 
         await attachGithubAdvisories(lib, plugin)
         sqliteCache.set(id, lib)
     } catch (e: any) {
-        log.warn(`Exception getting remote info for ${pkg.name}`)
-        log.error(e)
+        logLookupFailure(pkg.name, ecosystemOf(plugin), e)
     }
 }

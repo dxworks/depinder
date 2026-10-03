@@ -45,6 +45,7 @@ import {PackageRecord, ResolvedEntry, resetResolverClient, resolvePurls} from '.
 import {toLibraryInfo} from '../resolver/adapter'
 import {createRegistryFallback, isRateLimit, RegistryFallback} from '../fallback/registry-fallback'
 import {REGISTRY_LIMITS_ENV, resolveRegistryLimits} from '../fallback/registry-limits'
+import {fallbackLookupName, logLookupFailure} from '../fallback/lookup-name'
 import {fixedReportNow, REPORT_NOW_ENV, reportNow} from '../utils/report-clock'
 import {usesVulnServer, vulnServerConfig, VulnServerConfig} from '../vuln-sources/server'
 import {
@@ -1035,7 +1036,7 @@ export async function runAnalysis(
                             fetch = (async () => {
                                 let fetched: LibraryInfo
                                 try {
-                                    fetched = await registries.lookup({type: registryType, name: dep.name})
+                                    fetched = await registries.lookup({type: registryType, name: fallbackLookupName(dep)})
                                 } catch (e: any) {
                                     if (!isRateLimit(e)) session.misses.set(cacheKey)
                                     throw e
@@ -1055,8 +1056,7 @@ export async function runAnalysis(
                     dep.vulnerabilities = resolveVulnerabilities(project, dep, lib)
                 } catch (e: any) {
                     count('registry:error')
-                    log.warn(`Exception getting remote info for ${dep.name}`)
-                    log.error(e)
+                    logLookupFailure(dep.name, ecosystemOf(plugin), e)
                 } finally {
                     depProgressBar.increment()
                     depsWithInfo++
