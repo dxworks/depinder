@@ -1,4 +1,4 @@
-import {LibraryInfo} from '../extension-points/registrar'
+import {LibraryInfo} from '../extension-points/library-info'
 import {type PackageRecord, VERSION_FLAG_YANKED} from '@depinder/core'
 
 /**

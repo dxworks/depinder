@@ -1,4 +1,4 @@
-import {LibraryInfo} from '../extension-points/registrar'
+import {LibraryInfo} from '../extension-points/library-info'
 
 export interface Cache {
     get: (key: string) => LibraryInfo | Promise<LibraryInfo> | undefined | any

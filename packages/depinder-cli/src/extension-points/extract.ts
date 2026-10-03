@@ -1,5 +1,5 @@
 import {SemVer} from 'semver'
-import {LibraryInfo} from './registrar'
+import {LibraryInfo} from './library-info'
 import {Vulnerability} from './vulnerability-checker'
 
 export interface Extractor {

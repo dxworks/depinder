@@ -2,7 +2,7 @@ import {DatabaseSync} from 'node:sqlite'
 import fs from 'fs'
 import path from 'path'
 import {Cache} from './cache'
-import {LibraryInfo} from '../extension-points/registrar'
+import {LibraryInfo} from '../extension-points/library-info'
 import {depinderFolder} from '../utils/utils'
 
 /**
@@ -106,7 +106,7 @@ export class CacheDb {
 
     /**
      * Writes the entry under `key`, stamped `updatedAt`: when its facts were last confirmed against
-     * the registry (epoch milliseconds). Now, for a registrar fetch or `update`; the server's
+     * the registry (epoch milliseconds). Now, for a registry fetch or `update`; the server's
      * `confirmed_at` for a resolver answer, which may be older than the run's cutoff — such a row is
      * written already expired, and the next run asks for it again.
      */

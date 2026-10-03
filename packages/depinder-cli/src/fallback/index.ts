@@ -4,4 +4,4 @@
 export {fetchLibraryInfo, type FallbackDeps, type FallbackPackage, type FallbackResult} from './fetch-library-info'
 export {createRegistryClients, type RegistryClients, type RegistryClientsOptions} from './registry-clients'
 export {toLibraryInfo} from '../resolver/adapter'
-export type {LibraryInfo} from '../extension-points/registrar'
+export type {LibraryInfo} from '../extension-points/library-info'

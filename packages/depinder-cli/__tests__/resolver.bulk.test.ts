@@ -7,7 +7,7 @@ import {Cache} from '../src/cache/cache'
 import {resetSharedCacheDb, sharedCacheDb, sqliteCacheWithCutoff} from '../src/cache/sqlite-cache'
 import {freshnessCutoffMs} from '../src/cache/max-age'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
-import {LibraryInfo} from '../src/extension-points/registrar'
+import {LibraryInfo} from '../src/extension-points/library-info'
 import {Plugin} from '../src/extension-points/plugin'
 import {ItemHandler, PackageRecord, ResolvedEntry} from '../src/resolver/client'
 import {ResolverConfig} from '../src/resolver/config'
@@ -23,7 +23,7 @@ const advisories = getVulnerabilitiesFromGithub as Mock
 /**
  * Phase 2 of `analyse`: one question per purl for the whole process, and an answer that lands in
  * the local cache under the keys phase 3 looks them up by. Everything this phase gets right shows up downstream as
- * a cache hit — which is exactly how the registrar stops being called — so these tests assert on
+ * a cache hit — which is exactly how the registry fallback stops being called — so these tests assert on
  * the cache and on what was asked for, not on the dependencies, which the phase never touches.
  */
 
@@ -61,7 +61,6 @@ function plugin(name: string, ecosystem: string, purlType: string, advisoryEcosy
         name,
         ecosystem,
         extractor: {files: [], createContexts: () => []},
-        registrar: {retrieve: () => { throw new Error('the registrar must not be called in phase 2') }},
         checker: {
             githubSecurityAdvisoryEcosystem: advisoryEcosystem,
             getPURL: (lib, ver) => `pkg:${purlType}/${lib.replace(':', '/').replace('@', '%40')}@${ver}`,
@@ -270,7 +269,7 @@ describe('the bulk resolve phase', () => {
         expect(server.asked[0]).toEqual(['pkg:npm/left-pad@1.0.0'])
     })
 
-    it('writes nothing for pending, not_found or invalid, so they fall back to the registrar', async () => {
+    it('writes nothing for pending, not_found or invalid, so they fall back to the registries', async () => {
         const cache = fakeCache()
         const projects: PluginProjects[] = [{
             plugin: npm,
@@ -305,7 +304,7 @@ describe('the bulk resolve phase', () => {
         expect([...outcome.written]).toEqual(['npm:old-pkg'])
         expect(await kept.has('npm:old-pkg')).toBe(true)
 
-        // --refresh asked for nothing older than the run: the registrar gets it instead.
+        // --refresh asked for nothing older than the run: the registries get it instead.
         resetBulkResolve()
         const refreshed = fakeCache()
         const refreshOutcome = await bulkResolve(config, projects(), refreshed, {refresh: true}, resolve)
@@ -329,7 +328,7 @@ describe('the bulk resolve phase', () => {
     /**
      * A resolved package is a cache hit in phase 3, and a cache hit has never fetched advisories —
      * so without this the bulk phase would empty the vulnerability columns for everything the
-     * resolver answered on a cold run. Parity with the registrar path, at the same cost:
+     * resolver answered on a cold run. Parity with the registry path, at the same cost:
      * one GraphQL call per cache key, which is what that cold run pays today.
      */
     describe('the GitHub advisory lookup', () => {
@@ -749,7 +748,7 @@ describe('the bulk resolve phase', () => {
             expect(second.requested).toBe(1)
             // The first source's object, handed to the second's phase 3 as it is.
             expect(second.libs.get('npm:old-pkg')).toBe(first.libs.get('npm:old-pkg'))
-            // Asked and pending: nothing to reuse, so it is the registrars' in phase 3.
+            // Asked and pending: nothing to reuse, so it is the registries' in phase 3.
             expect(second.libs.has('npm:cold-pkg')).toBe(false)
             // Not written again: nothing new was learned about it.
             expect(second.written.has('npm:old-pkg')).toBe(false)
@@ -936,7 +935,7 @@ describe('the bulk resolve phase with a cache max age', () => {
         expect(confirmedAtMs('yesterday-ish', now)).toBe(0)
     })
 
-    it('leaves an expired row untouched when the resolver cannot answer, for the registrar to try', async () => {
+    it('leaves an expired row untouched when the resolver cannot answer, for the registries to try', async () => {
         cachedAgo('npm:left-pad', 2 * 86_400_000)
         const before = sharedCacheDb().libUpdatedAt('npm:left-pad')
         const cache = sqliteCacheWithCutoff(freshnessCutoffMs(86_400))

@@ -1,7 +1,7 @@
 import {registryFallbackWith} from '../src/fallback/registry-fallback'
 import {librariesIoFallback, LibrariesIoFallback} from '../src/fallback/libraries-io'
 import {FallbackPackage, FallbackResult} from '../src/fallback/fetch-library-info'
-import {LibraryInfo} from '../src/extension-points/registrar'
+import {LibraryInfo} from '../src/extension-points/library-info'
 
 const library = (name: string, description: string): LibraryInfo => ({name, description, licenses: [], versions: []})
 const LIBRARIES_IO_TYPES = ['maven', 'pypi', 'nuget', 'composer']
@@ -86,5 +86,31 @@ describe('librariesIoFallback', () => {
 
         delete process.env.LIBRARIES_IO_API_KEY
         expect(LIBRARIES_IO_TYPES.some(it => librariesIoFallback().covers(it))).toBe(false)
+    })
+
+    it('asks Libraries.io under its platform name and maps the project to a LibraryInfo', async () => {
+        process.env.LIBRARIES_IO_API_KEY = 'test-key'
+        const project = {
+            versions: [{number: '1.0.0', published_at: '2020-01-01T00:00:00Z'}, {number: '2.0.0', published_at: '2021-01-01T00:00:00Z'}],
+            latest_release_number: '2.0.0', description: 'logging', licenses: 'MIT',
+            homepage: 'https://example.org', repository_url: 'https://github.com/example/log', keywords: ['log'],
+        }
+        const fetchMock = vi.fn(async (_url: string) => ({json: async () => project}))
+        vi.stubGlobal('fetch', fetchMock)
+        try {
+            const info = await librariesIoFallback().retrieve('composer', 'example/log')
+            expect(fetchMock.mock.calls[0][0]).toMatch(/^https:\/\/libraries\.io\/api\/packagist\/example\/log\?api_key=/)
+            expect(info).toEqual({
+                name: 'example/log',
+                versions: [
+                    {version: '1.0.0', timestamp: Date.parse('2020-01-01T00:00:00Z'), latest: false, licenses: []},
+                    {version: '2.0.0', timestamp: Date.parse('2021-01-01T00:00:00Z'), latest: true, licenses: []},
+                ],
+                description: 'logging', licenses: ['MIT'], homepageUrl: 'https://example.org',
+                keywords: ['log'], reposUrl: ['https://github.com/example/log'],
+            })
+        } finally {
+            vi.unstubAllGlobals()
+        }
     })
 })

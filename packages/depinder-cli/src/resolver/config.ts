@@ -4,7 +4,7 @@ import {log} from '../utils/logging'
  * Where the bulk purl resolver lives, and how long a run is willing to wait for it.
  *
  * The resolver is opt-in and never required: with no URL configured, `analyse` behaves exactly as
- * it did before — every dependency goes through its plugin's registrar chain. Same shape as
+ * it did before — every dependency goes through the registry fallback. Same shape as
  * `--profile` (`utils/profile.ts`): a flag, an environment variable behind it, and nothing else.
  */
 
@@ -79,7 +79,7 @@ function chunkConcurrencyFromEnv(): number {
 }
 
 /**
- * The resolver to use for this run, or `undefined` for "no resolver, registrars only".
+ * The resolver to use for this run, or `undefined` for "no resolver, registry fallback only".
  *
  * Disabled — without failing the run — when `--no-resolver` is given, when no URL is configured,
  * or when a URL is configured but `DEPINDER_RESOLVER_TOKEN` is not. The last case warns: it is a

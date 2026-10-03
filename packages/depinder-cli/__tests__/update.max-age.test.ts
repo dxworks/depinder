@@ -3,7 +3,7 @@ import os from 'os'
 import path from 'path'
 import {updateLibs} from '../src/commands/update'
 import {resetSharedCacheDb, sharedCacheDb} from '../src/cache/sqlite-cache'
-import {LibraryInfo} from '../src/extension-points/registrar'
+import {LibraryInfo} from '../src/extension-points/library-info'
 
 const lookup = vi.fn(async ({name}: {type: string, name: string}): Promise<LibraryInfo> => ({name, description: 'updated', licenses: [], versions: []}))
 

@@ -3,7 +3,7 @@ import {convertDepToRow} from '../src/commands/analyse'
 import {operationalRisk} from '../src/blackduck/risk'
 import {fixedReportNow, parseReportNow, REPORT_NOW_ENV, reportNow} from '../src/utils/report-clock'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
-import {LibraryInfo} from '../src/extension-points/registrar'
+import {LibraryInfo} from '../src/extension-points/library-info'
 
 const saved = process.env[REPORT_NOW_ENV]
 afterEach(() => {

@@ -3,7 +3,7 @@ import os from 'os'
 import path from 'path'
 import {Cache, noCache} from '../src/cache/cache'
 import {openCacheDb, resetSharedCacheDb, sqliteCache} from '../src/cache/sqlite-cache'
-import {LibraryInfo} from '../src/extension-points/registrar'
+import {LibraryInfo} from '../src/extension-points/library-info'
 
 /**
  * The enrichment loop checkpoints the cache every 60 seconds so a crash loses at most that much

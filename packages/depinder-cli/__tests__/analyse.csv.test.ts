@@ -2,7 +2,7 @@ import {parse} from 'csv-parse/sync'
 import {convertDepToRow} from '../src/commands/analyse'
 import {csvRow} from '../src/utils/csv'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
-import {LibraryInfo} from '../src/extension-points/registrar'
+import {LibraryInfo} from '../src/extension-points/library-info'
 
 /**
  * Rows were built by raw interpolation, with only the vuln-details and licence cells quoted. Maven

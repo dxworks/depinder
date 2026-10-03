@@ -1,4 +1,4 @@
-import {LibraryInfo} from '../extension-points/registrar'
+import {LibraryInfo} from '../extension-points/library-info'
 import {log} from '../utils/logging'
 import {fetchLibraryInfo, FallbackPackage, FallbackResult} from './fetch-library-info'
 import {librariesIoFallback, LibrariesIoFallback} from './libraries-io'

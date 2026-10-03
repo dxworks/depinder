@@ -1,5 +1,5 @@
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
-import {availableVersions} from '../extension-points/registrar'
+import {availableVersions} from '../extension-points/library-info'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {ecosystemForPurlType} from '../vuln-sources/github/ecosystems'
 import {comparatorFor, VersionComparator} from '../vuln-sources/github/versions'

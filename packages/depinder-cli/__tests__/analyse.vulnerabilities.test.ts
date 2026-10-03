@@ -1,6 +1,6 @@
 import {advisoriesMatchingVersion, resolveVulnerabilities} from '../src/commands/analyse'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
-import {LibraryInfo} from '../src/extension-points/registrar'
+import {LibraryInfo} from '../src/extension-points/library-info'
 import {Vulnerability} from '../src/extension-points/vulnerability-checker'
 
 function vuln(vulnerableRange?: string): Vulnerability {

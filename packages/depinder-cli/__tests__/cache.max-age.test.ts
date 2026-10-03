@@ -13,7 +13,7 @@ import {openCacheDb, resetSharedCacheDb, sharedCacheDb, sqliteCacheWithCutoff} f
 import {missCache} from '../src/cache/misses'
 import {CacheSession, runAnalysis} from '../src/commands/analyse'
 import {cacheInfoAction} from '../src/commands/cache'
-import {LibraryInfo} from '../src/extension-points/registrar'
+import {LibraryInfo} from '../src/extension-points/library-info'
 import {DepinderDependency} from '../src/extension-points/extract'
 import {Plugin} from '../src/extension-points/plugin'
 import {log} from '../src/utils/logging'
@@ -240,7 +240,6 @@ describe('cached packages expire', () => {
                         dependencies: {'left-pad@1.0.0': leftPad},
                     }),
                 },
-                registrar: {retrieve: () => { throw new Error('analyse must not call the plugin registrar') }},
             }
         }
 

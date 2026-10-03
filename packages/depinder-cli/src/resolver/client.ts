@@ -6,7 +6,7 @@ import {ResolverConfig} from './config'
 /**
  * The client for `POST {url}/resolve`.
  *
- * One call answers thousands of purls, which is the whole point: the per-package registrar chain
+ * One call answers thousands of purls, which is the whole point: the per-package registry fallback
  * costs one upstream request per library, the resolver costs one request per 2000 of them. What it
  * cannot answer — a package it has never seen and did not fetch in time (`pending`), one the
  * registry does not have (`not_found`), an unparseable purl (`invalid`) — falls through to that
@@ -21,13 +21,13 @@ import {ResolverConfig} from './config'
  *
  * Every chunk of an ask is posted at once, under one deadline, and each is posted exactly once.
  * There are no retries: whatever has not answered by the deadline — or at all, because the post
- * failed — goes to the registrar chain, and a failed post turns the resolver off for the rest of
+ * failed — goes to the registry fallback, and a failed post turns the resolver off for the rest of
  * the process.
  */
 
 /**
  * `error` is the server's fifth status: it could not read the registry after three tries. Like
- * `not_found` and `invalid` it carries no package, so it falls through to the registrar chain —
+ * `not_found` and `invalid` it carries no package, so it falls through to the registry fallback —
  * but it has to be counted, or the summary line silently loses purls.
  *
  * `refreshing` is a package the server holds but has not confirmed within the `max_age` it was
@@ -98,7 +98,7 @@ type Logger = Pick<typeof defaultLog, 'info' | 'warn'>
 /**
  * "The server is not answering" is a property of the run, not of one chunk: once a call has failed,
  * nothing more is asked of the server in this process — every later ask is skipped rather than
- * paying the timeout again, and its purls go to the registrar chain.
+ * paying the timeout again, and its purls go to the registry fallback.
  */
 let unavailable = false
 let warned = false
@@ -234,7 +234,7 @@ type PostOutcome =
  * Never throws: a status, a network error, a malformed line and a body that stops before the
  * trailer all come back as an outcome, with every item that did arrive already handed to `onLine`.
  * Each line is a complete, final fact about its package, so a stream cut short is not discarded —
- * only the purls nobody answered for go to the registrars.
+ * only the purls nobody answered for go to the registry fallback.
  */
 async function postOnce(
     config: ResolverConfig,
@@ -338,7 +338,7 @@ export async function resolvePurls(
      *
      * There is no retry, of any kind. Every line that arrived is kept — each is the last word on its
      * package — and a purl no line answered is simply not in the map, so the caller sends it to the
-     * registrar chain. Asking the server again bought little and cost a lot: the retry went out with
+     * registry fallback. Asking the server again bought little and cost a lot: the retry went out with
      * what was left of the deadline, so it rarely had time to fetch anything new, and it queued on
      * the same narrow server the first post had just failed on.
      *

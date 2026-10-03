@@ -1,5 +1,5 @@
 import {canFetch, fetchPackage, fromRegistryName, nullLogger, toPackageRecord, type Logger} from '@depinder/core'
-import {LibraryInfo} from '../extension-points/registrar'
+import {LibraryInfo} from '../extension-points/library-info'
 import {toLibraryInfo} from '../resolver/adapter'
 import {RegistryClients} from './registry-clients'
 

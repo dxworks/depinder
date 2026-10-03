@@ -7,7 +7,7 @@ import {log} from '../utils/logging'
  * against the registry: when depinder fetched them itself, the moment it wrote the row; when the
  * resolver answered, the server's own `confirmed_at`, which can be much older. A row confirmed at or
  * after the run's cutoff (`run start − max age`) is fresh and answered locally; an older one is
- * expired: it is asked for again — the resolver in bulk first, then the registrar — and whatever
+ * expired: it is asked for again — the resolver in bulk first, then the registry — and whatever
  * answers rewrites it. An expired row that nothing answers for is treated exactly like a row that
  * was never cached.
  *

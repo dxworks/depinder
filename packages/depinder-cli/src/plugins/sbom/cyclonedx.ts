@@ -92,15 +92,15 @@ export function projectNameOf(bom: CycloneDxBom, sbomFile: string): string {
 /** A parsed purl, reduced to what depinder's model needs. */
 export interface ParsedPurl {
     type: string  // maven, npm, gem, pypi, nuget, composer, ...
-    name: string  // normalised to the name the matching registrar expects
+    name: string  // normalised to the name the registry fallback expects
     version: string
 }
 
 /**
  * Parses a Package URL into the (type, name, version) triple depinder needs.
  *
- * The name must match what the ecosystem's registrar expects or lookups silently return nothing:
- *  - maven wants `groupId:artifactId` (MavenCentralRegistrar splits on ':')
+ * The name must match what the registry fallback expects or lookups silently return nothing:
+ *  - maven wants `groupId:artifactId` (core splits it on ':')
  *  - npm wants the scope preserved as `@scope/name`
  *  - everything else uses the bare name
  *
