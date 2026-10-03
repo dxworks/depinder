@@ -83,8 +83,8 @@ export function commonsHandler(overrides: Record<string, () => Response> = {}): 
     return url => routes[url]?.() ?? body('not found', 404)
 }
 
-export function context(mavenPerVersionLicenses = false): FetchContext {
-    return testContext(records, undefined, mavenPerVersionLicenses)
+export function context(): FetchContext {
+    return testContext(records)
 }
 
 export function headersOf(call: Call | undefined): Record<string, string> {

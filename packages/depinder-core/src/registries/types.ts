@@ -49,11 +49,6 @@ export interface FetchContext {
     /** Timeout, User-Agent and the caller's per-ecosystem limiter. Never call `fetch`. */
     http: HttpClient
     log: Logger
-    options: RegistryOptions
-}
-
-export interface RegistryOptions {
-    mavenPerVersionLicenses: boolean
 }
 
 // [10] THE CONTRACT [7] calls (its feed half is the server's `Registry`). Next [11], the server's registries/types.ts.

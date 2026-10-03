@@ -292,11 +292,7 @@ async function processRow(row: FetchQueueRow, job: JobContext, urgency: Urgency 
     const startedAt = new Date()
 
     try {
-        const fetched = await fetchPackage(key, {
-            http,
-            log,
-            options: {mavenPerVersionLicenses: job.config.mavenPerVersionLicenses},
-        })
+        const fetched = await fetchPackage(key, {http, log})
         await writeResult(job, row, key, fetched, records, startedAt)
         log.debug(fetched ? 'resolved' : 'not found', {versions: fetched?.versions.length ?? 0})
     } catch (e) {

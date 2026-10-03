@@ -22,13 +22,12 @@ export interface SeenRequest extends RequestEvent {
 }
 
 /** A context whose client tells `seen` about every request, with an open limiter of its own. */
-export function testContext(seen: SeenRequest[], log: Logger = nullLogger, mavenPerVersionLicenses = false): FetchContext {
+export function testContext(seen: SeenRequest[], log: Logger = nullLogger): FetchContext {
     return {
         http: createHttpClient({
             limiter: createLimiter({concurrency: 8, minIntervalMs: 0}),
             onRequest: event => seen.push({...event, source: new URL(event.url).host}),
         }),
         log,
-        options: {mavenPerVersionLicenses},
     }
 }

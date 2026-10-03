@@ -83,7 +83,6 @@ the data is in Supabase.
 | `RESOLVER_API_TOKEN` | API token, `openssl rand -hex 32`. depinder uses it as `DEPINDER_RESOLVER_TOKEN` |
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` |
 | `FETCH_CONCURRENCY` | Registry fetches at once (64) |
-| `MAVEN_PER_VERSION_LICENSES` | `false`; `true` fetches a POM per maven version |
 | `PAYLOAD_CACHE_MAX_PACKAGES` | Packages cached in memory (50000; 0 = off) |
 | `VULN_MAX_SCANS` | Scans at once (1 on a 4 GB server) |
 | `VULN_MAX_QUEUED` | Requests waiting for a scan before 503 |

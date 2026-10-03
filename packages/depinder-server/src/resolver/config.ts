@@ -22,8 +22,6 @@ export interface Config {
     role: Role
     port: number
     logLevel: LogLevel
-    /** Fetch a POM per maven version for per-version licenses. Off by default. */
-    mavenPerVersionLicenses: boolean
     /** How many package fetches the demand-fill worker keeps in flight at once. */
     fetchConcurrency: number
     /** Packages whose version tuples the api keeps in memory. 0 disables the cache. */
@@ -132,7 +130,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         role,
         port,
         logLevel,
-        mavenPerVersionLicenses: bool(env.MAVEN_PER_VERSION_LICENSES, false),
         fetchConcurrency,
         payloadCacheMaxPackages,
     }

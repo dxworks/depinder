@@ -62,7 +62,6 @@ export interface FetchContext {
     /** Timeout, User-Agent and the caller's per-ecosystem limiter. Never call `fetch`. */
     http: HttpClient
     log: Logger
-    options: RegistryOptions // { mavenPerVersionLicenses: boolean }
 }
 ```
 
@@ -97,8 +96,10 @@ The server's half, from `src/resolver/registries/types.ts`, is the `FeedSpec` de
   `./normalise.ts`. It flattens strings, `{type}` objects and arrays, and leaves SPDX expressions
   (`"MIT OR Apache-2.0"`) whole. `toDate` and `normaliseRepoUrl` are there for the same reason —
   so that eight registries agree on what a date and a repository URL look like.
-- When a registry has no per-version license (maven without `MAVEN_PER_VERSION_LICENSES`), fall
-  back to the library-level list rather than leaving versions empty.
+- When a registry has no per-version license (maven, while core's `MAVEN_PER_VERSION_LICENSES` is
+  off), fall back to the library-level list rather than leaving versions empty.
+- A setting that would change the facts (not just the speed) is never a per-side option: it is a
+  constant in core's `src/facts.ts`, the same for the CLI and this server.
 - `sources` is the host list, for provenance: `['repo1.maven.org']`, or
   `['proxy.golang.org', 'api.deps.dev']` when two hosts contributed.
 - `recheckAt` is for facts you know are not final yet and that no feed will tell you about when
@@ -253,7 +254,7 @@ The feed's tests are this server's `test/resolver/registries/<type>-feed.test.ts
 
 | type | facts | change detection |
 |---|---|---|
-| maven | `repo1.maven.org/maven2/<g/>/<a>/maven-metadata.xml`, directory listing for dates, `<a>-<v>.pom` for `<licenses>` with a parent walk (depth 5). Per-version POMs only when `ctx.options.mavenPerVersionLicenses`. Never search.maven.org. | poll: conditional GET on `maven-metadata.xml` (ETag + Last-Modified both present) |
+| maven | `repo1.maven.org/maven2/<g/>/<a>/maven-metadata.xml`, directory listing for dates, `<a>-<v>.pom` for `<licenses>` with a parent walk (depth 5). Per-version POMs only when core's `MAVEN_PER_VERSION_LICENSES` (off). Never search.maven.org. | poll: conditional GET on `maven-metadata.xml` (ETag + Last-Modified both present) |
 | pypi | `pypi.org/pypi/<name>/json`: `releases[v][0].upload_time_iso_8601`, `yanked`, `info.version`, license precedence `license_expression` > `license` > `License ::` classifier | feed: XML-RPC `changelog_since_serial(serial)` on `pypi.org/pypi` |
 | nuget | `api.nuget.org/v3/registration5-gz-semver2/<id-lower>/index.json` plus non-inlined pages: `catalogEntry.version/published/licenseExpression/licenseUrl/listed`. Cap the page fan-out. | feed: catalog `api.nuget.org/v3/catalog0/index.json`, cursor = `commitTimeStamp` |
 | composer | `repo.packagist.org/p2/<vendor>/<pkg>.json` and `~dev.json`, minified (expand per composer/metadata-minifier) | feed: `packagist.org/metadata/changes.json?since=<ts*10000>` |

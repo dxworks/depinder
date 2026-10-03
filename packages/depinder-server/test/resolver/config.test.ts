@@ -19,7 +19,6 @@ describe('loadConfig', () => {
             role: 'all',
             port: 8080,
             logLevel: 'info',
-            mavenPerVersionLicenses: false,
             fetchConcurrency: 64,
             payloadCacheMaxPackages: 50_000,
         })
@@ -50,7 +49,6 @@ describe('loadConfig', () => {
             ROLE: 'worker',
             PORT: '9000',
             LOG_LEVEL: 'debug',
-            MAVEN_PER_VERSION_LICENSES: 'true',
             FETCH_CONCURRENCY: '16',
             DATABASE_POOL_SIZE: '8',
             API_POOL_SIZE: '2',
@@ -62,7 +60,6 @@ describe('loadConfig', () => {
             role: 'worker',
             port: 9000,
             logLevel: 'debug',
-            mavenPerVersionLicenses: true,
             fetchConcurrency: 16,
             databasePoolSize: 8,
             apiPoolSize: 2,

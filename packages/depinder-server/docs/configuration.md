@@ -14,7 +14,6 @@ All of it is environment variables; `.env.example` is the annotated copy.
 | `ROLE` | `all` | `api` (HTTP only), `worker` (demand-fill + feeds only), `all` (both), `vuln` (the vulnerability server, no Postgres; its own settings are under [Vulnerabilities](vuln-server.md)) |
 | `PORT` | `8080` | |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
-| `MAVEN_PER_VERSION_LICENSES` | `false` | Fetch a POM per maven version. Off: per-version licenses fall back to the library-level list |
 | `FETCH_CONCURRENCY` | `64` | Package fetches the demand-fill worker keeps in flight at once. Just above what the per-ecosystem limiters add up to, so those stay the constraint |
 | `DATABASE_POOL_SIZE` | `15` | Postgres connections this process opens at most. The write side of a fill runs on these; about half `FETCH_CONCURRENCY` keeps every fetch slot moving |
 | `API_POOL_SIZE` | `8` | Of those, the api's own. Carved out of `DATABASE_POOL_SIZE`, so the worker gets the rest and the process still opens no more than the ceiling. `ROLE=all` only |

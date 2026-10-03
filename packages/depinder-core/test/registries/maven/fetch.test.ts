@@ -1,6 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import {parsePurl} from '../../../src/purl.js'
-import {mavenFetcher} from '../../../src/registries/maven/index.js'
+import {MAVEN_PER_VERSION_LICENSES} from '../../../src/facts.js'
+import {fetchMavenPackage, mavenFetcher} from '../../../src/registries/maven/index.js'
 import {artifactBase} from '../../../src/registries/maven/metadata.js'
 import {
     BASE,
@@ -186,7 +187,11 @@ describe('maven per-version licenses', () => {
     const pomFor = (license: string): string =>
         `<project><licenses><license><name>${license}</name></license></licenses></project>`
 
-    it('fetches a POM per version when the option is on', async () => {
+    it('is off: the fact is a constant, the same for every caller', () => {
+        expect(MAVEN_PER_VERSION_LICENSES).toBe(false)
+    })
+
+    it('fetches a POM per version when it is on', async () => {
         stubFetch(
             centralHandler({
                 [`${BASE}/r09/guava-r09.pom`]: () => body(pomFor('Apache 2')),
@@ -194,7 +199,7 @@ describe('maven per-version licenses', () => {
                 [`${BASE}/10.0-rc1/guava-10.0-rc1.pom`]: () => body('gone', 404),
             }),
         )
-        const result = await mavenFetcher.fetchPackage(parsePurl(GUAVA), context(true))
+        const result = await fetchMavenPackage(parsePurl(GUAVA), context(), true)
         const byVersion = new Map(result!.versions.map(v => [v.version, v]))
 
         expect(byVersion.get('r09')!.licenses).toEqual(['Apache 2'])

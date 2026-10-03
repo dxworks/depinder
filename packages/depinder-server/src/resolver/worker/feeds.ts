@@ -94,7 +94,6 @@ export async function runFeedOnce(registry: Registry, options: FeedWorkerOptions
     const ctx: FetchContext = {
         http: createRegistryClient({type: registry.type, recorder: record => records.push(record)}),
         log: options.log,
-        options: {mavenPerVersionLicenses: options.config.mavenPerVersionLicenses},
     }
 
     try {

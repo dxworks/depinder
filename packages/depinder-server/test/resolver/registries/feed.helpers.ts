@@ -13,7 +13,7 @@ export function warningsLogger(warnings: {msg: string; fields?: Record<string, u
 }
 
 export function feedContext(type: string, log: Logger = nullLogger): FetchContext {
-    return {http: createRegistryClient({type}), log, options: {mavenPerVersionLicenses: false}}
+    return {http: createRegistryClient({type}), log}
 }
 
 /** The feed-mode half of a spec, or a failed test when it is a poll. */
