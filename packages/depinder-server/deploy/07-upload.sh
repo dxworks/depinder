@@ -5,14 +5,14 @@
 # shortcut for compose with those files. To ship new code later: run this again, then 08-start.sh.
 source "$(dirname "$0")/lib.sh"
 
-# What the Dockerfile copies (it lists every workspace's package.json), plus the Caddyfile.
+# What the image is built from: the `!` allowlist of the root .dockerignore (so this list cannot
+# drift from the Dockerfile), plus the files compose needs next to it.
 SERVER=packages/depinder-server
-SOURCES=(package.json package-lock.json tsconfig.base.json .dockerignore
-  packages/depinder-cli/package.json bench/package.json
-  "$SERVER/package.json" "$SERVER/Dockerfile" "$SERVER/tsconfig.json" "$SERVER/tsconfig.build.json"
-  "$SERVER/src" "$SERVER/migrations" "$SERVER/Caddyfile")
-
 cd "$MONOREPO_DIR"
+SOURCES=(.dockerignore "$SERVER/Dockerfile" "$SERVER/Caddyfile")
+while IFS= read -r allowed; do SOURCES+=("$allowed"); done < <(sed -n 's/^!//p' .dockerignore)
+for source in "${SOURCES[@]}"; do [ -e "$source" ] || die "$source is in .dockerignore but missing"; done
+
 version="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 git diff --quiet HEAD -- "${SOURCES[@]}" 2>/dev/null || version="$version+dirty"
 

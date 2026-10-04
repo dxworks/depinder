@@ -15,7 +15,13 @@ if grep -qE "^Host[[:space:]]+$SERVER_SSH_ALIAS\$" ~/.ssh/config 2>/dev/null; th
   if [ "$configured" = "$SERVER_IP" ]; then
     echo "already in ~/.ssh/config"
   else
-    echo "WARNING: Host $SERVER_SSH_ALIAS in ~/.ssh/config points at $configured, not $SERVER_IP; fix it by hand"
+    # A new server: point the alias's HostName at it (only inside that Host block), keeping a backup.
+    cp ~/.ssh/config ~/.ssh/config.bak
+    awk -v alias="$SERVER_SSH_ALIAS" -v ip="$SERVER_IP" '
+      /^Host[[:space:]]/ { inside = ($2 == alias && NF == 2) }
+      inside && $1 == "HostName" { sub(/HostName[[:space:]]+.*/, "HostName " ip) }
+      { print }' ~/.ssh/config.bak > ~/.ssh/config
+    echo "Host $SERVER_SSH_ALIAS moved from $configured to $SERVER_IP (old config: ~/.ssh/config.bak)"
   fi
 else
   printf '\nHost %s\n  HostName %s\n  User root\n  IdentityFile %s\n  IdentitiesOnly yes\n' \

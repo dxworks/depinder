@@ -8,7 +8,8 @@ remote bash -s <<'REMOTE'
 set -euo pipefail
 echo 'PasswordAuthentication no' > /etc/ssh/sshd_config.d/00-hardening.conf
 sshd -t
-systemctl reload ssh
+# Ubuntu 24.04+ can run sshd from ssh.socket, where a plain reload fails while sshd is idle.
+systemctl reload-or-restart ssh
 sshd -T | grep -i '^passwordauthentication'
 REMOTE
 

@@ -7,7 +7,11 @@ if remote '[ -f /var/run/reboot-required ]'; then
   echo "rebooting $SERVER_IP"
   remote 'systemctl reboot' || true
   sleep 10
-  until remote true 2>/dev/null; do sleep 5; done
+  deadline=$((SECONDS + 300))
+  until remote true 2>/dev/null; do
+    [ $SECONDS -lt $deadline ] || die "no SSH 5 min after the reboot; check the Hetzner Console, then re-run this script"
+    sleep 5
+  done
   echo "back up"
 else
   echo "no reboot needed"
