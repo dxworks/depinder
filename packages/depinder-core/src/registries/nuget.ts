@@ -211,10 +211,13 @@ function entryLicenses(entry: CatalogEntry): string[] {
 /**
  * The library-level answer is the version a consumer would actually get: the highest stable one,
  * as `computeLatest` picks it — not the newest publish, which is often a servicing release of an
- * older major.
+ * older major. A package whose publisher unlisted every version (blazored.localstorage) still has
+ * a license: the highest unlisted version's.
  */
 function packageLicenses(versions: FetchedVersion[]): string[] {
-    const usable = versions.filter(v => !v.yanked && v.licenses.length > 0)
+    const anyListed = versions.some(v => !v.yanked)
+    const candidates = anyListed ? versions.filter(v => !v.yanked) : versions
+    const usable = candidates.filter(v => v.licenses.length > 0)
     const stable = usable.filter(v => !v.prerelease)
     return highest(stable.length > 0 ? stable : usable)?.licenses ?? []
 }

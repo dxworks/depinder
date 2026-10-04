@@ -176,6 +176,25 @@ describe('nuget fetchPackage', () => {
         expect(onlyUnlisted.homepageUrl).toBe('https://old.example/unlisted')
     })
 
+    describe('package licenses', () => {
+        const leaf = (version: string, listed: boolean, licenseExpression: string) =>
+            ({catalogEntry: {version, listed, licenseExpression, published: '1900-01-01T00:00:00Z'}}) as Parameters<typeof packageFromLeaves>[0][number]
+
+        it('takes the highest unlisted version\'s licenses when every version is unlisted', () => {
+            // Blazored.LocalStorage: all 41 versions unlisted, 4.5.0 declares MIT.
+            const result = packageFromLeaves([leaf('0.1.0', false, 'Apache-2.0'), leaf('4.5.0', false, 'MIT'), leaf('4.4.0', false, 'BSD-3-Clause')])
+
+            expect(result.licenses).toEqual(['MIT'])
+            expect(computeLatest('nuget', result.versions).latest).toBeUndefined()
+        })
+
+        it('ignores unlisted versions while any version is listed', () => {
+            const result = packageFromLeaves([leaf('1.0.0', true, 'Apache-2.0'), leaf('2.0.0', false, 'MIT')])
+
+            expect(result.licenses).toEqual(['Apache-2.0'])
+        })
+    })
+
     it('takes the library facts from the newest listed version and designates no latest', async () => {
         stubFetch(registration)
         const result = await nugetFetcher.fetchPackage(parsePurl('pkg:nuget/newtonsoft.json'), context())

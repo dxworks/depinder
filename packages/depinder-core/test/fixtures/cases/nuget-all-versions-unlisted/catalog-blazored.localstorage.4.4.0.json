@@ -1,0 +1,159 @@
+{
+  "@id": "https://api.nuget.org/v3/catalog0/data/2025.12.26.21.40.47/blazored.localstorage.4.4.0.json",
+  "@type": [
+    "PackageDetails",
+    "catalog:Permalink"
+  ],
+  "authors": "Chris Sainty",
+  "catalog:commitId": "c163755e-ff1d-402d-a350-9ed3eb84abf9",
+  "catalog:commitTimeStamp": "2025-12-26T21:40:47.6220637Z",
+  "copyright": "Copyright 2020 (c) Chris Sainty. All rights reserved.",
+  "created": "2023-08-14T07:45:26.003Z",
+  "description": "A library to provide access to local storage in Blazor applications",
+  "iconFile": "icon.png",
+  "id": "Blazored.LocalStorage",
+  "isPrerelease": false,
+  "lastEdited": "2025-12-26T21:40:42.863Z",
+  "licenseExpression": "MIT",
+  "licenseUrl": "https://licenses.nuget.org/MIT",
+  "listed": false,
+  "packageHash": "Lpv6af5urgk0sDIdrQJFLialcicI1kmipMQCGoqjVxaXWKkB2IN1r+Uy9Vk73T+BYjDXJd0ez+AHO4/T5pzw0w==",
+  "packageHashAlgorithm": "SHA512",
+  "packageSize": 83459,
+  "projectUrl": "https://github.com/Blazored/LocalStorage",
+  "published": "1900-01-01T00:00:00Z",
+  "repository": "",
+  "verbatimVersion": "4.4.0",
+  "version": "4.4.0",
+  "dependencyGroups": [
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.12.26.21.40.47/blazored.localstorage.4.4.0.json#dependencygroup/net6.0",
+      "@type": "PackageDependencyGroup",
+      "dependencies": [
+        {
+          "@id": "https://api.nuget.org/v3/catalog0/data/2025.12.26.21.40.47/blazored.localstorage.4.4.0.json#dependencygroup/net6.0/microsoft.aspnetcore.components.web",
+          "@type": "PackageDependency",
+          "id": "Microsoft.AspNetCore.Components.Web",
+          "range": "[6.0.0, )"
+        }
+      ],
+      "targetFramework": "net6.0"
+    },
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.12.26.21.40.47/blazored.localstorage.4.4.0.json#dependencygroup/net7.0",
+      "@type": "PackageDependencyGroup",
+      "dependencies": [
+        {
+          "@id": "https://api.nuget.org/v3/catalog0/data/2025.12.26.21.40.47/blazored.localstorage.4.4.0.json#dependencygroup/net7.0/microsoft.aspnetcore.components.web",
+          "@type": "PackageDependency",
+          "id": "Microsoft.AspNetCore.Components.Web",
+          "range": "[7.0.0, )"
+        }
+      ],
+      "targetFramework": "net7.0"
+    }
+  ],
+  "packageEntries": [
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.12.26.21.40.47/blazored.localstorage.4.4.0.json#Blazored.LocalStorage.nuspec",
+      "@type": "PackageEntry",
+      "compressedLength": 545,
+      "fullName": "Blazored.LocalStorage.nuspec",
+      "length": 1173,
+      "name": "Blazored.LocalStorage.nuspec"
+    },
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.12.26.21.40.47/blazored.localstorage.4.4.0.json#lib/net6.0/Blazored.LocalStorage.dll",
+      "@type": "PackageEntry",
+      "compressedLength": 12437,
+      "fullName": "lib/net6.0/Blazored.LocalStorage.dll",
+      "length": 30208,
+      "name": "Blazored.LocalStorage.dll"
+    },
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.12.26.21.40.47/blazored.localstorage.4.4.0.json#lib/net7.0/Blazored.LocalStorage.dll",
+      "@type": "PackageEntry",
+      "compressedLength": 12782,
+      "fullName": "lib/net7.0/Blazored.LocalStorage.dll",
+      "length": 31232,
+      "name": "Blazored.LocalStorage.dll"
+    },
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.12.26.21.40.47/blazored.localstorage.4.4.0.json#icon.png",
+      "@type": "PackageEntry",
+      "compressedLength": 44129,
+      "fullName": "icon.png",
+      "length": 44398,
+      "name": "icon.png"
+    },
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.12.26.21.40.47/blazored.localstorage.4.4.0.json#.signature.p7s",
+      "@type": "PackageEntry",
+      "compressedLength": 11513,
+      "fullName": ".signature.p7s",
+      "length": 11513,
+      "name": ".signature.p7s"
+    }
+  ],
+  "tags": [
+    "Blazored",
+    "Blazor",
+    "Razor",
+    "Components",
+    "LocalStorage",
+    "Local",
+    "Storage",
+    "ASP.NET",
+    "Core",
+    "CSharp",
+    "Web"
+  ],
+  "@context": {
+    "@vocab": "http://schema.nuget.org/schema#",
+    "catalog": "http://schema.nuget.org/catalog#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "dependencies": {
+      "@id": "dependency",
+      "@container": "@set"
+    },
+    "dependencyGroups": {
+      "@id": "dependencyGroup",
+      "@container": "@set"
+    },
+    "packageEntries": {
+      "@id": "packageEntry",
+      "@container": "@set"
+    },
+    "packageTypes": {
+      "@id": "packageType",
+      "@container": "@set"
+    },
+    "supportedFrameworks": {
+      "@id": "supportedFramework",
+      "@container": "@set"
+    },
+    "tags": {
+      "@id": "tag",
+      "@container": "@set"
+    },
+    "vulnerabilities": {
+      "@id": "vulnerability",
+      "@container": "@set"
+    },
+    "published": {
+      "@type": "xsd:dateTime"
+    },
+    "created": {
+      "@type": "xsd:dateTime"
+    },
+    "lastEdited": {
+      "@type": "xsd:dateTime"
+    },
+    "catalog:commitTimeStamp": {
+      "@type": "xsd:dateTime"
+    },
+    "reasons": {
+      "@container": "@set"
+    }
+  }
+}
