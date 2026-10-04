@@ -16,7 +16,7 @@ describe('loadConfig', () => {
             databasePoolSize: 15,
             apiPoolSize: 8,
             apiToken: base.RESOLVER_API_TOKEN,
-            role: 'all',
+            role: 'resolver',
             port: 8080,
             logLevel: 'info',
             fetchConcurrency: 64,
@@ -46,7 +46,7 @@ describe('loadConfig', () => {
             ...base,
             DATABASE_SSL: 'false',
             DATABASE_LISTEN: 'false',
-            ROLE: 'worker',
+            ROLE: 'resolver-worker',
             PORT: '9000',
             LOG_LEVEL: 'debug',
             FETCH_CONCURRENCY: '16',
@@ -57,7 +57,7 @@ describe('loadConfig', () => {
         expect(config).toMatchObject({
             databaseSsl: false,
             databaseListen: false,
-            role: 'worker',
+            role: 'resolver-worker',
             port: 9000,
             logLevel: 'debug',
             fetchConcurrency: 16,
@@ -66,6 +66,14 @@ describe('loadConfig', () => {
             // 0 switches the payload cache off; it is a bound, not a toggle, so it has no `false`.
             payloadCacheMaxPackages: 0,
         })
+    })
+
+    it('still boots on the old role names, remembering them for a warning', () => {
+        expect(loadConfig({...base, ROLE: 'all'})).toMatchObject({role: 'resolver', legacyRole: 'all'})
+        expect(loadConfig({...base, ROLE: 'api'})).toMatchObject({role: 'resolver-api', legacyRole: 'api'})
+        expect(loadConfig({...base, ROLE: 'worker'})).toMatchObject({role: 'resolver-worker', legacyRole: 'worker'})
+        expect(loadConfig({...base, ROLE: 'resolver'}).legacyRole).toBeUndefined()
+        expect(loadConfig(base).role).toBe('resolver')
     })
 
     it('rejects nonsense in the enumerated settings', () => {
@@ -92,17 +100,17 @@ describe('loadConfig', () => {
         expect(() => loadConfig({...base, DATABASE_POOL_SIZE: '3', API_POOL_SIZE: '2'})).not.toThrow()
         // A single role has nothing to share with, so the check does not apply.
         expect(() =>
-            loadConfig({...base, ROLE: 'api', DATABASE_POOL_SIZE: '3', API_POOL_SIZE: '9'}),
+            loadConfig({...base, ROLE: 'resolver-api', DATABASE_POOL_SIZE: '3', API_POOL_SIZE: '9'}),
         ).not.toThrow()
     })
 })
 
 describe('poolSizes', () => {
-    const config = {role: 'all', databasePoolSize: 15, apiPoolSize: 4} as const
+    const config = {role: 'resolver', databasePoolSize: 15, apiPoolSize: 4} as const
 
     it('gives a single role the whole allowance', () => {
-        expect(poolSizes({...config, role: 'api'})).toEqual({api: 15, worker: 0})
-        expect(poolSizes({...config, role: 'worker'})).toEqual({api: 0, worker: 15})
+        expect(poolSizes({...config, role: 'resolver-api'})).toEqual({api: 15, worker: 0})
+        expect(poolSizes({...config, role: 'resolver-worker'})).toEqual({api: 0, worker: 15})
     })
 
     it('carves the api out of the allowance rather than adding to it', () => {

@@ -1,7 +1,7 @@
 import {bool, ConfigError, requireLogLevel, requirePort, requireToken, str} from '../shared/config.js'
 import type {LogLevel} from '@depinder/core'
 
-export type Role = 'api' | 'worker' | 'all'
+export type Role = 'resolver-api' | 'resolver-worker' | 'resolver'
 
 export interface Config {
     /** Postgres connection string. Supabase: direct or session pooler (5432), not the 6543 pooler. */
@@ -20,6 +20,8 @@ export interface Config {
     /** Bearer token required on every route except /health. */
     apiToken: string
     role: Role
+    /** The old ROLE value this process was started with (`api`, `worker`, `all`), for a warning. */
+    legacyRole?: string
     port: number
     logLevel: LogLevel
     /** How many package fetches the demand-fill worker keeps in flight at once. */
@@ -28,7 +30,9 @@ export interface Config {
     payloadCacheMaxPackages: number
 }
 
-const ROLES: Role[] = ['api', 'worker', 'all']
+const ROLES: Role[] = ['resolver-api', 'resolver-worker', 'resolver']
+/** The names before the rename, still accepted so an old env or compose file keeps booting. */
+const LEGACY_ROLES: Record<string, Role> = {api: 'resolver-api', worker: 'resolver-worker', all: 'resolver'}
 
 /**
  * Reads config from an environment. Throws `ConfigError` with a message meant for a human
@@ -47,9 +51,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
     const apiToken = requireToken(env)
 
-    const role = (str(env.ROLE) ?? 'all') as Role
+    const roleRaw = str(env.ROLE) ?? 'resolver'
+    const legacyRole = roleRaw in LEGACY_ROLES ? roleRaw : undefined
+    const role = (LEGACY_ROLES[roleRaw] ?? roleRaw) as Role
     if (!ROLES.includes(role)) {
-        throw new ConfigError(`ROLE must be one of ${ROLES.join(', ')} (got "${role}").`)
+        throw new ConfigError(`ROLE must be one of ${ROLES.join(', ')} or vuln (got "${roleRaw}").`)
     }
 
     const logLevel = requireLogLevel(env)
@@ -102,9 +108,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (!Number.isInteger(apiPoolSize) || apiPoolSize < 1 || apiPoolSize > 200) {
         throw new ConfigError(`API_POOL_SIZE must be an integer between 1 and 200 (got "${apiPoolRaw}").`)
     }
-    if (role === 'all' && apiPoolSize >= databasePoolSize) {
+    if (role === 'resolver' && apiPoolSize >= databasePoolSize) {
         throw new ConfigError(
-            `API_POOL_SIZE (${apiPoolSize}) is carved out of DATABASE_POOL_SIZE (${databasePoolSize}) when ROLE=all, ` +
+            `API_POOL_SIZE (${apiPoolSize}) is carved out of DATABASE_POOL_SIZE (${databasePoolSize}) when ROLE=resolver, ` +
             'so it must leave at least one connection for the worker.',
         )
     }
@@ -128,6 +134,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         apiPoolSize,
         apiToken,
         role,
+        ...(legacyRole ? {legacyRole} : {}),
         port,
         logLevel,
         fetchConcurrency,
@@ -138,8 +145,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 /**
  * How `DATABASE_POOL_SIZE` is split between the two halves of the process.
  *
- * A single role has nothing to split: `api` and `worker` each get the whole allowance, which is
- * what a two-container deployment wants. `all` gives the api `API_POOL_SIZE` of its own and the
+ * A single role has nothing to split: `resolver-api` and `resolver-worker` each get the whole
+ * allowance, which is what a two-container deployment wants. `resolver` gives the api `API_POOL_SIZE` of its own and the
  * worker the rest, so that the worker's writes can never be what a `/resolve` waits behind — the
  * two pools are separate queues, and one process still opens no more connections than before.
  *
@@ -149,8 +156,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 export function poolSizes(
     config: Pick<Config, 'role' | 'databasePoolSize' | 'apiPoolSize'>,
 ): {api: number; worker: number} {
-    if (config.role === 'api') return {api: config.databasePoolSize, worker: 0}
-    if (config.role === 'worker') return {api: 0, worker: config.databasePoolSize}
+    if (config.role === 'resolver-api') return {api: config.databasePoolSize, worker: 0}
+    if (config.role === 'resolver-worker') return {api: 0, worker: config.databasePoolSize}
     const api = Math.max(1, Math.min(config.apiPoolSize, config.databasePoolSize - 1))
     return {api, worker: Math.max(1, config.databasePoolSize - api)}
 }

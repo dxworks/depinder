@@ -14,7 +14,7 @@ import {errorMessage, type Logger} from '@depinder/core'
  *
  * This end listens on one connection of its own — outside the pool, because a pooled client is
  * handed back between queries and a `LISTEN` lives on its session — and replays what it hears into
- * the process's `ResolverEvents`. The in-process calls stay as they are: under `ROLE=all` they cost
+ * the process's `ResolverEvents`. The in-process calls stay as they are: under `ROLE=resolver` they cost
  * nothing and need no connection, and hearing the same thing twice is harmless (`/resolve` ignores
  * a key it is no longer waiting on, and a wake is a wake). Nothing depends on a notification
  * arriving either: while the connection is down, both halves fall back to the database poll, and

@@ -20,9 +20,9 @@ feed or poll file each — under `src/resolver/registries/`. See
 
 One image, one entry point (`src/main.ts`); `ROLE` decides what a process runs:
 
-- **resolver** — `ROLE=api` serves `/resolve`, `/feeds`, `/queue` and `/health`; `ROLE=worker` fills
-  the fetch queue and follows the registries' feeds; `ROLE=all` (the default) runs both in one
-  process. It needs Postgres.
+- **resolver** — `ROLE=resolver-api` serves `/resolve`, `/feeds`, `/queue` and `/health`;
+  `ROLE=resolver-worker` fills the fetch queue and follows the registries' feeds; `ROLE=resolver`
+  (the default) runs both in one process. It needs Postgres.
 - **vulnerability server** — `ROLE=vuln`: purls in, Trivy and Grype findings out. No Postgres. See
   [docs/vuln-server.md](docs/vuln-server.md).
 

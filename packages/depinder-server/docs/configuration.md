@@ -11,12 +11,12 @@ All of it is environment variables; `.env.example` is the annotated copy.
 | `RESOLVER_API_TOKEN` | — | **required**, at least 16 characters. The bearer token. The server refuses to start without it |
 | `DATABASE_SSL` | `true` | `true` connects with `rejectUnauthorized: false`, which is what Supabase's shared certificate needs |
 | `DATABASE_LISTEN` | `true` | Keep one extra connection, outside the pool, that `LISTEN`s for queue and settle notifications, so an api and a worker in different processes hear each other at once. Off: they find out by polling. See [The fetch queue](resolver-internals.md#the-fetch-queue) |
-| `ROLE` | `all` | `api` (HTTP only), `worker` (demand-fill + feeds only), `all` (both), `vuln` (the vulnerability server, no Postgres; its own settings are under [Vulnerabilities](vuln-server.md)) |
+| `ROLE` | `resolver` | `resolver-api` (HTTP only), `resolver-worker` (demand-fill + feeds only), `resolver` (both; the old names `api`, `worker`, `all` still work with a warning), `vuln` (the vulnerability server, no Postgres; its own settings are under [Vulnerabilities](vuln-server.md)) |
 | `PORT` | `8080` | |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 | `FETCH_CONCURRENCY` | `64` | Package fetches the demand-fill worker keeps in flight at once. Just above what the per-ecosystem limiters add up to, so those stay the constraint |
 | `DATABASE_POOL_SIZE` | `15` | Postgres connections this process opens at most. The write side of a fill runs on these; about half `FETCH_CONCURRENCY` keeps every fetch slot moving |
-| `API_POOL_SIZE` | `8` | Of those, the api's own. Carved out of `DATABASE_POOL_SIZE`, so the worker gets the rest and the process still opens no more than the ceiling. `ROLE=all` only |
+| `API_POOL_SIZE` | `8` | Of those, the api's own. Carved out of `DATABASE_POOL_SIZE`, so the worker gets the rest and the process still opens no more than the ceiling. `ROLE=resolver` only |
 | `PAYLOAD_CACHE_MAX_PACKAGES` | `50000` | Packages whose version tuples the api holds in memory. An entry is used only when the `package` row read this request carries the same `fetched_at`, so it is multi-instance safe. `0` switches it off |
 
 `FETCH_CONCURRENCY` and `DATABASE_POOL_SIZE` are a pair. A package is a registry request and then a
@@ -30,7 +30,7 @@ connect directly, which on a small instance is ~60 connections) and then set
 `DATABASE_POOL_SIZE=32`. Splitting the roles across two containers gives each its own pool, so count
 both against the same ceiling.
 
-`API_POOL_SIZE` divides that allowance rather than adding to it. Under `ROLE=all` the two halves
+`API_POOL_SIZE` divides that allowance rather than adding to it. Under `ROLE=resolver` the two halves
 used to share one pool, and a fill keeps `FETCH_CONCURRENCY` writes in flight, so the worker held
 every client in it; pg does not queue a waiter indefinitely, and a `/resolve` query left in the
 pending queue is rejected after ten seconds with `timeout exceeded when trying to connect` — an HTTP
@@ -84,7 +84,7 @@ Three services, one address (`localhost:8080`, or `PUBLIC_PORT`), one token:
 
 | service | what | published |
 |---|---|---|
-| `resolver` | `ROLE=all`: `/resolve`, `/feeds`, `/queue`, `/health` | no |
+| `resolver` | `ROLE=resolver`: `/resolve`, `/feeds`, `/queue`, `/health` | no |
 | `vuln` | `ROLE=vuln`: `/vulnerabilities`, its `/health` | no |
 | `caddy` | routes `/vulnerabilities` to `vuln`, `/vuln/health` to `vuln`'s `/health`, everything else to `resolver` (`Caddyfile`) | `${PUBLIC_PORT:-8080}` |
 
@@ -112,4 +112,4 @@ No database container — the database is hosted. Both servers read `.env` for t
 - **Shutdown.** 70 s grace, so a `/resolve` stream or a scan in flight can finish.
 
 Splitting the resolver across two containers is a matter of running the same image twice with
-`ROLE=api` and `ROLE=worker`; disable the health check on the worker, which serves no HTTP.
+`ROLE=resolver-api` and `ROLE=resolver-worker`; disable the health check on the worker, which serves no HTTP.

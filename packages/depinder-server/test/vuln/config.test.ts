@@ -129,7 +129,7 @@ describe('loadVulnConfig', () => {
 
 describe('loadConfig and ROLE=vuln', () => {
     it('still requires DATABASE_URL for the other roles', () => {
-        for (const ROLE of ['api', 'worker', 'all']) {
+        for (const ROLE of ['resolver-api', 'resolver-worker', 'resolver', 'all']) {
             expect(() => loadConfig({RESOLVER_API_TOKEN: base.RESOLVER_API_TOKEN, ROLE})).toThrow(/DATABASE_URL is required/)
         }
     })

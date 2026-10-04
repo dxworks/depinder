@@ -9,8 +9,9 @@ import {startDemandFill} from './resolver/worker/fill/pool.js'
 import {ensureFeedRows, startFeeds} from './resolver/worker/feeds.js'
 
 /**
- * Boot. `ROLE` decides what runs: `api` serves HTTP, `worker` fills the queue and reads the
- * feeds, `all` (the default) does both in one process, which is what the compose file uses.
+ * Boot. `ROLE` decides what runs: `resolver-api` serves HTTP, `resolver-worker` fills the queue
+ * and reads the feeds, `resolver` (the default) does both in one process, which is what the
+ * compose file uses. The old names `api`, `worker` and `all` still work, with a warning.
  * Migrations run on every boot in every role; they are guarded by an advisory lock.
  *
  * The api is built before the worker, and the two have things to say to each other, so the
@@ -19,7 +20,7 @@ import {ensureFeedRows, startFeeds} from './resolver/worker/feeds.js'
  * `DATABASE_LISTEN=false`, or while that connection is down, both halves fall back to the database
  * poll — see `src/resolver/events.ts`.
  *
- * What they do NOT share is a pool. Under `ROLE=all` the worker keeps up to `FETCH_CONCURRENCY`
+ * What they do NOT share is a pool. Under `ROLE=resolver` the worker keeps up to `FETCH_CONCURRENCY`
  * writes in flight and would hold every client of a common pool; a request's `getPackages` then
  * waits in pg's pending queue and, after `connectionTimeoutMillis`, is rejected outright. So each
  * half gets its own pool out of the same `DATABASE_POOL_SIZE` ceiling — see `poolSizes`.
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
 
     const config = loadConfigOrExit()
     const log = createLogger(config.logLevel, {role: config.role})
+    if (config.legacyRole) log.warn(`ROLE=${config.legacyRole} is an old name; use ROLE=${config.role}`)
     const sizes = poolSizes(config)
     const apiDb = sizes.api > 0 ? createDb(config, sizes.api, API_CONNECT_TIMEOUT_MS) : undefined
     const workerDb = sizes.worker > 0 ? createDb(config, sizes.worker) : undefined

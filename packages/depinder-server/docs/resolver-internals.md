@@ -12,7 +12,7 @@ src/
     config.ts                env parsing helpers (the logger and purls come from @depinder/core)
     http-server.ts           auth, compression, error handler, body limit, clientGone
     errors.ts                BadRequestError, answered as a 400
-  resolver/                ROLE=api|worker|all
+  resolver/                ROLE=resolver-api|resolver-worker|resolver
     config.ts                env
     events.ts                what the api and the worker tell each other in one process
     db/db.ts                 pg pool, migration runner, transactions

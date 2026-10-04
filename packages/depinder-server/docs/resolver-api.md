@@ -99,7 +99,7 @@ refetched on nearly every request — allowed, not advised. `not_found` and `err
 retry schedules, whatever `max_age` asks.
 
 **How it waits.** The worker announces every package it commits — they share a process in the
-default `ROLE=all` — and the stream gathers those announcements for 100 ms, then reads every
+default `ROLE=resolver` — and the stream gathers those announcements for 100 ms, then reads every
 package they name in one query, and sends them. One read runs at a time per stream; whatever lands
 during it goes into the next. Every 2 s it also reads every package it is still waiting on, which
 is all it gets with the worker somewhere else or more than one instance. The versions of packages
