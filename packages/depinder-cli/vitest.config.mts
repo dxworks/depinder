@@ -5,6 +5,7 @@ export default defineConfig({
     ssr: {resolve: {conditions: ['depinder-source']}},
     test: {
         include: ['__tests__/**/*.test.ts'],
+        setupFiles: ['__tests__/setup/hermetic-resolver.ts'],
         environment: 'node',
         globals: true,
     },

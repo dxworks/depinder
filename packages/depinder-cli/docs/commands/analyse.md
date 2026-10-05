@@ -22,9 +22,10 @@ any mix, and both sources are optional: depinder processes whatever it finds.
 | `--vuln-source <sources>` | `trivy`, `grype`, `github`, `all`, comma-separated | `trivy,grype` |
 | `--github-token-file <file>` | Tokens for `github`, relative to the working directory; `GH_TOKEN` from the environment when absent | `.github-tokens` |
 | `--github-max-age <hours>` | Re-download advisories older than this | `24` |
-| `--resolver-url <url>` | A [bulk purl resolver](../configuration.md#bulk-resolver) to ask before the registries; needs `DEPINDER_RESOLVER_TOKEN` | `DEPINDER_RESOLVER_URL` |
-| `--no-resolver` | Skip the bulk resolver even when one is configured; also skips its vulnerability server unless `--vuln-server` | off |
+| `--resolver-url <url>` | The [bulk purl resolver](../configuration.md#bulk-resolver) to ask before the registries; needs `DEPINDER_RESOLVER_TOKEN` | `DEPINDER_RESOLVER_URL`, else `https://libs.dxworks.org` |
+| `--no-resolver` | Skip the bulk resolver, which is on by default; also skips its vulnerability server unless `--vuln-server` | off |
 | `--vuln-server` | With `--no-resolver`: still ask the server for vulnerabilities (the bench's no-server cell) | off |
+| `--no-vuln-server` | Keep the resolver for packages, but scan vulnerabilities with the local Trivy and Grype instead of its server | off |
 | `--registry-limits <limits>` | Registry requests at once per ecosystem, with an optional gap in ms: `npm=16,cargo=1:1000`; see [registry fallback](../configuration.md#registry-fallback) | `DEPINDER_REGISTRY_LIMITS`, else 8 at once (`golang` 64, `nuget` 32) |
 | `--profile` | Phase timings, cache hits, requests per host | off |
 
@@ -134,8 +135,8 @@ Registry answers go to `~/.dxw/depinder/cache/depinder.sqlite`; failed lookups t
 An answer older than `--cache-max-age` (default `1d`) is expired and fetched again, the resolver
 first. `--refresh` bypasses both. See [cache](cache.md#expiry).
 
-With a [bulk resolver](../configuration.md#bulk-resolver) configured, every purl the cache cannot
-answer is asked for after parsing and before enrichment — once per run, even when a Trivy and a Syft
+With `DEPINDER_RESOLVER_TOKEN` set, every purl the cache cannot answer is asked of the
+[bulk resolver](../configuration.md#bulk-resolver) after parsing and before enrichment — once per run, even when a Trivy and a Syft
 source both name it, and with no retries — and what comes back fills that same cache. Anything it
 does not answer before its deadline goes to the registries as usual, through the
 [registry fallback](../configuration.md#registry-fallback): the server's own fetch code, then

@@ -74,8 +74,9 @@ fails, fix the cause and run it again.
 
 To run them all in one go: `for s in ./0*.sh; do "$s" || break; done`
 
-When `09` says "all good", point depinder at it:
-`DEPINDER_RESOLVER_URL=http://<server ip>`, `DEPINDER_RESOLVER_TOKEN=<RESOLVER_API_TOKEN>`.
+When `09` says "all good", depinder can use it. It calls `https://libs.dxworks.org` by default, so
+clients only set `DEPINDER_RESOLVER_TOKEN=<RESOLVER_API_TOKEN>`; for another server, also set
+`DEPINDER_RESOLVER_URL` to its domain.
 
 ## 4. Ship new code or a changed setting
 

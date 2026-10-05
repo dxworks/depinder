@@ -13,8 +13,8 @@ No configuration file: command-line options, environment variables, and a few fi
 | `DEPINDER_CACHE_DB` | SQLite cache path. Default `~/.dxw/depinder/cache/depinder.sqlite` |
 | `DEPINDER_CACHE_MAX_AGE` | How old a cached library may be before it is fetched again. Same as `--cache-max-age`. Default `1d` |
 | `DEPINDER_PROFILE` | `1` for the same output as `--profile` |
-| `DEPINDER_RESOLVER_URL` | Base URL of a bulk purl resolver. Same as `--resolver-url`; off when unset |
-| `DEPINDER_RESOLVER_TOKEN` | Bearer token for it. Required with the URL: without it the resolver is skipped |
+| `DEPINDER_RESOLVER_URL` | Base URL of the bulk purl resolver. Same as `--resolver-url`. Default `https://libs.dxworks.org` |
+| `DEPINDER_RESOLVER_TOKEN` | Bearer token for it. Required: without it the resolver is skipped, with a warning |
 | `DEPINDER_RESOLVER_MAX_WAIT_MS` | How long one run waits for the resolver in total. Default `60000` |
 | `DEPINDER_RESOLVER_CONCURRENCY` | Caps how many 2000-purl chunks are posted at once. Default: all of them |
 | `DEPINDER_REPORT_NOW` | For tests and benches: an ISO date (`2026-10-03`, `2026-10-03T14:30:00Z`) the report measures ages from (Now-Used, Now-latest, Out of Support, Operational Risk). Cache freshness keeps the real clock. Default: now |
@@ -44,22 +44,26 @@ No configuration file: command-line options, environment variables, and a few fi
 
 ## Bulk resolver
 
-Optional. A resolver service answers thousands of package URLs in one call, from its own store of
-registry facts, instead of depinder asking each registry package by package.
+On by default. A resolver service answers thousands of package URLs in one call, from its own
+store of registry facts, instead of depinder asking each registry package by package. `analyse`
+calls the one at `https://libs.dxworks.org`; all it needs is a token:
 
 ```bash
-export DEPINDER_RESOLVER_URL=https://resolver.internal
 export DEPINDER_RESOLVER_TOKEN=…
 depinder analyse ./repo
 ```
 
+Without `DEPINDER_RESOLVER_TOKEN`, the run warns once and fetches everything from the registries.
+To use another resolver, set `DEPINDER_RESOLVER_URL` or pass `--resolver-url`; to turn it off, pass
+`--no-resolver`.
+
 | Setting | Meaning |
 |---|---|
-| `--resolver-url <url>` / `DEPINDER_RESOLVER_URL` | Where the resolver is. Nothing set, nothing changes |
-| `DEPINDER_RESOLVER_TOKEN` | Mandatory with the URL; a missing token warns and skips the resolver |
+| `--resolver-url <url>` / `DEPINDER_RESOLVER_URL` | Where the resolver is; the flag wins over the variable. Default `https://libs.dxworks.org` |
+| `DEPINDER_RESOLVER_TOKEN` | Mandatory; a missing token warns and skips the resolver |
 | `DEPINDER_RESOLVER_MAX_WAIT_MS` | Budget for the whole bulk phase; each request sends what is left of it as `deadline_ms` (at most 60 s). Default `60000` |
 | `DEPINDER_RESOLVER_CONCURRENCY` | Caps the chunks in flight at once. Default: every chunk at once; `1` posts one chunk at a time |
-| `--no-resolver` | Skip it for this run |
+| `--no-resolver` | Skip it for this run; no token needed |
 
 Every chunk is posted at once, with one deadline for all of them, so no chunk waits behind another
 and each has the whole budget to fetch what the server does not know yet. Each is posted once: there

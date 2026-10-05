@@ -3,9 +3,9 @@ import {log} from '../utils/logging'
 /**
  * Where the bulk purl resolver lives, and how long a run is willing to wait for it.
  *
- * The resolver is opt-in and never required: with no URL configured, `analyse` behaves exactly as
- * it did before — every dependency goes through the registry fallback. Same shape as
- * `--profile` (`utils/profile.ts`): a flag, an environment variable behind it, and nothing else.
+ * On by default, at `DEFAULT_RESOLVER_URL`, but never required: without a token, or with
+ * `--no-resolver`, every dependency goes through the registry fallback. The URL comes from
+ * `--resolver-url`, then `DEPINDER_RESOLVER_URL`, then the default.
  */
 
 export interface ResolverConfig {
@@ -30,11 +30,14 @@ export interface ResolverConfig {
 
 /** The resolver options `analyse` declares. */
 export interface ResolverOptions {
-    /** `--resolver-url <url>`. Overrides `DEPINDER_RESOLVER_URL`. */
+    /** `--resolver-url <url>`. Overrides `DEPINDER_RESOLVER_URL` and `DEFAULT_RESOLVER_URL`. */
     resolverUrl?: string
     /** Commander sets this to `false` for `--no-resolver`, and leaves it `true` otherwise. */
     resolver?: boolean
 }
+
+/** The public resolver, used when neither `--resolver-url` nor `DEPINDER_RESOLVER_URL` names one. */
+export const DEFAULT_RESOLVER_URL = 'https://libs.dxworks.org'
 
 export const DEFAULT_RESOLVER_MAX_WAIT_MS = 60_000
 
@@ -55,6 +58,14 @@ export const DEFAULT_RESOLVER_MAX_WAIT_MS = 60_000
  * that turns out to need it.
  */
 export const RESOLVER_CHUNK_CONCURRENCY = Infinity
+
+/** The flag, then the environment, then the default; a blank value counts as unset. */
+function resolverUrl(options: ResolverOptions): string {
+    const configured = [options.resolverUrl, process.env.DEPINDER_RESOLVER_URL]
+        .map(value => value?.trim())
+        .find(value => value)
+    return (configured ?? DEFAULT_RESOLVER_URL).replace(/\/+$/, '')
+}
 
 function maxWaitFromEnv(): number {
     const raw = process.env.DEPINDER_RESOLVER_MAX_WAIT_MS
@@ -81,24 +92,21 @@ function chunkConcurrencyFromEnv(): number {
 /**
  * The resolver to use for this run, or `undefined` for "no resolver, registry fallback only".
  *
- * Disabled — without failing the run — when `--no-resolver` is given, when no URL is configured,
- * or when a URL is configured but `DEPINDER_RESOLVER_TOKEN` is not. The last case warns: it is a
- * misconfiguration rather than a choice, and it would otherwise look like a very slow resolver.
+ * Disabled — without failing the run — when `--no-resolver` is given, or when
+ * `DEPINDER_RESOLVER_TOKEN` is not set. The second case warns once and says how to fix it.
  */
 export function resolverConfig(options: ResolverOptions = {}): ResolverConfig | undefined {
     if (options.resolver === false) return undefined
 
-    const url = (options.resolverUrl ?? process.env.DEPINDER_RESOLVER_URL ?? '').trim()
-    if (!url) return undefined
-
+    const url = resolverUrl(options)
     const token = (process.env.DEPINDER_RESOLVER_TOKEN ?? '').trim()
     if (!token) {
-        log.warn(`Resolver at ${url} disabled: DEPINDER_RESOLVER_TOKEN is not set`)
+        log.warn(`Resolver at ${url} skipped: set DEPINDER_RESOLVER_TOKEN to use it, or pass --no-resolver`)
         return undefined
     }
 
     return {
-        url: url.replace(/\/+$/, ''),
+        url,
         token,
         maxWaitMs: maxWaitFromEnv(),
         chunkConcurrency: chunkConcurrencyFromEnv(),

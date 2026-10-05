@@ -1,10 +1,12 @@
-import {DEFAULT_RESOLVER_MAX_WAIT_MS, RESOLVER_CHUNK_CONCURRENCY, resolverConfig} from '../src/resolver/config'
+import type {MockInstance} from 'vitest'
+import {
+    DEFAULT_RESOLVER_MAX_WAIT_MS, DEFAULT_RESOLVER_URL, RESOLVER_CHUNK_CONCURRENCY, resolverConfig,
+} from '../src/resolver/config'
+import {log} from '../src/utils/logging'
 
 /**
- * The resolver is opt-in, and every way of not opting in must end at the same place: `undefined`,
- * meaning "run exactly as depinder ran before". The one case that warns is a configured URL with
- * no token, because that is a mistake rather than a choice — and the server answers nothing at all
- * without a bearer token, so it would otherwise look like a resolver that knows nothing.
+ * The resolver is on by default, at libs.dxworks.org. `undefined` means "registry fallback only":
+ * `--no-resolver`, or no token, in which case it warns once and says how to fix it.
  */
 
 const vars = [
@@ -16,26 +18,43 @@ const vars = [
 
 describe('the resolver configuration', () => {
     const saved: {[key: string]: string | undefined} = {}
+    let warnings: string[]
+    let warnSpy: MockInstance
 
     beforeEach(() => {
         for (const key of vars) {
             saved[key] = process.env[key]
             delete process.env[key]
         }
+        warnings = []
+        warnSpy = vi.spyOn(log, 'warn').mockImplementation(((message: string) => {
+            warnings.push(message)
+            return log
+        }) as any)
     })
     afterEach(() => {
         for (const key of vars) {
             if (saved[key] === undefined) delete process.env[key]
             else process.env[key] = saved[key]
         }
+        warnSpy.mockRestore()
     })
 
-    it('is off when nothing is configured', () => {
+    it('uses libs.dxworks.org when no url is configured', () => {
+        process.env.DEPINDER_RESOLVER_TOKEN = 'secret'
+        expect(DEFAULT_RESOLVER_URL).toBe('https://libs.dxworks.org')
+        expect(resolverConfig({})?.url).toBe(DEFAULT_RESOLVER_URL)
+        expect(resolverConfig()?.url).toBe(DEFAULT_RESOLVER_URL)
+    })
+
+    it('is off, with one warning on how to fix it, when no token is set', () => {
         expect(resolverConfig({})).toBeUndefined()
-        expect(resolverConfig()).toBeUndefined()
+        expect(warnings).toEqual([
+            'Resolver at https://libs.dxworks.org skipped: set DEPINDER_RESOLVER_TOKEN to use it, or pass --no-resolver',
+        ])
     })
 
-    it('reads the url and token from the environment', () => {
+    it('takes the environment url over the default', () => {
         process.env.DEPINDER_RESOLVER_URL = 'https://resolver.example'
         process.env.DEPINDER_RESOLVER_TOKEN = 'secret'
 
@@ -59,9 +78,11 @@ describe('the resolver configuration', () => {
         expect(resolverConfig({resolverUrl: 'https://resolver.example/'})?.url).toBe('https://resolver.example')
     })
 
-    it('is off, and says so, when the url has no token with it', () => {
+    it('names the configured url in the missing-token warning', () => {
         process.env.DEPINDER_RESOLVER_URL = 'https://resolver.example'
         expect(resolverConfig({})).toBeUndefined()
+        expect(warnings).toHaveLength(1)
+        expect(warnings[0]).toMatch(/^Resolver at https:\/\/resolver\.example skipped: /)
     })
 
     it('is off when --no-resolver is given, whatever the environment says', () => {
@@ -70,6 +91,11 @@ describe('the resolver configuration', () => {
 
         expect(resolverConfig({resolver: false})).toBeUndefined()
         expect(resolverConfig({resolver: false, resolverUrl: 'https://resolver.example'})).toBeUndefined()
+    })
+
+    it('is off without a warning when --no-resolver is given and no token is set', () => {
+        expect(resolverConfig({resolver: false})).toBeUndefined()
+        expect(warnings).toEqual([])
     })
 
     it('is on when commander leaves resolver at its default true', () => {
@@ -110,10 +136,13 @@ describe('the resolver configuration', () => {
         }
     })
 
-    it('ignores an empty or whitespace url', () => {
+    it('treats a blank flag or environment url as unset, and falls through to the next source', () => {
         process.env.DEPINDER_RESOLVER_TOKEN = 'secret'
-        expect(resolverConfig({resolverUrl: '   '})).toBeUndefined()
-        process.env.DEPINDER_RESOLVER_URL = ''
-        expect(resolverConfig({})).toBeUndefined()
+        process.env.DEPINDER_RESOLVER_URL = 'https://from-env.example'
+        expect(resolverConfig({resolverUrl: '   '})?.url).toBe('https://from-env.example')
+
+        process.env.DEPINDER_RESOLVER_URL = '  '
+        expect(resolverConfig({})?.url).toBe(DEFAULT_RESOLVER_URL)
+        expect(resolverConfig({resolverUrl: ''})?.url).toBe(DEFAULT_RESOLVER_URL)
     })
 })

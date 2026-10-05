@@ -12,7 +12,7 @@ A folder of CycloneDX SBOMs in, a folder of CSVs out.
 ## 1. Analyse
 
 ```bash
-depinder analyse /path/to/depminer/results/trivy /path/to/depminer/results/syft -r results \
+depinder analyse /path/to/depminer/results -r results \
     --vuln-source trivy,grype,github --project-name my-project
 ```
 
@@ -25,10 +25,10 @@ and `DEPINDER_CACHE_MAX_AGE` sets it for every run:
 
 ```bash
 # Re-runs over the next week answer from the cache
-depinder analyse /path/to/depminer/results/trivy /path/to/depminer/results/syft -r results --cache-max-age 7d
+depinder analyse /path/to/depminer/results -r results --cache-max-age 7d
 
 # Everything fetched again now
-depinder analyse /path/to/depminer/results/trivy /path/to/depminer/results/syft -r results --cache-max-age 0
+depinder analyse /path/to/depminer/results -r results --cache-max-age 0
 ```
 
 The `github` source needs a GitHub token, read from the directory you run the command in:
@@ -49,6 +49,23 @@ nothing. To fill the cache ahead of time, or to run offline later:
 ```bash
 depinder github-advisories download --sbom /path/to/sboms
 ```
+
+### Resolver and registry options
+
+`analyse` asks the [bulk resolver](configuration.md#bulk-resolver) at `https://libs.dxworks.org`
+first, and the registries only for what it could not answer. It needs `DEPINDER_RESOLVER_TOKEN`:
+without it the run warns once and uses the registries alone. These options change that:
+
+| Option | What it does | Without it |
+|---|---|---|
+| `--resolver-url <url>` | Ask this resolver instead; needs `DEPINDER_RESOLVER_TOKEN` | `DEPINDER_RESOLVER_URL`, else `https://libs.dxworks.org` |
+| `--no-resolver` | Skip the resolver; fetch everything from the registries | the resolver is used whenever the token is set |
+| `--vuln-server` | With `--no-resolver`: still get vulnerabilities from the resolver's server | `--no-resolver` turns that off too |
+| `--no-vuln-server` | Keep the resolver, but scan vulnerabilities with the local Trivy and Grype | the server answers vulnerabilities |
+| `--registry-limits <limits>` | Registry requests at once per ecosystem, optional gap in ms: `npm=16,cargo=1:1000` | 8 at once (`golang` 64, `nuget` 32) |
+| `--cache-max-age <duration>` | Re-fetch cached packages older than this (see above) | `1d` |
+
+Every option is in [`analyse`](commands/analyse.md).
 
 ## 2. Results
 

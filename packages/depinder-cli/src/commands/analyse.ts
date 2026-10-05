@@ -40,7 +40,7 @@ import {classifyInputs, inputFolderOf, InputSources} from './sources'
 import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
 import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/profile'
-import {ResolverConfig, ResolverOptions, resolverConfig} from '../resolver/config'
+import {DEFAULT_RESOLVER_URL, ResolverConfig, ResolverOptions, resolverConfig} from '../resolver/config'
 import {PackageRecord, ResolvedEntry, resetResolverClient, resolvePurls} from '../resolver/client'
 import {toLibraryInfo} from '../resolver/adapter'
 import {createRegistryFallback, isRateLimit, RegistryFallback} from '../fallback/registry-fallback'
@@ -114,9 +114,9 @@ export function createAnalyseCommand(): Command {
             'Re-download a cached ecosystem\'s GitHub advisories when they are older than this',
             String(DEFAULT_MAX_AGE_HOURS))
         .option('--resolver-url <url>',
-            'Base URL of a depinder resolver service that answers purls in bulk; '
-            + 'DEPINDER_RESOLVER_URL when unset, and DEPINDER_RESOLVER_TOKEN must be set with it')
-        .option('--no-resolver', 'Do not call the bulk resolver even when one is configured')
+            'Base URL of the bulk purl resolver, called by default; DEPINDER_RESOLVER_URL when unset, '
+            + `else ${DEFAULT_RESOLVER_URL}. Needs DEPINDER_RESOLVER_TOKEN`)
+        .option('--no-resolver', 'Do not call the bulk resolver, which is on by default; fetch every package from the registries')
         .option('--vuln-server',
             'Ask the resolver\'s server for vulnerabilities even with --no-resolver, which otherwise turns both off')
         .option('--no-vuln-server',
@@ -872,7 +872,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
     // Same server and token as the resolver; `--no-vuln-server` keeps the scan local, and
     // `--vuln-server` keeps the server's scan when `--no-resolver` turned the resolver off.
     const vulnServer = vulnServerConfig(
-        configured ?? (options.vulnServer === true ? resolverConfig({...options, resolver: true}) : undefined), options)
+        configured ?? (options.resolver === false && options.vulnServer === true ? resolverConfig({...options, resolver: true}) : undefined), options)
 
     const prep = await prepareSbomScans(runs, options, vulnServer)
     const session = await openCacheSession(useCache, cutoffMs)

@@ -92,8 +92,8 @@ describe('the analyse command line', () => {
             expect(folders).toEqual(['/repo'])
         })
 
-        // No default: an unset flag must fall through to DEPINDER_RESOLVER_URL, and a default here
-        // would shadow it.
+        // No commander default: an unset flag must fall through to DEPINDER_RESOLVER_URL, then to
+        // DEFAULT_RESOLVER_URL in resolver/config.ts; a default here would shadow the env.
         it('leaves the url undefined when not given', async () => {
             expect((await parseArgs('/repo')).options.resolverUrl).toBeUndefined()
         })
