@@ -10,6 +10,11 @@ line says how many files were passed over — CycloneDX SBOMs are depinder's onl
 is analysed on its own and written to its own subfolder of the results folder. A folder can hold
 any mix, and both sources are optional: depinder processes whatever it finds.
 
+Package facts come from the [bulk resolver](../configuration.md#bulk-resolver) at
+`https://libs.dxworks.org` first, and from the registries for what it does not answer. The resolver
+needs its token in `DEPINDER_RESOLVER_TOKEN`, a secret set once in your shell
+([how](../install.md#4-resolver-token)); without it every package comes from the registries.
+
 | Option | Meaning | Default |
 |---|---|---|
 | `[folders...]` | Folders to walk for CycloneDX SBOMs | — |
