@@ -102,6 +102,42 @@ The `github` source needs no binary, only [`github-advisories download`](command
     vulnerabilities for the same SBOM. Depinder refreshes both once, before the first scan, so a
     folder of SBOMs scanned at once never has a dozen processes downloading the same database.
 
+## 4. Resolver token
+
+`analyse` asks the [bulk resolver](configuration.md#bulk-resolver) at `https://libs.dxworks.org`
+first, which is much faster than asking every registry package by package. The server only answers
+requests that carry its token, read from `DEPINDER_RESOLVER_TOKEN`. Ask the depinder maintainers
+(dxworks) for it, then set it once for every terminal:
+
+=== "macOS"
+
+    ```bash
+    echo 'export DEPINDER_RESOLVER_TOKEN=<token>' >> ~/.zshrc
+    source ~/.zshrc
+    ```
+
+=== "Linux"
+
+    ```bash
+    echo 'export DEPINDER_RESOLVER_TOKEN=<token>' >> ~/.bashrc
+    source ~/.bashrc
+    ```
+
+=== "Windows"
+
+    ```powershell
+    setx DEPINDER_RESOLVER_TOKEN "<token>"
+    ```
+
+    Open a new terminal afterwards.
+
+!!! warning "The token is a secret"
+    Keep it in your shell profile or a secret store. Never commit it, paste it in an issue, or put
+    it in a script that is shared.
+
+Without the token, depinder still works: each run warns once and fetches everything from the
+registries, which is slower. `--no-resolver` skips the resolver and the warning.
+
 ## From source
 
 ```bash

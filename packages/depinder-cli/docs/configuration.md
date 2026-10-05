@@ -46,7 +46,8 @@ No configuration file: command-line options, environment variables, and a few fi
 
 On by default. A resolver service answers thousands of package URLs in one call, from its own
 store of registry facts, instead of depinder asking each registry package by package. `analyse`
-calls the one at `https://libs.dxworks.org`; all it needs is a token:
+calls the one at `https://libs.dxworks.org`; all it needs is its token, a secret you get from the
+depinder maintainers and set once ([how](install.md#4-resolver-token)):
 
 ```bash
 export DEPINDER_RESOLVER_TOKEN=…

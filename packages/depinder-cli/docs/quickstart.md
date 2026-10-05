@@ -8,6 +8,8 @@ A folder of CycloneDX SBOMs in, a folder of CSVs out.
 - A folder of CycloneDX SBOMs (`*.cdx.json`, or any `.json` declaring `bomFormat`). A [DepMiner](https://dxworks.org/depminer/) results zip has them
   under `depminer/results/syft/` and `depminer/results/trivy/`.
 - Trivy and/or Grype on `PATH`, for vulnerabilities.
+- `DEPINDER_RESOLVER_TOKEN` set, for the resolver server (see [Installing](install.md#4-resolver-token)).
+  Without it every package is fetched from the registries, which is slower.
 
 ## 1. Analyse
 
