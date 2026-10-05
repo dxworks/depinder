@@ -78,11 +78,3 @@ trailer, no "Generated with Claude Code" line, no mention in the text. Applies t
 every PR in this repo (and in the archived depinder-server-side).
 
 No hand-off documents: Alex carries the context between phases.
-
----
-
-## Graphify MCP: the user is new to this tool — narrate everything
-
-**Alex has never used Graphify before and is still forming a mental model of it.**
-Treat every interaction with the `graphify` MCP server as a teaching moment, not a
-silent internal step. Verbosity here is the point, not noise.
