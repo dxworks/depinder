@@ -33,18 +33,21 @@ depinder analyse /path/to/depminer/results -r results --cache-max-age 7d
 depinder analyse /path/to/depminer/results -r results --cache-max-age 0
 ```
 
-The `github` source needs a GitHub token, read from the directory you run the command in:
-`GH_TOKEN` in the environment, or a `.github-tokens` file next to you (`--github-token-file` to
-point elsewhere):
+The `github` source is optional. The Trivy and Grype databases already include GitHub's
+advisories, so it adds a third view of the same data. To use it, create a GitHub token with no
+scopes at [github.com/settings/tokens](https://github.com/settings/tokens) (public advisory data
+needs none), and either put it in a `.github-tokens` file in the folder you run depinder from, or
+set `GH_TOKEN` (`--github-token-file` points elsewhere; a key the file lacks is read from the
+environment):
 
 ```bash
-export GH_TOKEN=ghp_...
-# or
 echo 'GH_TOKEN_1=ghp_...' > .github-tokens
+# or
+export GH_TOKEN=ghp_...
 ```
 
 With a token, the run downloads the advisories for the ecosystems in the SBOMs by itself, into
-`cache/github-advisories/` under the working directory, and reuses them for 24 hours
+`cache/github-advisories/` in the folder you run from, and reuses them for 24 hours
 (`--github-max-age`). Without one, the refresh is skipped with a warning and `github` contributes
 nothing. To fill the cache ahead of time, or to run offline later:
 
@@ -62,8 +65,8 @@ without it the run warns once and uses the registries alone. These options chang
 |---|---|---|
 | `--resolver-url <url>` | Ask this resolver instead; needs `DEPINDER_RESOLVER_TOKEN` | `DEPINDER_RESOLVER_URL`, else `https://libs.dxworks.org` |
 | `--no-resolver` | Skip the resolver; fetch everything from the registries | the resolver is used whenever the token is set |
-| `--vuln-server` | With `--no-resolver`: still get vulnerabilities from the resolver's server | `--no-resolver` turns that off too |
-| `--no-vuln-server` | Keep the resolver, but scan vulnerabilities with the local Trivy and Grype | the server answers vulnerabilities |
+| `--vuln-server` | With `--no-resolver`: still let the [vulnerability server](configuration.md#vulnerability-server) scan the SBOMs | `--no-resolver` turns that off too |
+| `--no-vuln-server` | Keep the resolver, but scan the SBOMs with the local Trivy and Grype | the [vulnerability server](configuration.md#vulnerability-server) scans them |
 | `--registry-limits <limits>` | Registry requests at once per ecosystem, optional gap in ms: `npm=16,cargo=1:1000` | 8 at once (`golang` 64, `nuget` 32) |
 | `--cache-max-age <duration>` | Re-fetch cached packages older than this (see above) | `1d` |
 

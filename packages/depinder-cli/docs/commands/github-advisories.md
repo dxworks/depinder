@@ -6,7 +6,10 @@ depinder github-advisories status   [options]
 ```
 
 The local copy of GitHub's reviewed advisories, the `github` vulnerability source. Lives in
-`cache/github-advisories/` under the working directory, one JSON file per ecosystem.
+`cache/github-advisories/` in the folder you run from, one JSON file per ecosystem.
+
+The source is optional. The Trivy and Grype databases already include GitHub's advisories, so it
+adds a third view of the same data.
 
 ## download
 
@@ -30,13 +33,14 @@ Takes `--token-file` and `--max-age`.
 
 ## Tokens
 
-`.github-tokens` in the working directory:
+Create a token with no scopes at [github.com/settings/tokens](https://github.com/settings/tokens);
+public advisory data needs none. Put it in `.github-tokens` in the folder you run from:
 
 ```
 GH_TOKEN_1=ghp_...
 GH_TOKEN_2=ghp_...
 ```
 
-Contiguous from 1; the first gap ends the pool. A bare `GH_TOKEN` is a pool of one. The same
-keys are read from the environment when the file is absent. Tokens rotate, one request each,
+Contiguous from 1; the first gap ends the pool. A bare `GH_TOKEN` is a pool of one. A key the
+file does not have is read from the environment, so `export GH_TOKEN=…` works without a file. Tokens rotate, one request each,
 and are stood down before their rate limit is exhausted.

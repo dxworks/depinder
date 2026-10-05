@@ -46,7 +46,9 @@ Pick your OS in any tab; every block on the page follows.
 ## 3. Scanners
 
 The SBOM route gets vulnerabilities from local scanners. Neither is bundled. A missing one is
-reported before the run, and the run completes without its findings.
+reported before the run, and the run completes without its findings. With the
+[resolver token](#4-resolver-token) set, the [vulnerability server](configuration.md#vulnerability-server)
+scans the SBOMs instead, and the local scanners are only its fallback.
 
 ### Trivy
 
@@ -106,8 +108,7 @@ The `github` source needs no binary, only [`github-advisories download`](command
 
 `analyse` asks the [bulk resolver](configuration.md#bulk-resolver) at `https://libs.dxworks.org`
 first, which is much faster than asking every registry package by package. The server only answers
-requests that carry its token, read from `DEPINDER_RESOLVER_TOKEN`. Ask the depinder maintainers
-(dxworks) for it, then set it once for every terminal:
+requests that carry its token, read from `DEPINDER_RESOLVER_TOKEN`. Set it once for every terminal:
 
 === "macOS"
 

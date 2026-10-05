@@ -4,8 +4,6 @@
 [`transformBlackDuckReports`](commands/blackduck-reports.md) produces from a real Black Duck
 export — same header line, same cell conventions, so a downstream reader processes either folder
 the same way — plus the raw-shaped `security.csv` and files Black Duck has no counterpart for.
-The headers and cell rules live in one module, `src/blackduck/columns.ts`, that both commands
-import.
 
 ## Files
 

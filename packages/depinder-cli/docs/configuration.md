@@ -14,10 +14,11 @@ No configuration file: command-line options, environment variables, and a few fi
 | `DEPINDER_CACHE_MAX_AGE` | How old a cached library may be before it is fetched again. Same as `--cache-max-age`. Default `1d` |
 | `DEPINDER_PROFILE` | `1` for the same output as `--profile` |
 | `DEPINDER_RESOLVER_URL` | Base URL of the bulk purl resolver. Same as `--resolver-url`. Default `https://libs.dxworks.org` |
-| `DEPINDER_RESOLVER_TOKEN` | Bearer token for it. Required: without it the resolver is skipped, with a warning |
+| `DEPINDER_RESOLVER_TOKEN` | Bearer token for it and for the [vulnerability server](#vulnerability-server). Needed for the resolver; without it packages come from the registries, with a warning |
 | `DEPINDER_RESOLVER_MAX_WAIT_MS` | How long one run waits for the resolver in total. Default `60000` |
 | `DEPINDER_RESOLVER_CONCURRENCY` | Caps how many 2000-purl chunks are posted at once. Default: all of them |
-| `DEPINDER_REPORT_NOW` | For tests and benches: an ISO date (`2026-10-03`, `2026-10-03T14:30:00Z`) the report measures ages from (Now-Used, Now-latest, Out of Support, Operational Risk). Cache freshness keeps the real clock. Default: now |
+| `DEPINDER_VULN_MAX_WAIT_MS` | How long one run waits for the [vulnerability server](#vulnerability-server) before scanning locally. Default `30000` |
+| `DEPINDER_VULN_CHUNK_SIZE` | Purls per request to the vulnerability server. Default and maximum `5000` |
 | `TRIVY_BIN`, `GRYPE_BIN` | Scanner binaries when not on `PATH` |
 
 ## Files
@@ -27,10 +28,7 @@ No configuration file: command-line options, environment variables, and a few fi
 | `~/.dxw/depinder/cache/depinder.sqlite` | The registry cache: `libs`, `misses` |
 | `./cache/github-advisories/<ecosystem>.json` | The advisory cache |
 | `./.github-tokens` | The token pool: `GH_TOKEN_1=…`, contiguous from 1 |
-| `./plugins.json` | Extra plugins: `[{"path": "<module>", "field": "<export>"}]` |
 | `./results/` | Default `-r` |
-
-`./cache/libs.json` is the previous layout; `depinder cache import cache` moves it into the database.
 
 ## Vulnerability sources
 
@@ -40,14 +38,28 @@ No configuration file: command-line options, environment variables, and a few fi
 |---|---|
 | `trivy` | `trivy` on `PATH` or `TRIVY_BIN` |
 | `grype` | `grype` on `PATH` or `GRYPE_BIN` |
-| `github` | A token: `GH_TOKEN` in the environment or `.github-tokens` in the working directory. The advisories download on the run, or ahead of it with [`github-advisories download`](commands/github-advisories.md) |
+| `github` | Optional. A GitHub token: `.github-tokens` in the folder you run from, or `GH_TOKEN`. The advisories download on the run, or ahead of it with [`github-advisories download`](commands/github-advisories.md) |
+
+### Vulnerability server
+
+With `DEPINDER_RESOLVER_TOKEN` set and `--vuln-source` naming both `trivy` and `grype` (the
+default, or `all`), the resolver's server scans the SBOMs with its own Trivy and Grype, and the
+local scanners do not run. `github` is still matched locally and merged in.
+
+The local scanners run instead:
+
+- without the token;
+- with `--no-vuln-server`, or `--no-resolver` (unless `--vuln-server` is also given);
+- when `--vuln-source` leaves out `trivy` or `grype`;
+- as a fallback, when the server fails or has not answered in full within
+  `DEPINDER_VULN_MAX_WAIT_MS` (default 30 s). The run warns and says why.
 
 ## Bulk resolver
 
 On by default. A resolver service answers thousands of package URLs in one call, from its own
 store of registry facts, instead of depinder asking each registry package by package. `analyse`
-calls the one at `https://libs.dxworks.org`; all it needs is its token, a secret you get from the
-depinder maintainers and set once ([how](install.md#4-resolver-token)):
+calls the one at `https://libs.dxworks.org`; all it needs is its token, a secret you set once
+([how](install.md#4-resolver-token)):
 
 ```bash
 export DEPINDER_RESOLVER_TOKEN=…
@@ -61,7 +73,7 @@ To use another resolver, set `DEPINDER_RESOLVER_URL` or pass `--resolver-url`; t
 | Setting | Meaning |
 |---|---|
 | `--resolver-url <url>` / `DEPINDER_RESOLVER_URL` | Where the resolver is; the flag wins over the variable. Default `https://libs.dxworks.org` |
-| `DEPINDER_RESOLVER_TOKEN` | Mandatory; a missing token warns and skips the resolver |
+| `DEPINDER_RESOLVER_TOKEN` | Needed for the resolver; without it the run warns once and packages come from the registries |
 | `DEPINDER_RESOLVER_MAX_WAIT_MS` | Budget for the whole bulk phase; each request sends what is left of it as `deadline_ms` (at most 60 s). Default `60000` |
 | `DEPINDER_RESOLVER_CONCURRENCY` | Caps the chunks in flight at once. Default: every chunk at once; `1` posts one chunk at a time |
 | `--no-resolver` | Skip it for this run; no token needed |

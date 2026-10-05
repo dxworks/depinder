@@ -46,11 +46,6 @@ how soon a *failed* lookup is retried, not how long an answer may be reused.
     rows are kept; the files are not touched. Imported libraries are as old as `libs.json` (its
     modification time), so a file older than the max age imports as expired.
 
-!!! note "Coming from the MongoDB cache"
-    The MongoDB cache and `cache init` / `up` / `down` are gone. `docker-compose.yml` and
-    `init-mongo.js`, left in `~/.dxw/depinder/cache/` by an earlier `cache init`, are no longer
-    used and can be deleted.
-
 ## update
 
 ```
@@ -71,6 +66,8 @@ included, with the same per-ecosystem limits.
 | `--cache-max-age <duration>` | Without a date, re-fetch the rows older than this; see [expiry](#expiry) | `DEPINDER_CACHE_MAX_AGE`, else `1d` |
 | `--registry-limits <limits>` | Registry requests at once per ecosystem, with an optional gap in ms: `npm=16,cargo=1:1000` | `DEPINDER_REGISTRY_LIMITS`, else 8 at once (`golang` 64, `nuget` 32) |
 
+To pick plugins, give a date first:
+
 ```bash
-depinder update --registry-limits maven=4:250 java
+depinder update 2026-10-01 java --registry-limits maven=4:250
 ```

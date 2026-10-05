@@ -47,8 +47,5 @@ Each source `analyse` finds — Trivy SBOMs, Syft SBOMs — gets its own subfold
 | `sbom-go` | `golang` | `sbom-golang` |
 | `sbom-rust` | `cargo` | `sbom-cargo` |
 
-The aliases without `sbom-` are the names of the lockfile plugins depinder had before, so an
-existing `-p java` still selects the Java ecosystem.
-
 Registry lookups are [cached](commands/cache.md) in `~/.dxw/depinder/cache/depinder.sqlite`, shared
 by every run on the machine, and fetched again once they are older than a day (`--cache-max-age`).

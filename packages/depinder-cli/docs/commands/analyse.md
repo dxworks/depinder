@@ -28,9 +28,9 @@ needs its token in `DEPINDER_RESOLVER_TOKEN`, a secret set once in your shell
 | `--github-token-file <file>` | Tokens for `github`, relative to the working directory; `GH_TOKEN` from the environment when absent | `.github-tokens` |
 | `--github-max-age <hours>` | Re-download advisories older than this | `24` |
 | `--resolver-url <url>` | The [bulk purl resolver](../configuration.md#bulk-resolver) to ask before the registries; needs `DEPINDER_RESOLVER_TOKEN` | `DEPINDER_RESOLVER_URL`, else `https://libs.dxworks.org` |
-| `--no-resolver` | Skip the bulk resolver, which is on by default; also skips its vulnerability server unless `--vuln-server` | off |
-| `--vuln-server` | With `--no-resolver`: still ask the server for vulnerabilities (the bench's no-server cell) | off |
-| `--no-vuln-server` | Keep the resolver for packages, but scan vulnerabilities with the local Trivy and Grype instead of its server | off |
+| `--no-resolver` | Skip the bulk resolver, which is on by default; also skips the [vulnerability server](../configuration.md#vulnerability-server) unless `--vuln-server` | off |
+| `--vuln-server` | With `--no-resolver`: still let the [vulnerability server](../configuration.md#vulnerability-server) scan the SBOMs; needs `DEPINDER_RESOLVER_TOKEN` | off |
+| `--no-vuln-server` | Keep the resolver for packages, but scan the SBOMs with the local Trivy and Grype instead of the [vulnerability server](../configuration.md#vulnerability-server) | off |
 | `--registry-limits <limits>` | Registry requests at once per ecosystem, with an optional gap in ms: `npm=16,cargo=1:1000`; see [registry fallback](../configuration.md#registry-fallback) | `DEPINDER_REGISTRY_LIMITS`, else 8 at once (`golang` 64, `nuget` 32) |
 | `--profile` | Phase timings, cache hits, requests per host | off |
 
@@ -105,10 +105,6 @@ the prefix is `<project-name>/-<pm>/` and own code stays in the chain. With it, 
 Black Duck's; `ProjectPath` and `_dependency_edges.csv` do not change. The repositories are
 looked up under `--target` by each SBOM's repository name.
 
-!!! note
-    Black Duck's unit is the manifest (83 sub-projects for a pnpm monorepo); ours is the lockfile
-    (4). The prefix matches, the row count per project does not.
-
 ## Examples
 
 ```bash
@@ -118,7 +114,7 @@ depinder analyse ./depminer/results/trivy ./depminer/results/syft -r results --v
 # One repository, Black Duck's exact paths
 depinder analyse ./sboms -r exports/my-project --project-name my-project --target /path/to/repositories
 
-# Only three ecosystems; the old plugin names select sbom-npm, sbom-ruby and sbom-java
+# Only three ecosystems; the aliases select sbom-npm, sbom-ruby and sbom-java
 depinder analyse ./sboms -r results -p npm ruby java
 
 # Reuse cached registry answers for a week instead of a day
