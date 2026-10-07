@@ -235,7 +235,7 @@ describe('queueRefresh', () => {
         // Not `enqueue`'s conflict branch: a counted ask on a row mid-fetch would fetch it twice.
         // The deadline is all a conflict changes.
         const conflict = calls[0]!.text.slice(calls[0]!.text.indexOf('on conflict'))
-        expect(conflict).toMatch(/do update\s+set wanted_until = greatest\(fetch_queue\.wanted_until,\s+excluded\.wanted_until\)\)/)
+        expect(conflict).toMatch(/do update\s+set wanted_until = greatest\(fetch_queue\.wanted_until,\s*excluded\.wanted_until\)/)
         expect(conflict).not.toMatch(/requests|priority|next_attempt_at/)
         expect(calls[0]!.params).toEqual([['pkg:npm/express', 'pkg:npm/react'], PRIORITY.refresh, until])
         expect(told.queued).toHaveBeenCalledTimes(1)
@@ -250,9 +250,7 @@ describe('queueRefresh', () => {
         expect(calls).toHaveLength(1)
         expect(calls[0]!.text).toMatch(/set wanted_until = greatest\(wanted_until, \$2::timestamptz\)/)
         expect(calls[0]!.text).not.toMatch(/next_attempt_at/)
-        // Only a row a worker holds is announced, carrying the deadline in epoch milliseconds.
-        expect(calls[0]!.text).toMatch(/when leased then pg_notify\('package_wanted'/)
-        expect(calls[0]!.params).toEqual([['pkg:npm/express', 'pkg:npm/react'], until, String(until.getTime())])
+        expect(calls[0]!.params).toEqual([['pkg:npm/express', 'pkg:npm/react'], until])
     })
 
     it('ranks a refresh below a first fetch and a feed event, above a retry', () => {

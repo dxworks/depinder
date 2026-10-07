@@ -12,7 +12,7 @@ import {checkGrype, checkTrivy} from './upstream.js'
 import {createUpdater, type Updater} from './updater.js'
 
 /**
- * Boot for `ROLE=vuln`. No pools, no migrations, no notify bridge: nothing here touches Postgres,
+ * Boot for `ROLE=vuln`. No pools, no migrations: nothing here touches Postgres,
  * and nothing under `src/vuln/` imports anything that does.
  *
  * A scanner that is missing is a deployment mistake and stops the process here, with the setting

@@ -1,6 +1,5 @@
 import {isDeadlock, type Db} from '../db/db.js'
 import type {ResolverEvents} from '../events.js'
-import {CHANNEL_QUEUED, CHANNEL_WANTED} from '../db/notify.js'
 import type {ParsedPurl} from '@depinder/core'
 import {enqueue, PRIORITY, sortedUnique} from '../db/queue.js'
 import type {PackageVersionsRow, QueueStats, RegistryFeedRow, ResolvePackageRow} from '../db/rows.js'
@@ -112,16 +111,14 @@ const PACKAGES_SQL = `select p.*,
                       where p.package_key = any($1::text[])`
 
 /**
- * Keeps the later of a row's deadline and `$2`, and tells whoever holds a row (`leased`) that it is
- * wanted now. `next_attempt_at` is not touched: a row in backoff stays in backoff. `$3` is `$2` in
- * epoch milliseconds, which is what the notification carries.
+ * Keeps the later of a row's deadline and `$2`. `next_attempt_at` is not touched: a row in backoff
+ * stays in backoff. A worker holding the row hears of it from `events.wanted`.
  */
 const MARK_WANTED_SQL = `update fetch_queue
                          set wanted_until = greatest(wanted_until, $2::timestamptz)
-                         where package_key = any($1::text[])
-                         returning case when leased then pg_notify('${CHANNEL_WANTED}', package_key || ' ' || $3) end`
+                         where package_key = any($1::text[])`
 
-/** `events`, when the worker shares this process, is told about the work `createPending` queues. */
+/** `events` tells the worker in this process about the work this queues and the packages it wants. */
 export function createResolveStore(db: Db, events?: ResolverEvents): ResolveStore {
     return {
         async getPackages(packageKeys) {
@@ -174,7 +171,7 @@ export function createResolveStore(db: Db, events?: ResolverEvents): ResolveStor
                     if (wantedUntil && created.length < unique.length) {
                         const mine = new Set(created.map(r => r.package_key))
                         const others = unique.map(p => p.packageKey).filter(key => !mine.has(key))
-                        await tx.query(MARK_WANTED_SQL, [others, wantedUntil, String(wantedUntil.getTime())])
+                        await tx.query(MARK_WANTED_SQL, [others, wantedUntil])
                         raced = others
                     }
                 })
@@ -205,14 +202,12 @@ export function createResolveStore(db: Db, events?: ResolverEvents): ResolveStor
             // later deadline.
             const insert = (): Promise<unknown> =>
                 db.query(
-                    `with queued as (insert into fetch_queue (package_key, priority, requested_at, attempts,
-                                                              next_attempt_at, wanted_until)
-                                     select t.key, $2::int, now(), 0, now(), $3::timestamptz
-                                     from unnest($1::text[]) as t(key)
-                                     on conflict (package_key) do update
-                                         set wanted_until = greatest(fetch_queue.wanted_until,
-                                                                     excluded.wanted_until))
-                     select pg_notify('${CHANNEL_QUEUED}', '')`,
+                    `insert into fetch_queue (package_key, priority, requested_at, attempts, next_attempt_at,
+                                              wanted_until)
+                     select t.key, $2::int, now(), 0, now(), $3::timestamptz
+                     from unnest($1::text[]) as t(key)
+                     on conflict (package_key) do update
+                         set wanted_until = greatest(fetch_queue.wanted_until, excluded.wanted_until)`,
                     [keys, PRIORITY.refresh, wantedUntil],
                 )
             try {
@@ -230,14 +225,14 @@ export function createResolveStore(db: Db, events?: ResolverEvents): ResolveStor
             const keys = sortedUnique(packageKeys)
             if (keys.length === 0) return
             const update = (): Promise<unknown> =>
-                db.query(MARK_WANTED_SQL, [keys, wantedUntil, String(wantedUntil.getTime())])
+                db.query(MARK_WANTED_SQL, [keys, wantedUntil])
             try {
                 await update()
             } catch (e) {
                 if (!isDeadlock(e)) throw e
                 await update()
             }
-            // After the commit, as ever. A worker in another process hears it from Postgres.
+            // After the commit, as ever.
             for (const key of keys) events?.wanted(key, wantedUntil.getTime())
         },
 

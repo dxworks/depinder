@@ -3,7 +3,6 @@ import type {Config} from '../config.js'
 import type {Db} from '../db/db.js'
 import type {ResolverEvents} from '../events.js'
 import {errorMessage, type Logger} from '@depinder/core'
-import type {NotifyBridge} from '../db/notify.js'
 import {PRIORITY} from '../db/queue.js'
 import type {QueueGroupRow} from '../db/rows.js'
 import {BODY_LIMIT_BYTES, clientGone, registerAuth, registerCompress, registerErrorHandler} from '../../shared/http-server.js'
@@ -23,8 +22,6 @@ interface ApiDeps {
     log: Logger
     /** The worker in this process, if there is one. See `src/resolver/events.ts`. */
     events?: ResolverEvents
-    /** The `LISTEN` connection that carries other processes' events. Reported by `GET /queue`. */
-    bridge?: NotifyBridge
     /** Overridden in tests. */
     store?: ResolveStore
 }
@@ -136,10 +133,8 @@ export async function createServer(deps: ApiDeps): Promise<FastifyInstance> {
 
     /**
      * The fetch queue at a glance: per ecosystem, how much somebody waits for, how much is waiting,
-     * held, retrying, and how old
-     * the oldest waiting ask is; how many packages gave up; and whether this process hears other
-     * processes. Behind the token, unlike `/health`, which stays a `select 1` for the container
-     * health check.
+     * held, retrying, and how old the oldest waiting ask is; and how many packages gave up. Behind
+     * the token, unlike `/health`, which stays a `select 1` for the container health check.
      */
     app.get('/queue', async () => {
         const {groups, errors} = await store.getQueue()
@@ -152,7 +147,7 @@ export async function createServer(deps: ApiDeps): Promise<FastifyInstance> {
             const name = PRIORITY_NAMES.get(group.priority) ?? String(group.priority)
             entry.by_priority[name] = (entry.by_priority[name] ?? 0) + group.queued
         }
-        return {listener: deps.bridge?.status ?? 'off', errors, total, types}
+        return {errors, total, types}
     })
 
     return app

@@ -7,17 +7,16 @@ what the fetch queue guarantees.
 
 ```
 src/
-  main.ts                  boot by ROLE, migrations, graceful shutdown
+  main.ts                  boot by ROLE (resolver or vuln), migrations, graceful shutdown
   shared/                  used by both roles; imports nothing from resolver/ or vuln/
     config.ts                env parsing helpers (the logger and purls come from @depinder/core)
     http-server.ts           auth, compression, error handler, body limit, clientGone
     errors.ts                BadRequestError, answered as a 400
-  resolver/                ROLE=resolver-api|resolver-worker|resolver
+  resolver/                ROLE=resolver: the api and the worker in one process
     config.ts                env
     events.ts                what the api and the worker tell each other in one process
     db/db.ts                 pg pool, migration runner, transactions
     db/queue.ts  db/rows.ts  fetch_queue priorities; row shapes
-    db/notify.ts             the same as events.ts, between processes, over LISTEN/NOTIFY
     db/fetch-log.ts          every upstream request, for provenance, kept FETCH_LOG_RETENTION_DAYS
     api/                     fastify server, /resolve, /feeds, /health
     registries/<type>-feed.ts  one change feed per ecosystem (maven-poll.ts, cargo-poll.ts poll
@@ -35,8 +34,8 @@ src/
 migrations/                plain SQL, applied at boot, tracked in schema_migrations
 ```
 
-A request for an unknown package inserts it as `pending` and queues it, and — when the two share a
-process — tells the worker so rather than leaving it to find out when its nap ends. The worker keeps
+A request for an unknown package inserts it as `pending` and queues it, and tells the worker so
+rather than leaving it to find out when its nap ends. The worker keeps
 `FETCH_CONCURRENCY` package fetches in flight at once and tops that pool back up — dequeuing as
 many rows as it has free slots, with `FOR UPDATE SKIP LOCKED` — as each one settles, rather than
 awaiting a batch. That matters because the batch would only finish when its slowest member did:
@@ -50,8 +49,7 @@ fill every slot with cargo at one request a second while npm sat idle behind it.
 the package is flagged `error` and retried in an hour — unless it already had good data, which
 keeps being served. `not_found` is retried after 24 hours, and a package whose registry said its
 facts are not final yet (golang, see [Ecosystems](../README.md#ecosystems)) is fetched again when it asked to be. Every terminal status is announced back
-to whatever request is waiting, after the commit that wrote it: see `src/resolver/events.ts` in one
-process and `src/resolver/db/notify.ts` between two. How the queue behaves as a whole is under
+to whatever request is waiting, after the commit that wrote it: see `src/resolver/events.ts`. How the queue behaves as a whole is under
 [The fetch queue](#the-fetch-queue).
 
 That transaction is counted in round trips, not in rows, because the database is hosted and a
@@ -107,12 +105,11 @@ only ever add rows to it; the demand-fill worker is the only thing that fetches.
 - **Atomic settle.** The queue row goes in the same statement as the package write that answers
   it, so there is no window in which a package is written but still queued, or dropped but not
   written.
-- **Signals, not dependencies.** Every queue write notifies `fetch_queued`, every terminal
-  package write notifies `package_settled`, and a caller waiting for a package a worker holds
-  notifies `package_wanted`, delivered by Postgres on commit only. A worker hears new work and new
-  urgency, and a `/resolve` hears its packages land, without waiting for a poll, even across
-  processes.
-  Without them (`DATABASE_LISTEN=false`, or the connection down) everything still works, by polling.
+- **Signals, not dependencies.** After each commit, the api tells the worker in the same process
+  about new work (`queued`) and new urgency (`wanted`), and the worker tells a waiting `/resolve`
+  that its packages landed (`settled`), so neither waits for a poll (`src/resolver/events.ts`).
+  Work the feeds or the retry sweep queue, or another instance commits, is found by polling: the
+  worker looks at a drained queue every second, a `/resolve` rereads its packages every 2 s.
 - **Visible.** [`GET /queue`](resolver-api.md#get-queue) shows depth, urgency, age, retries and dead letters per
   ecosystem.
 

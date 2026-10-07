@@ -26,9 +26,9 @@ export const DEFAULT_MAX_AGE_S = 86_400
 /**
  * How often the wait reads every key it is still waiting on, whatever it has heard.
  *
- * With the worker in the same process this is the fallback rather than the mechanism — a `settled`
- * event is what makes the stream look — so it can be slow. It is what a split `ROLE`, or a second
- * instance, whose workers never tell this process anything, falls back to.
+ * This is the fallback rather than the mechanism — a `settled` event from the worker in the same
+ * process is what makes the stream look — so it can be slow. It is what catches a package settled
+ * by a second instance, whose worker never tells this process anything.
  */
 export const POLL_INTERVAL_MS = 2_000
 /**

@@ -1,15 +1,13 @@
 import {beforeAll, describe, expect, it, vi} from 'vitest'
-import pg from 'pg'
 import {createResolveStore} from '../../../../src/resolver/api/store.js'
 import type {Config} from '../../../../src/resolver/config.js'
 import type {Db} from '../../../../src/resolver/db/db.js'
-import {setTimeout as sleep} from 'node:timers/promises'
 import {nullLogger, parsePurl} from '@depinder/core'
 import {enqueue, PRIORITY} from '../../../../src/resolver/db/queue.js'
 import type {FetchQueueRow, PackageRow} from '../../../../src/resolver/db/rows.js'
 import {dequeue, quotas, renewLeases} from '../../../../src/resolver/worker/fill/dequeue.js'
 import {runOnce} from '../../../../src/resolver/worker/fill/pool.js'
-import {express, json, url, type Postgres} from '../db.integration.helpers.js'
+import {express, json, type Postgres} from '../db.integration.helpers.js'
 
 /** What the queue keeps, the order it hands rows out in, who it wants them for, and the leases. */
 export function queueTests(postgres: () => Postgres): void {
@@ -115,16 +113,9 @@ export function queueTests(postgres: () => Postgres): void {
             await db.query('delete from fetch_queue')
         })
 
-        it('marks rows wanted with the later deadline, and tells only a worker that holds one', async () => {
+        it('marks rows wanted with the later deadline, and leaves a backoff alone', async () => {
             await db.query('delete from fetch_queue')
             const store = createResolveStore(db)
-            const listener = new pg.Client({connectionString: url})
-            await listener.connect()
-            const heard: string[] = []
-            listener.on('notification', m => {
-                if (m.channel === 'package_wanted') heard.push(m.payload!)
-            })
-            await listener.query('listen package_wanted')
             try {
                 const soon = new Date(Date.now() + 10_000)
                 const later = new Date(Date.now() + 20_000)
@@ -146,12 +137,7 @@ export function queueTests(postgres: () => Postgres): void {
                     ['pkg:npm/waiting', later.getTime(), 1],
                 ])
                 expect(rows.find(r => r.package_key === 'pkg:npm/waiting')!.backoff).toBe(true)
-
-                const deadline = Date.now() + 2_000
-                while (heard.length < 2 && Date.now() < deadline) await sleep(10)
-                expect(heard).toEqual([`pkg:npm/held ${later.getTime()}`, `pkg:npm/held ${soon.getTime()}`])
             } finally {
-                await listener.end()
                 await db.query('delete from fetch_queue')
             }
         })

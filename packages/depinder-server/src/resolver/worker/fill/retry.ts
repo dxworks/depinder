@@ -1,11 +1,10 @@
 import type {Db} from '../../db/db.js'
 import type {FetchRecord} from '../../registries/http.js'
 import type {Logger} from '@depinder/core'
-import {CHANNEL_QUEUED} from '../../db/notify.js'
 import {PRIORITY} from '../../db/queue.js'
 import type {FetchQueueRow} from '../../db/rows.js'
 import {insertFetchLog} from '../../db/fetch-log.js'
-import {notifySettled, settleQueueRow, type JobContext} from './write.js'
+import {settleQueueRow, type JobContext} from './write.js'
 
 export const MAX_ATTEMPTS = 3
 /** Backoff after the 1st, 2nd and 3rd failure. The queue gives up at MAX_ATTEMPTS. */
@@ -63,8 +62,7 @@ export async function giveUp(
              set status        = case when status = 'resolved' then 'resolved' else 'error' end,
                  error         = $2,
                  next_retry_at = now() + ${ERROR_RETRY}
-             where package_key = $1
-             returning ${notifySettled}`,
+             where package_key = $1`,
             [row.package_key, message],
         )
         await insertFetchLog(tx, row.package_key, records)
@@ -92,8 +90,7 @@ export async function sweepRetries(db: Db, log: Logger): Promise<void> {
               queued as (
                   insert into fetch_queue (package_key, priority, requested_at, attempts, next_attempt_at)
                       select package_key, $1::int, now(), 0, now() from due
-                      on conflict (package_key) do nothing
-                      returning package_key, pg_notify('${CHANNEL_QUEUED}', ''))
+                      on conflict (package_key) do nothing)
          update package
          set next_retry_at = null
          where package_key in (select package_key from due)

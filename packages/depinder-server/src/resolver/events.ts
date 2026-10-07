@@ -3,9 +3,10 @@
  *
  * Both halves already talk through the database — the queue row and the package row are the real
  * record, and everything here is only a way of not waiting for a timer to find out what has
- * already happened. Nothing depends on an event arriving: `ROLE=resolver-api` and `ROLE=resolver-worker` in separate
- * processes, or two instances behind a load balancer, never hear each other and fall back to the
- * database poll and the idle nap, just slower.
+ * already happened. Nothing depends on an event arriving: work another process commits — a second
+ * instance behind a load balancer, say — is found by the database poll and the idle nap, just
+ * slower. The feeds and the retry sweep send nothing either; the pump finds their rows on its
+ * next look at the queue.
  *
  * Three signals:
  *

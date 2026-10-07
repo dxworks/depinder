@@ -61,9 +61,9 @@ export const API_CONNECT_TIMEOUT_MS = 60_000
 /**
  * A pool and the handful of helpers around it.
  *
- * `poolSize` defaults to the whole of `DATABASE_POOL_SIZE` and is passed explicitly when a process
- * runs both roles: the api and the worker then get a pool each out of that one ceiling, because a
- * pool they share is a pool the worker holds every client of. See `poolSizes` in `config.ts`.
+ * `poolSize` defaults to the whole of `DATABASE_POOL_SIZE`. `main.ts` passes it explicitly: the api
+ * and the worker get a pool each out of that one ceiling, because a pool they share is a pool the
+ * worker holds every client of. See `poolSizes` in `config.ts`.
  * `connectTimeoutMs` is how long a query may wait for one of those clients; `main.ts` gives the
  * api's pool {@link API_CONNECT_TIMEOUT_MS}.
  */

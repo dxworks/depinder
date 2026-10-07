@@ -93,7 +93,6 @@ describe('routes', () => {
 
         const response = await app.inject({method: 'GET', url: '/queue', headers: auth})
         expect(response.json()).toEqual({
-            listener: 'off',
             errors: 4,
             total: {queued: 35, urgent: 13, in_flight: 5, due: 29, retrying: 2, oldest_due_s: 700},
             types: {

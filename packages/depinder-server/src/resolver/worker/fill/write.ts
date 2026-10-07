@@ -3,7 +3,6 @@ import type {Db, Queryable} from '../../db/db.js'
 import type {ResolverEvents} from '../../events.js'
 import type {FetchRecord} from '../../registries/http.js'
 import {distinctVersions, type Logger, type ParsedPurl, type ResolvedPackage} from '@depinder/core'
-import {CHANNEL_SETTLED} from '../../db/notify.js'
 import type {FetchQueueRow} from '../../db/rows.js'
 import {insertFetchLog} from '../../db/fetch-log.js'
 import {chunk} from '../loop.js'
@@ -94,14 +93,6 @@ export function settleQueueRow(requests: string): string {
            and requests <> ${requests}::int`
 }
 
-/**
- * The `returning` of every terminal package write: tells a `/resolve` in another process, on
- * commit, that this package has an answer. In-process listeners hear it from `events.settled`. A
- * data-modifying CTE runs to completion — `returning` included — whether or not anything reads it,
- * so this costs the write no extra statement.
- */
-export const notifySettled = `pg_notify('${CHANNEL_SETTLED}', package_key)`
-
 /** The package row, and with it the queue row that asked for it. */
 async function markNotFound(tx: Queryable, key: ParsedPurl, fetchedAt: Date, requests: number): Promise<void> {
     await tx.query(
@@ -113,8 +104,7 @@ async function markNotFound(tx: Queryable, key: ParsedPurl, fetchedAt: Date, req
                          error         = null,
                          fetched_at    = excluded.fetched_at,
                          as_of         = excluded.as_of,
-                         next_retry_at = excluded.next_retry_at
-                 returning ${notifySettled}),
+                         next_retry_at = excluded.next_retry_at),
          ${settleQueueRow('$6')}`,
         [key.packageKey, key.type, key.namespace, key.name, fetchedAt, requests],
     )
@@ -148,8 +138,7 @@ async function upsertResolved(
                          fetched_at                = excluded.fetched_at,
                          as_of                     = excluded.as_of,
                          -- A registry that knows its facts are incomplete asks to be fetched again.
-                         next_retry_at             = excluded.next_retry_at
-                 returning ${notifySettled}),
+                         next_retry_at             = excluded.next_retry_at),
          ${settleQueueRow('$13')}`,
         [
             key.packageKey,

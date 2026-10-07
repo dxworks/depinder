@@ -2,70 +2,23 @@ import {beforeAll, describe, expect, it, vi} from 'vitest'
 import {createResolveStore} from '../../../../src/resolver/api/store.js'
 import type {Config} from '../../../../src/resolver/config.js'
 import type {Db} from '../../../../src/resolver/db/db.js'
-import {createResolverEvents} from '../../../../src/resolver/events.js'
-import {setTimeout as sleep} from 'node:timers/promises'
 import {nullLogger, parsePurl} from '@depinder/core'
-import {startNotifyBridge} from '../../../../src/resolver/db/notify.js'
 import {enqueue, PRIORITY} from '../../../../src/resolver/db/queue.js'
 import type {FetchQueueRow, PackageRow} from '../../../../src/resolver/db/rows.js'
 import {runOnce} from '../../../../src/resolver/worker/fill/pool.js'
 import {sweepRetries} from '../../../../src/resolver/worker/fill/retry.js'
 import {ensureFeedRows} from '../../../../src/resolver/worker/feeds.js'
-import {express, json, type Postgres} from '../db.integration.helpers.js'
+import {json, type Postgres} from '../db.integration.helpers.js'
 
-/** What another process hears, how `confirmed_at` is worked out, and a re-check a registry asked for. */
+/** How `confirmed_at` is worked out, and a re-check a registry asked for. */
 export function freshnessTests(postgres: () => Postgres): void {
-    describe('notify and freshness', () => {
+    describe('freshness', () => {
         let db: Db
         let config: Config
 
         beforeAll(() => {
             db = postgres().db
             config = postgres().config
-        })
-
-        it('notifies another process of committed work and settled packages, and of nothing rolled back', async () => {
-            await db.query('delete from fetch_queue')
-            const events = createResolverEvents()
-            let queued = 0
-            const settled: string[] = []
-            events.onQueued(() => queued++)
-            events.onSettled(key => settled.push(key))
-            const bridge = startNotifyBridge({config, events, log: nullLogger})
-            try {
-                const deadline = Date.now() + 5_000
-                while (bridge.status !== 'connected' && Date.now() < deadline) await sleep(10)
-                expect(bridge.status).toBe('connected')
-
-                // Rolled back: the notification goes with the transaction.
-                await db
-                    .withTransaction(async tx => {
-                        await enqueue(tx, ['pkg:npm/never'], PRIORITY.demand)
-                        throw new Error('roll back')
-                    })
-                    .catch(() => undefined)
-                await sleep(100)
-                expect(queued).toBe(0)
-
-                // No in-process events are wired here: whatever arrives came through Postgres.
-                await createResolveStore(db).createPending([parsePurl('pkg:npm/notified')], null)
-                await waitUntil(() => queued > 0)
-                expect(queued).toBe(1)
-
-                vi.stubGlobal('fetch', async () => json({...(express as object), name: 'notified'}))
-                await runOnce({db, log: nullLogger, config})
-                await waitUntil(() => settled.length > 0)
-                expect(settled).toEqual(['pkg:npm/notified'])
-            } finally {
-                await bridge.stop()
-                await db.query("delete from package where package_key = 'pkg:npm/notified'")
-                await db.query('delete from fetch_queue')
-            }
-
-            async function waitUntil(condition: () => boolean): Promise<void> {
-                const deadline = Date.now() + 5_000
-                while (!condition() && Date.now() < deadline) await sleep(10)
-            }
         })
 
         it('works out confirmed_at: the feed vouches only when it can be believed', async () => {

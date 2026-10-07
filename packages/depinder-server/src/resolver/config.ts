@@ -1,27 +1,17 @@
 import {bool, ConfigError, requireLogLevel, requirePort, requireToken, str} from '../shared/config.js'
 import type {LogLevel} from '@depinder/core'
 
-export type Role = 'resolver-api' | 'resolver-worker' | 'resolver'
-
 export interface Config {
     /** Postgres connection string. Supabase: direct or session pooler (5432), not the 6543 pooler. */
     databaseUrl: string
     /** `false` disables TLS entirely (local Postgres). */
     databaseSsl: boolean
-    /**
-     * Keep one more connection, outside the pool, that `LISTEN`s for queue and settle notifications
-     * from other processes. See `src/resolver/db/notify.ts`. Off means polling only.
-     */
-    databaseListen: boolean
     /** Postgres connections this process keeps at most. Sized against `fetchConcurrency`. */
     databasePoolSize: number
-    /** Of those, how many are the api's alone when this process also runs the worker. */
+    /** Of those, how many are the api's alone; the worker gets the rest. */
     apiPoolSize: number
     /** Bearer token required on every route except /health. */
     apiToken: string
-    role: Role
-    /** The old ROLE value this process was started with (`api`, `worker`, `all`), for a warning. */
-    legacyRole?: string
     port: number
     logLevel: LogLevel
     /** How many package fetches the demand-fill worker keeps in flight at once. */
@@ -31,10 +21,6 @@ export interface Config {
     /** Days of `fetch_log` the worker keeps; older rows are deleted by its periodic sweep. */
     fetchLogRetentionDays: number
 }
-
-const ROLES: Role[] = ['resolver-api', 'resolver-worker', 'resolver']
-/** The names before the rename, still accepted so an old env or compose file keeps booting. */
-const LEGACY_ROLES: Record<string, Role> = {api: 'resolver-api', worker: 'resolver-worker', all: 'resolver'}
 
 /**
  * Reads config from an environment. Throws `ConfigError` with a message meant for a human
@@ -53,12 +39,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
     const apiToken = requireToken(env)
 
-    const roleRaw = str(env.ROLE) ?? 'resolver'
-    const legacyRole = roleRaw in LEGACY_ROLES ? roleRaw : undefined
-    const role = (LEGACY_ROLES[roleRaw] ?? roleRaw) as Role
-    if (!ROLES.includes(role)) {
-        throw new ConfigError(`ROLE must be one of ${ROLES.join(', ')} or vuln (got "${roleRaw}").`)
-    }
+    const role = str(env.ROLE) ?? 'resolver'
+    if (role !== 'resolver') throw new ConfigError(`ROLE must be resolver or vuln (got "${role}").`)
 
     const logLevel = requireLogLevel(env)
     const port = requirePort(env)
@@ -78,7 +60,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // slot ever to stand still waiting for a client. That would be 32, and it is not the default:
     // a Supabase session pooler serves its configured `pool_size` and refuses everything past it
     // outright (EMAXCONNSESSION) rather than queueing, and a stock project's is 15 — for the whole
-    // process, api role and migration lock included. 15 is therefore the most that needs no
+    // process, api pool and migration lock included. 15 is therefore the most that needs no
     // dashboard change; raise Pool Size there (or connect directly) and then set this to 32.
     const poolSizeRaw = str(env.DATABASE_POOL_SIZE) ?? '15'
     const databasePoolSize = Number(poolSizeRaw)
@@ -103,16 +85,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // and leaves two for /feeds, /health and a seventh chunk; the connect timeout is no longer ten
     // seconds either (see `API_CONNECT_TIMEOUT_MS` in `db/db.ts`). It is carved OUT of
     // DATABASE_POOL_SIZE rather than added to it, because the ceiling that matters is the pooler's
-    // and it counts the whole process: with the Pro pooler's 45 and DATABASE_POOL_SIZE=32 that is 8
-    // for the api, 24 for the worker and one LISTEN connection, 33 in all.
+    // and it counts the whole process: with DATABASE_POOL_SIZE=32 that is 8 for the api and 24 for
+    // the worker.
     const apiPoolRaw = str(env.API_POOL_SIZE) ?? '8'
     const apiPoolSize = Number(apiPoolRaw)
     if (!Number.isInteger(apiPoolSize) || apiPoolSize < 1 || apiPoolSize > 200) {
         throw new ConfigError(`API_POOL_SIZE must be an integer between 1 and 200 (got "${apiPoolRaw}").`)
     }
-    if (role === 'resolver' && apiPoolSize >= databasePoolSize) {
+    if (apiPoolSize >= databasePoolSize) {
         throw new ConfigError(
-            `API_POOL_SIZE (${apiPoolSize}) is carved out of DATABASE_POOL_SIZE (${databasePoolSize}) when ROLE=resolver, ` +
+            `API_POOL_SIZE (${apiPoolSize}) is carved out of DATABASE_POOL_SIZE (${databasePoolSize}), ` +
             'so it must leave at least one connection for the worker.',
         )
     }
@@ -138,12 +120,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     return {
         databaseUrl,
         databaseSsl: bool(env.DATABASE_SSL, true),
-        databaseListen: bool(env.DATABASE_LISTEN, true),
         databasePoolSize,
         apiPoolSize,
         apiToken,
-        role,
-        ...(legacyRole ? {legacyRole} : {}),
         port,
         logLevel,
         fetchConcurrency,
@@ -153,21 +132,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 }
 
 /**
- * How `DATABASE_POOL_SIZE` is split between the two halves of the process.
- *
- * A single role has nothing to split: `resolver-api` and `resolver-worker` each get the whole
- * allowance, which is what a two-container deployment wants. `resolver` gives the api `API_POOL_SIZE` of its own and the
- * worker the rest, so that the worker's writes can never be what a `/resolve` waits behind — the
- * two pools are separate queues, and one process still opens no more connections than before.
+ * How `DATABASE_POOL_SIZE` is split between the two halves of the process: the api gets
+ * `API_POOL_SIZE` of its own and the worker the rest, so that the worker's writes can never be what
+ * a `/resolve` waits behind. The two pools are separate queues under one connection ceiling.
  *
  * `loadConfig` already refuses an `API_POOL_SIZE` that would leave the worker nothing; the clamp
  * here is so the function is total for a hand-built `Config` in a test.
  */
 export function poolSizes(
-    config: Pick<Config, 'role' | 'databasePoolSize' | 'apiPoolSize'>,
+    config: Pick<Config, 'databasePoolSize' | 'apiPoolSize'>,
 ): {api: number; worker: number} {
-    if (config.role === 'resolver-api') return {api: config.databasePoolSize, worker: 0}
-    if (config.role === 'resolver-worker') return {api: 0, worker: config.databasePoolSize}
     const api = Math.max(1, Math.min(config.apiPoolSize, config.databasePoolSize - 1))
     return {api, worker: Math.max(1, config.databasePoolSize - api)}
 }

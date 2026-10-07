@@ -1,5 +1,4 @@
 import type {Queryable} from './db.js'
-import {CHANNEL_QUEUED} from './notify.js'
 
 /**
  * `fetch_queue` is the message queue between whoever asks for a package and the worker that
@@ -38,9 +37,6 @@ export const PRIORITY = {
  * and that fetch deletes it only if the count is still the one it dequeued — so a feed event for a
  * package mid-fetch keeps the row, and the package is fetched once more.
  *
- * It also notifies {@link CHANNEL_QUEUED}, from inside the statement, so a worker in another
- * process hears of the work when — and only if — the transaction carrying it commits.
- *
  * The keys are sorted and deduplicated here rather than by `select distinct` in the statement, and
  * that is a correctness fix, not a tidy-up. `on conflict do update` takes a row lock on every key
  * it touches and holds it to the end of the transaction, in the order the rows arrive; a
@@ -57,16 +53,14 @@ export async function enqueue(
     const keys = sortedUnique(packageKeys)
     if (keys.length === 0) return
     await db.query(
-        `with queued as (insert into fetch_queue (package_key, priority, requested_at, attempts, next_attempt_at,
-                                                 wanted_until)
-                         select t.key, $2::int, now(), 0, now(), $3::timestamptz
-                         from unnest($1::text[]) as t(key)
-                         on conflict (package_key) do update
-                             set priority     = least(fetch_queue.priority, excluded.priority),
-                                 requested_at = least(fetch_queue.requested_at, excluded.requested_at),
-                                 requests     = fetch_queue.requests + 1,
-                                 wanted_until = greatest(fetch_queue.wanted_until, excluded.wanted_until))
-         select pg_notify('${CHANNEL_QUEUED}', '')`,
+        `insert into fetch_queue (package_key, priority, requested_at, attempts, next_attempt_at, wanted_until)
+         select t.key, $2::int, now(), 0, now(), $3::timestamptz
+         from unnest($1::text[]) as t(key)
+         on conflict (package_key) do update
+             set priority     = least(fetch_queue.priority, excluded.priority),
+                 requested_at = least(fetch_queue.requested_at, excluded.requested_at),
+                 requests     = fetch_queue.requests + 1,
+                 wanted_until = greatest(fetch_queue.wanted_until, excluded.wanted_until)`,
         [keys, priority, wantedUntil],
     )
 }

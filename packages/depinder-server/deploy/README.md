@@ -133,7 +133,6 @@ lost because the data lives in Supabase.
 | `SITE_ADDRESS` | `:80` serves plain HTTP on the IP. A domain that points at the server gets HTTPS |
 | `DATABASE_URL` | Supabase session pooler string, port 5432 |
 | `DATABASE_SSL` | `true` for Supabase |
-| `DATABASE_LISTEN` | `true` uses one extra connection for notifications |
 | `DATABASE_POOL_SIZE` | Max DB connections (32; the Pro pooler allows 45 in total) |
 | `API_POOL_SIZE` | How many of those are reserved for the API (8) |
 | `RESOLVER_API_TOKEN` | API token, from `openssl rand -hex 32`. depinder uses it as `DEPINDER_RESOLVER_TOKEN` |

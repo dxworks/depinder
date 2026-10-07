@@ -102,7 +102,7 @@ retry schedules, whatever `max_age` asks.
 default `ROLE=resolver` — and the stream gathers those announcements for 100 ms, then reads every
 package they name in one query, and sends them. One read runs at a time per stream; whatever lands
 during it goes into the next. Every 2 s it also reads every package it is still waiting on, which
-is all it gets with the worker somewhere else or more than one instance. The versions of packages
+is all it gets for a package another instance's worker settles. The versions of packages
 known at once are read 500 packages at a time, with a flush after each slice, so the first lines
 leave after the first round trip rather than after the whole read. There are no keepalive lines:
 the deadline is capped at a minute, well inside undici's 300 s body timeout.
@@ -142,7 +142,6 @@ The fetch queue at a glance, read live (one query, not memoised):
 
 ```json
 {
-  "listener": "connected",
   "errors": 4,
   "total": {"queued": 35, "urgent": 13, "in_flight": 5, "due": 29, "retrying": 2, "oldest_due_s": 700},
   "types": {
@@ -156,8 +155,7 @@ The fetch queue at a glance, read live (one query, not memoised):
 `in_flight` is held by a worker under a live lease; `due` is waiting for a free slot (or for the
 cap its ecosystem is at); `retrying` has failed at least once; `oldest_due_s` is how long the oldest
 due row has been asked for. `errors` counts packages that ran out of attempts and wait for the
-sweeper's hourly retry — the dead letters. `listener` is this process's `LISTEN` connection:
-`connected`, `reconnecting`, or `off` (`DATABASE_LISTEN=false`). See
+sweeper's hourly retry — the dead letters. See
 [The fetch queue](resolver-internals.md#the-fetch-queue).
 
 ### `GET /health`

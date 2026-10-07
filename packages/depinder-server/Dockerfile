@@ -56,9 +56,8 @@ USER node
 
 EXPOSE 8080
 
-# ROLE=resolver-worker containers serve no HTTP: disable this check for them
-# (`healthcheck: {disable: true}` in compose). ROLE=vuln needs a longer start period: its first boot
-# on an empty volume downloads both databases (docker-compose.yml).
+# Both roles serve /health. ROLE=vuln needs a longer start period: its first boot on an empty
+# volume downloads both databases (docker-compose.yml).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 

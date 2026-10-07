@@ -8,7 +8,7 @@ agreements (commits, secrets, sizes, the resolver database) are in the root `CLA
 ## Layout and the import rule
 
 ```
-src/main.ts      ROLE switch: resolver-api, resolver-worker, resolver, vuln
+src/main.ts      ROLE switch: resolver (api + worker in one process), vuln
 src/shared/      config, errors, the fastify plumbing both servers use (purls and logging: @depinder/core)
 src/resolver/    api/, db/, registries/ (feeds, polls, limits), worker/ (Postgres-backed)
 src/vuln/        POST /vulnerabilities: Trivy + Grype, no Postgres

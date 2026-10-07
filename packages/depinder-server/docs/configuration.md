@@ -10,13 +10,12 @@ All of it is environment variables; `.env.example` is the annotated copy.
 | `DATABASE_URL` | — | **required.** Postgres connection string |
 | `RESOLVER_API_TOKEN` | — | **required**, at least 16 characters. The bearer token. The server refuses to start without it |
 | `DATABASE_SSL` | `true` | `true` connects with `rejectUnauthorized: false`, which is what Supabase's shared certificate needs |
-| `DATABASE_LISTEN` | `true` | Keep one extra connection, outside the pool, that `LISTEN`s for queue and settle notifications, so an api and a worker in different processes hear each other at once. Off: they find out by polling. See [The fetch queue](resolver-internals.md#the-fetch-queue) |
-| `ROLE` | `resolver` | `resolver-api` (HTTP only), `resolver-worker` (demand-fill + feeds only), `resolver` (both; the old names `api`, `worker`, `all` still work with a warning), `vuln` (the vulnerability server, no Postgres; its own settings are under [Vulnerabilities](vuln-server.md)) |
+| `ROLE` | `resolver` | `resolver` (the api and the worker in one process) or `vuln` (the vulnerability server, no Postgres; its own settings are under [Vulnerabilities](vuln-server.md)). Anything else refuses to start |
 | `PORT` | `8080` | |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 | `FETCH_CONCURRENCY` | `64` | Package fetches the demand-fill worker keeps in flight at once. Just above what the per-ecosystem limiters add up to, so those stay the constraint |
 | `DATABASE_POOL_SIZE` | `15` | Postgres connections this process opens at most. The write side of a fill runs on these; about half `FETCH_CONCURRENCY` keeps every fetch slot moving |
-| `API_POOL_SIZE` | `8` | Of those, the api's own. Carved out of `DATABASE_POOL_SIZE`, so the worker gets the rest and the process still opens no more than the ceiling. `ROLE=resolver` only |
+| `API_POOL_SIZE` | `8` | Of those, the api's own. Carved out of `DATABASE_POOL_SIZE`, so the worker gets the rest and the process still opens no more than the ceiling. Must be smaller than `DATABASE_POOL_SIZE` |
 | `PAYLOAD_CACHE_MAX_PACKAGES` | `50000` | Packages whose version tuples the api holds in memory. An entry is used only when the `package` row read this request carries the same `fetched_at`, so it is multi-instance safe. `0` switches it off |
 | `FETCH_LOG_RETENTION_DAYS` | `3` | Days of `fetch_log` (every upstream request the worker made) to keep, 1 to 365. The worker's ten-minute sweep deletes older rows. The bench reads only its own run's window |
 
@@ -26,17 +25,15 @@ long as the request did, so a fetch pool of 64 wants roughly 32 connections unde
 stand still waiting for one. The default is 15, not 32, because of the pooler: **a Supabase session
 pooler serves its own "Pool Size" (Dashboard > Settings > Database > Connection pooling) and refuses
 everything past it outright with `EMAXCONNSESSION` rather than queueing**, and a stock project's
-Pool Size is 15 — for the whole process, api role and migrations included. Raise it there (or
+Pool Size is 15 — for the whole process, api pool and migrations included. Raise it there (or
 connect directly, which on a small instance is ~60 connections) and then set
-`DATABASE_POOL_SIZE=32`. Splitting the roles across two containers gives each its own pool, so count
-both against the same ceiling.
+`DATABASE_POOL_SIZE=32`.
 
-`API_POOL_SIZE` divides that allowance rather than adding to it. Under `ROLE=resolver` the two halves
-used to share one pool, and a fill keeps `FETCH_CONCURRENCY` writes in flight, so the worker held
-every client in it; pg does not queue a waiter indefinitely, and a `/resolve` query left in the
-pending queue is rejected after ten seconds with `timeout exceeded when trying to connect` — an HTTP
-500 for a caller who did nothing wrong. Each half now has a pool of its own, and so a queue of its
-own. A process running a single role gives the whole of `DATABASE_POOL_SIZE` to it.
+`API_POOL_SIZE` divides that allowance rather than adding to it. A fill keeps `FETCH_CONCURRENCY`
+writes in flight, so in a pool shared with the api the worker would hold every client; pg does not
+queue a waiter indefinitely, and a `/resolve` query left in the pending queue is rejected with
+`timeout exceeded when trying to connect` — an HTTP 500 for a caller who did nothing wrong. So each
+half has a pool of its own, and so a queue of its own.
 
 The default of 8 is what a depinder run asks for at once. It posts every chunk of a run together, up
 to 2,000 purls each, so a 10,000-purl run is six requests in flight, and it never retries one: a
@@ -46,8 +43,8 @@ on a cold version cache a chunk's 500-package version reads take 2–8 s each ag
 database. With 4 clients, six such chunks queued for longer than pg's ten-second connect timeout;
 one stream lost its trailer and its 2,000 purls, and a run that takes 15 s took 152. Eight gives
 each of six chunks a client and leaves two for `/feeds`, `/health` and a seventh. With the Pro
-pooler's 45 and `DATABASE_POOL_SIZE=32` that is 8 for the api, 24 for the worker and one `LISTEN`
-connection, 33 in all; with the stock 15 the worker keeps 7.
+pooler's 45 and `DATABASE_POOL_SIZE=32` that is 8 for the api and 24 for the worker; with the stock
+15 the worker keeps 7.
 
 The api's pool also waits longer for a client than the worker's: 60 seconds, the longest
 `deadline_ms` a `/resolve` may ask for, instead of 10. A request whose read has to queue becomes
@@ -65,9 +62,7 @@ queue rows the request already committed stay committed.
 
 With Supabase use the **direct or session pooler** connection string (port 5432), not the
 transaction pooler on 6543: migrations and the `FOR UPDATE SKIP LOCKED` queue need session
-semantics — and so does `LISTEN`, which is why the listen connection works through the session
-pooler. It is one connection per process on top of `DATABASE_POOL_SIZE`; count it against the
-pooler's Pool Size too. `.env` is gitignored.
+semantics. `.env` is gitignored.
 
 ## Docker
 
@@ -111,6 +106,3 @@ No database container — the database is hosted. Both servers read `.env` for t
   cannot starve the resolver. Placeholders: tune them on the machine it runs on (`bench/micro/vuln-bench.cjs`).
   The page cache of Grype's 2.9 GB database counts against the memory limit.
 - **Shutdown.** 70 s grace, so a `/resolve` stream or a scan in flight can finish.
-
-Splitting the resolver across two containers is a matter of running the same image twice with
-`ROLE=resolver-api` and `ROLE=resolver-worker`; disable the health check on the worker, which serves no HTTP.
