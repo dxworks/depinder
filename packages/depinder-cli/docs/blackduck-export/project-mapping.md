@@ -1,6 +1,6 @@
 # Project paths in Black Duck reports
 
-[`transformBlackDuckReports`](commands/blackduck-reports.md#transformblackduckreports) reads the
+[`transformBlackDuckReports`](../commands/blackduck-reports.md#transformblackduckreports) reads the
 project each dependency belongs to from its Black Duck `Path`, writes it as `ProjectPath`, and,
 with `--basePath`, checks that the folder exists on disk (`VerifiedPath`, `VerifiedPathMethod`).
 

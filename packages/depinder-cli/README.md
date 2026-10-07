@@ -70,9 +70,15 @@ dependency graph.
 
 ```shell
 depinder analyse <sbom-folder...> -r <out> \
-    [--vuln-source trivy,grype,github] [--github-token-file F] [--project-name NAME] [--target DIR] \
-    [--cache-max-age 1d] [--refresh]
+    [--vuln-source trivy,grype,github] [--github-token-file F] [--project-name NAME] \
+    [--depminer-index FILE | --no-depminer-index] [--cache-max-age 1d] [--refresh]
 ```
+
+Black Duck's `Path` prefix and its own-code rule need the repositories' manifests. DepMiner keeps
+them in its results (`depminer/results/depminer/` and its `index.json`), and `analyse` finds that
+index beside the input on its own, so the DepMiner results are enough: no access to the scanned
+repositories is needed. `--depminer-index` names an index kept elsewhere; `--no-depminer-index`
+leaves the plain prefix.
 
 Each SBOM is sorted by its content — a Trivy SBOM goes to `<out>/trivy/`, a Syft SBOM to
 `<out>/syft/` — and each subfolder gets the normal depinder CSVs for that source, then the

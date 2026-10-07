@@ -21,6 +21,45 @@ No configuration file: command-line options, environment variables, and a few fi
 | `DEPINDER_VULN_CHUNK_SIZE` | Purls per request to the vulnerability server. Default and maximum `5000` |
 | `TRIVY_BIN`, `GRYPE_BIN` | Scanner binaries when not on `PATH` |
 
+### Setting a variable
+
+Each variable can be set for every terminal, for one terminal, or for one run. The
+[resolver token](install.md#4-resolver-token-optional) belongs in the shell profile; the rest are usually
+set for one terminal or one run.
+
+=== "macOS / Linux"
+
+    ```bash
+    # Every new terminal: append to ~/.zshrc (macOS) or ~/.bashrc (Linux), then reload it
+    echo 'export DEPINDER_CACHE_MAX_AGE=7d' >> ~/.zshrc && source ~/.zshrc
+
+    # This terminal only
+    export DEPINDER_CACHE_MAX_AGE=7d
+
+    # One run only: put it before the command
+    DEPINDER_CACHE_DB=./run.sqlite depinder analyse ./sboms -r results
+
+    # Unset it again for this terminal
+    unset DEPINDER_CACHE_MAX_AGE
+    ```
+
+=== "Windows"
+
+    ```powershell
+    # Every new terminal (open one afterwards)
+    setx DEPINDER_CACHE_MAX_AGE "7d"
+
+    # This terminal only
+    $env:DEPINDER_CACHE_MAX_AGE = "7d"
+
+    # Unset it again for this terminal
+    Remove-Item Env:DEPINDER_CACHE_MAX_AGE
+    ```
+
+    PowerShell has no one-run form: set it for the terminal, run, then unset it.
+
+A command-line option always wins over its variable.
+
 ## Files
 
 | Path | What |
@@ -59,7 +98,7 @@ The local scanners run instead:
 On by default. A resolver service answers thousands of package URLs in one call, from its own
 store of registry facts, instead of depinder asking each registry package by package. `analyse`
 calls the one at `https://libs.dxworks.org`; all it needs is its token, a secret you set once
-([how](install.md#4-resolver-token)):
+([how](install.md#4-resolver-token-optional)):
 
 ```bash
 export DEPINDER_RESOLVER_TOKEN=…
@@ -77,6 +116,15 @@ To use another resolver, set `DEPINDER_RESOLVER_URL` or pass `--resolver-url`; t
 | `DEPINDER_RESOLVER_MAX_WAIT_MS` | Budget for the whole bulk phase; each request sends what is left of it as `deadline_ms` (at most 60 s). Default `60000` |
 | `DEPINDER_RESOLVER_CONCURRENCY` | Caps the chunks in flight at once. Default: every chunk at once; `1` posts one chunk at a time |
 | `--no-resolver` | Skip it for this run; no token needed |
+
+Both servers say whether they are up without a token (`curl.exe` on Windows):
+
+```bash
+curl -s https://libs.dxworks.org/health        # the resolver: {"status":"ok","db":"ok"}
+curl -s https://libs.dxworks.org/vuln/health   # the vulnerability server: scanner databases and their age
+```
+
+With `DEPINDER_RESOLVER_URL` set, ask that server instead. Every other route needs the token.
 
 Every chunk is posted at once, with one deadline for all of them, so no chunk waits behind another
 and each has the whole budget to fetch what the server does not know yet. Each is posted once: there

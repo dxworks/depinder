@@ -76,8 +76,8 @@ export interface AnalyseOptions extends ResolverOptions, CacheMaxAgeOptions {
     profile?: boolean
     /** SBOM sources: the `Project path` value and the head of every dependency path. */
     projectName?: string
-    /** SBOM sources: the scanned repositories, one per SBOM repo name, for Black Duck's `Path` prefix. */
-    target?: string
+    /** SBOM sources: DepMiner's `index.json` for Black Duck's `Path` prefix; `false` for `--no-depminer-index`. */
+    depminerIndex?: string | false
     /** `false` for `--no-vuln-server`, `true` for `--vuln-server` (kept on under `--no-resolver`), else unset. */
     vulnServer?: boolean
     /** `npm=16,cargo=1:1000`: per-ecosystem registry limits over `DEPINDER_REGISTRY_LIMITS` and the defaults. */
@@ -101,9 +101,9 @@ export function createAnalyseCommand(): Command {
         .option('-p, --plugins [plugins...]', 'A list of plugins')
         .option('--project-name <name>',
             'SBOM sources: the name to write in the Project path column and at the head of every dependency path')
-        .option('--target <folder>',
-            'SBOM sources: the folder holding the scanned repositories, one per SBOM name; their manifests give '
-            + 'Path its Black Duck project prefix and drop the repository\'s own code from the chain')
+        .option('--depminer-index <file>', 'SBOM sources: DepMiner\'s index.json (or its folder), whose manifests give Path '
+            + 'its Black Duck project prefix and drop own code from the chain; found beside the input when unset')
+        .option('--no-depminer-index', 'SBOM sources: do not read the DepMiner index; Path keeps the plain directory prefix')
         .option('--vuln-source <sources>',
             'Vulnerability sources for the SBOM route: a comma-separated list of trivy, grype, github, all',
             DEFAULT_VULN_SOURCE)

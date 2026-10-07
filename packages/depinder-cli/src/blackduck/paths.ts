@@ -9,7 +9,7 @@ import {
     readBomGraph,
 } from '../plugins/sbom/cyclonedx'
 import {log} from '../utils/logging'
-import {blackDuckPrefix, manifestOfTree, ownCodeMatcher, readRepoManifests, RepoManifests} from './manifests'
+import {blackDuckPrefix, manifestOfTree, ownCodeMatcher, RepoManifests} from './manifests'
 import {originFor, pathSegment} from './origins'
 
 /**
@@ -41,8 +41,8 @@ export interface SbomPath {
     purlType: string
     /**
      * `<repo>/-<package manager>/<name>/<version>/…` — the chain, as Black Duck writes it
-     * (`<name>:<version>` where the origin id uses a colon). With the scanned repository on disk
-     * (`--target`) the prefix is Black Duck's project prefix, `<name>/<version>/<repo>/…`; see
+     * (`<name>:<version>` where the origin id uses a colon). With the repository's manifests (from
+     * DepMiner's index) the prefix is Black Duck's project prefix, `<name>/<version>/<repo>/…`; see
      * `blackDuckPrefix`.
      */
     path: string
@@ -350,13 +350,17 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
     return {paths: results, edges: treeEdges(contracted, seeds, flat, render, treeOf, repo, purlType)}
 }
 
+export interface SbomTreeOptions {
+    manifests?: RepoManifests
+}
+
 /**
  * Every (component, path) pair and every parent-child edge in one SBOM, restricted to the purl
  * types being exported. `repo` is the label the chain starts from — the project name, which is
- * what Black Duck puts first. `repoDir`, when given, is the scanned repository on disk: its
- * manifests supply Black Duck's project prefix and the own-code rule (see `manifests.ts`).
+ * what Black Duck puts first. `manifests`, when given, are the scanned repository's: they
+ * supply Black Duck's project prefix and the own-code rule (see `manifests.ts`).
  */
-export function sbomTree(sbomFile: string, repo: string, purlTypes: Set<string>, options: {repoDir?: string} = {}): {paths: SbomPath[], edges: SbomEdge[]} {
+export function sbomTree(sbomFile: string, repo: string, purlTypes: Set<string>, options: SbomTreeOptions = {}): {paths: SbomPath[], edges: SbomEdge[]} {
     let graph: BomGraph
     try {
         graph = readBomGraph(sbomFile)
@@ -364,14 +368,12 @@ export function sbomTree(sbomFile: string, repo: string, purlTypes: Set<string>,
         log.warn(`Could not read ${path.basename(sbomFile)} for dependency paths: ${e?.message ?? e}`)
         return {paths: [], edges: []}
     }
-    const manifests = options.repoDir ? readRepoManifests(options.repoDir) : undefined
-    if (options.repoDir && !manifests) log.warn(`${options.repoDir} is not a directory; paths of ${path.basename(sbomFile)} get no project prefix`)
     const trees = [...purlTypes].flatMap(purlType =>
-        findProjectNodes(graph, sbomFile, purlType).map(node => projectTree(graph, node, repo, purlType, manifests)))
+        findProjectNodes(graph, sbomFile, purlType).map(node => projectTree(graph, node, repo, purlType, options.manifests)))
     return {paths: trees.flatMap(it => it.paths), edges: trees.flatMap(it => it.edges)}
 }
 
 /** Just the chains, for a caller that only writes the `Path` column. */
-export function sbomPaths(sbomFile: string, repo: string, purlTypes: Set<string>, options: {repoDir?: string} = {}): SbomPath[] {
+export function sbomPaths(sbomFile: string, repo: string, purlTypes: Set<string>, options: SbomTreeOptions = {}): SbomPath[] {
     return sbomTree(sbomFile, repo, purlTypes, options).paths
 }

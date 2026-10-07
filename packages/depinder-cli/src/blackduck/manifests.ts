@@ -3,7 +3,7 @@ import path from 'path'
 import {ParsedPurl} from '../plugins/sbom/cyclonedx'
 
 /**
- * What the scanned repository says about itself, read off its manifests on disk.
+ * What the scanned repository says about itself, read off its manifests (see `depminer-index.ts`).
  *
  * Two things in the Black Duck export cannot be read from an SBOM, and both come from here:
  *
@@ -78,47 +78,33 @@ export function familyOfTag(tag: string): string {
     }
 }
 
-/** Walks the repository once and reads every manifest it recognises. */
-export function readRepoManifests(repoDir: string): RepoManifests | undefined {
-    if (!repoDir || !fs.existsSync(repoDir) || !fs.statSync(repoDir).isDirectory()) return undefined
+/** Repo-relative path (`/`-separated) -> the file on disk that holds its content. */
+export type RepoFiles = Map<string, string>
+
+/** Reads every manifest it recognises among one repository's files. */
+export function readRepoManifests(files: RepoFiles): RepoManifests {
     const manifests: RepoManifest[] = []
     const lockDirs = new Set<string>()
-    const walk = (dir: string) => {
-        let entries: fs.Dirent[]
-        try {
-            entries = fs.readdirSync(dir, {withFileTypes: true})
-        } catch {
-            return
-        }
-        const rel = path.relative(repoDir, dir).split(path.sep).join('/')
-        for (const entry of entries) {
-            if (entry.isDirectory()) {
-                if (!SKIPPED_DIRS.has(entry.name)) walk(path.join(dir, entry.name))
-                continue
-            }
-            if (!entry.isFile()) continue
-            for (const family of FAMILIES) {
-                if (family.lockfiles.test(entry.name)) lockDirs.add(`${family.purlType}\0${rel}`)
-                if (family.manifests.test(entry.name)) {
-                    const read = readManifest(path.join(dir, entry.name), family.purlType)
-                    manifests.push({dir: rel, file: entry.name, purlType: family.purlType, ...read})
-                }
+    for (const relative of files.keys()) {
+        const dir = path.posix.dirname(relative) === '.' ? '' : path.posix.dirname(relative)
+        if (dir.split('/').some(segment => SKIPPED_DIRS.has(segment))) continue
+        const base = path.posix.basename(relative)
+        for (const family of FAMILIES) {
+            if (family.lockfiles.test(base)) lockDirs.add(`${family.purlType}\0${dir}`)
+            if (family.manifests.test(base)) {
+                const read = readManifest(files, relative, family.purlType)
+                manifests.push({dir, file: base, purlType: family.purlType, ...read})
             }
         }
     }
-    walk(repoDir)
     manifests.sort((a, b) => a.dir.localeCompare(b.dir) || a.file.localeCompare(b.file))
     return {manifests, lockDirs}
 }
 
-function readManifest(file: string, purlType: string): {name?: string, version?: string} {
-    let text: string
-    try {
-        text = fs.readFileSync(file, 'utf8')
-    } catch {
-        return {}
-    }
-    const base = path.basename(file)
+function readManifest(files: RepoFiles, relative: string, purlType: string): {name?: string, version?: string} {
+    const text = readText(files.get(relative))
+    if (text === undefined) return {}
+    const base = path.posix.basename(relative)
     try {
         if (base === 'package.json' || base === 'composer.json') {
             const json = JSON.parse(text)
@@ -128,12 +114,21 @@ function readManifest(file: string, purlType: string): {name?: string, version?:
         if (base === 'Cargo.toml') return tomlSection(text, 'package') ?? {}
         if (base === 'go.mod') return {name: text.match(/^module\s+(\S+)/m)?.[1]}
         if (base === 'pom.xml') return pomCoordinates(text)
-        if (base.startsWith('build.gradle')) return gradleCoordinates(file, text)
+        if (base.startsWith('build.gradle')) return gradleCoordinates(files, path.posix.dirname(relative), text)
         if (purlType === 'nuget') return {name: base.replace(/\.(csproj|fsproj|vbproj)$/, '')}
     } catch {
         return {}
     }
     return {}
+}
+
+function readText(file: string | undefined): string | undefined {
+    if (!file) return undefined
+    try {
+        return fs.readFileSync(file, 'utf8')
+    } catch {
+        return undefined
+    }
 }
 
 function str(value: unknown): string | undefined {
@@ -178,13 +173,10 @@ function pomCoordinates(text: string): {name?: string, version?: string} {
  * Only an unindented `version` is the project's: one inside a block (a plugin's, a dependency's)
  * is not, and Black Duck writes `unspecified` for teammates, whose only `version` is such a one.
  */
-function gradleCoordinates(file: string, text: string): {name?: string, version?: string} {
-    const dir = path.dirname(file)
+function gradleCoordinates(files: RepoFiles, dir: string, text: string): {name?: string, version?: string} {
     let name: string | undefined
     for (const settings of ['settings.gradle', 'settings.gradle.kts']) {
-        const settingsFile = path.join(dir, settings)
-        if (!fs.existsSync(settingsFile)) continue
-        name = fs.readFileSync(settingsFile, 'utf8').match(/rootProject\.name\s*=\s*["']([^"']+)["']/)?.[1]
+        name = readText(files.get(path.posix.join(dir, settings)))?.match(/rootProject\.name\s*=\s*["']([^"']+)["']/)?.[1]
         if (name) break
     }
     const version = text.match(/^version\s*=?\s*["']([^"']+)["']/m)?.[1]
@@ -216,7 +208,7 @@ export function manifestOfTree(repo: RepoManifests | undefined, treeDir: string,
  *   gradle   `java-gradle-teammates:unspecified:` — no directory segment
  *   go_mod   `github.com/caddyserver/caddy/v2:go-caddy:`
  *   yarn, rubygems, packagist, cargo, pip   the plain directory
- * Without manifests (no `--target`), every tag gets the plain directory, as before.
+ * Without manifests (no DepMiner index), every tag gets the plain directory.
  */
 export function blackDuckPrefix(tag: string, projectPath: string, manifest: RepoManifest | undefined): string {
     const plain = `${projectPath}/`

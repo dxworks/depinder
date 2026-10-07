@@ -65,12 +65,17 @@ describe('the analyse command line', () => {
         expect((await parseArgs('/repo')).options.cacheMaxAge).toBeUndefined()
     })
 
-    it('accepts the SBOM export options --project-name and --target', async () => {
-        const {options} = await parseArgs('/sboms', '--project-name', 'mastodon', '--target', '/repos', '--github-token-file', 'f')
+    it('accepts the SBOM export options --project-name and --depminer-index', async () => {
+        const {options} = await parseArgs('/sboms', '--project-name', 'mastodon', '--depminer-index', '/dm/index.json', '--github-token-file', 'f')
         expect(options.projectName).toBe('mastodon')
-        expect(options.target).toBe('/repos')
+        expect(options.depminerIndex).toBe('/dm/index.json')
         expect(options.githubTokenFile).toBe('f')
         expect((await parseArgs('/sboms')).options.projectName).toBeUndefined()
+    })
+
+    it('leaves the DepMiner index to be found unless --no-depminer-index turns it off', async () => {
+        expect((await parseArgs('/sboms')).options.depminerIndex).toBeUndefined()
+        expect((await parseArgs('/sboms', '--no-depminer-index')).options.depminerIndex).toBe(false)
     })
 
     it('defaults --vuln-source to trivy and grype', async () => {

@@ -18,7 +18,7 @@ depinder transformBlackDuckReports <reportPath> [options]
 
 Writes `_dependencies.csv`, `_dependencies_sources.csv` (with `VerifiedPath`,
 `VerifiedPathMethod`), `_vulnerability_details.csv` and `_upgrade_guidance.csv` into the same
-folder. How project paths are found and verified: [Project paths in Black Duck reports](../project-mapping.md).
+folder. How project paths are found and verified: [Project paths in Black Duck reports](../blackduck-export/project-mapping.md).
 [`analyse`](analyse.md) writes the same four files, same headers and cell
 conventions, from SBOMs.
 

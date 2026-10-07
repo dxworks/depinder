@@ -1,6 +1,7 @@
 import path from 'path'
 import {SbomDescription} from '../plugins/sbom/describe'
 import {log} from '../utils/logging'
+import {depMinerManifests} from './depminer-index'
 import {timePhaseSync} from '../utils/profile'
 import {WrittenFile, writeBlackDuckExport} from './export'
 import {AnalysedEcosystem, buildModel} from './model'
@@ -17,8 +18,8 @@ import {SbomEdge, SbomPath, sbomTree} from './paths'
 export interface BlackDuckRunOptions {
     /** `Project path` and the head of every dependency path. Defaults to `defaultProjectName`. */
     projectName?: string
-    /** The scanned repositories, one per SBOM repo name; their manifests give `Path` its prefix. */
-    target?: string
+    /** DepMiner's `index.json` (or its folder); `false` turns it off; unset finds it beside the input. */
+    depminerIndex?: string | false
 }
 
 /**
@@ -43,10 +44,10 @@ export function writeBlackDuckForSource(
     // One source can hold several repos' SBOMs, and the repo a path belongs to is the SBOM's own
     // repo, not the run's label — so each file contributes its paths under its own repo. An
     // explicit --project-name still overrides, for a run that really is a single project.
-    // The repository a SBOM was scanned from sits under --target by that same repo name.
-    const repoDirOf = (sbom: SbomDescription) => options.target ? path.join(options.target, sbom.repo) : undefined
+    // DepMiner's index holds each repo's manifests, under the SBOM's repo name.
+    const manifestsOf = depMinerManifests(options.depminerIndex, inputFolder)
     const trees = timePhaseSync('blackduck:paths', () => sboms.map(sbom =>
-        sbomTree(sbom.file, options.projectName ?? sbom.repo, exportedTypes, {repoDir: repoDirOf(sbom)})))
+        sbomTree(sbom.file, options.projectName ?? sbom.repo, exportedTypes, {manifests: manifestsOf(sbom)})))
     const paths: SbomPath[] = trees.flatMap(it => it.paths)
     const edges: SbomEdge[] = trees.flatMap(it => it.edges)
 

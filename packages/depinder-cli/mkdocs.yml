@@ -79,9 +79,9 @@ nav:
       - analyse: commands/analyse.md
       - github-advisories: commands/github-advisories.md
       - cache & update: commands/cache.md
-      - Black Duck report tools:
-          - commands/blackduck-reports.md
-          - Project paths: project-mapping.md
+      - Black Duck report tools: commands/blackduck-reports.md
       - extractFrameworkVersion: commands/extract-framework-version.md
-  - Black Duck Export: blackduck-export.md
+  - Black Duck Export:
+      - blackduck-export/index.md
+      - Project paths: blackduck-export/project-mapping.md
   - Configuration: configuration.md

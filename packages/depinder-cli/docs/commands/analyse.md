@@ -13,7 +13,7 @@ any mix, and both sources are optional: depinder processes whatever it finds.
 Package facts come from the [bulk resolver](../configuration.md#bulk-resolver) at
 `https://libs.dxworks.org` first, and from the registries for what it does not answer. The resolver
 needs its token in `DEPINDER_RESOLVER_TOKEN`, a secret set once in your shell
-([how](../install.md#4-resolver-token)); without it every package comes from the registries.
+([how](../install.md#4-resolver-token-optional)); without it every package comes from the registries.
 
 | Option | Meaning | Default |
 |---|---|---|
@@ -21,7 +21,8 @@ needs its token in `DEPINDER_RESOLVER_TOKEN`, a secret set once in your shell
 | `-r, --results <folder>` | Output folder; one subfolder per source appears under it | `results` |
 | `-p, --plugins [plugins...]` | Use these `sbom-*` plugins, by name or [alias](../index.md#ecosystems) (`java` selects `sbom-java`) | from the SBOMs |
 | `--project-name <name>` | SBOM sources: `ProjectPath` value and head of every `Path` | the SBOMs' repo name |
-| `--target <folder>` | SBOM sources: the scanned repositories, one per SBOM repo name; gives `Path` Black Duck's project prefix and drops own code from the chain | off |
+| `--depminer-index <file>` | SBOM sources: DepMiner's `index.json`, or the folder holding it; its manifests give `Path` Black Duck's project prefix and drop own code from the chain ([more](#the-depminer-index)) | `depminer/index.json` beside the input |
+| `--no-depminer-index` | SBOM sources: do not read the DepMiner index; `Path` keeps the plain prefix and own code | off |
 | `--refresh` | Ignore the cache | off |
 | `--cache-max-age <duration>` | Cached libraries older than this are fetched again: `90s`, `30m`, `12h`, `7d`; a bare number is seconds | `DEPINDER_CACHE_MAX_AGE`, else `1d` |
 | `--vuln-source <sources>` | `trivy`, `grype`, `github`, `all`, comma-separated | `trivy,grype` |
@@ -91,19 +92,29 @@ A subfolder appears only when its source had input.
 The four `_*.csv` files have the header line and cell conventions of
 [`transformBlackDuckReports`](blackduck-reports.md), so a downstream reader processes a
 depinder subfolder and a transformed Black Duck folder the same way. Columns and derivations:
-[Black Duck Export](../blackduck-export.md).
+[Black Duck Export](../blackduck-export/index.md).
 
 Plugins come from the purl types in the SBOMs; `-p` picks them instead. Trivy and Grype scan each
 file once; findings are unioned by (package, id). Syft SBOMs carry edges only for yarn
 workspaces and Maven modules; Trivy SBOMs carry the graph for every lockfile.
 
-## `--target`
+## The DepMiner index
 
 Black Duck prefixes every path with `<name>/<version>/<dir>/-<pm>/`, read from the manifest, and
-treats the repository's own code as the project. An SBOM has no manifest, so without `--target`
-the prefix is `<project-name>/-<pm>/` and own code stays in the chain. With it, `Path` matches
-Black Duck's; `ProjectPath` and `_dependency_edges.csv` do not change. The repositories are
-looked up under `--target` by each SBOM's repository name.
+treats the repository's own code as the project. An SBOM has no manifest, but DepMiner keeps
+every manifest and lockfile it mined: flat copies in `depminer/results/depminer/`, and an
+`index.json` that maps each copy back to `<repo>/<path>`. `analyse` reads the manifests from
+there, so **the DepMiner results are all it needs; no access to the scanned repositories is
+required.**
+
+The index is found on its own: `analyse` looks for `depminer/index.json` from each SBOM's folder
+upwards, up to the folder holding the input, so both `depminer/results` and
+`depminer/results/syft` find `depminer/results/depminer/index.json`. `--depminer-index` points at
+an index somewhere else; `--no-depminer-index` turns it off. Each SBOM's manifests are those
+listed under its repository name.
+
+With the index, `Path` matches Black Duck's. Without one, the prefix is `<project-name>/-<pm>/`
+and own code stays in the chain. `ProjectPath` and `_dependency_edges.csv` are the same either way.
 
 ## Examples
 
@@ -111,8 +122,8 @@ looked up under `--target` by each SBOM's repository name.
 # A DepMiner results folder: Trivy and Syft SBOMs side by side, one run, two subfolders
 depinder analyse ./depminer/results/trivy ./depminer/results/syft -r results --vuln-source trivy,grype,github
 
-# One repository, Black Duck's exact paths
-depinder analyse ./sboms -r exports/my-project --project-name my-project --target /path/to/repositories
+# SBOMs copied away from their DepMiner results: name the index to keep Black Duck's exact paths
+depinder analyse ./sboms -r exports/my-project --project-name my-project --depminer-index ./depminer/results/depminer
 
 # Only three ecosystems; the aliases select sbom-npm, sbom-ruby and sbom-java
 depinder analyse ./sboms -r results -p npm ruby java

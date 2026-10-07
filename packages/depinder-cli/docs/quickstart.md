@@ -6,10 +6,16 @@ A folder of CycloneDX SBOMs in, a folder of CSVs out.
 
 - Depinder [installed](install.md).
 - A folder of CycloneDX SBOMs (`*.cdx.json`, or any `.json` declaring `bomFormat`). A [DepMiner](https://dxworks.org/depminer/) results zip has them
-  under `depminer/results/syft/` and `depminer/results/trivy/`.
+  under `depminer/results/syft/` and `depminer/results/trivy/`. The DepMiner results are all you
+  need: the manifests Black Duck's paths take their prefix from are in
+  [its index](commands/analyse.md#the-depminer-index), so the scanned repositories are not.
 - Trivy and/or Grype on `PATH`, for vulnerabilities.
-- `DEPINDER_RESOLVER_TOKEN` set, for the resolver server (see [Installing](install.md#4-resolver-token)).
-  Without it every package is fetched from the registries, which is slower.
+- Optionally, `DEPINDER_RESOLVER_TOKEN` set, for our server (see [Installing](install.md#4-resolver-token-optional)).
+
+!!! tip "No token? No problem"
+    Depinder works fully locally without the token: package data comes from the registries and
+    vulnerabilities from your local Trivy and Grype. The results are the same; the run is only
+    slower.
 
 ## 1. Analyse
 
@@ -31,6 +37,14 @@ depinder analyse /path/to/depminer/results -r results --cache-max-age 7d
 
 # Everything fetched again now
 depinder analyse /path/to/depminer/results -r results --cache-max-age 0
+```
+
+To start from an empty cache without touching the shared one, give the run a database of its own
+with `DEPINDER_CACHE_DB`; the file is created on first use, and deleting it empties it again.
+`--profile` prints at the end where the time went:
+
+```bash
+DEPINDER_CACHE_DB=./run.sqlite depinder analyse /path/to/depminer/results -r results --profile
 ```
 
 The `github` source is optional. The Trivy and Grype databases already include GitHub's
@@ -97,4 +111,4 @@ results/
 ```
 
 The four `_*.csv` files have the exact shape [`transformBlackDuckReports`](commands/blackduck-reports.md)
-gives a real Black Duck export — see [Black Duck files](blackduck-export.md).
+gives a real Black Duck export — see [Black Duck files](blackduck-export/index.md).

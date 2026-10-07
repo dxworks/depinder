@@ -8,7 +8,7 @@ vulnerabilities. It runs as `depinder` on the command line, or as a `dxw` plugin
 | CycloneDX SBOMs, `*.cdx.json` or any `.json` declaring `bomFormat` | [DepMiner](https://dxworks.org/depminer/) — Syft and Trivy, offline |
 
 SBOMs are the only input: lockfiles and manifests are not parsed. From them come the dependency
-graph, upgrade guidance, three vulnerability sources, and the [Black Duck export](blackduck-export.md).
+graph, upgrade guidance, three vulnerability sources, and the [Black Duck export](blackduck-export/index.md).
 
 ## Where to go next
 
@@ -17,7 +17,7 @@ graph, upgrade guidance, three vulnerability sources, and the [Black Duck export
 - :material-download: **[Installing](install.md)** — the CLI and the two scanners.
 - :material-rocket-launch: **[Quick Start](quickstart.md)** — SBOMs in, CSVs out.
 - :material-console: **[Commands](commands/index.md)** — every command, with its options.
-- :material-file-table: **[Black Duck Export](blackduck-export.md)** — the files and every column.
+- :material-file-table: **[Black Duck Export](blackduck-export/index.md)** — the files and every column.
 - :material-tune: **[Configuration](configuration.md)** — tokens, cache, environment.
 
 </div>
@@ -32,7 +32,7 @@ Per ecosystem found, three CSVs named after the plugin, `sbom-<eco>`:
 
 Each source `analyse` finds — Trivy SBOMs, Syft SBOMs — gets its own subfolder (`trivy/`,
 `syft/`). Each also holds `security.csv`, one row per (component, advisory), and the
-[Black Duck-shaped files](blackduck-export.md).
+[Black Duck-shaped files](blackduck-export/index.md).
 
 ## Ecosystems
 
