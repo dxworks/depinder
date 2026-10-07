@@ -4,7 +4,7 @@ import path from 'node:path'
 import {setTimeout as sleep} from 'node:timers/promises'
 import {parseArgs} from 'node:util'
 import {byStatus, counts, fetchedIn, formatCounts, isDrained, openDb, type BenchDb} from './lib/db.js'
-import {copyCache, depinderPreflight, EXPECTED_BRANCH, gitInfo, runDepinder} from './lib/depinder.js'
+import {copyCache, depinderPreflight, gitInfo, runDepinder} from './lib/depinder.js'
 import {apiToken, maskedDbHost, readEnvFile, scrubDbDetails} from './lib/env.js'
 import {imageCreated, imageStaleness, stackUp, waitHealthy} from './lib/stack.js'
 import {buildSummary, CELLS, describeVulnDbs, WARM_AFTER_COLD, type Cell, type RunRecord, type ServerStats} from './lib/summary.js'
@@ -275,7 +275,7 @@ async function main(): Promise<void> {
         const runStarted = new Date()
         const meta = (finished: boolean) => ({
             label: opts.label, target: target.name, url: target.url, dbHost: host,
-            depinder: {...depinder, dir: MONOREPO_DIR, expectedBranch: EXPECTED_BRANCH}, server,
+            depinder: {...depinder, dir: MONOREPO_DIR}, server,
             imageCreated: created, imageWarning: stale, vulnHealth: vulnHealth.body, inputDir: INPUT_DIR,
             node: process.version, host: os.hostname(), cpus: os.cpus().length,
             ghTokensStripped: true, strippedEnv: ctx.strippedEnv, loads: ctx.loads, options: opts, reportNow: opts.now,

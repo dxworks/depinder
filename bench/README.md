@@ -60,9 +60,10 @@ and `syft/`), overridable with `BENCH_INPUT_DIR`.
 For the local targets the bench runs `docker compose up -d` with the target's files first. That is
 idempotent, and recreates the containers when the env file differs from what they run on, so
 switching targets moves the stack to the right database. Then it waits for `/health` and
-`/vuln/health`. It warns (does not fail) when the image is older than the last commit touching
-`packages/depinder-server` or anything under its `src/`; pass `--rebuild` then. **Only one stack per database**: don't bench `deploy`
-while the hosted server runs on the same database.
+`/vuln/health`. It warns (does not fail) when the image is older than its inputs (the Dockerfile and
+everything the root `.dockerignore` lets in: server and core sources, migrations, lockfile), by last
+commit or by file time; pass `--rebuild` then. **Only one stack per database**: don't bench
+`deploy` while the hosted server runs on the same database.
 
 Secrets: env files are parsed into an object, never into the bench's environment, and never
 printed. Of `DATABASE_URL` only a masked host is shown (`dev database (***.example.com)`: the
@@ -72,8 +73,8 @@ as `DEPINDER_RESOLVER_TOKEN`.
 
 ### Preflight
 
-- depinder-cli's `dist/` exists and is not older than its `src/` (else it stops; `--build-depinder`
-  builds), its branch is `feature/depinder-rework` (warns otherwise).
+- depinder-cli's `dist/` exists and is not older than what it bundles: its `src/`, core's `src/`
+  and their build configs (else it stops; `--build-depinder` builds).
 - The token is at least 16 characters.
 - Trivy and Grype are not needed locally: vulnerabilities come from the vuln server, whose health
   and database builds are recorded.

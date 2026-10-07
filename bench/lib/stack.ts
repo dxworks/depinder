@@ -1,7 +1,6 @@
 import {spawnSync} from 'node:child_process'
-import {readdirSync, statSync} from 'node:fs'
-import path from 'node:path'
 import {setTimeout as sleep} from 'node:timers/promises'
+import {newestFile, serverImageInputs} from './build-inputs.js'
 import {MONOREPO_DIR, SERVER_DIR, type Target} from './targets.js'
 
 /**
@@ -95,28 +94,20 @@ export function imageCreated(target: Target): string | null {
     return capture(['docker', 'image', 'inspect', IMAGE, '--format', '{{.Created}}'])
 }
 
-/** The newest file modification time under `dir`, for "is the build older than its source". */
-export function newestMtime(dir: string): number {
-    let newest = 0
-    for (const entry of readdirSync(dir, {withFileTypes: true, recursive: true})) {
-        if (!entry.isFile()) continue
-        newest = Math.max(newest, statSync(path.join(entry.parentPath, entry.name)).mtimeMs)
-    }
-    return newest
-}
-
 /**
- * A warning (never a failure) when the image is older than the code it should contain: a bench of
- * yesterday's image against today's source measures the wrong thing. `--rebuild` fixes it.
+ * A warning (never a failure) when the image is older than the code it should contain (server, core,
+ * lockfile, Dockerfile): a bench of yesterday's image against today's source measures the wrong
+ * thing. `--rebuild` fixes it.
  */
 export function imageStaleness(created: string | null): string | null {
     if (!created) return null
     const builtAt = Date.parse(created)
-    const head = Date.parse(capture(['git', 'log', '-1', '--format=%cI', '--', 'packages/depinder-server'], MONOREPO_DIR) ?? '')
-    const src = newestMtime(path.join(SERVER_DIR, 'src'))
+    const inputs = serverImageInputs()
+    const lastCommit = Date.parse(capture(['git', 'log', '-1', '--format=%cI', '--', ...inputs], MONOREPO_DIR) ?? '')
+    const newest = newestFile(inputs)
     const reasons: string[] = []
-    if (head > builtAt) reasons.push(`the last server commit (${new Date(head).toISOString()})`)
-    if (src > builtAt) reasons.push(`a file under src/ (${new Date(src).toISOString()})`)
+    if (lastCommit > builtAt) reasons.push(`the last commit touching its inputs (${new Date(lastCommit).toISOString()})`)
+    if (newest && newest.mtimeMs > builtAt) reasons.push(`${newest.path} (${new Date(newest.mtimeMs).toISOString()})`)
     if (reasons.length === 0) return null
     return `image ${IMAGE} (built ${new Date(builtAt).toISOString()}) is older than ${reasons.join(' and ')}; pass --rebuild`
 }

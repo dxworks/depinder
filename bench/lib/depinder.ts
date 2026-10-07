@@ -4,15 +4,14 @@ import os from 'node:os'
 import path from 'node:path'
 import {childEnv} from './env.js'
 import {parseProfile, pick, type Picks, type Profile} from './profile.js'
-import {capture, newestMtime, sh} from './stack.js'
+import {CLI_BUNDLE_INPUTS, newestFile} from './build-inputs.js'
+import {capture, sh} from './stack.js'
 import {INPUT_DIR, MONOREPO_DIR} from './targets.js'
 
 /**
- * The client side of a run: checking that depinder's dist is the code on its branch, and running
- * `depinder analyse` once with its output, log and SQLite cache where the bench wants them.
+ * The client side of a run: checking that depinder's dist is built from the current sources, and
+ * running `depinder analyse` once with its output, log and SQLite cache where the bench wants them.
  */
-
-export const EXPECTED_BRANCH = 'feature/depinder-rework'
 
 /** The CLI's Nx project in the monorepo; its build lands in dist/. */
 export const DEPINDER_CLI_DIR = path.join(MONOREPO_DIR, 'packages', 'depinder-cli')
@@ -35,14 +34,12 @@ export function gitInfo(dir: string): GitInfo {
 }
 
 /**
- * Fails when the CLI's dist/ is missing or older than its src/ (a run of stale JavaScript would be
- * credited to code it does not contain), unless `build` is set, which builds it first. Returns the
- * warnings worth printing.
+ * Fails when the CLI's dist/ is missing or older than what it bundles, its own sources and core's (a
+ * run of stale JavaScript would be credited to code it does not contain), unless `build` is set,
+ * which builds it first. Returns the warnings worth printing.
  */
 export function depinderPreflight(build: boolean): string[] {
     const warnings: string[] = []
-    const git = gitInfo(MONOREPO_DIR)
-    if (git.branch !== EXPECTED_BRANCH) warnings.push(`depinder is on ${git.branch}, not ${EXPECTED_BRANCH}`)
     if (build) {
         console.log(`Building depinder (${BUILD_COMMAND.join(' ')} in ${MONOREPO_DIR})`)
         sh(BUILD_COMMAND, MONOREPO_DIR, 10 * 60_000)
@@ -50,10 +47,11 @@ export function depinderPreflight(build: boolean): string[] {
     const howToBuild = `run ${BUILD_COMMAND.join(' ')} in ${MONOREPO_DIR}, or pass --build-depinder`
     const entry = path.join(DEPINDER_CLI_DIR, 'dist', 'index.js')
     if (!existsSync(entry)) throw new Error(`${entry} is missing: ${howToBuild}`)
-    const src = newestMtime(path.join(DEPINDER_CLI_DIR, 'src'))
+    const newest = newestFile(CLI_BUNDLE_INPUTS)
     const dist = statSync(entry).mtimeMs
-    if (src > dist) {
-        throw new Error(`depinder dist/ (${new Date(dist).toISOString()}) is older than its src/ (${new Date(src).toISOString()}): ${howToBuild}`)
+    if (newest && newest.mtimeMs > dist) {
+        throw new Error(`depinder dist/ (${new Date(dist).toISOString()}) is older than ${newest.path} `
+            + `(${new Date(newest.mtimeMs).toISOString()}): ${howToBuild}`)
     }
     for (const producer of ['trivy', 'syft']) {
         if (!existsSync(path.join(INPUT_DIR, producer))) warnings.push(`input folder ${path.join(INPUT_DIR, producer)} is missing`)
