@@ -1,5 +1,9 @@
 import axios from 'axios'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
+import {countRequest} from './profile'
+
+const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql'
+const SONATYPE_REPORT_URL = 'https://ossindex.sonatype.org/api/v3/component-report'
 
 export async function getVulnerabilitiesFromGithub(ecosystem: string, packageName: string): Promise<Vulnerability[]> {
     const query = `
@@ -45,8 +49,9 @@ export async function getVulnerabilitiesFromGithub(ecosystem: string, packageNam
         }
     `.trim()
 
+    countRequest(GITHUB_GRAPHQL_URL)
     const { data: response } = await axios.post(
-        'https://api.github.com/graphql',
+        GITHUB_GRAPHQL_URL,
         {
             query,
             variables: { ecosystem, package: packageName }
@@ -76,7 +81,8 @@ export async function getVulnerabilitiesFromGithub(ecosystem: string, packageNam
 
 }
 export async function getVulnerabilitiesFromSonatype(purls: string[]): Promise<{ [purl: string]: Vulnerability[] }> {
-    const {data} = await axios.post('https://ossindex.sonatype.org/api/v3/component-report', {coordinates: purls})
+    countRequest(SONATYPE_REPORT_URL)
+    const {data} = await axios.post(SONATYPE_REPORT_URL, {coordinates: purls})
 
     return data.reduce((a: any, v: any) => ({
         ...a, [v.coordinates]: v.vulnerabilities.map((it: any) => ({

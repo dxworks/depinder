@@ -1,5 +1,5 @@
 import {log as defaultLog} from '../utils/logging'
-import {count} from '../utils/profile'
+import {count, countRequest} from '../utils/profile'
 import type {PackageRecord} from '@depinder/core'
 import {ResolverConfig} from './config'
 
@@ -243,11 +243,13 @@ async function postOnce(
     onLine: (item: ItemLine) => void
 ): Promise<PostOutcome> {
     count('resolver:request')
+    const url = `${config.url}/resolve`
+    countRequest(url)
     const body: {purls: string[], max_age?: number, deadline_ms: number} = {purls, deadline_ms: deadlineMs}
     if (config.freshAfterMs !== undefined) body.max_age = maxAgeFor(config.freshAfterMs)
     let items = 0
     try {
-        const response = await fetch(`${config.url}/resolve`, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${config.token}`,
@@ -258,9 +260,7 @@ async function postOnce(
                 'Accept-Encoding': 'br, gzip',
             },
             body: JSON.stringify(body),
-            signal: typeof AbortSignal?.timeout === 'function'
-                ? AbortSignal.timeout(deadlineMs + REQUEST_TIMEOUT_SLACK_MS)
-                : undefined,
+            signal: AbortSignal.timeout(deadlineMs + REQUEST_TIMEOUT_SLACK_MS),
         })
         if (!response.ok) {
             // Nothing else will be read from it; let undici close the connection.

@@ -1,6 +1,6 @@
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {log as defaultLog} from '../utils/logging'
-import {count} from '../utils/profile'
+import {count, countRequest} from '../utils/profile'
 import {ResolverConfig} from '../resolver/config'
 
 /**
@@ -194,8 +194,10 @@ export async function fetchServerVulnerabilities(
 
     const askChunk = async (chunk: string[]): Promise<void> => {
         count('vuln:request')
+        const url = `${config.url}/vulnerabilities`
+        countRequest(url)
         try {
-            const response = await fetch(`${config.url}/vulnerabilities`, {
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${config.token}`,

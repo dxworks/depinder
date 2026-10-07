@@ -5,8 +5,7 @@
     "src/vuln-sources/server.ts",
     "src/vuln-sources/github/client.ts",
     "src/utils/vulnerabilities.ts",
-    "src/fallback/libraries-io.ts",
-    "src/utils/profile.ts"
+    "src/fallback/libraries-io.ts"
   ],
   "httpModules": [
     "axios", "node-fetch", "npm-registry-fetch", "undici", "got", "ky", "superagent", "request", "cross-fetch",

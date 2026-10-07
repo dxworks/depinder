@@ -1,5 +1,6 @@
 import {LibraryInfo} from '../extension-points/library-info'
 import {log} from '../utils/logging'
+import {countRequest} from '../utils/profile'
 import {fetchLibraryInfo, FallbackPackage, FallbackResult} from './fetch-library-info'
 import {librariesIoFallback, LibrariesIoFallback} from './libraries-io'
 import {createRegistryClients} from './registry-clients'
@@ -31,7 +32,7 @@ export function isRateLimit(e: any): boolean {
 
 /** The fallback over the real registries, with the CLI's limits. */
 export function createRegistryFallback(limits: RegistryLimits): RegistryFallback {
-    const clients = createRegistryClients({limits: limits.limits})
+    const clients = createRegistryClients({limits: limits.limits, onRequest: event => countRequest(event.url)})
     return {
         ...registryFallbackWith({fetchInfo: pkg => fetchLibraryInfo(pkg, {clients}), librariesIo: librariesIoFallback()}),
         packagesAtOnce: type => packagesAtOnce(limits, type),

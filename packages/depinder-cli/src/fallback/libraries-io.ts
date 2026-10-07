@@ -1,5 +1,6 @@
 import moment from 'moment'
 import {LibraryInfo} from '../extension-points/library-info'
+import {countRequest} from '../utils/profile'
 import {delay} from '../utils/utils'
 
 /**
@@ -36,7 +37,9 @@ export function librariesIoFallback(): LibrariesIoFallback {
 /** One project from https://libraries.io/api, spaced half a second apart as old depinder did. */
 async function retrieveFromLibrariesIo(platform: LibrariesIoPlatform, libraryName: string): Promise<LibraryInfo> {
     await delay(500)
-    const response = await fetch(`https://libraries.io/api/${platform}/${libraryName}?api_key=${process.env.LIBRARIES_IO_API_KEY}`)
+    const url = `https://libraries.io/api/${platform}/${libraryName}?api_key=${process.env.LIBRARIES_IO_API_KEY}`
+    countRequest(url)
+    const response = await fetch(url)
     const data: any = await response.json()
 
     return {

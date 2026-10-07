@@ -2,6 +2,7 @@ import https from 'https'
 import {GithubAdvisory} from './advisory'
 import {TokenPool} from './tokens'
 import {log} from '../../utils/logging'
+import {countRequest} from '../../utils/profile'
 
 /**
  * The `GET /advisories` client: one page at a time, cursor pagination, tokens drawn from the pool.
@@ -165,6 +166,7 @@ export class AdvisoryClient {
  * pagination is pinned to `baseUrl`'s origin, so a request never carries a token off that host.
  */
 export const nodeHttpsFetch: HttpFetch = (url, headers) => new Promise((resolve, reject) => {
+    countRequest(url)
     const request = https.get(url, {headers}, response => {
         const chunks: Buffer[] = []
         response.on('data', chunk => chunks.push(chunk))
