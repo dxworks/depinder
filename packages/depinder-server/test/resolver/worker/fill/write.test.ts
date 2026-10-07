@@ -65,10 +65,10 @@ describe('demand-fill write path', () => {
         // Every row of this package that the registry did not just list goes; the ones it did are
         // refreshed rather than skipped, so a re-release or a yank is not lost.
         expect(write!.text).toContain('delete from package_version')
-        expect(write!.text).toMatch(/purl not in \(select unnest\(\$10::text\[]\)\)/)
+        expect(write!.text).toMatch(/purl not in \(select unnest\(\$8::text\[]\)\)/)
         expect(write!.text).toContain('on conflict (purl) do update')
         expect(write!.params[0]).toBe('pkg:npm/one')
-        expect(write!.params[9]).toEqual(['pkg:npm/one@1.0.0', 'pkg:npm/one@2.0.0'])
+        expect(write!.params[7]).toEqual(['pkg:npm/one@1.0.0', 'pkg:npm/one@2.0.0'])
         expect(write!.params[1]).toEqual(['pkg:npm/one@1.0.0', 'pkg:npm/one@2.0.0'])
     })
 
@@ -84,8 +84,8 @@ describe('demand-fill write path', () => {
         expect(writes[0]!.text).toContain('delete from package_version')
         expect(writes[1]!.text).not.toContain('delete from package_version')
         // Only the first statement carries the list to keep; the second is an upsert and nothing else.
-        expect(writes[0]!.params).toHaveLength(10)
-        expect(writes[1]!.params).toHaveLength(9)
+        expect(writes[0]!.params).toHaveLength(8)
+        expect(writes[1]!.params).toHaveLength(7)
 
         const first = writes[0]!.params[1] as string[]
         const second = writes[1]!.params[1] as string[]
@@ -93,7 +93,7 @@ describe('demand-fill write path', () => {
         expect(second).toHaveLength(1)
         // The delete is told the whole list rather than its own chunk, so it cannot take away the
         // rows the second statement is about to write.
-        expect(writes[0]!.params[9]).toEqual([...first, ...second])
+        expect(writes[0]!.params[7]).toEqual([...first, ...second])
     })
 
     it('takes the last versions away when the registry lists none', async () => {

@@ -80,20 +80,19 @@ export function freshnessTests(postgres: () => Postgres): void {
 
             const fetched = new Date('2026-10-01T09:00:00Z')
             const before = new Date('2026-10-01T07:00:00Z')
-            const rows: [key: string, type: string, fetchedAt: Date | null, tracked: boolean, error: string | null][] = [
-                ['pkg:npm/cf-vouched', 'npm', fetched, true, null],
-                ['pkg:npm/cf-untracked', 'npm', fetched, false, null],
-                ['pkg:npm/cf-failed', 'npm', fetched, true, 'registry.npmjs.org returned 503'],
-                ['pkg:npm/cf-queued', 'npm', fetched, true, null],
-                ['pkg:npm/cf-before', 'npm', before, true, null],
-                ['pkg:npm/cf-never', 'npm', null, true, null],
-                ['pkg:maven/g/cf-polled', 'maven', fetched, true, null],
+            const rows: [key: string, type: string, fetchedAt: Date | null, error: string | null][] = [
+                ['pkg:npm/cf-vouched', 'npm', fetched, null],
+                ['pkg:npm/cf-failed', 'npm', fetched, 'registry.npmjs.org returned 503'],
+                ['pkg:npm/cf-queued', 'npm', fetched, null],
+                ['pkg:npm/cf-before', 'npm', before, null],
+                ['pkg:npm/cf-never', 'npm', null, null],
+                ['pkg:maven/g/cf-polled', 'maven', fetched, null],
             ]
-            for (const [key, type, fetchedAt, tracked, error] of rows) {
+            for (const [key, type, fetchedAt, error] of rows) {
                 await db.query(
-                    `insert into package (package_key, type, name, status, fetched_at, as_of, tracked, error)
-                     values ($1, $2, $1, 'resolved', $3, $3, $4, $5)`,
-                    [key, type, fetchedAt, tracked, error],
+                    `insert into package (package_key, type, name, status, fetched_at, as_of, error)
+                     values ($1, $2, $1, 'resolved', $3, $3, $4)`,
+                    [key, type, fetchedAt, error],
                 )
             }
             await enqueue(db, ['pkg:npm/cf-queued'], PRIORITY.feed)
@@ -103,7 +102,6 @@ export function freshnessTests(postgres: () => Postgres): void {
             // Fetched while the feed was running, and nothing since: the feed vouches up to its cursor.
             expect(got.get('pkg:npm/cf-vouched')).toMatchObject({confirmed_at: cursor, queued: false})
             // Any one condition missing, and the package is only as fresh as its own as_of.
-            expect(got.get('pkg:npm/cf-untracked')!.confirmed_at).toEqual(fetched)
             expect(got.get('pkg:npm/cf-failed')!.confirmed_at).toEqual(fetched)
             expect(got.get('pkg:npm/cf-queued')).toMatchObject({confirmed_at: fetched, queued: true})
             expect(got.get('pkg:npm/cf-before')!.confirmed_at).toEqual(before)

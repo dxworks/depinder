@@ -52,7 +52,7 @@ export function feedTests(postgres: () => Postgres): void {
             )
             expect(still!.covered_since).toEqual(started!.covered_since)
 
-            // Only tracked packages are queued: express is stored, left-pad is not.
+            // Only stored packages are queued: express is stored, left-pad is not.
             const queue = await db.query<FetchQueueRow>('select * from fetch_queue order by package_key')
             expect(queue.map(q => q.package_key)).toEqual(['pkg:npm/@babel/core', 'pkg:npm/express'])
             expect(queue[0]!.priority).toBe(PRIORITY.feed)

@@ -55,12 +55,19 @@ describe.skipIf(!url)('postgres', () => {
             'registry_feed',
             'schema_migrations',
         ])
-        // 0003 dropped the flag the old sqlite seed import set.
-        const seedColumn = await db.query(
-            `select 1 from information_schema.columns
-             where table_schema = 'public' and table_name = 'package' and column_name = 'seed'`,
+        // 0003 dropped the flag the old sqlite seed import set; 0007 the columns nothing read.
+        const droppedColumns = await db.query(
+            `select table_name, column_name from information_schema.columns
+             where table_schema = 'public'
+               and (table_name, column_name) in (('package', 'seed'), ('package', 'tracked'),
+                                                 ('package_version', 'source'), ('package_version', 'fetched_at'))`,
         )
-        expect(seedColumn).toEqual([])
+        expect(droppedColumns).toEqual([])
+        const indexes = await db.query<{indexname: string}>(
+            `select indexname from pg_indexes where schemaname = 'public' and tablename in ('package', 'fetch_queue')`,
+        )
+        expect(indexes.map(i => i.indexname)).toEqual(expect.arrayContaining(['package_type_key_idx']))
+        expect(indexes.map(i => i.indexname)).not.toContain('fetch_queue_ready_idx')
     })
 
     packageWriteTests(postgres)
@@ -110,6 +117,7 @@ describe.skipIf(!url)('postgres', () => {
                 '0004_fetch_queue_type.sql',
                 '0005_fetch_queue_leased.sql',
                 '0006_fetch_queue_wanted.sql',
+                '0007_drop_unused_columns.sql',
             ])
 
             const rows = new Map(

@@ -86,10 +86,10 @@ const VERSIONS_SQL = `select v.package_key,
  * `confirmed_at` is the freshness rule of docs/resolver-api.md, in one place. A full fetch, and for
  * maven and cargo a 304 since, is already in `as_of`. A feed ecosystem also vouches for a package
  * simply by moving on without naming it — but that is written nowhere per package, because it would
- * mean rewriting every tracked row every 30 s. So it is read here, as the feed's `cursor_time`, and
- * only when the feed can be believed about this package: it is tracked, the feed was already
- * running when it was fetched (`covered_since`), its last refresh did not fail, and no event about
- * it is still waiting in the queue. Otherwise the package is as fresh as `as_of` says, no fresher.
+ * mean rewriting every row every 30 s. So it is read here, as the feed's `cursor_time`, and only
+ * when the feed can be believed about this package: the feed was already running when it was
+ * fetched (`covered_since`), its last refresh did not fail, and no event about it is still waiting
+ * in the queue. Otherwise the package is as fresh as `as_of` says, no fresher.
  *
  * The joins are `left` so that a package is never lost to a missing feed row or a missing queue
  * row: it comes back with `as_of` and `queued = false`.
@@ -97,7 +97,6 @@ const VERSIONS_SQL = `select v.package_key,
 const PACKAGES_SQL = `select p.*,
                              case
                                  when f.mode = 'feed'
-                                     and p.tracked
                                      and p.error is null
                                      and q.package_key is null
                                      and p.fetched_at is not null

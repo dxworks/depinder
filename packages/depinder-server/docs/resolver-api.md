@@ -235,7 +235,6 @@ fetches, the two modes vouch for a package differently:
   30 s to say so would be absurd. It is worked out when a request reads the row, as
   `confirmed_at = greatest(as_of, cursor_time)`, and only when all of these hold — otherwise
   `confirmed_at` is `as_of`:
-  - the package is `tracked`;
   - `fetched_at >= registry_feed.covered_since` — the feed was already running when the package
     was fetched, so it cannot have missed a change in between (`covered_since` is set when the
     cursor is first initialised);

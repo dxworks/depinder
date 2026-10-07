@@ -36,7 +36,7 @@ export function packageWriteTests(postgres: () => Postgres): void {
 
             const rows = await store.getPackages(['pkg:npm/express', 'pkg:npm/@babel/core'])
             expect(rows).toHaveLength(2)
-            expect(rows.every(r => r.status === 'pending' && r.tracked)).toBe(true)
+            expect(rows.every(r => r.status === 'pending')).toBe(true)
 
             const queue = await db.query<FetchQueueRow>('select * from fetch_queue order by package_key')
             expect(queue.map(q => q.package_key)).toEqual(['pkg:npm/@babel/core', 'pkg:npm/express'])

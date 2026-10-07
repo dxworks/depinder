@@ -22,7 +22,6 @@ export interface PackageRow {
     fetched_at: Date | null
     /** The latest instant the registry vouched for these facts: `fetched_at`, or later after a poll 304. */
     as_of: Date | null
-    tracked: boolean
     poll_etag: string | null
     poll_last_modified: string | null
     next_retry_at: Date | null
@@ -40,18 +39,6 @@ export interface ResolvePackageRow extends PackageRow {
     confirmed_at: Date | null
     /** The package has a `fetch_queue` row: a fetch of it is already on its way. */
     queued: boolean
-}
-
-export interface PackageVersionRow {
-    purl: string
-    package_key: string
-    version: string
-    released_at: Date | null
-    licenses: string[]
-    prerelease: boolean
-    yanked: boolean
-    source: string | null
-    fetched_at: Date | null
 }
 
 /**

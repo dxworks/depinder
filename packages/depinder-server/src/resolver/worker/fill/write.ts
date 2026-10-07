@@ -22,7 +22,7 @@ import {chunk} from '../loop.js'
 
 /**
  * Version rows per statement. They travel as arrays through `unnest`, so the parameter count is
- * ten however many rows go with them and the pg parameter limit stops being the thing that decides
+ * eight however many rows go with them and the pg parameter limit stops being the thing that decides
  * this: what is left is how large an array to hand one statement. At 5 000 every package we have
  * met is a single round trip — the busiest npm packages run to a few thousand versions — and the
  * ones that are not cost one more statement each.
@@ -63,7 +63,7 @@ export async function writeResult(
         } else {
             const source = fetched.sources.join(', ')
             await upsertResolved(tx, key, fetched, source, fetchedAt, row.requests)
-            await replaceVersions(tx, key, fetched, source, fetchedAt)
+            await replaceVersions(tx, key, fetched)
         }
         await insertFetchLog(tx, key.packageKey, records)
     })
@@ -180,13 +180,7 @@ async function upsertResolved(
  * insert is bringing — and a package costs one round trip instead of two, with none of the window
  * in which the package briefly had no versions at all.
  */
-async function replaceVersions(
-    tx: Queryable,
-    key: ParsedPurl,
-    fetched: ResolvedPackage,
-    source: string,
-    fetchedAt: Date,
-): Promise<void> {
+async function replaceVersions(tx: Queryable, key: ParsedPurl, fetched: ResolvedPackage): Promise<void> {
     // Deduplicated as the wire is: `on conflict do update` refuses to touch a row twice in one statement.
     const rows = distinctVersions(key.packageKey, fetched.versions)
     const parts = chunk(rows, VERSION_CHUNK)
@@ -208,8 +202,6 @@ async function replaceVersions(
             part.map(r => JSON.stringify(r.licenses)),
             part.map(r => r.prerelease),
             part.map(r => r.yanked),
-            source,
-            fetchedAt,
         ]
         // The stale delete goes on the first statement only, and it is told the whole version list
         // rather than this chunk, so that a package split across chunks cannot delete the rows the
@@ -225,29 +217,24 @@ function versionsSql(withStale: boolean): string {
         ? `,
                  stale as (delete from package_version
                            where package_key = $1
-                             and purl not in (select unnest($10::text[])))`
+                             and purl not in (select unnest($8::text[])))`
         : ''
     return `with incoming as (select *
                               from unnest($2::text[], $3::text[], $4::timestamptz[], $5::jsonb[],
                                           $6::boolean[], $7::boolean[])
                                        as t(purl, version, released_at, licenses, prerelease, yanked))${stale}
-            insert into package_version (purl, package_key, version, released_at, licenses, prerelease, yanked,
-                                         source, fetched_at)
+            insert into package_version (purl, package_key, version, released_at, licenses, prerelease, yanked)
             select i.purl,
                    $1::text,
                    i.version,
                    i.released_at,
                    array(select jsonb_array_elements_text(i.licenses)),
                    i.prerelease,
-                   i.yanked,
-                   $8::text,
-                   $9::timestamptz
+                   i.yanked
             from incoming i
             on conflict (purl) do update
                 set released_at = excluded.released_at,
                     licenses    = excluded.licenses,
                     prerelease  = excluded.prerelease,
-                    yanked      = excluded.yanked,
-                    source      = excluded.source,
-                    fetched_at  = excluded.fetched_at`
+                    yanked      = excluded.yanked`
 }

@@ -153,10 +153,10 @@ async function runCursorFeed(
 
     const result = await spec.poll(row.cursor, ctx)
     const keys = [...new Set(result.events.map(e => e.packageKey))]
-    const tracked = await trackedPackages(db, keys)
+    const stored = await storedPackages(db, keys)
 
     await db.withTransaction(async tx => {
-        await enqueue(tx, tracked, PRIORITY.feed)
+        await enqueue(tx, stored, PRIORITY.feed)
         await tx.query(
             `update registry_feed
              set cursor             = $2,
@@ -170,16 +170,16 @@ async function runCursorFeed(
     })
     records.length = 0 // already written inside the transaction
 
-    if (tracked.length > 0 || result.events.length > 0) {
-        log.info('feed batch', {events: result.events.length, queued: tracked.length, cursor: result.cursor})
+    if (stored.length > 0 || result.events.length > 0) {
+        log.info('feed batch', {events: result.events.length, queued: stored.length, cursor: result.cursor})
     }
 }
 
 /** The one query the plan calls for: which of these changed packages do we actually hold? */
-async function trackedPackages(db: Db, packageKeys: string[]): Promise<string[]> {
+async function storedPackages(db: Db, packageKeys: string[]): Promise<string[]> {
     if (packageKeys.length === 0) return []
     const rows = await db.query<{package_key: string}>(
-        'select package_key from package where package_key = any($1::text[]) and tracked',
+        'select package_key from package where package_key = any($1::text[])',
         [packageKeys],
     )
     return rows.map(r => r.package_key)
@@ -206,7 +206,6 @@ async function runPollFeed(registry: Registry, options: FeedWorkerOptions, ctx: 
             `select package_key, poll_etag, poll_last_modified, fetched_at
              from package
              where type = $1
-               and tracked
                and package_key > $2
              order by package_key
              limit $3`,

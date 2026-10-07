@@ -85,8 +85,7 @@ export async function sweepRetries(db: Db, log: Logger): Promise<void> {
     const rows = await db.query<{package_key: string}>(
         `with due as (select package_key
                       from package
-                      where tracked
-                        and next_retry_at is not null
+                      where next_retry_at is not null
                         and next_retry_at <= now()
                       order by next_retry_at
                       limit 1000),

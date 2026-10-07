@@ -13,7 +13,6 @@ const TOTALS = `select
     (select count(*) from package where status = 'pending')  as pending,
     (select count(*) from package where status = 'not_found') as not_found,
     (select count(*) from package where status = 'error')     as error,
-    (select count(*) from package where tracked)              as tracked,
     (select count(*) from package_version)                    as versions,
     (select count(*) from fetch_queue)                        as queued,
     (select count(*) from fetch_log)                          as http_requests`

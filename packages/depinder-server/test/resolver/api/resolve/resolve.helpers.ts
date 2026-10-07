@@ -37,7 +37,6 @@ export function packageRow(overrides: Partial<ResolvePackageRow> & Pick<ResolveP
         source: 'registry.npmjs.org',
         fetched_at: new Date('2026-09-16T10:00:00Z'),
         as_of: new Date('2026-09-16T09:59:00Z'),
-        tracked: true,
         poll_etag: null,
         poll_last_modified: null,
         next_retry_at: null,
