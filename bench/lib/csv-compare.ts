@@ -107,8 +107,8 @@ export interface DirComparison {
 }
 
 /** Examples kept per column: regressions first, a few of each allowed class. */
-const MAX_EXAMPLES: Record<DiffClass, number> = {'regression': 10, 'expected-d9': 5, 'newer-release': 3, 'vuln-db': 3}
-export const zeroByClass = (): Record<DiffClass, number> => ({'regression': 0, 'expected-d9': 0, 'newer-release': 0, 'vuln-db': 0})
+const MAX_EXAMPLES: Record<DiffClass, number> = {'regression': 10, 'newer-release': 3, 'vuln-db': 3}
+export const zeroByClass = (): Record<DiffClass, number> => ({'regression': 0, 'newer-release': 0, 'vuln-db': 0})
 
 function compareFile(file: string, a: Table, b: Table, ignoreClock: boolean, classifier: DifferenceClassifier): FileDiff {
     const ignored = new Set([...(ignoreClock ? CLOCK_COLUMNS : []), ...(PER_FILE_IGNORED[path.basename(file)] ?? [])])
@@ -185,7 +185,6 @@ export function compareDirs(dirA: string, dirB: string, ignoreClock: boolean, cl
 
 const CLASS_LABELS: Record<DiffClass, string> = {
     'regression': 'regression',
-    'expected-d9': "expected D9 (needs Alex's sign-off)",
     'newer-release': 'newer release',
     'vuln-db': 'vulnerability database',
 }

@@ -13,14 +13,11 @@ import {newerRecommendations, recommendedVersionColumnOf} from './upgrade-guidan
  *   and the columns that follow it). An ecosystem's project stats follow when it has such rows,
  *   its license list when such rows changed a library's licenses.
  * - `vuln-db`: a vulnerability column or file, when A and B scanned with different database builds.
- * - `expected-d9`: an npm row that differs only in Component Link, where A's link is what the
- *   server gave a package without a top-level homepage before D9 (blank, or its repository). Neither
- *   allowed nor a regression: it needs Alex's sign-off.
  * - `regression`: everything else.
  */
 
-export type DiffClass = 'newer-release' | 'vuln-db' | 'expected-d9' | 'regression'
-export const DIFF_CLASSES: readonly DiffClass[] = ['regression', 'expected-d9', 'newer-release', 'vuln-db']
+export type DiffClass = 'newer-release' | 'vuln-db' | 'regression'
+export const DIFF_CLASSES: readonly DiffClass[] = ['regression', 'newer-release', 'vuln-db']
 
 /** One differing cell of a row present in both runs. */
 export interface CellChange {
@@ -41,8 +38,6 @@ const VULN_COLUMN = /vulnerab|security risk/i
 
 const SUMMARY_FILE = /^sbom-(\w+)-(project-stats|licenses)\.csv$/
 const LIBS_FILE = /^sbom-(\w+)-libs\.csv$/
-const DEPENDENCIES_FILE = '_dependencies.csv'
-const COMPONENT_LINK = 'Component Link'
 
 /** Black Duck origin names → depinder's cache ecosystems; unknown origins search every ecosystem. */
 const ORIGIN_ECOSYSTEMS: Readonly<Record<string, string>> = {
@@ -93,7 +88,7 @@ export class DifferenceClassifier {
         return new DifferenceClassifier(facts, cacheB)
     }
 
-    /** Without B's cache no row is a newer release, and an npm link change counts as D9 on its ecosystem alone. */
+    /** Whether B's cache is open; without it no row is a newer release. */
     get canTellNewerReleases(): boolean {
         return this.cacheB !== null
     }
@@ -121,7 +116,6 @@ export class DifferenceClassifier {
             || (c === LATEST_VERSION_LICENSES && columns.includes('Latest Version'))
             || newerRecommended.has(recommendedVersionColumnOf(base, c) ?? '')
             || (this.facts?.vulnDbsDiffer && VULN_COLUMN.test(c)))
-        if (library && this.isExpectedD9(base, library, changes)) return 'expected-d9'
         if (!allowed || !library || !this.cacheB?.hasReleaseAfterCutoff(library.ecosystems, library.name)) return 'regression'
         for (const eco of library.ecosystems) {
             this.ecosystemsWithNewerReleases.add(eco)
@@ -130,28 +124,9 @@ export class DifferenceClassifier {
         return 'newer-release'
     }
 
-    /**
-     * D9: only the npm Component Link moved, and A's link is the pre-D9 answer for a package with
-     * no top-level homepage, i.e. blank or its repository (from B's cache). Without the cache, any
-     * changed npm link counts.
-     */
-    private isExpectedD9(file: string, library: Library, changes: CellChange[]): boolean {
-        const [change] = changes
-        if (file !== DEPENDENCIES_FILE || changes.length !== 1 || change?.column !== COMPONENT_LINK) return false
-        if (library.ecosystems.length !== 1 || library.ecosystems[0] !== 'npm') return false
-        if (!this.cacheB) return true
-        const repository = this.cacheB.repositoryOf('npm', library.name)
-        return repository !== undefined && ['', webForm(repository)].includes(webForm(change.a))
-    }
-
     close(): void {
         this.cacheB?.close()
     }
-}
-
-/** A repository URL as the export's Component Link writes it (the CLI's `canonicalProjectUrl`, in short). */
-export function webForm(url: string): string {
-    return url.trim().replace(/^git\+/, '').replace(/\.git(?=$|[#?])/, '')
 }
 
 interface Library {

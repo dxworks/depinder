@@ -106,7 +106,7 @@ function outputs(dirA: string, dirB: string, comparisons: Comparison[], ignoreCl
         const c = compareDirs(path.join(dirA, 'out', cmp.outA), path.join(dirB, 'out', cmp.outB), ignoreClock, classifier)
         classifier.close()
         for (const k of Object.keys(total) as DiffClass[]) total[k] += c.byClass[k]
-        const noCache = classifier.canTellNewerReleases ? '' : ' (no B cache kept: newer releases cannot be told apart, and every changed npm Component Link counts as D9)'
+        const noCache = classifier.canTellNewerReleases ? '' : ' (no B cache kept: newer releases cannot be told apart)'
         console.log(`${cmp.outA === cmp.outB ? cmp.outA : `${cmp.outA} vs ${cmp.outB}`}: `
             + (c.differences === 0 ? 'identical' : `${c.differences} difference(s): ${describeClasses(c.byClass)}${noCache}`))
         if (c.differences) for (const line of formatComparison(c)) console.log(line)
@@ -152,8 +152,7 @@ function main(): void {
     const byClass = outputs(dirA, dirB, comparisons, ignoreClock)
     const regressions = byClass.regression
     const allowed = byClass['newer-release'] + byClass['vuln-db']
-    const signOff = byClass['expected-d9']
-    const csv = regressions + allowed + signOff === 0
+    const csv = regressions + allowed === 0
         ? `CSV identical${ignoreClock ? ' (ignoring clock columns)' : ''}`
         : `CSV: ${describeClasses(byClass)}`
     const ctr = paired ? 'counters not compared (pairs)' : moved === 0 ? 'warm counters identical' : `${moved} warm counter(s) differ`
@@ -163,8 +162,7 @@ function main(): void {
         return
     }
     const verdict = regressions > 0 || moved > 0 ? 'DIFFERENT'
-        : signOff > 0 ? "allowed and expected D9 differences only (D9 needs Alex's sign-off)"
-            : allowed > 0 ? 'allowed differences only' : 'identical'
+        : allowed > 0 ? 'allowed differences only' : 'identical'
     console.log(`VERDICT: ${verdict} — ${csv}; ${ctr}; ${time}`)
 }
 

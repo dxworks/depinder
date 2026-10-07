@@ -3,7 +3,6 @@ import {DatabaseSync} from 'node:sqlite'
 /** What the compare reads back from a run's kept SQLite cache (`--keep-caches`): depinder's `LibraryInfo`. */
 interface CachedLibrary {
     versions?: {version?: string, timestamp?: number}[]
-    reposUrl?: string[]
 }
 
 /** B's kept cache, one lookup per library. */
@@ -24,12 +23,6 @@ export class KeptCache {
     isReleasedAfterCutoff(ecosystems: readonly string[], name: string, version: string): boolean {
         return ecosystems.some(eco => (this.library(eco, name)?.versions ?? [])
             .some(v => v.version === version && (v.timestamp ?? 0) > this.cutoffMs))
-    }
-
-    /** The registry's top-level repository, as the resolver served it; '' when it has none. */
-    repositoryOf(ecosystem: string, name: string): string | undefined {
-        const library = this.library(ecosystem, name)
-        return library ? library.reposUrl?.[0] ?? '' : undefined
     }
 
     private library(ecosystem: string, name: string): CachedLibrary | null {
