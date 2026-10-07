@@ -13,15 +13,12 @@ src/shared/      config, errors, the fastify plumbing both servers use (purls an
 src/resolver/    api/, db/, registries/ (feeds, polls, limits), worker/ (Postgres-backed)
 src/vuln/        POST /vulnerabilities: Trivy + Grype, no Postgres
 test/            mirrors src/; recorded feed answers in test/fixtures/ (the fetchers' are in core)
-bench/micro/     the server's micro benches (the end-to-end bench is the root bench/ project)
 deploy/          the deploy kit (Hetzner, compose.server.yml); the server address only from
                  DEPINDER_SERVER_IP or --ip, never in a file
 ```
 
 - `shared` <- `resolver`, `shared` <- `vuln`. Never `vuln` -> `resolver`, and `shared` imports
   neither.
-- `bench/micro/` does not import `src/`; the one exception is `bench/micro/vuln-parity.ts`, which
-  checks `src/vuln/merge/`.
 - The root `bench/` never imports this project: it talks to the server over HTTP and SQL.
 
 ## Size targets

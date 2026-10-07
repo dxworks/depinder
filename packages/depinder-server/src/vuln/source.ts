@@ -1,17 +1,16 @@
-import type {DatabaseBuild, DatabaseInfo, DbState} from './databases.js'
+import type {DatabaseBuild} from './databases.js'
 import type {ScannerName} from './scanners.js'
 
 /**
- * Where a scan's databases come from, whichever mode the server runs in.
+ * Where a scan's databases come from: the builds in the store (`store.ts`), which counts the leases
+ * on each.
  *
  * A request leases one Trivy build and one Grype build for its whole scan: both scanners read the
  * builds the answer names, and a build that is replaced meanwhile stays on disk until the last
- * request reading it lets go. Frozen mode (`TRIVY_CACHE_DIR` + `GRYPE_DB_CACHE_DIR`) has one fixed
- * folder per tool and nothing to hold on to; managed mode (`VULN_DATA_DIR`, `store.ts`) has a
- * folder per build and counts the leases on each.
+ * request reading it lets go.
  *
  * `lease()` is synchronous so that nothing can change between the scan slot being granted and the
- * builds being pinned. Whatever needs a disk read happens before, in `refresh()`.
+ * builds being pinned.
  */
 
 export interface BuildInfo extends DatabaseBuild {
@@ -34,7 +33,7 @@ export interface Lease {
 
 export type LeaseResult = Lease | {ready: false, reason: string}
 
-/** One tool on `/health`. The build fields are missing while it has none; the rest is managed mode's. */
+/** One tool on `/health`: its build, missing while it has none, and what its updater is doing. */
 export interface ToolHealth {
     built_at?: string
     schema?: string
@@ -63,8 +62,6 @@ export interface SourceHealth {
 }
 
 export interface DatabaseSource {
-    /** Brings what `lease` and `health` answer up to date. Awaited before either on every request. */
-    refresh(): Promise<void>
     lease(): LeaseResult
     health(): SourceHealth
 }
@@ -97,54 +94,17 @@ export function describeBuild(
 }
 
 /**
- * Frozen mode: Phase 1's two folders, looked at through `createDatabaseInfo`, which re-reads them
- * only when one of the three files changed. Leasing pins nothing — the folders are someone else's,
- * and if they swap a database in place, scans already running are on their own, as before.
+ * The builds come from the store, which counts the leases on them; `/health` adds what each tool's
+ * updater is doing. The store's pointer is the truth, and it only changes by an install in this
+ * process.
  */
-export function createFrozenSource(
-    info: DatabaseInfo,
-    dirs: {trivy: string, grype: string},
-    staleHours: StaleHours,
-    now: () => number = Date.now,
-): DatabaseSource {
-    let state: DbState = {ready: false, reason: 'databases not read yet'}
-    const describe = (tool: ScannerName, at: number): BuildInfo => {
-        if (!state.ready) throw new Error('not ready')
-        return describeBuild(tool, dirs[tool], state[tool], staleHours, at)
-    }
-
-    return {
-        async refresh() {
-            state = await info.current()
-        },
-        lease() {
-            if (!state.ready) return {ready: false, reason: state.reason}
-            const at = now()
-            return {ready: true, trivy: describe('trivy', at), grype: describe('grype', at), release: () => undefined}
-        },
-        health() {
-            if (!state.ready) return {ready: false, status: 'not_ready', reason: state.reason}
-            const at = now()
-            const trivy = publicBuild(describe('trivy', at))
-            const grype = publicBuild(describe('grype', at))
-            return {ready: true, status: trivy.stale || grype.stale ? 'stale' : 'ok', trivy, grype}
-        },
-    }
-}
-
-/**
- * Managed mode: the builds come from the store, which counts the leases on them; `/health` adds
- * what each tool's updater is doing. Nothing to refresh: the store's pointer is the truth, and it
- * only changes by an install in this process.
- */
-export function createManagedSource(
+export function createDatabaseSource(
     store: {lease(): LeaseResult, current(tool: ScannerName): {dir: string, record: DatabaseBuild} | undefined},
     updaterStatus: (tool: ScannerName) => Partial<ToolHealth>,
     staleHours: StaleHours,
     now: () => number = Date.now,
 ): DatabaseSource {
     return {
-        async refresh() {},
         lease: () => store.lease(),
         health() {
             const at = now()

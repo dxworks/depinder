@@ -21,7 +21,7 @@ interface VulnDeps {
     config: VulnConfig
     log: Logger
     limiter: ScanLimiter
-    /** Frozen folders or managed builds (`source.ts`). */
+    /** The builds in the store (`source.ts`). */
     source: DatabaseSource
     /** Read once at startup (`scannerVersions`), reported on every answer. */
     versions: ScannerVersions
@@ -43,7 +43,6 @@ export async function createVulnServer(deps: VulnDeps): Promise<FastifyInstance>
     // container is reported unhealthy rather than up. Stale is still a 200: a restart cannot make
     // an upstream publish, and the old data keeps being served, labelled with its age.
     app.get('/health', async (_request, reply) => {
-        await source.refresh()
         const {ready, status, reason, trivy, grype} = source.health()
         const databases = {...trivy && {trivy}, ...grype && {grype}}
         if (!ready) return reply.code(503).send({status, reason, databases})
@@ -67,7 +66,6 @@ export async function createVulnServer(deps: VulnDeps): Promise<FastifyInstance>
         }
 
         // Refused before it queues: no point waiting for a slot to learn there is nothing to read.
-        await source.refresh()
         const health = source.health()
         if (!health.ready) return reply.code(503).send({error: 'databases not ready', reason: health.reason})
 
@@ -171,7 +169,7 @@ export async function createVulnServer(deps: VulnDeps): Promise<FastifyInstance>
             grypeMs: reports.grypeMs,
             totalMs,
         })
-        // The same times, for the caller: `bench/micro/vuln-bench.cjs` reads the queue time from here.
+        // The same times, for the caller: depinder's `--profile` counters (`vuln:server-timing:*`) read them.
         reply.header('server-timing',
             `queue;dur=${queueMs}, trivy;dur=${reports.trivyMs}, grype;dur=${reports.grypeMs}, total;dur=${totalMs}`)
         return answer(lease, Object.fromEntries(index))

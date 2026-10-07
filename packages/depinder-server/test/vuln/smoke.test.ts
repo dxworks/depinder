@@ -96,7 +96,7 @@ describe('smokeTest', () => {
 
     const config = () => ({trivyBin, grypeBin, scanTimeoutMs: 5000, tmpDir: root})
 
-    it('scans the canaries with the tool\'s Phase 1 command against the new build and returns the findings', async () => {
+    it('scans the canaries with the tool\'s normal scan command against the new build and returns the findings', async () => {
         expect(await smokeTest('trivy', '/data/trivy/new', config(), 3, undefined, CANS)).toBe(3)
         const args = (await readFile(join(root, 'trivy.args'), 'utf8')).trim()
         expect(args).toMatch(new RegExp(`^sbom --quiet --format json --skip-db-update --cache-dir /data/trivy/new ${root}/depinder-vuln-[^/]+/sbom.json$`))

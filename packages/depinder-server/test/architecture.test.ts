@@ -45,26 +45,20 @@ function lineCount(file: string): number {
 const under = (path: string, dir: string) => path === dir || path.startsWith(`${dir}/`)
 
 /** Every import from a file in `from` into one of `forbidden`, as "file -> specifier". */
-function violations(
-    from: string[],
-    forbidden: string[],
-    allowed: (file: string, target: string) => boolean = () => false,
-): string[] {
+function violations(from: string[], forbidden: string[]): string[] {
     return from.flatMap((file) =>
         relativeImports(file)
-            .filter(({target}) => forbidden.some((dir) => under(target, dir)) && !allowed(file, target))
+            .filter(({target}) => forbidden.some((dir) => under(target, dir)))
             .map(({specifier}) => `${file} -> ${specifier}`),
     )
 }
 
 describe('architecture', () => {
     const src = walk('src', /\.ts$/)
-    const bench = walk('bench', CODE, ['bench/runs'])
 
     it('sees the imports it is meant to police', () => {
         // Guards against a parser that silently finds nothing.
         expect(relativeImports('src/vuln/server.ts').map((i) => i.target)).toContain('src/shared/http-server.js')
-        expect(relativeImports('bench/micro/vuln-parity.ts').map((i) => i.target)).toContain('src/vuln/merge/index.js')
     })
 
     it('keeps src/vuln free of src/resolver', () => {
@@ -73,12 +67,6 @@ describe('architecture', () => {
 
     it('keeps src/shared free of src/resolver and src/vuln', () => {
         expect(violations(src.filter((f) => under(f, 'src/shared')), ['src/resolver', 'src/vuln'])).toEqual([])
-    })
-
-    it('keeps bench/ out of src/, except the vuln parity check on the merge', () => {
-        const allowed = (file: string, target: string) =>
-            file === 'bench/micro/vuln-parity.ts' && under(target, 'src/vuln/merge')
-        expect(violations(bench, ['src'], allowed)).toEqual([])
     })
 })
 

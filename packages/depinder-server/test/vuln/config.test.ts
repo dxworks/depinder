@@ -6,22 +6,19 @@ import {loadVulnConfig} from '../../src/vuln/config.js'
 
 const base = {
     RESOLVER_API_TOKEN: 'test-token-'.padEnd(16, 'x'),
-    TRIVY_CACHE_DIR: '/var/lib/trivy',
-    GRYPE_DB_CACHE_DIR: '/var/lib/grype',
+    VULN_DATA_DIR: '/var/lib/vuln',
 }
 
 describe('loadVulnConfig', () => {
     it('fills in the defaults, with no DATABASE_URL anywhere', () => {
         const scans = Math.max(1, Math.floor(availableParallelism() / 2))
         expect(loadVulnConfig(base)).toEqual({
-            mode: 'frozen',
             apiToken: base.RESOLVER_API_TOKEN,
             port: 8080,
             logLevel: 'info',
             trivyBin: 'trivy',
             grypeBin: 'grype',
-            trivyCacheDir: '/var/lib/trivy',
-            grypeDbCacheDir: '/var/lib/grype',
+            dataDir: '/var/lib/vuln',
             maxPurls: 5000,
             maxScans: scans,
             maxQueued: 4 * scans,
@@ -71,22 +68,9 @@ describe('loadVulnConfig', () => {
         expect(() => loadVulnConfig({...base, RESOLVER_API_TOKEN: 'x'.repeat(15)})).toThrow(/at least 16 characters/)
     })
 
-    it('refuses a missing cache dir', () => {
-        expect(() => loadVulnConfig({...base, TRIVY_CACHE_DIR: undefined})).toThrow(/TRIVY_CACHE_DIR is required/)
-        expect(() => loadVulnConfig({...base, GRYPE_DB_CACHE_DIR: '  '})).toThrow(/GRYPE_DB_CACHE_DIR is required/)
-    })
-
-    it('is managed with VULN_DATA_DIR, frozen with the two cache dirs, and neither or both is an error', () => {
-        const managed = {RESOLVER_API_TOKEN: base.RESOLVER_API_TOKEN, VULN_DATA_DIR: '/var/lib/vuln'}
-        const config = loadVulnConfig(managed)
-        expect(config).toMatchObject({mode: 'managed', dataDir: '/var/lib/vuln'})
-        expect(config).not.toHaveProperty('trivyCacheDir')
-        expect(config).not.toHaveProperty('grypeDbCacheDir')
-        expect(loadVulnConfig(base)).not.toHaveProperty('dataDir')
-
-        expect(() => loadVulnConfig({RESOLVER_API_TOKEN: base.RESOLVER_API_TOKEN})).toThrow(/VULN_DATA_DIR is required/)
-        expect(() => loadVulnConfig({...base, VULN_DATA_DIR: '/var/lib/vuln'})).toThrow(/not both/)
-        expect(() => loadVulnConfig({...managed, TRIVY_CACHE_DIR: '/var/lib/trivy'})).toThrow(/not both/)
+    it('refuses a missing data dir', () => {
+        expect(() => loadVulnConfig({...base, VULN_DATA_DIR: undefined})).toThrow(/VULN_DATA_DIR is required/)
+        expect(() => loadVulnConfig({...base, VULN_DATA_DIR: '  '})).toThrow(/VULN_DATA_DIR is required/)
     })
 
     it('reads the update settings, and gives the Trivy repository its tag', () => {

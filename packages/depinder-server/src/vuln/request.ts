@@ -9,8 +9,8 @@ import {isSupportedType, tryParsePurl} from '@depinder/core'
  * What goes into the dummy SBOM is the purl as the caller wrote it, decoded — NOT `parsePurl`'s
  * canonical form. That form is a database key: it lowercases npm, nuget and composer names and
  * PEP-503s pypi ones, and a scanner given `pkg:golang/github.com/burntsushi/toml` instead of
- * `BurntSushi` is looking for a different module. The scanners must see exactly what Phase 0 gave
- * them, which is the raw decoded parts.
+ * `BurntSushi` is looking for a different module. The scanners must see the raw decoded parts,
+ * which is what matched scanning the real SBOMs.
  */
 
 type UnsupportedReason = 'invalid' | 'no_version' | 'unsupported_type'

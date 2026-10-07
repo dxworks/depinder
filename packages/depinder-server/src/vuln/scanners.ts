@@ -154,9 +154,9 @@ export interface ScanDirs {
 type ScanConfig = Pick<VulnConfig, 'trivyBin' | 'grypeBin' | 'scanTimeoutMs'>
 
 /**
- * Trivy over one SBOM, against the database in `dir`. This is Phase 0's command and flags exactly —
- * the ones whose findings matched scanning the real SBOMs — so a flag is not added here without
- * re-running `bench/micro/vuln-parity.ts`. `--skip-db-update`: the scan only ever reads its database.
+ * Trivy over one SBOM, against the database in `dir`. These are exactly the command and flags whose
+ * findings matched scanning the real SBOMs, so a flag added here needs that comparison again.
+ * `--skip-db-update`: the scan only ever reads its database.
  */
 export async function scanTrivy(sbomPath: string, dir: string, config: ScanConfig, signal?: AbortSignal): Promise<TrivyReport> {
     const {stdout} = await runScanner('trivy', config.trivyBin,
@@ -165,7 +165,7 @@ export async function scanTrivy(sbomPath: string, dir: string, config: ScanConfi
     return parseReport('trivy', stdout, isTrivyReport)
 }
 
-/** Grype over one SBOM, against the database in `dir`: Phase 0's command, with `grypeEnv`. */
+/** Grype over one SBOM, against the database in `dir`: the command that matched, with `grypeEnv`. */
 export async function scanGrype(sbomPath: string, dir: string, config: ScanConfig, signal?: AbortSignal): Promise<GrypeReport> {
     const {stdout} = await runScanner('grype', config.grypeBin, ['-q', `sbom:${sbomPath}`, '-o', 'json'], grypeEnv(dir), {
         timeoutMs: config.scanTimeoutMs,

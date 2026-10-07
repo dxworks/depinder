@@ -1,7 +1,7 @@
 # Vulnerabilities (`ROLE=vuln`)
 
 For clients and operators of the vulnerability server: its API, concurrency, health, and how it
-keeps its databases fresh. The parity, bench and soak checks are in [benchmarks.md](benchmarks.md).
+keeps its databases fresh.
 
 A second server in the same image: purls in, Trivy and Grype findings out. Depinder scans every
 SBOM with both tools on the machine it runs on; this lets it send the purls instead and get the
@@ -11,24 +11,18 @@ required — and it shares only the token, the port and the log level with the r
 
 The purls are written into a dummy CycloneDX file, one `library` component each, named the way
 Trivy's own SBOMs name them (maven and npm: group and name; composer and golang: the whole path as
-the name), and both scanners read that file side by side. Phase 0 checked the approach against
-scanning the real SBOMs: the same 1,329 Trivy and 1,326 Grype findings. The merge of the two tools'
+the name), and both scanners read that file side by side. Checked against scanning the real SBOMs
+of a 10,049-purl reference set, it gives the same 1,329 Trivy and 1,326 Grype findings. The merge of the two tools'
 findings is depinder's own (`src/plugins/sbom/local-scan.ts`), ported as is; a finding is tied back
 to the purl that was sent by the component's `bom-ref`, which both tools echo, never by the purl
 they echo, which is their own spelling (Trivy lowercases a golang path).
 
 A scan never updates its database (Trivy runs with `--skip-db-update`, Grype with
-`GRYPE_DB_AUTO_UPDATE=false`). Where the databases come from depends on the mode:
+`GRYPE_DB_AUTO_UPDATE=false`). The server downloads both databases into `VULN_DATA_DIR` and keeps
+them current itself, with no cron job (see [Keeping the databases fresh](#keeping-the-databases-fresh)).
 
-- **managed** — `VULN_DATA_DIR` is set: the server downloads both databases there and keeps them
-  current itself, with no cron job (see [Keeping the databases fresh](#keeping-the-databases-fresh)).
-- **frozen** — `TRIVY_CACHE_DIR` and `GRYPE_DB_CACHE_DIR` are set: someone else's folders, read as
-  they are and looked at on every request with a `stat`, so a database swapped in place is used by
-  the next scan. This is what keeps `bench/micro/vuln-parity.ts` and the bench repeatable: same data, same
-  answer.
-
-Both or neither is a configuration error. A missing scanner binary stops the process at startup;
-missing databases do not — the server starts and answers 503 until they are there.
+A missing scanner binary stops the process at startup; missing databases do not — the server
+starts and answers 503 until they are there.
 
 | variable | default | meaning |
 |---|---|---|
@@ -36,9 +30,7 @@ missing databases do not — the server starts and answers 503 until they are th
 | `RESOLVER_API_TOKEN` | — | **required**, at least 16 characters. The same token and checks as the resolver |
 | `PORT`, `LOG_LEVEL` | `8080`, `info` | as for the resolver |
 | `TRIVY_BIN` / `GRYPE_BIN` | `trivy` / `grype` | the binaries |
-| `VULN_DATA_DIR` | — | managed mode: where the server keeps the databases. **One of this or the two below is required** |
-| `TRIVY_CACHE_DIR` | — | frozen mode: Trivy's `--cache-dir`, the folder with `db/trivy.db` and `db/metadata.json` |
-| `GRYPE_DB_CACHE_DIR` | — | frozen mode: the folder with `6/vulnerability.db` |
+| `VULN_DATA_DIR` | — | **required**: where the server keeps the databases |
 | `VULN_MAX_PURLS` | `5000` | distinct purls per request, 1..50000. Past it: 413 |
 | `VULN_MAX_SCANS` | half the cores | scans running at once, 1..64. Each scan is one Trivy and one Grype |
 | `VULN_MAX_QUEUED` | 4 × `VULN_MAX_SCANS` | requests that may wait for a scan, 0..1000. Past it: 503 busy |
@@ -46,11 +38,10 @@ missing databases do not — the server starts and answers 503 until they are th
 | `VULN_TMP_DIR` | the OS temp dir | where each scan's `depinder-vuln-*` folder goes |
 | `VULN_TRIVY_STALE_HOURS` / `VULN_GRYPE_STALE_HOURS` | `24` / `72` | past this age a build is reported `stale` (and still served), 1..8760 |
 
-The settings of managed mode are under [Keeping the databases fresh](#keeping-the-databases-fresh).
+The update settings are under [Keeping the databases fresh](#keeping-the-databases-fresh).
 
 ```bash
 ROLE=vuln RESOLVER_API_TOKEN=... VULN_DATA_DIR=/var/lib/vuln npm run dev
-ROLE=vuln RESOLVER_API_TOKEN=... TRIVY_CACHE_DIR=/var/lib/trivy GRYPE_DB_CACHE_DIR=/var/lib/grype npm run dev
 ```
 
 ## `POST /vulnerabilities`
@@ -95,10 +86,10 @@ ROLE=vuln RESOLVER_API_TOKEN=... TRIVY_CACHE_DIR=/var/lib/trivy GRYPE_DB_CACHE_D
 | 401 | no or wrong token |
 | 413 | more than `VULN_MAX_PURLS` distinct purls; `{"error", "max"}` |
 | 503 `{"error": "busy"}` | every scan slot taken and the waiting line full; `Retry-After: 1` |
-| 503 `{"error": "databases not ready", "reason"}` | a tool has no usable build: in managed mode only until its first download is in (`"reason": "grype: downloading"`), in frozen mode while a file is missing or unreadable |
+| 503 `{"error": "databases not ready", "reason"}` | a tool has no usable build, only until its first download is in (`"reason": "grype: downloading"`) |
 | 500 `{"error": "scan failed", "scanner", "reason"}` | a scanner exited non-zero (its verdict line is in `reason`), timed out, or printed something that is not its report |
 
-Measured on a 10-core laptop with Phase 0's databases: Grype is the slow one, at about 0.85 s to
+Measured on a 10-core laptop with the databases of 2026-10-01: Grype is the slow one, at about 0.85 s to
 open its database plus ~0.45 ms per purl; 2,000 purls take ~2 s, 5,000 ~3 s. Answers are small next
 to the resolver's: 490 KB raw for 2,000 purls (86 KB br), 990 KB for 5,000 (139 KB br).
 
@@ -111,7 +102,7 @@ laptop, 10,049 purls finished fastest as five chunks at once (2.5 s; one chunk 5
 
 The default is half of `os.availableParallelism()`, and **inside a container that can read the
 host's cores rather than the container's share**: set `VULN_MAX_SCANS` explicitly when deploying,
-from `bench/micro/vuln-bench.cjs` run on that machine.
+measured on that machine.
 
 ## `GET /health`
 
@@ -121,13 +112,13 @@ Unauthenticated.
 - `status` is `ok`, or `stale` when a build is past its stale age — **still 200**: a restart cannot
   make an upstream publish, so the health check must not trigger one.
 - 503 `{"status": "not_ready", "reason", "databases"}` only while a tool has no usable build at all.
-- Each tool has its build (`built_at`, `schema`, `age_seconds`, `stale`) and, in managed mode, what
-  its update loop is doing: `updating`, `last_check_at`, `last_ok_at`, `last_error`,
-  `next_check_at`, `upstream_built_at` (what the publisher says its newest build is).
+- Each tool has its build (`built_at`, `schema`, `age_seconds`, `stale`) and what its update loop
+  is doing: `updating`, `last_check_at`, `last_ok_at`, `last_error`, `next_check_at`,
+  `upstream_built_at` (what the publisher says its newest build is).
 
 ## Keeping the databases fresh
 
-In managed mode the server keeps both databases current itself. Each tool has its own loop, so a
+The server keeps both databases current itself. Each tool has its own loop, so a
 hung Grype download never delays a Trivy update. Every `VULN_DB_CHECK_INTERVAL_MIN`, and once right
 after boot:
 
@@ -147,10 +138,10 @@ after boot:
    must be later than the current build's. If not, the download is thrown away and its identity
    remembered, so it is not fetched again.
 5. **Smoke test** — 22 canary purls in six ecosystems (`src/vuln/canaries.ts`), each one that both
-   tools flagged in Phase 0, scanned with that tool's normal scan command against the new build.
-   It must exit 0, find every canary's id, and find at least 90 % of the current build's total on
-   the canaries: a truncated database can still have Log4Shell while missing thousands of
-   advisories. About a second.
+   tools flagged in the reference set, scanned with that tool's normal scan command against the
+   new build. It must exit 0, find every canary's id, and find at least 90 % of the current
+   build's total on the canaries: a truncated database can still have Log4Shell while missing
+   thousands of advisories. About a second.
 6. **Install** — the staging folder is renamed into place and `current.json` replaced (both
    atomic); new requests get the new build at once.
 
@@ -186,7 +177,7 @@ VULN_DATA_DIR/
 
 | variable | default | meaning |
 |---|---|---|
-| `VULN_DATA_DIR` | — | turns managed mode on; the server must be able to write here |
+| `VULN_DATA_DIR` | — | where the builds live; the server must be able to write here |
 | `VULN_DB_CHECK_INTERVAL_MIN` | `30` | how often each tool checks for a new build, 5..1440. 30 min adds ~15 min of average staleness to Trivy's 6 h, for ~100 tiny requests a day |
 | `VULN_DB_DOWNLOAD_TIMEOUT_MS` | `900000` | one download before it is killed, 60000..7200000 |
 | `TRIVY_DB_REPOSITORY` | `mirror.gcr.io/aquasec/trivy-db:2` | checked and downloaded from (Trivy's own default; anonymous ghcr pulls are rate-limited). `:2` is added when there is no tag |

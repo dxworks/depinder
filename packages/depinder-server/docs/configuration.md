@@ -103,6 +103,6 @@ No database container — the database is hosted. Both servers read `.env` for t
   `SITE_ADDRESS` (default `:8080`, plain HTTP) set to a domain, with ports 80 and 443 published,
   gets a certificate automatically.
 - **Limits.** `vuln` gets 2 CPUs and 4 GB with `VULN_MAX_SCANS=2`, `VULN_MAX_QUEUED=8`, so scans
-  cannot starve the resolver. Placeholders: tune them on the machine it runs on (`bench/micro/vuln-bench.cjs`).
+  cannot starve the resolver. Placeholders: tune them on the machine it runs on.
   The page cache of Grype's 2.9 GB database counts against the memory limit.
 - **Shutdown.** 70 s grace, so a `/resolve` stream or a scan in flight can finish.

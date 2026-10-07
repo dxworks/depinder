@@ -5,10 +5,10 @@ import type {Scannable} from './request.js'
  * The dummy CycloneDX file both scanners read: one `library` component per purl, under a root
  * application nobody asked about.
  *
- * Phase 0 measured that the purl alone is not enough. Trivy matches by the component's name and
- * group, not only by its purl, and given bare names it lost 159 findings and invented 218; given
- * names and groups the way its own SBOMs write them, it found exactly what scanning the real SBOMs
- * found. So this writes them the way Trivy does (`build.py` in Phase 0 is the reference):
+ * The purl alone is not enough, measured against scanning the real SBOMs. Trivy matches by the
+ * component's name and group, not only by its purl, and given bare names it lost 159 findings and
+ * invented 218; given names and groups the way its own SBOMs write them, it found exactly what
+ * scanning the real SBOMs found. So this writes them that way:
  *
  *   maven, npm                group = namespace (`org.yaml`, `@nestjs`), name = the last segment
  *   composer, golang          no group, name = the whole path (`github.com/BurntSushi/toml`)

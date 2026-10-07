@@ -19,7 +19,7 @@ for itself (`src/resolver/api/stream.ts`) whatever its size, sets `Content-Encod
 gzip `Z_SYNC_FLUSH` — never after each line, so the window is kept and the ratio stays close to a
 single body's. Node's `fetch` decodes both as the bytes arrive, but on its own it asks only for
 `gzip, deflate`, and so would be answered in gzip. Depinder therefore sends
-`Accept-Encoding: br, gzip` itself, as do the bench scripts (`bench/micro/bench-stream.cjs`).
+`Accept-Encoding: br, gzip` itself.
 
 ### `POST /resolve`
 

@@ -7,8 +7,8 @@ import type {ScannerName} from '../../src/vuln/scanners.js'
 import {type BuildRecord, buildFolderName, createStore, type Store} from '../../src/vuln/store.js'
 
 /**
- * The managed data folder on a real filesystem, with fake database files: the store never opens
- * them, it only needs them to be there.
+ * The data folder on a real filesystem, with fake database files: the store never opens them,
+ * it only needs them to be there.
  */
 
 let dataDir: string

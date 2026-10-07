@@ -1,12 +1,12 @@
 import {statfs} from 'node:fs/promises'
 import {createLogger, errorMessage, type Logger} from '@depinder/core'
 import {loadVulnConfigOrExit, type VulnConfig} from './config.js'
-import {createDatabaseInfo, grypeStatusCommand, readGrypeBuild, readTrivyBuild} from './databases.js'
+import {grypeStatusCommand, readGrypeBuild, readTrivyBuild} from './databases.js'
 import {createScanLimiter} from './limiter.js'
 import {downloadGrypeDb, downloadTrivyDb, removeLeftoverScanDirs, type ScannerName, scannerVersions, type ScannerVersions} from './scanners.js'
 import {createVulnServer} from './server.js'
 import {smokeTest} from './smoke.js'
-import {createFrozenSource, createManagedSource, type DatabaseSource, type StaleHours} from './source.js'
+import {createDatabaseSource, type DatabaseSource, type StaleHours} from './source.js'
 import {createStore, TOOLS} from './store.js'
 import {checkGrype, checkTrivy} from './upstream.js'
 import {createUpdater, type Updater} from './updater.js'
@@ -16,9 +16,8 @@ import {createUpdater, type Updater} from './updater.js'
  * and nothing under `src/vuln/` imports anything that does.
  *
  * A scanner that is missing is a deployment mistake and stops the process here, with the setting
- * to fix. Databases that are missing are not: in frozen mode they may simply not have arrived yet,
- * in managed mode they are being downloaded, and either way the server starts and answers 503
- * until they are there.
+ * to fix. Databases that are missing are not: they are being downloaded, and the server starts and
+ * answers 503 until they are there.
  */
 
 /** One build on disk, measured on 2026-10-01: Trivy 1.47 GB, Grype 3.14 GB. A little over, rounded. */
@@ -41,16 +40,13 @@ export async function startVuln(): Promise<void> {
     if (removed > 0) log.info('removed leftover scan folders', {count: removed, tmpDir: config.tmpDir})
 
     const staleHours = {trivy: config.trivyStaleHours, grype: config.grypeStaleHours}
-    const {source, updaters} = config.mode === 'managed'
-        ? await managed(config, staleHours, log)
-        : await frozen(config, staleHours, log)
+    const {source, updaters} = await openDatabases(config, staleHours, log)
 
     const limiter = createScanLimiter(config.maxScans, config.maxQueued)
     const app = await createVulnServer({config, log, limiter, source, versions})
     await app.listen({host: '0.0.0.0', port: config.port})
     log.info('vuln listening', {
         port: config.port,
-        mode: config.mode,
         maxScans: config.maxScans,
         maxQueued: config.maxQueued,
         maxPurls: config.maxPurls,
@@ -75,20 +71,9 @@ export async function startVuln(): Promise<void> {
     process.on('SIGINT', () => void stop('SIGINT'))
 }
 
-/** Phase 1: two folders someone else fills. */
-async function frozen(config: VulnConfig, staleHours: StaleHours, log: Logger): Promise<{source: DatabaseSource, updaters: Updater[]}> {
-    const dirs = {trivy: config.trivyCacheDir!, grype: config.grypeDbCacheDir!}
-    const source = createFrozenSource(createDatabaseInfo({...config, trivyCacheDir: dirs.trivy, grypeDbCacheDir: dirs.grype}), dirs, staleHours)
-    await source.refresh()
-    const health = source.health()
-    if (health.ready) log.info('databases ready', {mode: 'frozen', trivy: health.trivy, grype: health.grype})
-    else log.warn('databases not ready; answering 503 until they are', {mode: 'frozen', reason: health.reason})
-    return {source, updaters: []}
-}
-
 /** `VULN_DATA_DIR`: the builds on disk serve at once; each tool's loop keeps them current. */
-async function managed(config: VulnConfig, staleHours: StaleHours, log: Logger): Promise<{source: DatabaseSource, updaters: Updater[]}> {
-    const dataDir = config.dataDir!
+async function openDatabases(config: VulnConfig, staleHours: StaleHours, log: Logger): Promise<{source: DatabaseSource, updaters: Updater[]}> {
+    const dataDir = config.dataDir
     const store = createStore({dataDir, staleHours, log})
     const opened = await store.open()
     log.info('database store opened', {
@@ -119,9 +104,9 @@ async function managed(config: VulnConfig, staleHours: StaleHours, log: Logger):
     })
     const updaters = {trivy: make('trivy'), grype: make('grype')}
 
-    const source = createManagedSource(store, tool => updaters[tool].status(), staleHours)
+    const source = createDatabaseSource(store, tool => updaters[tool].status(), staleHours)
     const missing = TOOLS.filter(tool => !opened[tool])
-    if (missing.length === 0) log.info('databases ready', {mode: 'managed', trivy: opened.trivy, grype: opened.grype})
-    else log.warn('databases not ready; downloading, answering 503 until they are here', {mode: 'managed', missing})
+    if (missing.length === 0) log.info('databases ready', {trivy: opened.trivy, grype: opened.grype})
+    else log.warn('databases not ready; downloading, answering 503 until they are here', {missing})
     return {source, updaters: [updaters.trivy, updaters.grype]}
 }

@@ -13,27 +13,17 @@ const DEFAULT_GRYPE_DB_UPDATE_URL = 'https://grype.anchore.io/databases/v6/lates
  *
  * It shares the resolver's token, port and log level and nothing else. There is no Postgres:
  * `DATABASE_URL` is neither read nor required, because everything this process knows is in the two
- * scanners' databases on disk.
- *
- * Two modes, by which folders are set:
- *   managed  `VULN_DATA_DIR`: the server downloads the databases there and keeps them current
- *   frozen   `TRIVY_CACHE_DIR` + `GRYPE_DB_CACHE_DIR`: someone else's folders, read as they are —
- *            what keeps `bench/micro/vuln-parity.ts` and the bench repeatable
+ * scanners' databases on disk, which the server downloads into `VULN_DATA_DIR` and keeps current.
  */
 export interface VulnConfig {
-    mode: 'managed' | 'frozen'
     /** Bearer token required on every route except /health. The resolver's, with its checks. */
     apiToken: string
     port: number
     logLevel: LogLevel
     trivyBin: string
     grypeBin: string
-    /** Managed mode: one folder per build, `staging/` and `current.json` (`store.ts`). */
-    dataDir?: string
-    /** Frozen mode: Trivy's `--cache-dir`, the folder holding `db/trivy.db` and `db/metadata.json`. */
-    trivyCacheDir?: string
-    /** Frozen mode: Grype's `GRYPE_DB_CACHE_DIR`, the folder holding `6/vulnerability.db`. */
-    grypeDbCacheDir?: string
+    /** One folder per build, `staging/` and `current.json` (`store.ts`). */
+    dataDir: string
     /** Distinct purls one request may carry. Past it the answer is a 413. */
     maxPurls: number
     /** Scans (one Trivy plus one Grype each) running at once. */
@@ -48,9 +38,9 @@ export interface VulnConfig {
     trivyStaleHours: number
     /** The same for Grype, which publishes about daily. */
     grypeStaleHours: number
-    /** Managed mode: how often each tool asks its publisher for a newer build. */
+    /** How often each tool asks its publisher for a newer build. */
     checkIntervalMin: number
-    /** Managed mode: one download, from spawn to exit, before it is killed. */
+    /** One download, from spawn to exit, before it is killed. */
     downloadTimeoutMs: number
     /** Where the Trivy build is checked and downloaded from, with its tag (`:2` if none was given). */
     trivyDbRepository: string
@@ -61,9 +51,8 @@ export interface VulnConfig {
 /**
  * Reads the vulnerability server's config. Throws `ConfigError`, like `loadConfig`.
  *
- * The folders are only checked to be set: whether the databases are actually in them is a runtime
- * question, because a server that starts before its databases arrive should answer 503 until they
- * do rather than refuse to start.
+ * `VULN_DATA_DIR` is only checked to be set: the databases are downloaded at runtime, and until
+ * they are in the server answers 503 rather than refusing to start.
  */
 export function loadVulnConfig(env: NodeJS.ProcessEnv = process.env): VulnConfig {
     const apiToken = requireToken(env)
@@ -71,22 +60,7 @@ export function loadVulnConfig(env: NodeJS.ProcessEnv = process.env): VulnConfig
     const port = requirePort(env)
 
     const dataDir = str(env.VULN_DATA_DIR)
-    const trivyCacheDir = str(env.TRIVY_CACHE_DIR)
-    const grypeDbCacheDir = str(env.GRYPE_DB_CACHE_DIR)
-    if (dataDir && (trivyCacheDir || grypeDbCacheDir)) {
-        throw new ConfigError('Set VULN_DATA_DIR (the server keeps the databases fresh) or TRIVY_CACHE_DIR and '
-            + 'GRYPE_DB_CACHE_DIR (frozen folders), not both.')
-    }
-    if (!dataDir && !trivyCacheDir && !grypeDbCacheDir) {
-        throw new ConfigError('VULN_DATA_DIR is required (where the server keeps the databases), '
-            + 'or TRIVY_CACHE_DIR and GRYPE_DB_CACHE_DIR for frozen folders.')
-    }
-    if (!dataDir && !trivyCacheDir) {
-        throw new ConfigError('TRIVY_CACHE_DIR is required (the folder with db/trivy.db; Trivy\'s --cache-dir).')
-    }
-    if (!dataDir && !grypeDbCacheDir) {
-        throw new ConfigError('GRYPE_DB_CACHE_DIR is required (the folder with 6/vulnerability.db).')
-    }
+    if (!dataDir) throw new ConfigError('VULN_DATA_DIR is required (where the server keeps the databases).')
 
     const rawRepository = str(env.TRIVY_DB_REPOSITORY) ?? DEFAULT_TRIVY_DB_REPOSITORY
     let trivyDbRepository: string
@@ -107,13 +81,12 @@ export function loadVulnConfig(env: NodeJS.ProcessEnv = process.env): VulnConfig
     const maxScans = int(env, 'VULN_MAX_SCANS', Math.max(1, Math.floor(availableParallelism() / 2)), 1, 64)
 
     return {
-        mode: dataDir ? 'managed' : 'frozen',
         apiToken,
         port,
         logLevel,
         trivyBin: str(env.TRIVY_BIN) ?? 'trivy',
         grypeBin: str(env.GRYPE_BIN) ?? 'grype',
-        ...dataDir ? {dataDir} : {trivyCacheDir, grypeDbCacheDir},
+        dataDir,
         maxPurls: int(env, 'VULN_MAX_PURLS', 5000, 1, 50_000),
         maxScans,
         maxQueued: int(env, 'VULN_MAX_QUEUED', 4 * maxScans, 0, 1000),

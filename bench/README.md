@@ -216,11 +216,3 @@ vulnerability database change, `VERDICT: allowed and expected D9 differences onl
 are expected D9 and none a regression, `VERDICT: DIFFERENT — ...` otherwise (timings are reported, never
 judged: the largest change in percent is on the line). A run can be named by its folder name alone
 (looked up under `bench/runs/`). The exit code is always 0.
-
-## Micro benches
-
-The server's narrow benches stay in its project, `packages/depinder-server/bench/micro/`:
-`bench-stream.cjs` (one /resolve read as a stream) with `bench-http.cjs` and `bench-chunks.cjs` on
-top of it, and the vuln server's `vuln-parity.ts`, `vuln-bench.cjs` and `vuln-soak.cjs` (usage in
-[its docs/benchmarks.md](../packages/depinder-server/docs/benchmarks.md)). `vuln-parity.ts` imports
-the server's `src/vuln/merge/` to check the answer field by field.

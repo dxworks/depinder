@@ -5,7 +5,7 @@ import type {ScannerName} from './scanners.js'
 import {describeBuild, type LeaseResult, type StaleHours} from './source.js'
 
 /**
- * Managed mode's databases on disk: one folder per build, never written again once it is live.
+ * The scanners' databases on disk: one folder per build, never written again once it is live.
  *
  *   VULN_DATA_DIR/
  *     trivy/<built-at>/db/{trivy.db,metadata.json}  + build.json

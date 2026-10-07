@@ -3,5 +3,5 @@ import {moduleBoundariesConfig} from '../../tools/workspace-checks/module-bounda
 
 export default [
     ...functionSizeConfig('packages/depinder-server/', ['src/**/*.ts']),
-    ...moduleBoundariesConfig(['src/**/*.ts', 'test/**/*.ts', 'bench/**/*.ts']),
+    ...moduleBoundariesConfig(['src/**/*.ts', 'test/**/*.ts']),
 ]

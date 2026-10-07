@@ -6,20 +6,18 @@ import type {FastifyInstance} from 'fastify'
 import {afterAll, afterEach, beforeAll, describe, expect, it, vi} from 'vitest'
 import {nullLogger} from '@depinder/core'
 import type {VulnConfig} from '../../src/vuln/config.js'
-import {createDatabaseInfo} from '../../src/vuln/databases.js'
 import {createScanLimiter, type ScanLimiter} from '../../src/vuln/limiter.js'
 import {buildVulnerabilityIndex, type GrypeReport, type TrivyReport} from '../../src/vuln/merge/index.js'
 import type {ScanDirs, ScannerName, ScanReports} from '../../src/vuln/scanners.js'
 import {createVulnServer, type RunScan} from '../../src/vuln/server.js'
-import {createFrozenSource, createManagedSource, type ToolHealth} from '../../src/vuln/source.js'
+import {createDatabaseSource, type ToolHealth} from '../../src/vuln/source.js'
 import {createStore, type Store} from '../../src/vuln/store.js'
 
 /**
  * The route end to end, with the two scanners replaced by shell scripts that print a fixture,
- * fail, hang or print garbage. The fixtures are real Trivy 0.74 / Grype 0.118 output from Phase 0
- * for three packages, refs renamed to c0..c2 — so the purls below must be sent in this order.
- *
- * Frozen mode reads two fixed folders; managed mode leases builds from a real store on disk.
+ * fail, hang or print garbage. The fixtures are real Trivy 0.74 / Grype 0.118 output for three
+ * packages, refs renamed to c0..c2 — so the purls below must be sent in this order. The builds are
+ * leased from a real store on disk, with fake database files.
  */
 
 const TOKEN = 'test-token-'.padEnd(20, 'x')
@@ -29,7 +27,7 @@ const FIXTURES = fileURLToPath(new URL('../fixtures/', import.meta.url))
 const TRIVY_FIXTURE = join(FIXTURES, 'vuln-trivy.json')
 const GRYPE_FIXTURE = join(FIXTURES, 'vuln-grype.json')
 
-/** The clock every frozen source here reads: the fixture builds are ~10 h and ~13.5 h old. */
+/** The clock every store and source here reads: the fixture builds are ~10 h and ~13.5 h old. */
 const NOW = Date.parse('2026-10-01T20:00:00Z')
 const TRIVY_BUILD = {built_at: '2026-10-01T10:04:05.794145908Z', schema: '2', age_seconds: 35754, stale: false}
 const GRYPE_BUILD = {built_at: '2026-10-01T06:33:48Z', schema: 'v6.1.9', age_seconds: 48372, stale: false}
@@ -52,8 +50,8 @@ vi.setConfig({testTimeout: 60_000})
 let root: string
 /** Where every server under test puts its scan folders; must be empty after each request. */
 let scanTmp: string
-let okDbs: {trivy: string, grype: string}
-let emptyDbs: {trivy: string, grype: string}
+/** A data folder holding both fixture builds, which every server opens unless told otherwise. */
+let readyDir: string
 const bins: Record<string, string> = {}
 const apps: FastifyInstance[] = []
 
@@ -77,15 +75,10 @@ beforeAll(async () => {
     await mkdir(scanTmp)
     await mkdir(join(root, 'bin'))
 
-    okDbs = {trivy: join(root, 'db', 'trivy'), grype: join(root, 'db', 'grype')}
-    await mkdir(join(okDbs.trivy, 'db'), {recursive: true})
-    await mkdir(join(okDbs.grype, '6'), {recursive: true})
-    await writeFile(join(okDbs.trivy, 'db', 'metadata.json'), JSON.stringify({Version: 2, UpdatedAt: '2026-10-01T10:04:05.794145908Z'}))
-    await writeFile(join(okDbs.trivy, 'db', 'trivy.db'), '')
-    await writeFile(join(okDbs.grype, '6', 'vulnerability.db'), '')
-    emptyDbs = {trivy: join(root, 'empty', 'trivy'), grype: join(root, 'empty', 'grype')}
-    await mkdir(emptyDbs.trivy, {recursive: true})
-    await mkdir(emptyDbs.grype, {recursive: true})
+    readyDir = join(root, 'ready')
+    const ready = await openStore(readyDir)
+    await install(ready, 'trivy', TRIVY_BUILD.built_at)
+    await install(ready, 'grype', GRYPE_BUILD.built_at)
 
     bins.trivyOk = await script('trivy-ok', `cat '${TRIVY_FIXTURE}'`)
     bins.grypeOk = await script('grype-ok', `cat '${GRYPE_FIXTURE}'`)
@@ -109,56 +102,52 @@ afterAll(async () => {
     await rm(root, {recursive: true, force: true})
 })
 
+/** A store on `dataDir` whose clock reads `now`. */
+async function openStore(dataDir: string, now = NOW): Promise<Store> {
+    const store = createStore({dataDir, staleHours: {trivy: 24, grype: 72}, log: nullLogger, now: () => now})
+    await store.open()
+    return store
+}
+
+/** Installs a build with empty database files, the way the updater does after a download. */
+async function install(store: Store, tool: ScannerName, built_at: string): Promise<void> {
+    const dir = await store.newStaging(tool)
+    if (tool === 'trivy') {
+        await mkdir(join(dir, 'db'))
+        await writeFile(join(dir, 'db', 'trivy.db'), '')
+        await writeFile(join(dir, 'db', 'metadata.json'), '{}')
+    } else {
+        await mkdir(join(dir, '6'))
+        await writeFile(join(dir, '6', 'vulnerability.db'), '')
+    }
+    await store.install(tool, dir, {tool, built_at, schema: tool === 'trivy' ? '2' : 'v6.1.9', upstream_id: null,
+        canary_findings: null, installed_at: built_at})
+}
+
+/** A server over a fresh store on `dataDir` (the ready builds by default), with what each updater reports in `status`. */
 async function server(options: {
+    dataDir?: string
     trivyBin?: string
     grypeBin?: string
-    dbs?: {trivy: string, grype: string}
     maxScans?: number
     maxQueued?: number
     maxPurls?: number
     scanTimeoutMs?: number
     now?: number
-} = {}): Promise<{app: FastifyInstance, limiter: ScanLimiter}> {
-    const dbs = options.dbs ?? okDbs
+    status?: Partial<Record<ScannerName, Partial<ToolHealth>>>
+    runScan?: RunScan
+} = {}): Promise<{app: FastifyInstance, limiter: ScanLimiter, store: Store}> {
     const config: VulnConfig = {
-        ...configBase(),
-        mode: 'frozen',
+        apiToken: TOKEN,
         port: 0,
         logLevel: 'error',
         trivyBin: options.trivyBin ?? bins.trivyOk!,
         grypeBin: options.grypeBin ?? bins.grypeOk!,
-        trivyCacheDir: dbs.trivy,
-        grypeDbCacheDir: dbs.grype,
+        dataDir: options.dataDir ?? readyDir,
         maxPurls: options.maxPurls ?? 100,
         maxScans: options.maxScans ?? 2,
         maxQueued: options.maxQueued ?? 2,
         scanTimeoutMs: options.scanTimeoutMs ?? SCAN_TIMEOUT_MS,
-    }
-    const limiter = createScanLimiter(config.maxScans, config.maxQueued)
-    const app = await createVulnServer({
-        config,
-        log: nullLogger,
-        limiter,
-        source: createFrozenSource(createDatabaseInfo({...config, trivyCacheDir: dbs.trivy, grypeDbCacheDir: dbs.grype}), dbs,
-            {trivy: 24, grype: 72}, () => options.now ?? NOW),
-        versions: {trivy: '0.74.0', grype: '0.118.0'},
-    })
-    await app.ready()
-    apps.push(app)
-    return {app, limiter}
-}
-
-function configBase(): Omit<VulnConfig, 'mode'> {
-    return {
-        apiToken: TOKEN,
-        port: 0,
-        logLevel: 'error',
-        trivyBin: bins.trivyOk!,
-        grypeBin: bins.grypeOk!,
-        maxPurls: 100,
-        maxScans: 2,
-        maxQueued: 2,
-        scanTimeoutMs: SCAN_TIMEOUT_MS,
         tmpDir: scanTmp,
         trivyStaleHours: 24,
         grypeStaleHours: 72,
@@ -167,6 +156,20 @@ function configBase(): Omit<VulnConfig, 'mode'> {
         trivyDbRepository: 'mirror.gcr.io/aquasec/trivy-db:2',
         grypeDbUpdateUrl: 'https://grype.anchore.io/databases/v6/latest.json',
     }
+    const now = options.now ?? NOW
+    const store = await openStore(config.dataDir, now)
+    const limiter = createScanLimiter(config.maxScans, config.maxQueued)
+    const app = await createVulnServer({
+        config,
+        log: nullLogger,
+        limiter,
+        source: createDatabaseSource(store, tool => options.status?.[tool] ?? {}, {trivy: 24, grype: 72}, () => now),
+        versions: {trivy: '0.74.0', grype: '0.118.0'},
+        runScan: options.runScan,
+    })
+    await app.ready()
+    apps.push(app)
+    return {app, limiter, store}
 }
 
 function post(app: FastifyInstance, purls: unknown, headers: Record<string, string> = auth) {
@@ -201,9 +204,10 @@ describe('POST /vulnerabilities', () => {
         expect(body.databases).toEqual({trivy: TRIVY_BUILD, grype: GRYPE_BUILD})
         expect(body.scanners).toEqual({trivy: '0.74.0', grype: '0.118.0'})
 
-        // Phase 0's flags, and the SBOM path, reached both scanners.
+        // The scan flags, the leased build and the SBOM path reached both scanners.
+        const trivyDir = join(readyDir, 'trivy', '2026-10-01T100405.794145908Z')
         const trivyArgs = (await readFile(join(root, 'trivy-ok.args'), 'utf8')).trim()
-        expect(trivyArgs).toMatch(new RegExp(`^sbom --quiet --format json --skip-db-update --cache-dir ${okDbs.trivy} ${scanTmp}/depinder-vuln-[^/]+/sbom.json$`))
+        expect(trivyArgs).toMatch(new RegExp(`^sbom --quiet --format json --skip-db-update --cache-dir ${trivyDir} ${scanTmp}/depinder-vuln-[^/]+/sbom.json$`))
         const grypeArgs = (await readFile(join(root, 'grype-ok.args'), 'utf8')).trim()
         expect(grypeArgs).toMatch(new RegExp(`^-q sbom:${scanTmp}/depinder-vuln-[^/]+/sbom.json -o json$`))
     })
@@ -256,11 +260,10 @@ describe('POST /vulnerabilities', () => {
     })
 
     it('answers 503 while the databases are not there', async () => {
-        const {app} = await server({dbs: emptyDbs})
+        const {app} = await server({dataDir: join(root, 'empty')})
         const response = await post(app, SCANNED)
         expect(response.statusCode).toBe(503)
-        expect(response.json()).toMatchObject({error: 'databases not ready'})
-        expect((response.json() as {reason: string}).reason).toContain('trivy.db')
+        expect(response.json()).toEqual({error: 'databases not ready', reason: 'trivy: no build yet; grype: no build yet'})
     })
 
     it('answers 500 with the scanner and the reason when a scan fails', async () => {
@@ -312,70 +315,28 @@ describe('GET /health', () => {
     })
 
     it('is a 503 while the databases are not there', async () => {
-        const {app} = await server({dbs: emptyDbs})
+        const {app} = await server({dataDir: join(root, 'empty')})
         const response = await app.inject({method: 'GET', url: '/health'})
         expect(response.statusCode).toBe(503)
-        expect(response.json()).toMatchObject({status: 'not_ready'})
-        expect((response.json() as {reason: string}).reason).toContain('trivy.db')
+        expect(response.json()).toMatchObject({status: 'not_ready', reason: 'trivy: no build yet; grype: no build yet'})
     })
 })
 
-describe('managed mode', () => {
+describe('leased builds', () => {
     let dataDir: string
-    let store: Store
 
     beforeAll(async () => {
-        dataDir = join(root, 'managed')
+        dataDir = join(root, 'builds')
     })
 
     afterEach(async () => {
         await rm(dataDir, {recursive: true, force: true})
     })
 
-    async function openStore(): Promise<Store> {
-        store = createStore({dataDir, staleHours: {trivy: 24, grype: 72}, log: nullLogger, now: () => NOW})
-        await store.open()
-        return store
-    }
-
-    async function install(tool: ScannerName, built_at: string): Promise<void> {
-        const dir = await store.newStaging(tool)
-        if (tool === 'trivy') {
-            await mkdir(join(dir, 'db'))
-            await writeFile(join(dir, 'db', 'trivy.db'), '')
-            await writeFile(join(dir, 'db', 'metadata.json'), '{}')
-        } else {
-            await mkdir(join(dir, '6'))
-            await writeFile(join(dir, '6', 'vulnerability.db'), '')
-        }
-        await store.install(tool, dir, {tool, built_at, schema: tool === 'trivy' ? '2' : 'v6.1.9', upstream_id: null,
-            canary_findings: null, installed_at: built_at})
-    }
-
-    async function managedServer(options: {
-        runScan?: RunScan
-        grypeBin?: string
-        status?: Partial<Record<ScannerName, Partial<ToolHealth>>>
-    } = {}): Promise<FastifyInstance> {
-        const config: VulnConfig = {...configBase(), mode: 'managed', dataDir, grypeBin: options.grypeBin ?? bins.grypeOk!}
-        const app = await createVulnServer({
-            config,
-            log: nullLogger,
-            limiter: createScanLimiter(2, 2),
-            source: createManagedSource(store, tool => options.status?.[tool] ?? {}, {trivy: 24, grype: 72}, () => NOW),
-            versions: {trivy: '0.74.0', grype: '0.118.0'},
-            runScan: options.runScan,
-        })
-        await app.ready()
-        apps.push(app)
-        return app
-    }
-
     it('scans with the folders of the leased builds', async () => {
-        await openStore()
-        await install('trivy', TRIVY_BUILD.built_at)
-        await install('grype', GRYPE_BUILD.built_at)
-        const app = await managedServer({grypeBin: bins.grypeEnv})
+        const {app, store} = await server({dataDir, grypeBin: bins.grypeEnv})
+        await install(store, 'trivy', TRIVY_BUILD.built_at)
+        await install(store, 'grype', GRYPE_BUILD.built_at)
         const response = await post(app, SCANNED)
         expect(response.statusCode).toBe(200)
         expect(response.json()).toMatchObject({databases: {trivy: TRIVY_BUILD, grype: GRYPE_BUILD}})
@@ -387,10 +348,9 @@ describe('managed mode', () => {
     })
 
     it('is a 503 naming the tool that is still downloading, and /health shows what each tool is doing', async () => {
-        await openStore()
-        await install('trivy', TRIVY_BUILD.built_at)
         const status = {grype: {updating: true, last_error: null, last_check_at: '2026-10-01T19:59:59.000Z'}}
-        const app = await managedServer({status})
+        const {app, store} = await server({dataDir, status})
+        await install(store, 'trivy', TRIVY_BUILD.built_at)
 
         const response = await post(app, SCANNED)
         expect(response.statusCode).toBe(503)
@@ -406,10 +366,9 @@ describe('managed mode', () => {
     })
 
     it('stays a 200 on /health with a stale build and the last error, and keeps scanning', async () => {
-        await openStore()
-        await install('trivy', '2026-09-29T10:00:00Z')
-        await install('grype', GRYPE_BUILD.built_at)
-        const app = await managedServer({status: {trivy: {last_error: 'check failed: HTTP 404', updating: false}}})
+        const {app, store} = await server({dataDir, status: {trivy: {last_error: 'check failed: HTTP 404', updating: false}}})
+        await install(store, 'trivy', '2026-09-29T10:00:00Z')
+        await install(store, 'grype', GRYPE_BUILD.built_at)
         const health = await app.inject({method: 'GET', url: '/health'})
         expect(health.statusCode).toBe(200)
         expect(health.json()).toMatchObject({
@@ -420,9 +379,6 @@ describe('managed mode', () => {
     })
 
     it('answers a request with the build it started on when a new one is installed during its scan', async () => {
-        await openStore()
-        await install('trivy', TRIVY_BUILD.built_at)
-        await install('grype', GRYPE_BUILD.built_at)
         const reports: ScanReports = {
             trivy: JSON.parse(await readFile(TRIVY_FIXTURE, 'utf8')) as TrivyReport,
             grype: JSON.parse(await readFile(GRYPE_FIXTURE, 'utf8')) as GrypeReport,
@@ -431,7 +387,8 @@ describe('managed mode', () => {
         }
         const seen: ScanDirs[] = []
         let unblock: (() => void) | undefined
-        const app = await managedServer({
+        const {app, store} = await server({
+            dataDir,
             runScan: async (_sbom, dirs) => {
                 seen.push(dirs)
                 if (seen.length === 1) await new Promise<void>(r => {
@@ -440,11 +397,13 @@ describe('managed mode', () => {
                 return reports
             },
         })
+        await install(store, 'trivy', TRIVY_BUILD.built_at)
+        await install(store, 'grype', GRYPE_BUILD.built_at)
 
         const first = post(app, SCANNED)
         while (!unblock) await new Promise(r => setTimeout(r, 5))
         const oldDir = seen[0]!.trivy
-        await install('trivy', '2026-10-01T19:00:16.340316472Z')
+        await install(store, 'trivy', '2026-10-01T19:00:16.340316472Z')
 
         // The old build stays on disk while the scan reading it runs.
         expect(await readdir(join(dataDir, 'trivy'))).toHaveLength(2)

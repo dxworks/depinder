@@ -16,10 +16,10 @@
  * (`github.com/burntsushi/toml`) and spells a maven name `group:artifact`, Grype gives the bare
  * artifactId.
  *
- * Verified on 2026-10-01 with real Grype 0.118.0 and Trivy 0.74.0 against Phase 0's databases, on a
+ * Verified on 2026-10-01 with real Grype 0.118.0 and Trivy 0.74.0 against that day's databases, on a
  * four-component SBOM with refs `c0`..`c3`: every Grype match carried `artifact.id` equal to its
  * component's ref (`c0`, `c1`, `c3`), and every Trivy finding `PkgIdentifier.BOMRef` equal to it.
- * Phase 0's 10,049-purl run, where the refs were the purls, agrees on all 1,326 Grype matches. So
+ * A 10,049-purl run where the refs were the purls agrees on all 1,326 Grype matches. So
  * `artifact.id` is the main path, and the exact `artifact.purl` fallback is only a safety net for a
  * Grype that some day stops echoing it.
  *

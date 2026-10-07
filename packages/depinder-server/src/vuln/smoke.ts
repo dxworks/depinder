@@ -10,8 +10,8 @@ import {SCAN_DIR_PREFIX, scanGrype, ScanError, type ScannerName, scanTrivy} from
 /**
  * The smoke test a freshly downloaded build must pass before it goes live.
  *
- * The canaries (`canaries.ts`) are scanned against the new build with that tool's exact Phase 1
- * scan command, through the same `buildSbom` and the same scanner wrapper as a request. To pass:
+ * The canaries (`canaries.ts`) are scanned against the new build with that tool's normal scan
+ * command, through the same `buildSbom` and the same scanner wrapper as a request. To pass:
  *   (a) the scanner exits 0 and its output parses;
  *   (b) every canary's `must` id is found;
  *   (c) the total findings on the canaries are at least 90 % of what the current build gave.
