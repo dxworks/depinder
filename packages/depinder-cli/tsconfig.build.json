@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "noEmit": false,
+    "declaration": true,
+    "types": ["node"],
+    "skipLibCheck": false,
+    // Checks against @depinder/core's compiled declarations, as the bundle reads its dist
+    "customConditions": []
+  },
+  "include": ["src"]
+}

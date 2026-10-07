@@ -1,0 +1,24 @@
+{
+  "files": {
+    "packages/depinder-cli/src/commands/analyse.ts": 1162,
+    "packages/depinder-cli/src/plugins/sbom/local-scan.ts": 888,
+    "packages/depinder-cli/src/plugins/sbom/cyclonedx.ts": 693,
+    "packages/depinder-cli/src/blackduck/licenses.ts": 539,
+    "packages/depinder-cli/src/blackduck/export.ts": 489,
+    "packages/depinder-cli/src/commands/transformBlackDuckReports.ts": 477,
+    "packages/depinder-cli/src/resolver/client.ts": 425,
+    "packages/depinder-cli/__tests__/resolver.bulk.test.ts": 953,
+    "packages/depinder-cli/__tests__/blackduck.export.test.ts": 820,
+    "packages/depinder-cli/__tests__/sbom.cyclonedx.test.ts": 768,
+    "packages/depinder-cli/__tests__/resolver.client.test.ts": 588
+  },
+  "longFunctions": [
+    "packages/depinder-cli/src/commands/analyse.ts",
+    "packages/depinder-cli/src/plugins/sbom/cyclonedx.ts",
+    "packages/depinder-server/src/resolver/api/store.ts",
+    "packages/depinder-server/src/resolver/worker/fill/pool.ts",
+    "packages/depinder-server/src/vuln/server.ts",
+    "packages/depinder-server/src/vuln/store.ts",
+    "packages/depinder-server/src/vuln/updater.ts"
+  ]
+}

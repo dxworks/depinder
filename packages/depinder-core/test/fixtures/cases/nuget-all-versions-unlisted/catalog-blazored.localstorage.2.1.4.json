@@ -1,0 +1,134 @@
+{
+  "@id": "https://api.nuget.org/v3/catalog0/data/2026.03.09.06.24.03/blazored.localstorage.2.1.4.json",
+  "@type": [
+    "PackageDetails",
+    "catalog:Permalink"
+  ],
+  "authors": "Chris Sainty",
+  "catalog:commitId": "6e140f15-b221-481a-aa1b-2f3e27dfd15a",
+  "catalog:commitTimeStamp": "2026-03-09T06:24:03.3449216Z",
+  "copyright": "Copyright 2018 (c) Chris Sainty. All rights reserved.",
+  "created": "2020-03-30T23:11:57.22Z",
+  "description": "A library to provide access to local storage in Blazor applications",
+  "iconUrl": "https://avatars1.githubusercontent.com/u/39194025",
+  "id": "Blazored.LocalStorage",
+  "isPrerelease": false,
+  "lastEdited": "2026-03-09T06:18:35.84Z",
+  "licenseExpression": "MIT",
+  "licenseUrl": "https://licenses.nuget.org/MIT",
+  "listed": false,
+  "packageHash": "NYSjQX7EYOeYRoh+VhgAU1hFGIYnnJwEuJv35Kons9pMyOENEEMHI6jWra/kqVx1NwJ78LOV3+rjhWPlk2xxpQ==",
+  "packageHashAlgorithm": "SHA512",
+  "packageSize": 19460,
+  "projectUrl": "https://github.com/blazored/LocalStorage",
+  "published": "1900-01-01T00:00:00Z",
+  "repository": {
+    "@id": "https://api.nuget.org/v3/catalog0/data/2026.03.09.06.24.03/blazored.localstorage.2.1.4.json#repository",
+    "url": "https://github.com/blazored/LocalStorage"
+  },
+  "requireLicenseAcceptance": false,
+  "verbatimVersion": "2.1.4",
+  "version": "2.1.4",
+  "dependencyGroups": [
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.03.09.06.24.03/blazored.localstorage.2.1.4.json#dependencygroup/.netstandard2.0",
+      "@type": "PackageDependencyGroup",
+      "dependencies": [
+        {
+          "@id": "https://api.nuget.org/v3/catalog0/data/2026.03.09.06.24.03/blazored.localstorage.2.1.4.json#dependencygroup/.netstandard2.0/microsoft.aspnetcore.components",
+          "@type": "PackageDependency",
+          "id": "Microsoft.AspNetCore.Components",
+          "range": "[3.1.2, )"
+        },
+        {
+          "@id": "https://api.nuget.org/v3/catalog0/data/2026.03.09.06.24.03/blazored.localstorage.2.1.4.json#dependencygroup/.netstandard2.0/microsoft.aspnetcore.components.web",
+          "@type": "PackageDependency",
+          "id": "Microsoft.AspNetCore.Components.Web",
+          "range": "[3.1.2, )"
+        }
+      ],
+      "targetFramework": ".NETStandard2.0"
+    }
+  ],
+  "packageEntries": [
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.03.09.06.24.03/blazored.localstorage.2.1.4.json#Blazored.LocalStorage.nuspec",
+      "@type": "PackageEntry",
+      "compressedLength": 586,
+      "fullName": "Blazored.LocalStorage.nuspec",
+      "length": 1242,
+      "name": "Blazored.LocalStorage.nuspec"
+    },
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.03.09.06.24.03/blazored.localstorage.2.1.4.json#lib/netstandard2.0/Blazored.LocalStorage.dll",
+      "@type": "PackageEntry",
+      "compressedLength": 7605,
+      "fullName": "lib/netstandard2.0/Blazored.LocalStorage.dll",
+      "length": 17920,
+      "name": "Blazored.LocalStorage.dll"
+    },
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.03.09.06.24.03/blazored.localstorage.2.1.4.json#.signature.p7s",
+      "@type": "PackageEntry",
+      "compressedLength": 9465,
+      "fullName": ".signature.p7s",
+      "length": 9465,
+      "name": ".signature.p7s"
+    }
+  ],
+  "tags": [
+    "Blazor",
+    "LocalStorage",
+    "Blazored",
+    "Razor",
+    "Components"
+  ],
+  "@context": {
+    "@vocab": "http://schema.nuget.org/schema#",
+    "catalog": "http://schema.nuget.org/catalog#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "dependencies": {
+      "@id": "dependency",
+      "@container": "@set"
+    },
+    "dependencyGroups": {
+      "@id": "dependencyGroup",
+      "@container": "@set"
+    },
+    "packageEntries": {
+      "@id": "packageEntry",
+      "@container": "@set"
+    },
+    "packageTypes": {
+      "@id": "packageType",
+      "@container": "@set"
+    },
+    "supportedFrameworks": {
+      "@id": "supportedFramework",
+      "@container": "@set"
+    },
+    "tags": {
+      "@id": "tag",
+      "@container": "@set"
+    },
+    "vulnerabilities": {
+      "@id": "vulnerability",
+      "@container": "@set"
+    },
+    "published": {
+      "@type": "xsd:dateTime"
+    },
+    "created": {
+      "@type": "xsd:dateTime"
+    },
+    "lastEdited": {
+      "@type": "xsd:dateTime"
+    },
+    "catalog:commitTimeStamp": {
+      "@type": "xsd:dateTime"
+    },
+    "reasons": {
+      "@container": "@set"
+    }
+  }
+}

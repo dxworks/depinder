@@ -1,0 +1,134 @@
+{
+  "@id": "https://api.nuget.org/v3/catalog0/data/2019.01.03.07.07.11/blazored.localstorage.0.1.0.json",
+  "@type": [
+    "PackageDetails",
+    "catalog:Permalink"
+  ],
+  "authors": "Chris Sainty",
+  "catalog:commitId": "724792da-2faa-4980-a1ab-5478a7e7cc3f",
+  "catalog:commitTimeStamp": "2019-01-03T07:07:11.5781109Z",
+  "contentFiles": "",
+  "copyright": "Copyright 2018 (c) Chris Sainty. All rights reserved.",
+  "created": "2018-06-06T22:26:45.92Z",
+  "description": "A library to provide access to local storage in Blazor applications",
+  "id": "Blazored.LocalStorage",
+  "isPrerelease": false,
+  "lastEdited": "2019-01-03T07:06:54.143Z",
+  "licenseUrl": "https://github.com/Blazored/LocalStorage/blob/master/LICENSE",
+  "listed": false,
+  "packageHash": "1gDDmJ4W/dg5qANzH/t1pd02NGL7ccAWpPxhH5E4/PLqxyaJ8S9L1Ppo5DWsigZFj3aA76VIieaR0aPE79cNjg==",
+  "packageHashAlgorithm": "SHA512",
+  "packageSize": 15416,
+  "projectUrl": "https://github.com/Blazored/LocalStorage",
+  "published": "1900-01-01T00:00:00Z",
+  "repository": "",
+  "requireLicenseAcceptance": false,
+  "verbatimVersion": "0.1.0",
+  "version": "0.1.0",
+  "dependencyGroups": [
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2019.01.03.07.07.11/blazored.localstorage.0.1.0.json#dependencygroup/.netstandard2.0",
+      "@type": "PackageDependencyGroup",
+      "dependencies": [
+        {
+          "@id": "https://api.nuget.org/v3/catalog0/data/2019.01.03.07.07.11/blazored.localstorage.0.1.0.json#dependencygroup/.netstandard2.0/microsoft.aspnetcore.blazor.browser",
+          "@type": "PackageDependency",
+          "id": "Microsoft.AspNetCore.Blazor.Browser",
+          "range": "[0.3.0, )"
+        },
+        {
+          "@id": "https://api.nuget.org/v3/catalog0/data/2019.01.03.07.07.11/blazored.localstorage.0.1.0.json#dependencygroup/.netstandard2.0/microsoft.aspnetcore.blazor.build",
+          "@type": "PackageDependency",
+          "id": "Microsoft.AspNetCore.Blazor.Build",
+          "range": "[0.3.0, )"
+        }
+      ],
+      "targetFramework": ".NETStandard2.0"
+    }
+  ],
+  "packageEntries": [
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2019.01.03.07.07.11/blazored.localstorage.0.1.0.json#Blazored.LocalStorage.nuspec",
+      "@type": "PackageEntry",
+      "compressedLength": 584,
+      "fullName": "Blazored.LocalStorage.nuspec",
+      "length": 1284,
+      "name": "Blazored.LocalStorage.nuspec"
+    },
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2019.01.03.07.07.11/blazored.localstorage.0.1.0.json#lib/netstandard2.0/Blazored.LocalStorage.dll",
+      "@type": "PackageEntry",
+      "compressedLength": 2648,
+      "fullName": "lib/netstandard2.0/Blazored.LocalStorage.dll",
+      "length": 7680,
+      "name": "Blazored.LocalStorage.dll"
+    },
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2019.01.03.07.07.11/blazored.localstorage.0.1.0.json#content/Properties/launchSettings.json",
+      "@type": "PackageEntry",
+      "compressedLength": 275,
+      "fullName": "content/Properties/launchSettings.json",
+      "length": 659,
+      "name": "launchSettings.json"
+    },
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2019.01.03.07.07.11/blazored.localstorage.0.1.0.json#contentFiles/any/netstandard2.0/Properties/launchSettings.json",
+      "@type": "PackageEntry",
+      "compressedLength": 275,
+      "fullName": "contentFiles/any/netstandard2.0/Properties/launchSettings.json",
+      "length": 659,
+      "name": "launchSettings.json"
+    },
+    {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2019.01.03.07.07.11/blazored.localstorage.0.1.0.json#.signature.p7s",
+      "@type": "PackageEntry",
+      "compressedLength": 9467,
+      "fullName": ".signature.p7s",
+      "length": 9467,
+      "name": ".signature.p7s"
+    }
+  ],
+  "tags": [
+    "blazored",
+    "blazor",
+    "localstorage",
+    "csharp"
+  ],
+  "@context": {
+    "@vocab": "http://schema.nuget.org/schema#",
+    "catalog": "http://schema.nuget.org/catalog#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "dependencies": {
+      "@id": "dependency",
+      "@container": "@set"
+    },
+    "dependencyGroups": {
+      "@id": "dependencyGroup",
+      "@container": "@set"
+    },
+    "packageEntries": {
+      "@id": "packageEntry",
+      "@container": "@set"
+    },
+    "supportedFrameworks": {
+      "@id": "supportedFramework",
+      "@container": "@set"
+    },
+    "tags": {
+      "@id": "tag",
+      "@container": "@set"
+    },
+    "published": {
+      "@type": "xsd:dateTime"
+    },
+    "created": {
+      "@type": "xsd:dateTime"
+    },
+    "lastEdited": {
+      "@type": "xsd:dateTime"
+    },
+    "catalog:commitTimeStamp": {
+      "@type": "xsd:dateTime"
+    }
+  }
+}

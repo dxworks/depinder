@@ -1,0 +1,21 @@
+{
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "name": "depinder-bench",
+  "projectType": "application",
+  "sourceRoot": "bench",
+  "tags": ["scope:bench"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "tsc -p tsconfig.json"}
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "eslint ."}
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "vitest run"}
+    }
+  }
+}

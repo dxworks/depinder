@@ -1,0 +1,58 @@
+{
+  "minified": "composer/2.0",
+  "packages": {
+    "monolog/monolog": [
+      {
+        "name": "monolog/monolog",
+        "description": "Sends your logs to files, sockets, inboxes, databases and various web services",
+        "keywords": ["log", "logging", "psr-3"],
+        "homepage": "https://github.com/Seldaek/monolog",
+        "version": "3.12.0",
+        "version_normalized": "3.12.0.0",
+        "license": ["MIT"],
+        "source": {
+          "url": "https://github.com/Seldaek/monolog.git",
+          "type": "git",
+          "reference": "72c534fc0ab181ef52d92a68382318631e301608"
+        },
+        "type": "library",
+        "time": "2026-09-09T08:34:20+00:00",
+        "require": {"php": ">=8.1", "psr/log": "^2.0 || ^3.0"}
+      },
+      {
+        "version": "3.11.0",
+        "version_normalized": "3.11.0.0",
+        "source": {
+          "url": "https://github.com/Seldaek/monolog.git",
+          "type": "git",
+          "reference": "147f303310f06334f03f409e49d7ad1e275ff05a"
+        },
+        "time": "2026-09-02T12:39:56+00:00"
+      },
+      {
+        "version": "2.0.0",
+        "version_normalized": "2.0.0.0",
+        "homepage": "__unset",
+        "license": ["MIT", "LGPL-2.1-only"],
+        "source": {
+          "url": "https://github.com/Seldaek/monolog.git",
+          "type": "git",
+          "reference": "aad2b3c1c1d3f4e2a3f2e1d0c9b8a7f6e5d4c3b2"
+        },
+        "time": "2019-11-11T09:12:00+00:00"
+      },
+      {
+        "version": "1.0.0-RC1",
+        "version_normalized": "1.0.0.0-RC1",
+        "license": "__unset",
+        "source": {
+          "url": "https://github.com/Seldaek/monolog.git",
+          "type": "git",
+          "reference": "5e651a82b4b03d267da6084720ada0cd398c8d16"
+        },
+        "time": "2011-07-01T19:29:40+00:00"
+      }
+    ]
+  },
+  "security-advisories": []
+}

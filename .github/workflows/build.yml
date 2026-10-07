@@ -24,12 +24,60 @@ jobs:
           node-version: '24.x'
           cache: 'npm'
 
-      - name: Build Node App
+      # typecheck, lint, test, build, size guard and dependency check of every Nx project
+      - name: Check and build
         run: |
           npm ci
-          npm run create
+          npm run check
         env:
 #          GH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
           CI: true
 
 
+
+  # Both roads to a package's facts (server and CLI fallback) on every recorded registry case,
+  # whenever core, the CLI or the server changed. glibc Postgres on purpose: its locale sorts text
+  # unlike JavaScript, as a hosted database's may.
+  parity:
+    name: Parity
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: depinder
+          POSTGRES_DB: depinder
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      # Base and head for `nx affected`: the merge base with dev, or the last green run on dev
+      - name: Find the affected range
+        uses: nrwl/nx-set-shas@v4
+        with:
+          main-branch-name: dev
+
+      - name: Parity test
+        run: npx nx affected -t test-parity
+        env:
+          CI: true
+          TEST_DATABASE_URL: postgresql://postgres:depinder@127.0.0.1:55432/depinder

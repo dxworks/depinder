@@ -1,0 +1,31 @@
+{
+  "purl": "pkg:composer/psr/log",
+  "ecosystem": "composer",
+  "pattern": "composer: an ordinary package, tagged releases plus the ~dev branch file",
+  "expect": "found",
+  "recordedAt": "2026-10-03T13:08:36.340Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://repo.packagist.org/p2/psr/log.json",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "etag": "\"6a439ffe-1b06\"",
+        "last-modified": "Tue, 30 Jun 2026 10:52:46 GMT"
+      },
+      "body": "p2-log.json"
+    },
+    {
+      "method": "GET",
+      "url": "https://repo.packagist.org/p2/psr/log~dev.json",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "etag": "\"6a439fff-5f9\"",
+        "last-modified": "Tue, 30 Jun 2026 10:52:47 GMT"
+      },
+      "body": "p2-log~dev.json"
+    }
+  ]
+}

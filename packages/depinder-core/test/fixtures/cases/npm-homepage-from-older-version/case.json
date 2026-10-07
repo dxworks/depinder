@@ -1,0 +1,20 @@
+{
+  "purl": "pkg:npm/unit-parser",
+  "ecosystem": "npm",
+  "pattern": "npm (D9): no top-level homepage or repository and none on the latest 0.1.1 or 0.1.0; only the older 0.0.7 has homepage and repository",
+  "expect": "found",
+  "recordedAt": "2026-10-03T13:08:29.750Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://registry.npmjs.org/unit-parser",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "etag": "W/\"e395ab4b3734fd3372fdd375d65ed688\"",
+        "last-modified": "Tue, 28 Jun 2022 04:48:13 GMT"
+      },
+      "body": "packument.json"
+    }
+  ]
+}

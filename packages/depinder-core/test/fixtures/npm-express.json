@@ -1,0 +1,53 @@
+{
+  "_id": "express",
+  "name": "express",
+  "description": "Fast, unopinionated, minimalist web framework",
+  "dist-tags": {
+    "latest": "4.18.2",
+    "next": "5.0.0-alpha.8"
+  },
+  "versions": {
+    "0.14.0": {
+      "name": "express",
+      "version": "0.14.0",
+      "licenses": [
+        {"type": "MIT", "url": "http://github.com/expressjs/express/blob/master/LICENSE"}
+      ]
+    },
+    "4.17.1": {
+      "name": "express",
+      "version": "4.17.1",
+      "license": {"type": "MIT", "url": "https://opensource.org/licenses/MIT"}
+    },
+    "5.0.0-alpha.8": {
+      "name": "express",
+      "version": "5.0.0-alpha.8",
+      "license": "MIT",
+      "deprecated": "5.x is not ready yet"
+    },
+    "4.18.2": {
+      "name": "express",
+      "version": "4.18.2",
+      "license": "MIT"
+    },
+    "4.19.0": {
+      "name": "express",
+      "version": "4.19.0"
+    }
+  },
+  "time": {
+    "created": "2010-12-29T19:38:25.450Z",
+    "modified": "2024-03-25T18:00:00.000Z",
+    "0.14.0": "2011-05-08T22:23:17.000Z",
+    "4.17.1": "2019-05-25T16:32:32.590Z",
+    "5.0.0-alpha.8": "2020-03-25T15:30:00.000Z",
+    "4.18.2": "2022-10-08T20:46:50.089Z",
+    "4.19.0": "2024-03-25T17:50:00.000Z"
+  },
+  "homepage": "http://expressjs.com/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/expressjs/express.git"
+  },
+  "license": "MIT"
+}

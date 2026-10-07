@@ -1,0 +1,41 @@
+{
+  "purl": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-logging-juli",
+  "ecosystem": "maven",
+  "pattern": "maven: <release> and the last listed version are the milestone 9.0.0.M6 (2016), while the older line 7.0.109 was deployed last (2021); latest must be a final release, never the milestone",
+  "expect": "found",
+  "recordedAt": "2026-10-03T13:08:26.899Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://repo1.maven.org/maven2/org/apache/tomcat/embed/tomcat-embed-logging-juli/maven-metadata.xml",
+      "status": 200,
+      "headers": {
+        "content-type": "text/xml",
+        "etag": "W/\"b35e80df9ec223b9448258c0a3475bfc\"",
+        "last-modified": "Mon, 26 Apr 2021 17:10:06 GMT"
+      },
+      "body": "metadata.xml"
+    },
+    {
+      "method": "GET",
+      "url": "https://repo1.maven.org/maven2/org/apache/tomcat/embed/tomcat-embed-logging-juli/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html",
+        "last-modified": "Wed, 04 Oct 2023 01:48:32 GMT"
+      },
+      "body": "listing.html"
+    },
+    {
+      "method": "GET",
+      "url": "https://repo1.maven.org/maven2/org/apache/tomcat/embed/tomcat-embed-logging-juli/7.0.109/tomcat-embed-logging-juli-7.0.109.pom",
+      "status": 200,
+      "headers": {
+        "content-type": "text/xml",
+        "etag": "W/\"839d283ca993940f93041d86f25c0a81\"",
+        "last-modified": "Thu, 22 Apr 2021 18:56:58 GMT"
+      },
+      "body": "tomcat-embed-logging-juli-7.0.109.pom"
+    }
+  ]
+}

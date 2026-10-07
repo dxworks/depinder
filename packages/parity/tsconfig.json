@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM"],
+    // Reads the CLI (CommonJS sources), the server and core (ESM) as a bundler does, from their sources
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "customConditions": ["depinder-source"],
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["test", "vitest.config.ts"]
+}

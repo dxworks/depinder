@@ -1,0 +1,953 @@
+import type {Mock} from 'vitest'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
+import {assignPurls, bulkResolve, confirmedAtMs, PluginProjects, resetBulkResolve} from '../src/commands/analyse'
+import {Cache} from '../src/cache/cache'
+import {resetSharedCacheDb, sharedCacheDb, sqliteCacheWithCutoff} from '../src/cache/sqlite-cache'
+import {freshnessCutoffMs} from '../src/cache/max-age'
+import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
+import {LibraryInfo} from '../src/extension-points/library-info'
+import {Plugin} from '../src/extension-points/plugin'
+import {ItemHandler, PackageRecord, ResolvedEntry} from '../src/resolver/client'
+import {ResolverConfig} from '../src/resolver/config'
+import {getVulnerabilitiesFromGithub} from '../src/utils/vulnerabilities'
+
+// The blacklist is read from `./.blacklist` at import time, so the only way to exercise the filter
+// is to stand in for that file.
+vi.mock('../src/utils/blacklist', () => ({blacklistedGlobs: ['@internal/*']}))
+vi.mock('../src/utils/vulnerabilities', () => ({getVulnerabilitiesFromGithub: vi.fn(async () => [])}))
+
+const advisories = getVulnerabilitiesFromGithub as Mock
+
+/**
+ * Phase 2 of `analyse`: one question per purl for the whole process, and an answer that lands in
+ * the local cache under the keys phase 3 looks them up by. Everything this phase gets right shows up downstream as
+ * a cache hit — which is exactly how the registry fallback stops being called — so these tests assert on
+ * the cache and on what was asked for, not on the dependencies, which the phase never touches.
+ */
+
+const config: ResolverConfig = {url: 'https://resolver.example', token: 'secret', maxWaitMs: 60_000, chunkConcurrency: 4}
+
+function fakeCache(): Cache & {entries: Map<string, LibraryInfo>, sets: {key: string, vulnerabilities?: number}[]} {
+    const entries = new Map<string, LibraryInfo>()
+    // Every write, with how many advisories it carried at that moment: the row a write leaves is a
+    // snapshot, even though the object it was given may be filled in later.
+    const sets: {key: string, vulnerabilities?: number}[] = []
+    return {
+        entries,
+        sets,
+        get: (key: string) => entries.get(key),
+        set: (key: string, value: LibraryInfo) => {
+            sets.push({key, vulnerabilities: value.vulnerabilities?.length})
+            entries.set(key, value)
+        },
+        has: (key: string) => entries.has(key),
+        load: () => { /* nothing */ },
+        flush: () => { /* nothing */ },
+        write: () => { /* nothing */ },
+    }
+}
+
+const dep = (name: string, version: string): DepinderDependency =>
+    ({id: `${name}@${version}`, name, version, semver: null, requestedBy: []})
+
+function project(name: string, deps: DepinderDependency[]): DepinderProject {
+    return {name, version: '1.0.0', path: `/repo/${name}`, dependencies: Object.fromEntries(deps.map(it => [it.id, it]))}
+}
+
+function plugin(name: string, ecosystem: string, purlType: string, advisoryEcosystem?: string): Plugin {
+    return {
+        name,
+        ecosystem,
+        extractor: {files: [], createContexts: () => []},
+        checker: {
+            githubSecurityAdvisoryEcosystem: advisoryEcosystem,
+            getPURL: (lib, ver) => `pkg:${purlType}/${lib.replace(':', '/').replace('@', '%40')}@${ver}`,
+        },
+    }
+}
+
+const maven = plugin('java', 'java', 'maven', 'MAVEN')
+const sbomMaven = {...plugin('sbom-java', 'java', 'maven', 'MAVEN')}
+const npm = plugin('javascript', 'npm', 'npm', 'NPM')
+
+const record = (type: string, namespace: string | null, name: string): PackageRecord => ({
+    type, namespace, name,
+    description: 'a package', homepage_url: null, repo_url: null,
+    licenses: ['Apache-2.0'],
+    latest: {version: '2.0.0', released_at: '2024-01-01T00:00:00Z'},
+    latest_prerelease: null,
+    versions: [
+        ['1.0.0', Math.floor(Date.parse('2023-01-01T00:00:00Z') / 1000), 0],
+        ['2.0.0', Math.floor(Date.parse('2024-01-01T00:00:00Z') / 1000), 0],
+    ],
+    as_of: null, source: 'test', fetched_at: '2026-09-16T10:00:00Z', confirmed_at: null,
+})
+
+/**
+ * A resolver that resolves everything it is asked about, and records what that was. Like the real
+ * client it hands each answer to `onItem` as it goes, and returns them all at the end too.
+ */
+function answering(packages: {[purl: string]: PackageRecord}) {
+    const asked: string[][] = []
+    const resolve = vi.fn(async (_config: ResolverConfig, purls: string[], _log?: unknown, onItem?: ItemHandler) => {
+        asked.push([...purls])
+        const answers = new Map<string, ResolvedEntry>(purls.map(purl => [
+            purl,
+            packages[purl]
+                ? {status: 'resolved' as const, package: packages[purl]}
+                : {status: 'not_found' as const},
+        ]))
+        for (const [purl, entry] of answers) onItem?.(purl, entry)
+        return answers
+    })
+    return {asked, resolve: resolve as any}
+}
+
+describe('assignPurls', () => {
+    it('names every dependency with its plugin\'s purl spelling', () => {
+        const projects: PluginProjects[] = [
+            {plugin: maven, projects: [project('app', [dep('com.google.guava:guava', '32.1.2-jre')])]},
+            {plugin: npm, projects: [project('web', [dep('@types/node', '20.1.0')])]},
+        ]
+
+        expect(assignPurls(projects)).toBe(2)
+        expect(projects[0].projects[0].dependencies['com.google.guava:guava@32.1.2-jre'].purl)
+            .toBe('pkg:maven/com.google.guava/guava@32.1.2-jre')
+        expect(projects[1].projects[0].dependencies['@types/node@20.1.0'].purl)
+            .toBe('pkg:npm/%40types/node@20.1.0')
+    })
+
+    it('leaves a dependency with no version, and a plugin with no checker, unnamed', () => {
+        const noChecker: Plugin = {...maven, checker: undefined}
+        const projects: PluginProjects[] = [
+            {plugin: maven, projects: [project('app', [dep('a:b', '  ')])]},
+            {plugin: noChecker, projects: [project('app', [dep('c:d', '1.0.0')])]},
+        ]
+
+        expect(assignPurls(projects)).toBe(0)
+        expect(projects[0].projects[0].dependencies['a:b@  '].purl).toBeUndefined()
+        expect(projects[1].projects[0].dependencies['c:d@1.0.0'].purl).toBeUndefined()
+    })
+})
+
+describe('assignPurls with purls from the SBOM', () => {
+    it('keeps a purl the parser already set, and fills a missing one via getPURL', () => {
+        // Trivy's golang purl would lowercase the module; the parser restored the case, and
+        // getPURL must not undo that.
+        const fromSbom = {...dep('github.com/Masterminds/semver/v3', 'v3.4.0'),
+            purl: 'pkg:golang/github.com/Masterminds/semver/v3@v3.4.0'}
+        const missing = dep('com.google.guava:guava', '32.1.2-jre')
+        const projects: PluginProjects[] = [{plugin: sbomMaven, projects: [project('app', [fromSbom, missing])]}]
+
+        expect(assignPurls(projects)).toBe(2)
+        expect(fromSbom.purl).toBe('pkg:golang/github.com/Masterminds/semver/v3@v3.4.0')
+        expect(missing.purl).toBe('pkg:maven/com.google.guava/guava@32.1.2-jre')
+    })
+
+    it('counts an SBOM purl even when the plugin has no checker to fall back on', () => {
+        const noChecker: Plugin = {...maven, checker: undefined}
+        const versionless = {...dep('org.apache.phoenix:phoenix-core', 'UNKNOWN'),
+            purl: 'pkg:maven/org.apache.phoenix/phoenix-core'}
+        const projects: PluginProjects[] = [{plugin: noChecker, projects: [project('app', [versionless])]}]
+
+        expect(assignPurls(projects)).toBe(1)
+        expect(versionless.purl).toBe('pkg:maven/org.apache.phoenix/phoenix-core')
+    })
+})
+
+describe('the bulk resolve phase', () => {
+    const savedToken = process.env.GH_TOKEN
+
+    beforeEach(() => {
+        resetBulkResolve()
+        advisories.mockClear()
+        advisories.mockImplementation(async () => [])
+        delete process.env.GH_TOKEN
+    })
+    afterEach(() => {
+        if (savedToken === undefined) delete process.env.GH_TOKEN
+        else process.env.GH_TOKEN = savedToken
+    })
+
+    it('writes what the resolver answered under the cache key phase 3 reads', async () => {
+        const cache = fakeCache()
+        const projects: PluginProjects[] = [{plugin: maven, projects: [project('app', [dep('com.google.guava:guava', '32.1.2-jre')])]}]
+        assignPurls(projects)
+        const server = answering({'pkg:maven/com.google.guava/guava@32.1.2-jre': record('maven', 'com.google.guava', 'guava')})
+
+        const outcome = await bulkResolve(config, projects, cache, {}, server.resolve)
+
+        expect(outcome.requested).toBe(1)
+        expect(outcome.resolved).toBe(1)
+        expect([...outcome.written]).toEqual(['java:com.google.guava:guava'])
+        // The key `processDep` builds is `${ecosystemOf(plugin)}:${dep.name}` — a hit here is a
+        // registry call that never happens.
+        expect(await cache.has('java:com.google.guava:guava')).toBe(true)
+        expect(cache.entries.get('java:com.google.guava:guava')?.name).toBe('com.google.guava:guava')
+        expect(cache.entries.get('java:com.google.guava:guava')?.versions.map(it => it.version)).toEqual(['1.0.0', '2.0.0'])
+    })
+
+    it('asks about one purl once, however many plugins and projects found it', async () => {
+        const cache = fakeCache()
+        const guava = 'com.google.guava:guava'
+        const projects: PluginProjects[] = [
+            {plugin: maven, projects: [project('app', [dep(guava, '32.1.2-jre')]), project('lib', [dep(guava, '32.1.2-jre')])]},
+            // Two plugins sharing an ecosystem share a cache key too.
+            {plugin: sbomMaven, projects: [project('sbom', [dep(guava, '32.1.2-jre')])]},
+        ]
+        assignPurls(projects)
+        const server = answering({'pkg:maven/com.google.guava/guava@32.1.2-jre': record('maven', 'com.google.guava', 'guava')})
+
+        const outcome = await bulkResolve(config, projects, cache, {}, server.resolve)
+
+        expect(server.resolve).toHaveBeenCalledTimes(1)
+        expect(server.asked[0]).toEqual(['pkg:maven/com.google.guava/guava@32.1.2-jre'])
+        expect([...outcome.written]).toEqual(['java:com.google.guava:guava'])
+        expect(cache.entries.size).toBe(1)
+    })
+
+    it('asks about two versions of the same library, and writes the cache key once', async () => {
+        const cache = fakeCache()
+        const projects: PluginProjects[] = [{
+            plugin: npm,
+            projects: [project('app', [dep('left-pad', '1.0.0')]), project('other', [dep('left-pad', '1.3.0')])],
+        }]
+        assignPurls(projects)
+        const server = answering({
+            'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+            'pkg:npm/left-pad@1.3.0': record('npm', null, 'left-pad'),
+        })
+
+        const outcome = await bulkResolve(config, projects, cache, {}, server.resolve)
+
+        expect(server.asked[0]).toEqual(['pkg:npm/left-pad@1.0.0', 'pkg:npm/left-pad@1.3.0'])
+        expect([...outcome.written]).toEqual(['npm:left-pad'])
+    })
+
+    it('does not ask about what the local cache already holds', async () => {
+        const cache = fakeCache()
+        cache.set('npm:left-pad', {name: 'left-pad', licenses: [], versions: []})
+        const projects: PluginProjects[] = [{
+            plugin: npm,
+            projects: [project('app', [dep('left-pad', '1.0.0'), dep('right-pad', '2.0.0')])],
+        }]
+        assignPurls(projects)
+        const server = answering({'pkg:npm/right-pad@2.0.0': record('npm', null, 'right-pad')})
+
+        await bulkResolve(config, projects, cache, {}, server.resolve)
+
+        expect(server.asked[0]).toEqual(['pkg:npm/right-pad@2.0.0'])
+    })
+
+    it('asks about everything under --refresh, cached or not', async () => {
+        const cache = fakeCache()
+        cache.set('npm:left-pad', {name: 'left-pad', licenses: [], versions: []})
+        const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('left-pad', '1.0.0')])]}]
+        assignPurls(projects)
+        const server = answering({'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad')})
+
+        const outcome = await bulkResolve(config, projects, cache, {refresh: true}, server.resolve)
+
+        expect(server.asked[0]).toEqual(['pkg:npm/left-pad@1.0.0'])
+        expect(outcome.written.has('npm:left-pad')).toBe(true)
+        expect(cache.entries.get('npm:left-pad')?.description).toBe('a package')
+    })
+
+    it('leaves blacklisted and unnamed dependencies out of the question', async () => {
+        const cache = fakeCache()
+        const projects: PluginProjects[] = [{
+            plugin: npm,
+            projects: [project('app', [dep('@internal/secret', '1.0.0'), dep('left-pad', '1.0.0'), dep('no-version', '')])],
+        }]
+        assignPurls(projects)
+        const server = answering({'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad')})
+
+        await bulkResolve(config, projects, cache, {}, server.resolve)
+
+        expect(server.asked[0]).toEqual(['pkg:npm/left-pad@1.0.0'])
+    })
+
+    it('writes nothing for pending, not_found or invalid, so they fall back to the registries', async () => {
+        const cache = fakeCache()
+        const projects: PluginProjects[] = [{
+            plugin: npm,
+            projects: [project('app', [dep('pending-pkg', '1.0.0'), dep('missing-pkg', '1.0.0'), dep('bad-pkg', '1.0.0')])],
+        }]
+        assignPurls(projects)
+        const resolve = vi.fn(async (_config: ResolverConfig, purls: string[]) => new Map<string, ResolvedEntry>([
+            [purls[0], {status: 'pending'}],
+            [purls[1], {status: 'not_found'}],
+            [purls[2], {status: 'invalid', reason: 'unparseable purl'}],
+        ])) as any
+
+        const outcome = await bulkResolve(config, projects, cache, {}, resolve)
+
+        expect(outcome.resolved).toBe(0)
+        expect(outcome.written.size).toBe(0)
+        expect(cache.entries.size).toBe(0)
+    })
+
+    it('writes a refreshing package\'s last facts, unless the run said --refresh', async () => {
+        const projects = (): PluginProjects[] => {
+            const p: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('old-pkg', '1.0.0')])]}]
+            assignPurls(p)
+            return p
+        }
+        const resolve = vi.fn(async (_config: ResolverConfig, purls: string[]) => new Map<string, ResolvedEntry>([
+            [purls[0], {status: 'refreshing', package: record('npm', null, 'old-pkg')}],
+        ])) as any
+
+        const kept = fakeCache()
+        const outcome = await bulkResolve(config, projects(), kept, {}, resolve)
+        expect([...outcome.written]).toEqual(['npm:old-pkg'])
+        expect(await kept.has('npm:old-pkg')).toBe(true)
+
+        // --refresh asked for nothing older than the run: the registries get it instead.
+        resetBulkResolve()
+        const refreshed = fakeCache()
+        const refreshOutcome = await bulkResolve(config, projects(), refreshed, {refresh: true}, resolve)
+        expect(refreshOutcome.written.size).toBe(0)
+        expect(refreshed.entries.size).toBe(0)
+    })
+
+    it('does nothing at all when every dependency is already cached', async () => {
+        const cache = fakeCache()
+        cache.set('npm:left-pad', {name: 'left-pad', licenses: [], versions: []})
+        const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('left-pad', '1.0.0')])]}]
+        assignPurls(projects)
+        const server = answering({})
+
+        const outcome = await bulkResolve(config, projects, cache, {}, server.resolve)
+
+        expect(server.resolve).not.toHaveBeenCalled()
+        expect(outcome).toEqual({written: new Set(), libs: new Map(), requested: 0, resolved: 0})
+    })
+
+    /**
+     * A resolved package is a cache hit in phase 3, and a cache hit has never fetched advisories —
+     * so without this the bulk phase would empty the vulnerability columns for everything the
+     * resolver answered on a cold run. Parity with the registry path, at the same cost:
+     * one GraphQL call per cache key, which is what that cold run pays today.
+     */
+    describe('the GitHub advisory lookup', () => {
+        const twoEcosystems = (): PluginProjects[] => {
+            const projects: PluginProjects[] = [
+                {plugin: maven, projects: [project('app', [dep('com.google.guava:guava', '32.1.2-jre')])]},
+                {plugin: npm, projects: [project('web', [dep('left-pad', '1.0.0')])]},
+            ]
+            assignPurls(projects)
+            return projects
+        }
+        const server = () => answering({
+            'pkg:maven/com.google.guava/guava@32.1.2-jre': record('maven', 'com.google.guava', 'guava'),
+            'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+        })
+
+        it('runs once per cache key, with that plugin\'s ecosystem and the library name', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            advisories.mockImplementation(async (_ecosystem: string, name: string) => [
+                {severity: 'HIGH', description: `${name} is vulnerable`, permalink: 'https://example/1'},
+            ])
+            const cache = fakeCache()
+
+            await bulkResolve(config, twoEcosystems(), cache, {}, server().resolve)
+
+            expect(advisories).toHaveBeenCalledTimes(2)
+            expect(advisories.mock.calls).toEqual(expect.arrayContaining([
+                ['MAVEN', 'com.google.guava:guava'],
+                ['NPM', 'left-pad'],
+            ]))
+            expect(cache.entries.get('java:com.google.guava:guava')?.vulnerabilities)
+                .toEqual([{severity: 'HIGH', description: 'com.google.guava:guava is vulnerable', permalink: 'https://example/1'}])
+            expect(cache.entries.get('npm:left-pad')?.vulnerabilities).toHaveLength(1)
+        })
+
+        it('is not called at all without a token', async () => {
+            const cache = fakeCache()
+
+            await bulkResolve(config, twoEcosystems(), cache, {}, server().resolve)
+
+            expect(advisories).not.toHaveBeenCalled()
+            expect(cache.entries.get('java:com.google.guava:guava')?.vulnerabilities).toBeUndefined()
+            expect(cache.entries.size).toBe(2)
+        })
+
+        it('is not called for a plugin with no advisory ecosystem', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            const rust = plugin('rust', 'rust', 'cargo')
+            const projects: PluginProjects[] = [{plugin: rust, projects: [project('app', [dep('serde', '1.0.0')])]}]
+            assignPurls(projects)
+            const cache = fakeCache()
+
+            await bulkResolve(config, projects, cache, {}, answering({'pkg:cargo/serde@1.0.0': record('cargo', null, 'serde')}).resolve)
+
+            expect(advisories).not.toHaveBeenCalled()
+            expect(cache.entries.has('rust:serde')).toBe(true)
+        })
+
+        it('runs once for a purl two plugins share, because they share the cache key', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            const guava = 'com.google.guava:guava'
+            const projects: PluginProjects[] = [
+                {plugin: maven, projects: [project('app', [dep(guava, '32.1.2-jre')])]},
+                {plugin: sbomMaven, projects: [project('sbom', [dep(guava, '32.1.2-jre')])]},
+            ]
+            assignPurls(projects)
+            const cache = fakeCache()
+
+            await bulkResolve(config, projects, cache, {}, answering({
+                'pkg:maven/com.google.guava/guava@32.1.2-jre': record('maven', 'com.google.guava', 'guava'),
+            }).resolve)
+
+            expect(advisories).toHaveBeenCalledTimes(1)
+        })
+
+        it('is not called for a library every owning project already has scan findings for', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            const scanned = project('app', [dep('left-pad', '1.0.0')])
+            scanned.exactVersionVulnerabilities = true
+            const projects: PluginProjects[] = [{plugin: npm, projects: [scanned]}]
+            assignPurls(projects)
+            const cache = fakeCache()
+
+            const outcome = await bulkResolve(config, projects, cache, {}, answering({
+                'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+            }).resolve)
+
+            // Phase 3 takes this project's findings from the scan, never from `lib.vulnerabilities`.
+            expect(advisories).not.toHaveBeenCalled()
+            expect(cache.sets).toEqual([{key: 'npm:left-pad', vulnerabilities: undefined}])
+            expect(outcome.libs.get('npm:left-pad')?.vulnerabilities).toBeUndefined()
+        })
+
+        it('is called, and the row written again with the advisories, when one owning project has no findings', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            advisories.mockImplementation(async () => [{severity: 'HIGH', description: 'bad', permalink: 'https://example/1'}])
+            const scanned = project('app', [dep('left-pad', '1.0.0')])
+            scanned.exactVersionVulnerabilities = true
+            // Another version of the same library, in a project no scanner answered for: it reads the
+            // advisories of the same cache key, so the key needs them.
+            const unscanned = project('web', [dep('left-pad', '1.3.0')])
+            const projects: PluginProjects[] = [{plugin: npm, projects: [scanned, unscanned]}]
+            assignPurls(projects)
+            const cache = fakeCache()
+
+            const outcome = await bulkResolve(config, projects, cache, {}, answering({
+                'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+                'pkg:npm/left-pad@1.3.0': record('npm', null, 'left-pad'),
+            }).resolve)
+
+            expect(advisories).toHaveBeenCalledTimes(1)
+            // First the registry facts at once, then the same row with its advisories.
+            expect(cache.sets).toEqual([
+                {key: 'npm:left-pad', vulnerabilities: undefined},
+                {key: 'npm:left-pad', vulnerabilities: 1},
+            ])
+            expect(outcome.libs.get('npm:left-pad')).toBe(cache.entries.get('npm:left-pad'))
+            expect(outcome.libs.get('npm:left-pad')?.vulnerabilities).toHaveLength(1)
+        })
+
+        /**
+         * With the vulnerability server, the findings — and so the flag — may land after phase 2 has
+         * started. The lookups wait for them, and then follow today's rule exactly.
+         */
+        describe('while the vulnerability findings are still on their way', () => {
+            const pending = () => {
+                let settle: () => void = () => undefined
+                const ready = new Promise<void>(resolve => { settle = resolve })
+                return {ready, settle}
+            }
+
+            it('is not called once the server\'s answer sets the flag', async () => {
+                process.env.GH_TOKEN = 'a-token'
+                const app = project('app', [dep('left-pad', '1.0.0')])
+                const projects: PluginProjects[] = [{plugin: npm, projects: [app]}]
+                assignPurls(projects)
+                const findings = pending()
+                const cache = fakeCache()
+
+                const phase = bulkResolve(config, projects, cache, {vulnerabilitiesReady: findings.ready}, answering({
+                    'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+                }).resolve)
+                await new Promise(resolve => setImmediate(resolve))
+                expect(advisories).not.toHaveBeenCalled()
+                app.exactVersionVulnerabilities = true
+                findings.settle()
+                const outcome = await phase
+
+                expect(advisories).not.toHaveBeenCalled()
+                expect(outcome.libs.get('npm:left-pad')?.vulnerabilities).toBeUndefined()
+            })
+
+            it('is called, as without a server, when the fallback found no scanner and left the flag unset', async () => {
+                process.env.GH_TOKEN = 'a-token'
+                advisories.mockImplementation(async () => [{severity: 'HIGH', description: 'bad', permalink: 'https://example/1'}])
+                const app = project('app', [dep('left-pad', '1.0.0')])
+                const projects: PluginProjects[] = [{plugin: npm, projects: [app]}]
+                assignPurls(projects)
+                const findings = pending()
+                const cache = fakeCache()
+
+                const phase = bulkResolve(config, projects, cache, {vulnerabilitiesReady: findings.ready}, answering({
+                    'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+                }).resolve)
+                await new Promise(resolve => setImmediate(resolve))
+                expect(advisories).not.toHaveBeenCalled()
+                findings.settle()
+                const outcome = await phase
+
+                expect(advisories).toHaveBeenCalledTimes(1)
+                expect(outcome.libs.get('npm:left-pad')?.vulnerabilities).toHaveLength(1)
+                expect(cache.sets).toEqual([
+                    {key: 'npm:left-pad', vulnerabilities: undefined},
+                    {key: 'npm:left-pad', vulnerabilities: 1},
+                ])
+            })
+
+            it('does not wait for them when no lookup is held back', async () => {
+                const app = project('app', [dep('left-pad', '1.0.0')])
+                const projects: PluginProjects[] = [{plugin: npm, projects: [app]}]
+                assignPurls(projects)
+                const never = new Promise<void>(() => undefined)
+
+                const outcome = await bulkResolve(config, projects, fakeCache(), {vulnerabilitiesReady: never}, answering({
+                    'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+                }).resolve)
+
+                expect(outcome.resolved).toBe(1)
+            })
+        })
+
+        it('keeps the registry data when the lookup fails', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            advisories.mockImplementation(async () => { throw new Error('401 Bad credentials') })
+            const cache = fakeCache()
+
+            const outcome = await bulkResolve(config, twoEcosystems(), cache, {}, server().resolve)
+
+            expect(outcome.written.size).toBe(2)
+            expect(cache.entries.get('npm:left-pad')?.versions).toHaveLength(2)
+            expect(cache.entries.get('npm:left-pad')?.vulnerabilities).toBeUndefined()
+        })
+    })
+
+    /**
+     * Phase 3 looks here before it touches the cache, so what comes back has to be the same object
+     * under the same key — a `has` plus a `get` plus a `JSON.parse` of ~10 KB per dependency,
+     * 15,587 times on the benchmark, to arrive at something phase 2 had in its hand.
+     */
+    it('hands back the library objects it wrote, under the keys it wrote them as', async () => {
+        const cache = fakeCache()
+        const projects: PluginProjects[] = [
+            {plugin: maven, projects: [project('app', [dep('com.google.guava:guava', '32.1.2-jre')])]},
+            {plugin: npm, projects: [project('web', [dep('left-pad', '1.0.0')])]},
+        ]
+        assignPurls(projects)
+        const server = answering({
+            'pkg:maven/com.google.guava/guava@32.1.2-jre': record('maven', 'com.google.guava', 'guava'),
+            'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad'),
+        })
+
+        const outcome = await bulkResolve(config, projects, cache, {}, server.resolve)
+
+        expect([...outcome.libs.keys()].sort()).toEqual([...outcome.written].sort())
+        expect(outcome.libs.get('npm:left-pad')?.versions.map(it => it.version)).toEqual(['1.0.0', '2.0.0'])
+        // The same object, not a copy of it: the cached row is the durable copy, this is the one
+        // phase 3 hands to every dependency of that library.
+        expect(outcome.libs.get('java:com.google.guava:guava')).toBe(cache.entries.get('java:com.google.guava:guava'))
+        expect(outcome.libs.get('npm:left-pad')).toBe(cache.entries.get('npm:left-pad'))
+    })
+
+    it('hands back nothing when nothing resolved', async () => {
+        const cache = fakeCache()
+        const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('missing-pkg', '1.0.0')])]}]
+        assignPurls(projects)
+
+        const outcome = await bulkResolve(config, projects, cache, {}, answering({}).resolve)
+
+        expect(outcome.libs.size).toBe(0)
+    })
+
+    /**
+     * The stream is the point: a package the server answered at once is written while the server is
+     * still fetching the others, rather than after the slowest one of the run.
+     */
+    describe('with a streamed answer', () => {
+        const threeLibs = (): PluginProjects[] => {
+            const projects: PluginProjects[] = [{
+                plugin: npm,
+                projects: [project('app', [dep('fast', '1.0.0'), dep('slow', '1.0.0'), dep('fast', '1.1.0')])],
+            }]
+            assignPurls(projects)
+            return projects
+        }
+
+        it('writes an answer as it arrives, before the stream has ended', async () => {
+            const cache = fakeCache()
+            let finish: () => void = () => undefined
+            let writtenMidStream: boolean | undefined
+            const resolve = vi.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem: ItemHandler) => {
+                const fast: ResolvedEntry = {status: 'resolved', package: record('npm', null, 'fast')}
+                onItem('pkg:npm/fast@1.0.0', fast)
+                // The server is still fetching `slow`: give the write queue time to run.
+                await new Promise<void>(resolve => { finish = resolve })
+                writtenMidStream = cache.entries.has('npm:fast')
+                const slow: ResolvedEntry = {status: 'resolved', package: record('npm', null, 'slow')}
+                onItem('pkg:npm/slow@1.0.0', slow)
+                onItem('pkg:npm/fast@1.1.0', fast)
+                return new Map<string, ResolvedEntry>(purls.map(purl => [purl, purl.includes('slow') ? slow : fast]))
+            }) as any
+
+            const outcome = bulkResolve(config, threeLibs(), cache, {}, resolve)
+            await new Promise(resolve => setTimeout(resolve, 5))
+            finish()
+            const result = await outcome
+
+            expect(writtenMidStream).toBe(true)
+            expect([...result.written].sort()).toEqual(['npm:fast', 'npm:slow'])
+            // Two versions of `fast` answered, one cache key written, once.
+            expect(result.resolved).toBe(3)
+            expect(cache.entries.size).toBe(2)
+        })
+
+        it('writes an answer the moment its line arrives, before its advisory lookup has run', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            let releaseLookups: () => void = () => undefined
+            const lookupsHeld = new Promise<void>(resolve => { releaseLookups = resolve })
+            advisories.mockImplementation(async () => {
+                await lookupsHeld
+                return [{severity: 'HIGH', description: 'bad', permalink: 'https://example/1'}]
+            })
+            const cache = fakeCache()
+            let finish: () => void = () => undefined
+            let writtenAtOnce: boolean | undefined
+            const resolve = vi.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem: ItemHandler) => {
+                const fast: ResolvedEntry = {status: 'resolved', package: record('npm', null, 'fast')}
+                onItem('pkg:npm/fast@1.0.0', fast)
+                // Synchronously, in the same turn as the line: the row is already there.
+                writtenAtOnce = cache.entries.has('npm:fast')
+                // The stream is held open: nothing else has arrived, and the lookup is parked.
+                await new Promise<void>(resolve => { finish = resolve })
+                const slow: ResolvedEntry = {status: 'resolved', package: record('npm', null, 'slow')}
+                onItem('pkg:npm/slow@1.0.0', slow)
+                onItem('pkg:npm/fast@1.1.0', fast)
+                return new Map<string, ResolvedEntry>(purls.map(purl => [purl, purl.includes('slow') ? slow : fast]))
+            }) as any
+
+            const outcome = bulkResolve(config, threeLibs(), cache, {}, resolve)
+            await new Promise(resolve => setTimeout(resolve, 5))
+            expect(writtenAtOnce).toBe(true)
+            expect(cache.sets).toEqual([{key: 'npm:fast', vulnerabilities: undefined}])
+
+            finish()
+            releaseLookups()
+            const result = await outcome
+            expect(result.written.size).toBe(2)
+            expect(cache.sets.filter(it => it.vulnerabilities === 1).map(it => it.key).sort()).toEqual(['npm:fast', 'npm:slow'])
+        })
+
+        it('returns only once every write it started has finished', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            let releaseLookups: () => void = () => undefined
+            const lookupsHeld = new Promise<void>(resolve => { releaseLookups = resolve })
+            advisories.mockImplementation(async () => {
+                await lookupsHeld
+                return []
+            })
+            const cache = fakeCache()
+            let settled = false
+
+            const outcome = bulkResolve(config, threeLibs(), cache, {}, answering({
+                'pkg:npm/fast@1.0.0': record('npm', null, 'fast'),
+                'pkg:npm/fast@1.1.0': record('npm', null, 'fast'),
+                'pkg:npm/slow@1.0.0': record('npm', null, 'slow'),
+            }).resolve)
+            outcome.then(() => { settled = true })
+
+            await new Promise(resolve => setTimeout(resolve, 5))
+            // The stream has ended; the lookups have not.
+            expect(settled).toBe(false)
+            expect(advisories).toHaveBeenCalledTimes(2)
+
+            releaseLookups()
+            const result = await outcome
+            expect(result.libs.size).toBe(2)
+            expect(cache.entries.size).toBe(2)
+        })
+
+        it('runs no more than eight advisory lookups at once', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            let inFlight = 0
+            let peak = 0
+            advisories.mockImplementation(async () => {
+                peak = Math.max(peak, ++inFlight)
+                await new Promise(resolve => setTimeout(resolve, 2))
+                inFlight--
+                return []
+            })
+            const names = Array.from({length: 20}, (_, i) => `lib${i}`)
+            const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', names.map(it => dep(it, '1.0.0')))]}]
+            assignPurls(projects)
+            const cache = fakeCache()
+
+            const outcome = await bulkResolve(config, projects, cache, {}, answering(Object.fromEntries(
+                names.map(it => [`pkg:npm/${it}@1.0.0`, record('npm', null, it)]))).resolve)
+
+            expect(outcome.written.size).toBe(20)
+            expect(cache.entries.size).toBe(20)
+            expect(peak).toBe(8)
+        })
+
+        it('still writes an answer the resolver returned without streaming it', async () => {
+            const cache = fakeCache()
+            const silentStream = vi.fn(async (_config: ResolverConfig, purls: string[]) =>
+                new Map<string, ResolvedEntry>(purls.map(purl => [purl, {status: 'resolved', package: record('npm', null, 'fast')}]))) as any
+            const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('fast', '1.0.0')])]}]
+            assignPurls(projects)
+
+            const outcome = await bulkResolve(config, projects, cache, {}, silentStream)
+
+            expect([...outcome.written]).toEqual(['npm:fast'])
+            expect(outcome.resolved).toBe(1)
+        })
+    })
+
+    /**
+     * One `analyse` runs a bulk phase per source (Trivy, Syft). The second must not ask the server
+     * about a purl the first already asked about — with `refreshing` rows written already expired,
+     * that would be a retry by another name — and must reuse what the first was told.
+     */
+    describe('a second source in the same process', () => {
+        const source = (name: string, deps: DepinderDependency[]): PluginProjects[] => {
+            const projects: PluginProjects[] = [{plugin: npm, projects: [project(name, deps)]}]
+            assignPurls(projects)
+            return projects
+        }
+
+        it('does not ask again about a purl the first one asked about, and reuses its answer', async () => {
+            const cache = fakeCache()
+            const resolve = vi.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem?: ItemHandler) => {
+                const answers = new Map<string, ResolvedEntry>(purls.map(purl => [purl,
+                    purl === 'pkg:npm/old-pkg@1.0.0'
+                        ? {status: 'refreshing' as const, package: {...record('npm', null, 'old-pkg'), confirmed_at: '2020-01-01T00:00:00Z'}}
+                        : {status: 'pending' as const}]))
+                for (const [purl, entry] of answers) onItem?.(purl, entry)
+                return answers
+            }) as any
+
+            const first = await bulkResolve(config, source('trivy', [dep('old-pkg', '1.0.0'), dep('cold-pkg', '1.0.0')]), cache, {}, resolve)
+            // The `refreshing` row is expired for the cache, which is exactly why it must not be
+            // asked about again.
+            const second = await bulkResolve(config,
+                source('syft', [dep('old-pkg', '1.0.0'), dep('cold-pkg', '1.0.0'), dep('new-pkg', '1.0.0')]), cache, {}, resolve)
+
+            expect(resolve).toHaveBeenCalledTimes(2)
+            expect(resolve.mock.calls[1][1]).toEqual(['pkg:npm/new-pkg@1.0.0'])
+            expect(second.requested).toBe(1)
+            // The first source's object, handed to the second's phase 3 as it is.
+            expect(second.libs.get('npm:old-pkg')).toBe(first.libs.get('npm:old-pkg'))
+            // Asked and pending: nothing to reuse, so it is the registries' in phase 3.
+            expect(second.libs.has('npm:cold-pkg')).toBe(false)
+            // Not written again: nothing new was learned about it.
+            expect(second.written.has('npm:old-pkg')).toBe(false)
+            expect(cache.sets.filter(it => it.key === 'npm:old-pkg')).toHaveLength(1)
+        })
+
+        it('writes the earlier answer under a key the earlier source did not name it by', async () => {
+            // Trivy lowercases a golang module path; Syft keeps its case. One purl, two cache keys.
+            const go = plugin('sbom-golang', 'go', 'golang')
+            const named = (name: string, sourceName: string): PluginProjects[] => [{plugin: go, projects: [project(sourceName, [
+                {...dep(name, 'v0.1.0'), purl: 'pkg:golang/github.com/KimMachineGun/automemlimit@v0.1.0'},
+            ])]}]
+            const confirmedAt = '2026-09-30T08:00:00Z'
+            const cache = fakeCache()
+            const server = answering({'pkg:golang/github.com/KimMachineGun/automemlimit@v0.1.0':
+                {...record('golang', 'github.com/KimMachineGun', 'automemlimit'), confirmed_at: confirmedAt}})
+            const stamps: number[] = []
+            const set = cache.set
+            cache.set = (key: string, value: LibraryInfo, updatedAt?: number) => {
+                if (updatedAt !== undefined) stamps.push(updatedAt)
+                return set(key, value, updatedAt)
+            }
+
+            await bulkResolve(config, named('github.com/kimmachinegun/automemlimit', 'trivy'), cache, {}, server.resolve)
+            const second = await bulkResolve(config, named('github.com/KimMachineGun/automemlimit', 'syft'), cache, {}, server.resolve)
+
+            expect(server.resolve).toHaveBeenCalledTimes(1)
+            expect(second.requested).toBe(0)
+            expect([...second.written]).toEqual(['go:github.com/KimMachineGun/automemlimit'])
+            expect(second.libs.get('go:github.com/KimMachineGun/automemlimit')?.versions.map(it => it.version)).toEqual(['1.0.0', '2.0.0'])
+            expect(cache.entries.has('go:github.com/KimMachineGun/automemlimit')).toBe(true)
+            // The server's stamp, carried over: not the moment the second key was written.
+            expect(stamps).toEqual([Date.parse(confirmedAt), Date.parse(confirmedAt)])
+        })
+
+        it('does not call the resolver at all when every purl was already asked', async () => {
+            const cache = fakeCache()
+            const server = answering({'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad')})
+
+            const first = await bulkResolve(config, source('trivy', [dep('left-pad', '1.0.0')]), cache, {refresh: true}, server.resolve)
+            const second = await bulkResolve(config, source('syft', [dep('left-pad', '1.0.0')]), cache, {refresh: true}, server.resolve)
+
+            expect(server.resolve).toHaveBeenCalledTimes(1)
+            expect(second).toEqual({written: new Set(), libs: new Map([['npm:left-pad', first.libs.get('npm:left-pad')]]), requested: 0, resolved: 0})
+        })
+
+        it('looks up advisories for a reused answer the first source had no use for', async () => {
+            process.env.GH_TOKEN = 'a-token'
+            advisories.mockImplementation(async () => [{severity: 'HIGH', description: 'bad', permalink: 'https://example/1'}])
+            const cache = fakeCache()
+            const server = answering({'pkg:npm/left-pad@1.0.0': record('npm', null, 'left-pad')})
+            const scanned = source('trivy', [dep('left-pad', '1.0.0')])
+            scanned[0].projects[0].exactVersionVulnerabilities = true
+
+            await bulkResolve(config, scanned, cache, {}, server.resolve)
+            expect(advisories).not.toHaveBeenCalled()
+
+            const second = await bulkResolve(config, source('syft', [dep('left-pad', '1.0.0')]), cache, {}, server.resolve)
+
+            expect(server.resolve).toHaveBeenCalledTimes(1)
+            expect(advisories).toHaveBeenCalledTimes(1)
+            expect(second.libs.get('npm:left-pad')?.vulnerabilities).toHaveLength(1)
+            expect(cache.sets.map(it => it.vulnerabilities)).toEqual([undefined, 1])
+        })
+    })
+
+    it('survives a resolver that answered nothing, leaving the cache untouched', async () => {
+        const cache = fakeCache()
+        const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('left-pad', '1.0.0')])]}]
+        assignPurls(projects)
+        const silent = vi.fn(async () => new Map<string, ResolvedEntry>()) as any
+
+        const outcome = await bulkResolve(config, projects, cache, {}, silent)
+
+        expect(outcome.requested).toBe(1)
+        expect(outcome.resolved).toBe(0)
+        expect(cache.entries.size).toBe(0)
+    })
+})
+
+/**
+ * The bulk phase asks about expired entries too, not only missing ones: an entry past the cache
+ * max age reads as absent through the analyse cache, so its purl lands in the ask list, and the
+ * answer rewrites the row with the age the server vouches for: its `confirmed_at`.
+ */
+describe('the bulk resolve phase with a cache max age', () => {
+    let tmp: string
+
+    beforeEach(() => {
+        resetBulkResolve()
+        tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder-bulk-age-'))
+        process.env.DEPINDER_CACHE_DB = path.join(tmp, 'depinder.sqlite')
+        resetSharedCacheDb()
+    })
+    afterEach(() => {
+        resetSharedCacheDb()
+        delete process.env.DEPINDER_CACHE_DB
+        fs.rmSync(tmp, {recursive: true, force: true})
+    })
+
+    function cachedAgo(key: string, ageMs: number) {
+        const db = sharedCacheDb()
+        db.setLib(key, {name: key, description: 'cached', licenses: [], versions: []})
+        ;(db as any).db.prepare('UPDATE libs SET updated_at = ? WHERE key = ?').run(Date.now() - ageMs, key)
+    }
+
+    it('asks about an expired entry, skips a fresh one, and rewrites the expired row', async () => {
+        cachedAgo('npm:left-pad', 2 * 86_400_000)
+        cachedAgo('npm:right-pad', 60_000)
+        const runStart = Date.now()
+        const cache = sqliteCacheWithCutoff(freshnessCutoffMs(86_400, runStart))
+        const projects: PluginProjects[] = [{
+            plugin: npm,
+            projects: [project('app', [dep('left-pad', '1.0.0'), dep('right-pad', '2.0.0')])],
+        }]
+        assignPurls(projects)
+        const confirmedAt = new Date(runStart - 5000).toISOString()
+        const server = answering({'pkg:npm/left-pad@1.0.0': {...record('npm', null, 'left-pad'), confirmed_at: confirmedAt}})
+
+        const outcome = await bulkResolve(config, projects, cache, {}, server.resolve)
+
+        expect(server.asked[0]).toEqual(['pkg:npm/left-pad@1.0.0'])
+        expect(outcome.written.has('npm:left-pad')).toBe(true)
+        expect(sharedCacheDb().getLib('npm:left-pad')?.description).toBe('a package')
+        // Stamped with the server's confirmation, not with the moment it was copied here.
+        expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBe(Date.parse(confirmedAt))
+        expect(await cache.has('npm:left-pad')).toBe(true)
+        expect(sharedCacheDb().getLib('npm:right-pad')?.description).toBe('cached')
+    })
+
+    it('stores a refreshing answer already expired, and still hands it to phase 3', async () => {
+        const runStart = Date.now()
+        const cache = sqliteCacheWithCutoff(freshnessCutoffMs(86_400, runStart))
+        const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('old-pkg', '1.0.0')])]}]
+        assignPurls(projects)
+        // The server last confirmed it three days ago and could not refetch it in time.
+        const confirmedAt = new Date(runStart - 3 * 86_400_000).toISOString()
+        const resolve = vi.fn(async (_config: ResolverConfig, purls: string[], _log: unknown, onItem?: ItemHandler) => {
+            const entry: ResolvedEntry = {status: 'refreshing', package: {...record('npm', null, 'old-pkg'), confirmed_at: confirmedAt}}
+            onItem?.(purls[0], entry)
+            return new Map([[purls[0], entry]])
+        }) as any
+
+        const outcome = await bulkResolve(config, projects, cache, {}, resolve)
+
+        // This run uses it...
+        expect(outcome.libs.get('npm:old-pkg')?.description).toBe('a package')
+        // ...and the next one asks for it again: the row is there, but expired.
+        expect(sharedCacheDb().libUpdatedAt('npm:old-pkg')).toBe(Date.parse(confirmedAt))
+        expect(await cache.has('npm:old-pkg')).toBe(false)
+        expect(await cache.isExpired?.('npm:old-pkg')).toBe(true)
+    })
+
+    it('keeps the confirmation time when the advisories are written in afterwards', async () => {
+        const savedToken = process.env.GH_TOKEN
+        process.env.GH_TOKEN = 'a-token'
+        advisories.mockImplementation(async () => [{severity: 'HIGH', description: 'bad', permalink: 'https://example/1'}])
+        try {
+            const cache = sqliteCacheWithCutoff(freshnessCutoffMs(86_400))
+            const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('left-pad', '1.0.0')])]}]
+            assignPurls(projects)
+            const confirmedAt = new Date(Date.now() - 60_000).toISOString()
+
+            await bulkResolve(config, projects, cache, {}, answering({
+                'pkg:npm/left-pad@1.0.0': {...record('npm', null, 'left-pad'), confirmed_at: confirmedAt},
+            }).resolve)
+
+            expect(sharedCacheDb().getLib('npm:left-pad')?.vulnerabilities).toHaveLength(1)
+            expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBe(Date.parse(confirmedAt))
+        } finally {
+            advisories.mockImplementation(async () => [])
+            if (savedToken === undefined) delete process.env.GH_TOKEN
+            else process.env.GH_TOKEN = savedToken
+        }
+    })
+
+    it('reads confirmed_at as epoch milliseconds: missing or unreadable is 0, and never later than now', () => {
+        const now = Date.parse('2026-10-01T12:00:00Z')
+        expect(confirmedAtMs('2026-10-01T11:00:00Z', now)).toBe(Date.parse('2026-10-01T11:00:00Z'))
+        expect(confirmedAtMs('2026-10-01T13:00:00Z', now)).toBe(now)
+        expect(confirmedAtMs(null, now)).toBe(0)
+        expect(confirmedAtMs(undefined, now)).toBe(0)
+        expect(confirmedAtMs('', now)).toBe(0)
+        expect(confirmedAtMs('yesterday-ish', now)).toBe(0)
+    })
+
+    it('leaves an expired row untouched when the resolver cannot answer, for the registries to try', async () => {
+        cachedAgo('npm:left-pad', 2 * 86_400_000)
+        const before = sharedCacheDb().libUpdatedAt('npm:left-pad')
+        const cache = sqliteCacheWithCutoff(freshnessCutoffMs(86_400))
+        const projects: PluginProjects[] = [{plugin: npm, projects: [project('app', [dep('left-pad', '1.0.0')])]}]
+        assignPurls(projects)
+        const server = answering({})
+
+        const outcome = await bulkResolve(config, projects, cache, {}, server.resolve)
+
+        expect(server.asked[0]).toEqual(['pkg:npm/left-pad@1.0.0'])
+        expect(outcome.written.size).toBe(0)
+        expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBe(before)
+        expect(await cache.has('npm:left-pad')).toBe(false)
+    })
+})

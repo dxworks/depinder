@@ -1,0 +1,18 @@
+{
+  "purl": "pkg:npm/depinder-fixture-no-such-package-7f3c9a",
+  "ecosystem": "npm",
+  "pattern": "npm: 404 for an unknown package; both roads must say not found",
+  "expect": "not_found",
+  "recordedAt": "2026-10-03T13:08:36.850Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://registry.npmjs.org/depinder-fixture-no-such-package-7f3c9a",
+      "status": 404,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": "error-404.json"
+    }
+  ]
+}

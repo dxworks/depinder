@@ -1,0 +1,51 @@
+[
+    {
+        "number": "2.0.0.beta1",
+        "created_at": "2024-06-01T10:00:00.000Z",
+        "licenses": ["MIT"],
+        "prerelease": true,
+        "platform": "ruby"
+    },
+    {
+        "number": "1.4.0",
+        "created_at": "2024-03-04T09:12:00.000Z",
+        "licenses": ["MIT"],
+        "prerelease": false,
+        "platform": "x86_64-linux"
+    },
+    {
+        "number": "1.4.0",
+        "created_at": "2024-03-04T09:11:00.000Z",
+        "licenses": ["MIT"],
+        "prerelease": false,
+        "platform": "ruby"
+    },
+    {
+        "number": "1.4.0",
+        "created_at": "2024-03-04T09:10:00.000Z",
+        "licenses": ["MIT"],
+        "prerelease": false,
+        "platform": "java"
+    },
+    {
+        "number": "1.3.0",
+        "created_at": "2023-11-20T08:00:00.000Z",
+        "licenses": ["MIT", "Apache-2.0"],
+        "prerelease": false,
+        "platform": "java"
+    },
+    {
+        "number": "1.3.0",
+        "created_at": "2023-11-20T07:59:00.000Z",
+        "licenses": ["MIT", "Apache-2.0"],
+        "prerelease": false,
+        "platform": "x86_64-linux"
+    },
+    {
+        "number": "1.2.0",
+        "created_at": "2023-01-05T12:30:00.000Z",
+        "licenses": null,
+        "prerelease": false,
+        "platform": "ruby"
+    }
+]

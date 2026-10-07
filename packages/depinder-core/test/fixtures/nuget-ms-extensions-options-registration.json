@@ -1,0 +1,2010 @@
+{
+ "@id": "https://api.nuget.org/v3/registration5-gz-semver2/microsoft.extensions.options/index.json",
+ "count": 3,
+ "items": [
+  {
+   "@id": "https://api.nuget.org/v3/registration5-gz-semver2/microsoft.extensions.options/page/0.0.1-alpha/3.1.23.json",
+   "lower": "0.0.1-alpha",
+   "upper": "3.1.23",
+   "count": 64,
+   "items": [
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2018.12.13.23.01.25/microsoft.extensions.options.0.0.1-alpha.json",
+      "version": "0.0.1-alpha",
+      "published": "1900-01-01T00:00:00+00:00",
+      "listed": false,
+      "projectUrl": "http://www.asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "http://www.microsoft.com/web/webpi/eula/net_library_eula_enu.htm"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.23.11.08.41/microsoft.extensions.options.1.0.0-rc2-final.json",
+      "version": "1.0.0-rc2-final",
+      "published": "2016-05-16T17:00:55.373+00:00",
+      "listed": true,
+      "projectUrl": "http://www.asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "http://www.microsoft.com/web/webpi/eula/net_library_eula_enu.htm"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.23.11.08.41/microsoft.extensions.options.1.0.0.json",
+      "version": "1.0.0",
+      "published": "2016-06-27T14:27:39.64+00:00",
+      "listed": true,
+      "projectUrl": "http://www.asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "http://www.microsoft.com/web/webpi/eula/net_library_eula_enu.htm"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.23.11.08.41/microsoft.extensions.options.1.0.1.json",
+      "version": "1.0.1",
+      "published": "2016-12-12T23:55:21.87+00:00",
+      "listed": true,
+      "projectUrl": "http://www.asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "http://www.microsoft.com/web/webpi/eula/net_library_eula_enu.htm"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.23.11.08.41/microsoft.extensions.options.1.0.2.json",
+      "version": "1.0.2",
+      "published": "2017-03-06T19:07:29.907+00:00",
+      "listed": true,
+      "projectUrl": "http://www.asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "http://www.microsoft.com/web/webpi/eula/net_library_eula_enu.htm"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.23.11.10.33/microsoft.extensions.options.1.1.0-preview1-final.json",
+      "version": "1.1.0-preview1-final",
+      "published": "2016-10-24T16:22:26.67+00:00",
+      "listed": true,
+      "projectUrl": "http://www.asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "http://www.microsoft.com/web/webpi/eula/net_library_eula_enu.htm"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.23.11.10.33/microsoft.extensions.options.1.1.0.json",
+      "version": "1.1.0",
+      "published": "2016-11-16T00:36:54.297+00:00",
+      "listed": true,
+      "projectUrl": "http://www.asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "http://www.microsoft.com/web/webpi/eula/net_library_eula_enu.htm"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.23.11.10.33/microsoft.extensions.options.1.1.1.json",
+      "version": "1.1.1",
+      "published": "2017-03-06T19:30:37.577+00:00",
+      "listed": true,
+      "projectUrl": "http://www.asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "http://www.microsoft.com/web/webpi/eula/net_library_eula_enu.htm"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.23.11.10.33/microsoft.extensions.options.1.1.2.json",
+      "version": "1.1.2",
+      "published": "2017-05-09T17:13:27.333+00:00",
+      "listed": true,
+      "projectUrl": "http://www.asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "http://www.microsoft.com/web/webpi/eula/net_library_eula_enu.htm"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.01.14.57/microsoft.extensions.options.2.0.0-preview1-final.json",
+      "version": "2.0.0-preview1-final",
+      "published": "2017-05-10T03:06:52.32+00:00",
+      "listed": true,
+      "projectUrl": "https://www.asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://www.microsoft.com/web/webpi/eula/net_library_eula_enu.htm"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.01.14.57/microsoft.extensions.options.2.0.0-preview2-final.json",
+      "version": "2.0.0-preview2-final",
+      "published": "2017-06-28T00:14:56.04+00:00",
+      "listed": true,
+      "projectUrl": "https://www.asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://www.microsoft.com/web/webpi/eula/net_library_eula_enu.htm"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.01.14.57/microsoft.extensions.options.2.0.0.json",
+      "version": "2.0.0",
+      "published": "2017-08-11T18:49:29.35+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/Home/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.01.14.57/microsoft.extensions.options.2.0.1.json",
+      "version": "2.0.1",
+      "published": "2018-03-13T16:06:18.67+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/Home/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.01.14.57/microsoft.extensions.options.2.0.2.json",
+      "version": "2.0.2",
+      "published": "2018-05-07T20:11:27.19+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/Home/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.01.14.57/microsoft.extensions.options.2.1.0-preview1-final.json",
+      "version": "2.1.0-preview1-final",
+      "published": "2018-02-26T22:13:13.51+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/Home/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.01.14.57/microsoft.extensions.options.2.1.0-preview2-final.json",
+      "version": "2.1.0-preview2-final",
+      "published": "2018-04-10T01:59:01.963+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/Home/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.01.14.57/microsoft.extensions.options.2.1.0-rc1-final.json",
+      "version": "2.1.0-rc1-final",
+      "published": "2018-05-06T23:13:27.277+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/Home/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2018.12.18.00.06.23/microsoft.extensions.options.2.1.0.json",
+      "version": "2.1.0",
+      "published": "2018-05-29T20:19:30.197+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/Home/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2018.12.17.23.36.40/microsoft.extensions.options.2.1.1.json",
+      "version": "2.1.1",
+      "published": "2018-06-18T20:18:37.947+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/Home/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.01.14.57/microsoft.extensions.options.2.2.0-preview1-35029.json",
+      "version": "2.2.0-preview1-35029",
+      "published": "2018-08-22T16:14:42.037+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/Home/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.01.14.57/microsoft.extensions.options.2.2.0-preview2-35157.json",
+      "version": "2.2.0-preview2-35157",
+      "published": "2018-09-12T15:13:20.997+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/Home/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.01.14.57/microsoft.extensions.options.2.2.0-preview3-35497.json",
+      "version": "2.2.0-preview3-35497",
+      "published": "2018-10-17T15:49:50.69+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/Home/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2023.05.04.03.59.31/microsoft.extensions.options.2.2.0.json",
+      "version": "2.2.0",
+      "published": "2018-12-03T23:18:33.573+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/AspNetCore/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.0-preview.18572.1.json",
+      "version": "3.0.0-preview.18572.1",
+      "published": "2018-12-04T00:01:34.3+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/AspNetCore/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.0-preview.19074.2.json",
+      "version": "3.0.0-preview.19074.2",
+      "published": "2019-01-29T16:16:18.017+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/AspNetCore/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.0-preview3.19153.1.json",
+      "version": "3.0.0-preview3.19153.1",
+      "published": "2019-03-06T17:13:36.443+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/aspnet/AspNetCore/2.0.0/LICENSE.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.0-preview4.19216.2.json",
+      "version": "3.0.0-preview4.19216.2",
+      "published": "2019-04-18T19:38:24.797+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.0.0-preview4.19216.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.0-preview5.19227.9.json",
+      "version": "3.0.0-preview5.19227.9",
+      "published": "2019-05-06T14:46:43.72+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.0.0-preview5.19227.9/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.0-preview6.19304.6.json",
+      "version": "3.0.0-preview6.19304.6",
+      "published": "2019-06-12T15:41:54.013+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.0.0-preview6.19304.6/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.0-preview7.19362.4.json",
+      "version": "3.0.0-preview7.19362.4",
+      "published": "2019-07-23T15:50:03.61+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.0.0-preview7.19362.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.0-preview8.19405.4.json",
+      "version": "3.0.0-preview8.19405.4",
+      "published": "2019-08-13T15:40:57.01+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.0.0-preview8.19405.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.0-preview9.19423.4.json",
+      "version": "3.0.0-preview9.19423.4",
+      "published": "2019-09-04T16:12:02.103+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.0.0-preview9.19423.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.0-rc1.19456.10.json",
+      "version": "3.0.0-rc1.19456.10",
+      "published": "2019-09-16T15:30:58.217+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.0.0-rc1.19456.10/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.0.json",
+      "version": "3.0.0",
+      "published": "2019-09-23T14:18:12.297+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.0.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.1.json",
+      "version": "3.0.1",
+      "published": "2019-11-18T23:15:02.873+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.0.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.2.json",
+      "version": "3.0.2",
+      "published": "2020-01-14T23:11:45.707+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.0.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.0.3.json",
+      "version": "3.0.3",
+      "published": "2020-02-18T16:30:27.95+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.0.3/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.1.0-preview1.19506.1.json",
+      "version": "3.1.0-preview1.19506.1",
+      "published": "2019-10-15T15:56:15.473+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.0-preview1.19506.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.1.0-preview2.19525.4.json",
+      "version": "3.1.0-preview2.19525.4",
+      "published": "2019-11-01T22:12:49.633+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.0-preview2.19525.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.24.21.18.48/microsoft.extensions.options.3.1.0-preview3.19553.2.json",
+      "version": "3.1.0-preview3.19553.2",
+      "published": "2019-11-13T23:12:40.263+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.0-preview3.19553.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2019.12.03.16.45.45/microsoft.extensions.options.3.1.0.json",
+      "version": "3.1.0",
+      "published": "2019-12-03T16:43:40.95+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2020.01.14.23.18.08/microsoft.extensions.options.3.1.1.json",
+      "version": "3.1.1",
+      "published": "2020-01-14T23:16:03.16+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2020.02.18.16.36.19/microsoft.extensions.options.3.1.2.json",
+      "version": "3.1.2",
+      "published": "2020-02-18T16:34:12.34+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2020.03.24.17.19.08/microsoft.extensions.options.3.1.3.json",
+      "version": "3.1.3",
+      "published": "2020-03-24T17:15:55.773+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.3/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2020.05.12.15.01.35/microsoft.extensions.options.3.1.4.json",
+      "version": "3.1.4",
+      "published": "2020-05-12T14:59:18.463+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2020.06.09.14.48.55/microsoft.extensions.options.3.1.5.json",
+      "version": "3.1.5",
+      "published": "2020-06-09T14:46:53.463+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.5/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2020.07.14.15.06.59/microsoft.extensions.options.3.1.6.json",
+      "version": "3.1.6",
+      "published": "2020-07-14T15:04:55.153+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.6/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2020.08.11.14.19.01/microsoft.extensions.options.3.1.7.json",
+      "version": "3.1.7",
+      "published": "2020-08-11T14:16:06.77+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.7/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2020.09.08.14.13.16/microsoft.extensions.options.3.1.8.json",
+      "version": "3.1.8",
+      "published": "2020-09-08T14:10:34.223+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.8/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2020.10.13.14.31.03/microsoft.extensions.options.3.1.9.json",
+      "version": "3.1.9",
+      "published": "2020-10-13T14:28:50.743+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.9/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2020.11.09.23.54.13/microsoft.extensions.options.3.1.10.json",
+      "version": "3.1.10",
+      "published": "2020-11-09T23:39:20.8+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.10/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.01.12.15.15.06/microsoft.extensions.options.3.1.11.json",
+      "version": "3.1.11",
+      "published": "2021-01-12T15:09:27.01+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.11/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.02.09.14.42.28/microsoft.extensions.options.3.1.12.json",
+      "version": "3.1.12",
+      "published": "2021-02-09T14:33:16.593+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.12/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.03.09.14.30.05/microsoft.extensions.options.3.1.13.json",
+      "version": "3.1.13",
+      "published": "2021-03-09T14:24:14.767+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.13/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.04.06.21.11.17/microsoft.extensions.options.3.1.14.json",
+      "version": "3.1.14",
+      "published": "2021-04-06T21:08:42.657+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.14/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.05.11.14.20.07/microsoft.extensions.options.3.1.15.json",
+      "version": "3.1.15",
+      "published": "2021-05-11T14:08:03.773+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.15/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.06.08.14.02.32/microsoft.extensions.options.3.1.16.json",
+      "version": "3.1.16",
+      "published": "2021-06-08T13:59:33.377+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.16/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.07.13.13.45.23/microsoft.extensions.options.3.1.17.json",
+      "version": "3.1.17",
+      "published": "2021-07-13T13:43:11.223+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.17/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.08.10.14.18.16/microsoft.extensions.options.3.1.18.json",
+      "version": "3.1.18",
+      "published": "2021-08-10T14:15:18.57+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.18/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.09.14.13.56.12/microsoft.extensions.options.3.1.19.json",
+      "version": "3.1.19",
+      "published": "2021-09-14T13:49:44.177+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.19/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.10.11.21.18.48/microsoft.extensions.options.3.1.20.json",
+      "version": "3.1.20",
+      "published": "2021-10-11T21:04:46.847+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.20/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.11.07.23.00.06/microsoft.extensions.options.3.1.21.json",
+      "version": "3.1.21",
+      "published": "2021-11-07T22:55:45.527+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.21/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.12.14.14.09.55/microsoft.extensions.options.3.1.22.json",
+      "version": "3.1.22",
+      "published": "2021-12-14T14:06:10.87+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.22/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.03.08.14.58.19/microsoft.extensions.options.3.1.23.json",
+      "version": "3.1.23",
+      "published": "2022-03-08T14:42:25.587+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.23/license"
+     }
+    }
+   ]
+  },
+  {
+   "@id": "https://api.nuget.org/v3/registration5-gz-semver2/microsoft.extensions.options/page/3.1.24/9.0.0-rc.1.24431.7.json",
+   "lower": "3.1.24",
+   "upper": "9.0.0-rc.1.24431.7",
+   "count": 64,
+   "items": [
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.04.11.23.47.33/microsoft.extensions.options.3.1.24.json",
+      "version": "3.1.24",
+      "published": "2022-04-11T23:44:53.92+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.24/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.05.10.14.48.56/microsoft.extensions.options.3.1.25.json",
+      "version": "3.1.25",
+      "published": "2022-05-10T14:27:10+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.25/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.14.14.17.25/microsoft.extensions.options.3.1.26.json",
+      "version": "3.1.26",
+      "published": "2022-06-14T14:03:06.873+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.26/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.07.12.13.14.38/microsoft.extensions.options.3.1.27.json",
+      "version": "3.1.27",
+      "published": "2022-07-12T13:11:05.3+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.27/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.08.09.13.56.01/microsoft.extensions.options.3.1.28.json",
+      "version": "3.1.28",
+      "published": "2022-08-09T13:36:25.66+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.28/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.09.13.13.32.48/microsoft.extensions.options.3.1.29.json",
+      "version": "3.1.29",
+      "published": "2022-09-13T13:26:33.22+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.29/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.10.11.13.54.49/microsoft.extensions.options.3.1.30.json",
+      "version": "3.1.30",
+      "published": "2022-10-11T13:34:58.66+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.30/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.11.08.14.24.57/microsoft.extensions.options.3.1.31.json",
+      "version": "3.1.31",
+      "published": "2022-11-08T14:22:02.47+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.31/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.12.13.14.20.54/microsoft.extensions.options.3.1.32.json",
+      "version": "3.1.32",
+      "published": "2022-12-13T14:15:36.973+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/3.1.32/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.00.43.19/microsoft.extensions.options.5.0.0-preview.1.20120.4.json",
+      "version": "5.0.0-preview.1.20120.4",
+      "published": "2020-03-16T16:39:09.04+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/5.0.0-preview.1.20120.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.00.43.19/microsoft.extensions.options.5.0.0-preview.2.20160.3.json",
+      "version": "5.0.0-preview.2.20160.3",
+      "published": "2020-04-02T13:37:25.29+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/5.0.0-preview.2.20160.3/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.00.43.19/microsoft.extensions.options.5.0.0-preview.3.20215.2.json",
+      "version": "5.0.0-preview.3.20215.2",
+      "published": "2020-04-23T15:13:58.57+00:00",
+      "listed": true,
+      "projectUrl": "https://asp.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/5.0.0-preview.3.20215.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.00.43.19/microsoft.extensions.options.5.0.0-preview.4.20251.6.json",
+      "version": "5.0.0-preview.4.20251.6",
+      "published": "2020-05-18T23:10:38.867+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/dotnet/runtime",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/5.0.0-preview.4.20251.6/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.00.43.19/microsoft.extensions.options.5.0.0-preview.5.20278.1.json",
+      "version": "5.0.0-preview.5.20278.1",
+      "published": "2020-06-10T15:13:42.637+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/dotnet/runtime",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/5.0.0-preview.5.20278.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.00.43.19/microsoft.extensions.options.5.0.0-preview.6.20305.6.json",
+      "version": "5.0.0-preview.6.20305.6",
+      "published": "2020-06-25T15:01:49.213+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/dotnet/runtime",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/5.0.0-preview.6.20305.6/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.00.43.19/microsoft.extensions.options.5.0.0-preview.7.20364.11.json",
+      "version": "5.0.0-preview.7.20364.11",
+      "published": "2020-07-21T14:59:47.647+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/dotnet/runtime",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/5.0.0-preview.7.20364.11/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.00.43.19/microsoft.extensions.options.5.0.0-preview.8.20407.11.json",
+      "version": "5.0.0-preview.8.20407.11",
+      "published": "2020-08-25T14:37:14.697+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/dotnet/runtime",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/5.0.0-preview.8.20407.11/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.00.43.19/microsoft.extensions.options.5.0.0-rc.1.20451.14.json",
+      "version": "5.0.0-rc.1.20451.14",
+      "published": "2020-09-14T14:44:14.257+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/dotnet/runtime",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/5.0.0-rc.1.20451.14/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.00.43.19/microsoft.extensions.options.5.0.0-rc.2.20475.5.json",
+      "version": "5.0.0-rc.2.20475.5",
+      "published": "2020-10-13T14:41:49.97+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/dotnet/runtime",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/5.0.0-rc.2.20475.5/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.00.43.19/microsoft.extensions.options.5.0.0.json",
+      "version": "5.0.0",
+      "published": "2020-11-09T23:39:11.187+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/dotnet/runtime",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/5.0.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.04.26.43/microsoft.extensions.options.6.0.0-preview.1.21102.12.json",
+      "version": "6.0.0-preview.1.21102.12",
+      "published": "2021-02-12T23:48:26.657+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/dotnet/runtime",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.0-preview.1.21102.12/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.28.04.26.43/microsoft.extensions.options.6.0.0-preview.2.21154.6.json",
+      "version": "6.0.0-preview.2.21154.6",
+      "published": "2021-03-11T16:44:35.943+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.0-preview.2.21154.6/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.04.08.19.55.55/microsoft.extensions.options.6.0.0-preview.3.21201.4.json",
+      "version": "6.0.0-preview.3.21201.4",
+      "published": "2021-04-08T19:53:19.24+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.0-preview.3.21201.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.05.24.21.53.32/microsoft.extensions.options.6.0.0-preview.4.21253.7.json",
+      "version": "6.0.0-preview.4.21253.7",
+      "published": "2021-05-24T21:48:32.05+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.0-preview.4.21253.7/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.06.15.19.12.06/microsoft.extensions.options.6.0.0-preview.5.21301.5.json",
+      "version": "6.0.0-preview.5.21301.5",
+      "published": "2021-06-15T19:09:38.927+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.0-preview.5.21301.5/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.07.14.13.52.33/microsoft.extensions.options.6.0.0-preview.6.21352.12.json",
+      "version": "6.0.0-preview.6.21352.12",
+      "published": "2021-07-14T13:49:57.02+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.0-preview.6.21352.12/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.08.10.18.46.51/microsoft.extensions.options.6.0.0-preview.7.21377.19.json",
+      "version": "6.0.0-preview.7.21377.19",
+      "published": "2021-08-10T18:44:39.92+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.0-preview.7.21377.19/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.09.14.17.24.29/microsoft.extensions.options.6.0.0-rc.1.21451.13.json",
+      "version": "6.0.0-rc.1.21451.13",
+      "published": "2021-09-14T17:21:33.49+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.0-rc.1.21451.13/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.10.12.14.21.07/microsoft.extensions.options.6.0.0-rc.2.21480.5.json",
+      "version": "6.0.0-rc.2.21480.5",
+      "published": "2021-10-12T14:17:54.77+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.0-rc.2.21480.5/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2021.11.08.06.39.16/microsoft.extensions.options.6.0.0.json",
+      "version": "6.0.0",
+      "published": "2021-11-08T06:37:20.553+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.11.12.18.16.50/microsoft.extensions.options.6.0.1.json",
+      "version": "6.0.1",
+      "published": "2024-11-12T18:12:27.677+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.06.20.15.55.25/microsoft.extensions.options.6.0.2-mauipre.1.22054.8.json",
+      "version": "6.0.2-mauipre.1.22054.8",
+      "published": "1900-01-01T00:00:00+00:00",
+      "listed": false,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.2-mauipre.1.22054.8/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.06.20.14.00.23/microsoft.extensions.options.6.0.2-mauipre.1.22102.15.json",
+      "version": "6.0.2-mauipre.1.22102.15",
+      "published": "1900-01-01T00:00:00+00:00",
+      "listed": false,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/6.0.2-mauipre.1.22102.15/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.02.17.15.44.50/microsoft.extensions.options.7.0.0-preview.1.22076.8.json",
+      "version": "7.0.0-preview.1.22076.8",
+      "published": "2022-02-17T15:42:20.84+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/7.0.0-preview.1.22076.8/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.03.14.20.35.52/microsoft.extensions.options.7.0.0-preview.2.22152.2.json",
+      "version": "7.0.0-preview.2.22152.2",
+      "published": "2022-03-14T20:33:15.383+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/7.0.0-preview.2.22152.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.04.13.16.10.31/microsoft.extensions.options.7.0.0-preview.3.22175.4.json",
+      "version": "7.0.0-preview.3.22175.4",
+      "published": "2022-04-13T16:04:54.99+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/7.0.0-preview.3.22175.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.05.10.14.34.38/microsoft.extensions.options.7.0.0-preview.4.22229.4.json",
+      "version": "7.0.0-preview.4.22229.4",
+      "published": "2022-05-10T14:23:36.59+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/7.0.0-preview.4.22229.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.06.14.13.07.37/microsoft.extensions.options.7.0.0-preview.5.22301.12.json",
+      "version": "7.0.0-preview.5.22301.12",
+      "published": "2022-06-14T13:05:14.34+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/7.0.0-preview.5.22301.12/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.07.12.13.27.27/microsoft.extensions.options.7.0.0-preview.6.22324.4.json",
+      "version": "7.0.0-preview.6.22324.4",
+      "published": "2022-07-12T13:19:46.773+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/7.0.0-preview.6.22324.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.08.09.13.35.55/microsoft.extensions.options.7.0.0-preview.7.22375.6.json",
+      "version": "7.0.0-preview.7.22375.6",
+      "published": "2022-08-09T13:27:45.707+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/7.0.0-preview.7.22375.6/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.09.14.13.35.56/microsoft.extensions.options.7.0.0-rc.1.22426.10.json",
+      "version": "7.0.0-rc.1.22426.10",
+      "published": "2022-09-14T13:24:50.083+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/7.0.0-rc.1.22426.10/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.10.11.13.32.30/microsoft.extensions.options.7.0.0-rc.2.22472.3.json",
+      "version": "7.0.0-rc.2.22472.3",
+      "published": "2022-10-11T13:26:31.8+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/7.0.0-rc.2.22472.3/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2022.11.07.17.58.16/microsoft.extensions.options.7.0.0.json",
+      "version": "7.0.0",
+      "published": "2022-11-07T17:55:19.83+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/7.0.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2023.02.14.13.27.09/microsoft.extensions.options.7.0.1.json",
+      "version": "7.0.1",
+      "published": "2023-02-14T13:21:55.39+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/7.0.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2023.02.21.14.33.57/microsoft.extensions.options.8.0.0-preview.1.23110.8.json",
+      "version": "8.0.0-preview.1.23110.8",
+      "published": "2023-02-21T14:30:17.07+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.0-preview.1.23110.8/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2023.03.14.12.48.36/microsoft.extensions.options.8.0.0-preview.2.23128.3.json",
+      "version": "8.0.0-preview.2.23128.3",
+      "published": "2023-03-14T12:29:39.04+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.0-preview.2.23128.3/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2023.04.11.13.33.13/microsoft.extensions.options.8.0.0-preview.3.23174.8.json",
+      "version": "8.0.0-preview.3.23174.8",
+      "published": "2023-04-11T13:22:22.25+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.0-preview.3.23174.8/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2023.05.16.12.51.21/microsoft.extensions.options.8.0.0-preview.4.23259.5.json",
+      "version": "8.0.0-preview.4.23259.5",
+      "published": "2023-05-16T12:48:32.09+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.0-preview.4.23259.5/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2023.06.13.13.30.01/microsoft.extensions.options.8.0.0-preview.5.23280.8.json",
+      "version": "8.0.0-preview.5.23280.8",
+      "published": "2023-06-13T12:59:39.523+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.0-preview.5.23280.8/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2023.07.11.13.09.16/microsoft.extensions.options.8.0.0-preview.6.23329.7.json",
+      "version": "8.0.0-preview.6.23329.7",
+      "published": "2023-07-11T13:03:56.29+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.0-preview.6.23329.7/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2023.08.08.14.59.42/microsoft.extensions.options.8.0.0-preview.7.23375.6.json",
+      "version": "8.0.0-preview.7.23375.6",
+      "published": "2023-08-08T14:54:55.787+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.0-preview.7.23375.6/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2023.09.12.13.29.36/microsoft.extensions.options.8.0.0-rc.1.23419.4.json",
+      "version": "8.0.0-rc.1.23419.4",
+      "published": "2023-09-12T13:11:23.303+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.0-rc.1.23419.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2023.10.10.13.28.26/microsoft.extensions.options.8.0.0-rc.2.23479.6.json",
+      "version": "8.0.0-rc.2.23479.6",
+      "published": "2023-10-10T12:58:18.983+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.0-rc.2.23479.6/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2023.11.14.13.49.09/microsoft.extensions.options.8.0.0.json",
+      "version": "8.0.0",
+      "published": "2023-11-14T13:23:42.81+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.01.09.14.28.30/microsoft.extensions.options.8.0.1.json",
+      "version": "8.0.1",
+      "published": "2024-01-09T13:56:26.313+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.02.13.14.37.35/microsoft.extensions.options.8.0.2.json",
+      "version": "8.0.2",
+      "published": "2024-02-13T14:22:10.763+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/8.0.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.02.13.14.55.47/microsoft.extensions.options.9.0.0-preview.1.24080.9.json",
+      "version": "9.0.0-preview.1.24080.9",
+      "published": "2024-02-13T14:24:04.137+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.0-preview.1.24080.9/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.03.12.13.14.45/microsoft.extensions.options.9.0.0-preview.2.24128.5.json",
+      "version": "9.0.0-preview.2.24128.5",
+      "published": "2024-03-12T13:07:39.68+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.0-preview.2.24128.5/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.04.11.14.17.54/microsoft.extensions.options.9.0.0-preview.3.24172.9.json",
+      "version": "9.0.0-preview.3.24172.9",
+      "published": "2024-04-11T14:10:42.74+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.0-preview.3.24172.9/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.05.21.14.17.03/microsoft.extensions.options.9.0.0-preview.4.24266.19.json",
+      "version": "9.0.0-preview.4.24266.19",
+      "published": "2024-05-21T14:14:41.01+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.0-preview.4.24266.19/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.06.11.17.24.44/microsoft.extensions.options.9.0.0-preview.5.24306.7.json",
+      "version": "9.0.0-preview.5.24306.7",
+      "published": "2024-06-11T17:19:08.037+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.0-preview.5.24306.7/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.07.09.12.36.24/microsoft.extensions.options.9.0.0-preview.6.24327.7.json",
+      "version": "9.0.0-preview.6.24327.7",
+      "published": "2024-07-09T12:32:47.827+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.0-preview.6.24327.7/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.08.13.12.51.34/microsoft.extensions.options.9.0.0-preview.7.24405.7.json",
+      "version": "9.0.0-preview.7.24405.7",
+      "published": "2024-08-13T12:44:03.237+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.0-preview.7.24405.7/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.09.10.18.36.32/microsoft.extensions.options.9.0.0-rc.1.24431.7.json",
+      "version": "9.0.0-rc.1.24431.7",
+      "published": "2024-09-10T13:25:31.91+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.0-rc.1.24431.7/license"
+     }
+    }
+   ]
+  },
+  {
+   "@id": "https://api.nuget.org/v3/registration5-gz-semver2/microsoft.extensions.options/page/9.0.0-rc.2.24473.5/11.0.0-rc.1.26425.128.json",
+   "lower": "9.0.0-rc.2.24473.5",
+   "upper": "11.0.0-rc.1.26425.128",
+   "count": 52,
+   "items": [
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.08.13.46.02/microsoft.extensions.options.9.0.0-rc.2.24473.5.json",
+      "version": "9.0.0-rc.2.24473.5",
+      "published": "2024-10-08T13:20:44.23+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.0-rc.2.24473.5/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.11.12.18.32.21/microsoft.extensions.options.9.0.0.json",
+      "version": "9.0.0",
+      "published": "2024-11-12T18:14:37.61+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.01.14.18.19.22/microsoft.extensions.options.9.0.1.json",
+      "version": "9.0.1",
+      "published": "2025-01-14T18:15:28.16+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.02.11.18.34.08/microsoft.extensions.options.9.0.2.json",
+      "version": "9.0.2",
+      "published": "2025-02-11T18:30:05.233+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.03.11.16.41.22/microsoft.extensions.options.9.0.3.json",
+      "version": "9.0.3",
+      "published": "2025-03-11T16:30:06.557+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.3/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.04.08.17.59.12/microsoft.extensions.options.9.0.4.json",
+      "version": "9.0.4",
+      "published": "2025-04-08T17:53:30.59+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.05.13.18.02.45/microsoft.extensions.options.9.0.5.json",
+      "version": "9.0.5",
+      "published": "2025-05-13T17:53:44.85+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.5/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.06.10.17.38.47/microsoft.extensions.options.9.0.6.json",
+      "version": "9.0.6",
+      "published": "2025-06-10T17:28:10.687+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.6/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.07.08.18.24.39/microsoft.extensions.options.9.0.7.json",
+      "version": "9.0.7",
+      "published": "2025-07-08T18:02:00.23+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.7/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.08.05.00.17.02/microsoft.extensions.options.9.0.8.json",
+      "version": "9.0.8",
+      "published": "2025-08-04T23:46:14.97+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.8/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.09.09.12.17.48/microsoft.extensions.options.9.0.9.json",
+      "version": "9.0.9",
+      "published": "2025-09-09T12:12:20.857+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.9/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.10.14.17.54.27/microsoft.extensions.options.9.0.10.json",
+      "version": "9.0.10",
+      "published": "2025-10-14T17:16:14.723+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.10/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.11.11.11.38.07/microsoft.extensions.options.9.0.11.json",
+      "version": "9.0.11",
+      "published": "2025-11-11T11:22:08.417+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.11/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.01.13.18.43.49/microsoft.extensions.options.9.0.12.json",
+      "version": "9.0.12",
+      "published": "2026-01-13T18:03:01.543+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.12/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.02.10.18.32.13/microsoft.extensions.options.9.0.13.json",
+      "version": "9.0.13",
+      "published": "2026-02-10T17:20:38.133+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.13/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.03.10.17.58.09/microsoft.extensions.options.9.0.14.json",
+      "version": "9.0.14",
+      "published": "2026-03-10T16:59:42.677+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.14/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.14.18.10.14/microsoft.extensions.options.9.0.15.json",
+      "version": "9.0.15",
+      "published": "2026-04-14T17:08:45.343+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.15/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.05.12.18.00.25/microsoft.extensions.options.9.0.16.json",
+      "version": "9.0.16",
+      "published": "2026-05-12T16:58:17.23+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.16/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.06.09.17.33.20/microsoft.extensions.options.9.0.17.json",
+      "version": "9.0.17",
+      "published": "2026-06-09T16:53:43.54+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.17/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.07.14.17.35.50/microsoft.extensions.options.9.0.18.json",
+      "version": "9.0.18",
+      "published": "2026-07-14T17:01:15.917+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.18/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.08.11.17.42.46/microsoft.extensions.options.9.0.19.json",
+      "version": "9.0.19",
+      "published": "2026-08-11T16:55:29.043+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.19/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.09.08.20.05.57/microsoft.extensions.options.9.0.20.json",
+      "version": "9.0.20",
+      "published": "2026-09-08T19:16:58.883+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/9.0.20/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.02.25.15.47.14/microsoft.extensions.options.10.0.0-preview.1.25080.5.json",
+      "version": "10.0.0-preview.1.25080.5",
+      "published": "2025-02-25T15:42:10.233+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.0-preview.1.25080.5/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.03.18.17.41.09/microsoft.extensions.options.10.0.0-preview.2.25163.2.json",
+      "version": "10.0.0-preview.2.25163.2",
+      "published": "2025-03-18T17:28:44.35+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.0-preview.2.25163.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.04.10.19.09.12/microsoft.extensions.options.10.0.0-preview.3.25171.5.json",
+      "version": "10.0.0-preview.3.25171.5",
+      "published": "2025-04-10T19:05:16.707+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.0-preview.3.25171.5/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.05.12.22.38.57/microsoft.extensions.options.10.0.0-preview.4.25258.110.json",
+      "version": "10.0.0-preview.4.25258.110",
+      "published": "2025-05-12T22:33:45.67+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.0-preview.4.25258.110/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.06.06.14.09.07/microsoft.extensions.options.10.0.0-preview.5.25277.114.json",
+      "version": "10.0.0-preview.5.25277.114",
+      "published": "2025-06-06T13:41:45.183+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.0-preview.5.25277.114/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.07.15.14.14.41/microsoft.extensions.options.10.0.0-preview.6.25358.103.json",
+      "version": "10.0.0-preview.6.25358.103",
+      "published": "2025-07-15T14:01:34.19+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.0-preview.6.25358.103/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.08.12.16.29.36/microsoft.extensions.options.10.0.0-preview.7.25380.108.json",
+      "version": "10.0.0-preview.7.25380.108",
+      "published": "2025-08-12T16:15:47.05+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.0-preview.7.25380.108/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.09.09.12.29.09/microsoft.extensions.options.10.0.0-rc.1.25451.107.json",
+      "version": "10.0.0-rc.1.25451.107",
+      "published": "2025-09-09T12:15:18.71+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.0-rc.1.25451.107/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.10.14.17.42.10/microsoft.extensions.options.10.0.0-rc.2.25502.107.json",
+      "version": "10.0.0-rc.2.25502.107",
+      "published": "2025-10-14T17:16:05.623+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.0-rc.2.25502.107/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.11.11.12.31.04/microsoft.extensions.options.10.0.0.json",
+      "version": "10.0.0",
+      "published": "2025-11-11T11:42:07.727+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2025.12.09.17.29.29/microsoft.extensions.options.10.0.1.json",
+      "version": "10.0.1",
+      "published": "2025-12-09T17:12:00.54+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.01.13.18.38.05/microsoft.extensions.options.10.0.2.json",
+      "version": "10.0.2",
+      "published": "2026-01-13T18:02:35.057+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.02.10.17.50.11/microsoft.extensions.options.10.0.3.json",
+      "version": "10.0.3",
+      "published": "2026-02-10T17:19:19.4+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.3/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.03.10.17.19.05/microsoft.extensions.options.10.0.4.json",
+      "version": "10.0.4",
+      "published": "2026-03-10T16:57:29.973+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.10.00.14.09/microsoft.extensions.options.10.0.5.json",
+      "version": "10.0.5",
+      "published": "2026-03-12T16:53:21.433+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.5/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.14.17.21.20/microsoft.extensions.options.10.0.6.json",
+      "version": "10.0.6",
+      "published": "2026-04-14T17:02:52.21+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.6/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.21.17.49.08/microsoft.extensions.options.10.0.7.json",
+      "version": "10.0.7",
+      "published": "2026-04-21T17:31:47.58+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.7/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.05.12.17.55.20/microsoft.extensions.options.10.0.8.json",
+      "version": "10.0.8",
+      "published": "2026-05-12T16:58:04.14+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.8/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.06.09.17.27.33/microsoft.extensions.options.10.0.9.json",
+      "version": "10.0.9",
+      "published": "2026-06-09T16:52:53.82+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.9/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.07.14.17.32.58/microsoft.extensions.options.10.0.10.json",
+      "version": "10.0.10",
+      "published": "2026-07-14T17:00:47.78+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.10/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.08.11.17.31.59/microsoft.extensions.options.10.0.11.json",
+      "version": "10.0.11",
+      "published": "2026-08-11T16:54:31.217+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.11/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.09.08.19.47.22/microsoft.extensions.options.10.0.12.json",
+      "version": "10.0.12",
+      "published": "2026-09-08T19:03:11.197+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.12/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.02.10.18.22.21/microsoft.extensions.options.11.0.0-preview.1.26104.118.json",
+      "version": "11.0.0-preview.1.26104.118",
+      "published": "2026-02-10T17:20:30.993+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/11.0.0-preview.1.26104.118/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.03.10.18.38.28/microsoft.extensions.options.11.0.0-preview.2.26159.112.json",
+      "version": "11.0.0-preview.2.26159.112",
+      "published": "2026-03-10T17:01:50.507+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/11.0.0-preview.2.26159.112/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.14.16.07.57/microsoft.extensions.options.11.0.0-preview.3.26207.106.json",
+      "version": "11.0.0-preview.3.26207.106",
+      "published": "2026-04-14T15:58:33.803+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/11.0.0-preview.3.26207.106/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.05.12.16.07.28/microsoft.extensions.options.11.0.0-preview.4.26230.115.json",
+      "version": "11.0.0-preview.4.26230.115",
+      "published": "2026-05-12T16:01:08.857+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/11.0.0-preview.4.26230.115/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.06.09.16.15.38/microsoft.extensions.options.11.0.0-preview.5.26302.115.json",
+      "version": "11.0.0-preview.5.26302.115",
+      "published": "2026-06-09T16:08:53.817+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/11.0.0-preview.5.26302.115/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.07.14.16.11.39/microsoft.extensions.options.11.0.0-preview.6.26359.118.json",
+      "version": "11.0.0-preview.6.26359.118",
+      "published": "2026-07-14T16:05:55.787+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/11.0.0-preview.6.26359.118/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.08.11.16.29.12/microsoft.extensions.options.11.0.0-preview.7.26381.103.json",
+      "version": "11.0.0-preview.7.26381.103",
+      "published": "2026-08-11T16:20:07.06+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/11.0.0-preview.7.26381.103/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.09.08.18.17.13/microsoft.extensions.options.11.0.0-rc.1.26425.128.json",
+      "version": "11.0.0-rc.1.26425.128",
+      "published": "2026-09-08T18:12:09.19+00:00",
+      "listed": true,
+      "projectUrl": "https://dot.net/",
+      "licenseExpression": "MIT",
+      "licenseUrl": "https://www.nuget.org/packages/Microsoft.Extensions.Options/11.0.0-rc.1.26425.128/license"
+     }
+    }
+   ]
+  }
+ ]
+}

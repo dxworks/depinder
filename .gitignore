@@ -69,9 +69,15 @@ web_modules/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
+# Env files at any depth (.env, .env.*, *.env, *.env.*), except those with "example" in the name
 .env
-.env.test
+.env.*
+*.env
+*.env.*
+!.env*example*
+!*.env*example*
+!*example*.env
+!*example*.env.*
 
 # GitHub advisory tokens — a dotenv-style file of live PATs, never commit it
 .github-tokens*
@@ -128,3 +134,12 @@ results
 /cache/
 results-*
 /.blacklist
+
+# Nx cache and workspace data
+/.nx/
+# MkDocs output of the docs target
+site/
+
+# Bench run folders (logs, CSVs, SQLite caches)
+/bench/runs/
+.DS_Store

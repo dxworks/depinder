@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist",
+    // Builds against @depinder/core's compiled output, not its sources (see customConditions)
+    "customConditions": []
+  },
+  "include": ["src"]
+}

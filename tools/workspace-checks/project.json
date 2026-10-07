@@ -1,0 +1,29 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "workspace-checks",
+  "projectType": "library",
+  "sourceRoot": "tools/workspace-checks/src",
+  "tags": ["scope:tooling"],
+  "targets": {
+    "size-guard": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "node src/size-guard.mts"}
+    },
+    "dependency-check": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "node src/dependency-check.mts"}
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "eslint src __tests__"}
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "tsc -p tsconfig.json"}
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {"cwd": "{projectRoot}", "command": "vitest run"}
+    }
+  }
+}

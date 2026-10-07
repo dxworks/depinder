@@ -1,0 +1,305 @@
+import fs from 'fs'
+import path from 'path'
+import {minimatch} from 'minimatch'
+import {DependencyFileContext, DepinderDependency, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
+import {ecosystemOf, Plugin} from '../../extension-points/plugin'
+import {Vulnerability, VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
+import {parseCycloneDxFile} from './cyclonedx'
+import {scanSbomFileOnce} from './local-scan'
+import {githubScanSbomFileOnce} from '../../vuln-sources/github/scan'
+import {mergeVulnerabilityIndexes} from '../../vuln-sources/merge'
+import {vulnSources} from '../../vuln-sources/selection'
+import {dotnetChecker, goChecker, javaChecker, npmChecker, phpChecker, pythonChecker, rubyChecker, rustChecker} from '../vulnerability-checkers'
+
+/**
+ * CycloneDX SBOM plugins.
+ *
+ * A single SBOM spans several ecosystems at once (on Apache Zeppelin: maven, npm, gem, pypi), but a
+ * depinder Plugin has exactly one purl type and one advisory ecosystem. So rather than one `sbom`
+ * plugin, we register one per ecosystem: each reads the same SBOM files, filters to its own purl
+ * type, and is enriched through the registry fallback and its vulnerability checker. CycloneDX
+ * SBOMs are depinder's only input.
+ *
+ * Files are matched by suffix so that both tools' outputs are picked up:
+ *   <project>.cdx.json        (Syft)
+ *   <project>.trivy.cdx.json  (Trivy)
+ */
+
+/**
+ * Every JSON file is a candidate; `isSbomFile` then reads the head of the file and keeps the ones
+ * that declare `"bomFormat": "CycloneDX"`. `*.cdx.json` is kept by name alone, as before.
+ */
+const SBOM_GLOBS = ['*.json']
+const SBOM_NAME_GLOBS = ['*.cdx.json']
+const SBOM_HEAD_BYTES = 4096
+const BOM_FORMAT = /"bomFormat"\s*:\s*"CycloneDX"/
+
+/**
+ * One SBOM yields many projects (Trivy emits one `application` node per manifest), but
+ * ParseDependencyTree must return a single project. So contexts are created per project: the
+ * extractor parses each file once to learn how many projects it holds, and encodes the index in
+ * `type`. The parser then resolves that index back to a project.
+ */
+const CONTEXT_TYPE_PREFIX = 'cyclonedx'
+
+/** Parsing the same file for several ecosystems and project indices is common — memoise it. */
+const cache = new Map<string, DepinderProject[]>()
+
+function projectsOf(sbomFile: string, purlType: string): DepinderProject[] {
+    const key = `${purlType}:${sbomFile}`
+    const hit = cache.get(key)
+    if (hit) return hit
+
+    const projects = parseCycloneDxFile(sbomFile, purlType)
+    cache.set(key, projects)
+    return projects
+}
+
+function createExtractor(purlType: string): Extractor {
+    return {
+        files: SBOM_GLOBS,
+        filter: isSbomFile,
+        createContexts: (files: string[]) => files.flatMap(file =>
+            projectsOf(file, purlType).map((_, index) => ({
+                root: path.dirname(file),
+                lockFile: path.basename(file),
+                type: `${CONTEXT_TYPE_PREFIX}:${purlType}:${index}`,
+            } as DependencyFileContext))
+        ),
+    }
+}
+
+/**
+ * When set, the parser leaves `dep.vulnerabilities` and `exactVersionVulnerabilities` alone, and
+ * analyse.ts attaches them once the vulnerability server has answered, or once the local scan it
+ * fell back to has. Off by default: the parser then scans exactly as it always has.
+ */
+let findingsDeferred = false
+
+export function deferSbomFindings(deferred: boolean): void {
+    findingsDeferred = deferred
+}
+
+/** The projects of one SBOM for one purl type: the very objects the parser hands out. */
+export function sbomProjectsOf(sbomFile: string, purlType: string): DepinderProject[] {
+    return projectsOf(path.resolve(sbomFile), purlType)
+}
+
+/**
+ * The local scan's findings on one project of `sbomFile`: Trivy and Grype on this machine, plus
+ * GitHub's advisory cache when selected.
+ *
+ * Which sources run is the run's `--vuln-source` selection: Trivy and Grype shell out to a local
+ * binary, `github` matches against the downloaded advisory cache. All of them matched the exact
+ * version recorded in the SBOM, so these findings are final: `exactVersionVulnerabilities` is
+ * what tells analyse.ts not to range-filter them. When no source produced anything the flag stays
+ * unset and the per-package GHSA GraphQL path runs instead. `projectsOf` memoises projects by
+ * reference, so the flag sticks for the process — correct here, since it is a property of the
+ * file, not of the caller.
+ */
+export async function attachLocalFindings(sbomFile: string, project: DepinderProject): Promise<void> {
+    const scan = await scanSbomFileOnce(sbomFile)
+    const github = vulnSources().github
+        ? githubScanSbomFileOnce(sbomFile)
+        : {available: false, index: new Map()}
+    const findings = mergeVulnerabilityIndexes(new Map(scan.index), github.index)
+
+    if (scan.available || github.available) {
+        for (const dep of Object.values(project.dependencies)) {
+            dep.vulnerabilities = findings.get(dep.id) ?? []
+        }
+        project.exactVersionVulnerabilities = true
+    }
+}
+
+/**
+ * The vulnerability server's findings on one project of `sbomFile`: `serverFindings(dep)` is what
+ * the server answered for the dependency's purl, `[]` when it was clean or not scannable. GitHub's
+ * advisory cache, when selected, is matched locally and merged in exactly as it is into a local
+ * scan, keyed the same way. An answer from the server is a scan that ran, so the flag is set.
+ */
+export function attachServerFindings(
+    sbomFile: string, project: DepinderProject, serverFindings: (dep: DepinderDependency) => Vulnerability[],
+): void {
+    const github = vulnSources().github ? githubScanSbomFileOnce(sbomFile) : undefined
+    for (const dep of Object.values(project.dependencies)) {
+        const findings = [...serverFindings(dep)]
+        const advisories = github?.index.get(dep.id)
+        if (advisories?.length) {
+            mergeVulnerabilityIndexes(new Map([[dep.id, findings]]), new Map([[dep.id, advisories]]))
+        }
+        dep.vulnerabilities = findings
+    }
+    project.exactVersionVulnerabilities = true
+}
+
+function createParser(purlType: string): Parser {
+    return {
+        parseDependencyTree: async (context: DependencyFileContext) => {
+            const parts = context.type?.split(':') ?? []
+            if (parts[0] !== CONTEXT_TYPE_PREFIX) {
+                throw new Error(`Unsupported context type: ${context.type}`)
+            }
+
+            const index = Number(parts[2])
+            const sbomFile = path.resolve(context.root, context.lockFile)
+            const projects = projectsOf(sbomFile, purlType)
+
+            const project = projects[index]
+            if (!project) {
+                throw new Error(`No ${purlType} project at index ${index} in ${context.lockFile}`)
+            }
+
+            // Vulnerability scan of the SBOM, once per file per process — unless analyse.ts asks the
+            // vulnerability server for the whole run instead, and attaches the findings itself
+            // once the answer (or the local fallback) is in: see `deferSbomFindings`.
+            if (!findingsDeferred) await attachLocalFindings(sbomFile, project)
+            return project
+        },
+    }
+}
+
+/** One ecosystem of the SBOM route: which purl type it filters on and where it enriches from. */
+interface SbomEcosystem {
+    name: string
+    purlType: string
+    /**
+     * The cache namespace, `${ecosystem}:${name}`. These are the names the ecosystem-specific
+     * manifest plugins cached under before SBOMs became the only input: changing one would
+     * invalidate every cached library of that ecosystem.
+     */
+    ecosystem: string
+    /** Extra CLI names for `-p`, after `sbom-<purlType>`: the old plugin names still select it. */
+    aliases: string[]
+    checker?: VulnerabilityChecker
+}
+
+function sbomPluginFor({name, purlType, ecosystem, aliases, checker}: SbomEcosystem): Plugin {
+    return {
+        name,
+        // `sbom-<purlType>` stays first: `purlTypeOfPlugin` reads the purl type back from it.
+        aliases: [`sbom-${purlType}`, ...aliases],
+        ecosystem,
+        extractor: createExtractor(purlType),
+        parser: createParser(purlType),
+        checker,
+    }
+}
+
+/**
+ * The ecosystems the SBOM route covers. This is the single place the (plugin name, purl type,
+ * checker) correspondence is written down — every lookup below reads it rather than restating it.
+ */
+const SBOM_ECOSYSTEMS: readonly SbomEcosystem[] = [
+    {name: 'sbom-java', purlType: 'maven', ecosystem: 'java', aliases: ['java', 'maven', 'gradle'], checker: javaChecker},
+    {name: 'sbom-npm', purlType: 'npm', ecosystem: 'npm', aliases: ['npm', 'js', 'javascript', 'node', 'nodejs', 'yarn'], checker: npmChecker},
+    {name: 'sbom-ruby', purlType: 'gem', ecosystem: 'ruby', aliases: ['ruby', 'gem'], checker: rubyChecker},
+    {name: 'sbom-python', purlType: 'pypi', ecosystem: 'python', aliases: ['python', 'pip', 'pipenv', 'poetry'], checker: pythonChecker},
+    {name: 'sbom-php', purlType: 'composer', ecosystem: 'php', aliases: ['php', 'composer'], checker: phpChecker},
+    {name: 'sbom-dotnet', purlType: 'nuget', ecosystem: 'dotnet', aliases: ['dotnet', '.net', 'c#', 'csharp', 'nuget'], checker: dotnetChecker},
+    {name: 'sbom-go', purlType: 'golang', ecosystem: 'go', aliases: [], checker: goChecker},
+    {name: 'sbom-rust', purlType: 'cargo', ecosystem: 'rust', aliases: [], checker: rustChecker},
+]
+
+export const sbomPlugins: Plugin[] = SBOM_ECOSYSTEMS.map(sbomPluginFor)
+
+export const [sbomJava, sbomNpm, sbomRuby, sbomPython, sbomPhp, sbomDotnet, sbomGo, sbomRust] = sbomPlugins
+
+/**
+ * The SBOM files a given plugin selection would scan.
+ *
+ * The parser is the only layer that holds an SBOM path, but the scanner preflight has to run once
+ * and up front, before any parsing — so analyse.ts needs to know whether the SBOM route is live
+ * from the file list alone. Same globs the extractors use, so the two cannot drift apart.
+ */
+export function sbomFilesFor(plugins: Plugin[], files: string[]): string[] {
+    if (!plugins.some(plugin => sbomPlugins.includes(plugin))) return []
+    return files.filter(isSbomFile)
+}
+
+const sbomByContent = new Map<string, boolean>()
+
+/**
+ * Whether a file is one the SBOM extractors pick up. A `*.cdx.json` is one by name; any other
+ * `*.json` is one when its first bytes declare a CycloneDX `bomFormat` — so a SBOM saved as
+ * `bom.json` is found, while `package.json` and lockfiles cost one short read and are ignored.
+ * The extractor's `filter` and `analyse`'s classification both come here, so they cannot drift.
+ */
+export function isSbomFile(file: string): boolean {
+    if (SBOM_NAME_GLOBS.some(glob => minimatch(file, glob, {matchBase: true}))) return true
+    if (!SBOM_GLOBS.some(glob => minimatch(file, glob, {matchBase: true}))) return false
+    const hit = sbomByContent.get(file)
+    if (hit !== undefined) return hit
+    const result = declaresCycloneDx(file)
+    sbomByContent.set(file, result)
+    return result
+}
+
+function declaresCycloneDx(file: string): boolean {
+    let fd: number | undefined
+    try {
+        fd = fs.openSync(file, 'r')
+        const buffer = Buffer.alloc(SBOM_HEAD_BYTES)
+        const read = fs.readSync(fd, buffer, 0, SBOM_HEAD_BYTES, 0)
+        return BOM_FORMAT.test(buffer.toString('utf8', 0, read))
+    } catch {
+        return false
+    } finally {
+        if (fd !== undefined) fs.closeSync(fd)
+    }
+}
+
+/** Exposed for tests, which rewrite a file under the same name. */
+export function clearSbomFileCache(): void {
+    sbomByContent.clear()
+}
+
+/**
+ * The SBOM files at least one of the selected sbom plugins will actually parse, in the order the
+ * parsers would first reach them: plugin by plugin, file by file. A file whose ecosystems none of
+ * them covers yields no project and is never scanned by the parser either, so scanning it up
+ * front would only add a file to the provenance record.
+ */
+export function sbomFilesToParse(plugins: Plugin[], files: string[]): string[] {
+    const candidates = sbomFilesFor(plugins, files)
+    const ordered = new Set<string>()
+    for (const plugin of plugins.filter(it => sbomPlugins.includes(it))) {
+        for (const file of candidates) {
+            if (plugin.extractor.createContexts([file]).length > 0) ordered.add(file)
+        }
+    }
+    return [...ordered]
+}
+
+/**
+ * The purl type an SBOM plugin filters on — `sbom-npm` -> `npm`. The alias is where that type is
+ * already recorded, so reading it back beats a second table that could drift out of step. Returns
+ * undefined for a plugin loaded from plugins.json that carries no `sbom-` alias.
+ */
+export function purlTypeOfPlugin(plugin: Plugin): string | undefined {
+    return plugin.aliases?.find(it => it.startsWith('sbom-'))?.slice('sbom-'.length)
+}
+
+/** The purl type a plugin's packages are looked up under; a plugins.json plugin falls back to its ecosystem. */
+export function registryTypeOfPlugin(plugin: Plugin): string {
+    return purlTypeOfPlugin(plugin) ?? ecosystemOf(plugin)
+}
+
+/**
+ * The SBOM plugins that can say anything about these purl types.
+ *
+ * `analyse` selects the plugins for an SBOM source from the SBOMs it found, so that a user pointing
+ * at a folder of SBOMs never has to work out which `sbom-*` plugins their ecosystems correspond to.
+ */
+export function sbomPluginsForPurlTypes(purlTypes: Iterable<string>): Plugin[] {
+    const wanted = new Set([...purlTypes].map(it => it.trim().toLowerCase()))
+    return sbomPlugins.filter(it => {
+        const purlType = purlTypeOfPlugin(it)
+        return !!purlType && wanted.has(purlType)
+    })
+}
+
+/** Exposed for tests, which need each parse to start from a clean slate. */
+export function clearSbomCache(): void {
+    cache.clear()
+}
