@@ -28,6 +28,8 @@ export interface Config {
     fetchConcurrency: number
     /** Packages whose version tuples the api keeps in memory. 0 disables the cache. */
     payloadCacheMaxPackages: number
+    /** Days of `fetch_log` the worker keeps; older rows are deleted by its periodic sweep. */
+    fetchLogRetentionDays: number
 }
 
 const ROLES: Role[] = ['resolver-api', 'resolver-worker', 'resolver']
@@ -126,6 +128,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         throw new ConfigError(`PAYLOAD_CACHE_MAX_PACKAGES must be an integer >= 0 (got "${cacheRaw}").`)
     }
 
+    // The log is provenance for debugging and the bench, which reads only its own run's window.
+    const retentionRaw = str(env.FETCH_LOG_RETENTION_DAYS) ?? '3'
+    const fetchLogRetentionDays = Number(retentionRaw)
+    if (!Number.isInteger(fetchLogRetentionDays) || fetchLogRetentionDays < 1 || fetchLogRetentionDays > 365) {
+        throw new ConfigError(`FETCH_LOG_RETENTION_DAYS must be an integer between 1 and 365 (got "${retentionRaw}").`)
+    }
+
     return {
         databaseUrl,
         databaseSsl: bool(env.DATABASE_SSL, true),
@@ -139,6 +148,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         logLevel,
         fetchConcurrency,
         payloadCacheMaxPackages,
+        fetchLogRetentionDays,
     }
 }
 

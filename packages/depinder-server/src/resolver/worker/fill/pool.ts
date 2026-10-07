@@ -1,5 +1,6 @@
 import type {Config} from '../../config.js'
 import type {Db} from '../../db/db.js'
+import {pruneFetchLog} from '../../db/fetch-log.js'
 import type {ResolverEvents} from '../../events.js'
 import {createRegistryClient, URGENT_RANK, type FetchRecord, type Rank} from '../../registries/http.js'
 import {canFetch, errorMessage, fetchPackage, parsePurl, type Logger, type ParsedPurl} from '@depinder/core'
@@ -34,6 +35,7 @@ import {writeResult, type JobContext} from './write.js'
 
 /** How long to wait before looking at a drained queue again. */
 const IDLE_MS = 1_000
+/** How often retries come due are re-queued and old `fetch_log` rows deleted. */
 const SWEEP_MS = 10 * 60 * 1_000
 /**
  * How often the leases of everything in flight are pushed out by another `LEASE`. A fetch that is
@@ -62,10 +64,14 @@ export function startDemandFill(options: DemandFillOptions): Loop {
     const log = options.log.child({component: 'demand-fill'})
     const fill = startFill({...options, log})
     const sweep = startLoop({
-        name: 'retry-sweep',
+        name: 'sweep',
         intervalMs: options.sweepIntervalMs ?? SWEEP_MS,
         log,
-        run: () => sweepRetries(options.db, log),
+        run: async () => {
+            await sweepRetries(options.db, log)
+            const pruned = await pruneFetchLog(options.db, options.config.fetchLogRetentionDays)
+            if (pruned > 0) log.info('deleted old fetch_log rows', {count: pruned})
+        },
     })
     // A request that queues work says so, so the pump does not sit out a nap with a demand row
     // waiting. Worth nothing during a bulk run, when the pump never idles; worth the whole nap for

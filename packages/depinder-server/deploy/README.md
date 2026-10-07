@@ -140,6 +140,7 @@ lost because the data lives in Supabase.
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` |
 | `FETCH_CONCURRENCY` | Registry fetches at once (64) |
 | `PAYLOAD_CACHE_MAX_PACKAGES` | Packages cached in memory (50000; 0 = off) |
+| `FETCH_LOG_RETENTION_DAYS` | Days of upstream request log to keep (3) |
 | `VULN_MAX_SCANS` | Scans at once (1 on a 4 GB server) |
 | `VULN_MAX_QUEUED` | Requests that can wait for a scan before the server answers 503 |
 | `VULN_MAX_PURLS` | Max purls per request (5000) |

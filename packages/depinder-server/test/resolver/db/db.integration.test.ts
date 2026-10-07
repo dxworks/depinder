@@ -4,6 +4,7 @@ import path from 'node:path'
 import {afterAll, afterEach, beforeAll, describe, expect, it, vi} from 'vitest'
 import {loadConfig, type Config} from '../../../src/resolver/config.js'
 import {createDb, migrate, migrationsDir, type Db} from '../../../src/resolver/db/db.js'
+import {pruneFetchLog} from '../../../src/resolver/db/fetch-log.js'
 import {nullLogger} from '@depinder/core'
 import type {FetchQueueRow, PackageRow} from '../../../src/resolver/db/rows.js'
 import {packageWriteTests} from './integration/writes.js'
@@ -64,10 +65,28 @@ describe.skipIf(!url)('postgres', () => {
         )
         expect(droppedColumns).toEqual([])
         const indexes = await db.query<{indexname: string}>(
-            `select indexname from pg_indexes where schemaname = 'public' and tablename in ('package', 'fetch_queue')`,
+            `select indexname from pg_indexes
+             where schemaname = 'public' and tablename in ('package', 'fetch_queue', 'fetch_log')`,
         )
-        expect(indexes.map(i => i.indexname)).toEqual(expect.arrayContaining(['package_type_key_idx']))
-        expect(indexes.map(i => i.indexname)).not.toContain('fetch_queue_ready_idx')
+        const indexNames = indexes.map(i => i.indexname)
+        expect(indexNames).toEqual(expect.arrayContaining(['package_type_key_idx', 'fetch_log_started_at_idx']))
+        expect(indexNames).not.toContain('fetch_queue_ready_idx')
+        expect(indexNames).not.toContain('fetch_log_package_idx')
+    })
+
+    it('deletes fetch_log rows past their retention and keeps the rest', async () => {
+        await db.query('truncate fetch_log')
+        await db.query(
+            `insert into fetch_log (package_key, url, started_at, finished_at)
+             values ('pkg:npm/old', 'https://old', now() - interval '4 days', now() - interval '4 days'),
+                    (null, 'https://feed-old', now() - interval '3 days 1 hour', now() - interval '3 days 1 hour'),
+                    ('pkg:npm/new', 'https://new', now() - interval '1 hour', now() - interval '1 hour')`,
+        )
+        expect(await pruneFetchLog(db, 3)).toBe(2)
+        const left = await db.query<{url: string}>('select url from fetch_log')
+        expect(left.map(r => r.url)).toEqual(['https://new'])
+        expect(await pruneFetchLog(db, 3)).toBe(0)
+        await db.query('truncate fetch_log')
     })
 
     packageWriteTests(postgres)
@@ -118,6 +137,7 @@ describe.skipIf(!url)('postgres', () => {
                 '0005_fetch_queue_leased.sql',
                 '0006_fetch_queue_wanted.sql',
                 '0007_drop_unused_columns.sql',
+                '0008_fetch_log_started_at.sql',
             ])
 
             const rows = new Map(

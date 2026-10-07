@@ -18,7 +18,7 @@ src/
     db/db.ts                 pg pool, migration runner, transactions
     db/queue.ts  db/rows.ts  fetch_queue priorities; row shapes
     db/notify.ts             the same as events.ts, between processes, over LISTEN/NOTIFY
-    db/fetch-log.ts          every upstream request, for provenance
+    db/fetch-log.ts          every upstream request, for provenance, kept FETCH_LOG_RETENTION_DAYS
     api/                     fastify server, /resolve, /feeds, /health
     registries/<type>-feed.ts  one change feed per ecosystem (maven-poll.ts, cargo-poll.ts poll
                              instead); fetching a package is @depinder/core's fetchPackage, latest rule included

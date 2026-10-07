@@ -18,6 +18,7 @@ All of it is environment variables; `.env.example` is the annotated copy.
 | `DATABASE_POOL_SIZE` | `15` | Postgres connections this process opens at most. The write side of a fill runs on these; about half `FETCH_CONCURRENCY` keeps every fetch slot moving |
 | `API_POOL_SIZE` | `8` | Of those, the api's own. Carved out of `DATABASE_POOL_SIZE`, so the worker gets the rest and the process still opens no more than the ceiling. `ROLE=resolver` only |
 | `PAYLOAD_CACHE_MAX_PACKAGES` | `50000` | Packages whose version tuples the api holds in memory. An entry is used only when the `package` row read this request carries the same `fetched_at`, so it is multi-instance safe. `0` switches it off |
+| `FETCH_LOG_RETENTION_DAYS` | `3` | Days of `fetch_log` (every upstream request the worker made) to keep, 1 to 365. The worker's ten-minute sweep deletes older rows. The bench reads only its own run's window |
 
 `FETCH_CONCURRENCY` and `DATABASE_POOL_SIZE` are a pair. A package is a registry request and then a
 write, and against a hosted database the write — five statements, five round trips — takes about as

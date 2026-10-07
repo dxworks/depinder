@@ -34,3 +34,30 @@ export async function insertFetchLog(
         )
     }
 }
+
+/** Rows one retention statement deletes at most, so no single delete holds the table for long. */
+const PRUNE_BATCH = 10_000
+
+/**
+ * Retention: deletes `fetch_log` rows that started more than `retentionDays` ago, a batch at a
+ * time until none are left. Returns how many went.
+ */
+export async function pruneFetchLog(db: Queryable, retentionDays: number): Promise<number> {
+    let deleted = 0
+    let batch: number
+    do {
+        const [row] = await db.query<{n: number}>(
+            `with gone as (
+                 delete from fetch_log
+                 where id in (select id from fetch_log
+                              where started_at < now() - make_interval(days => $1::int)
+                              limit $2::int)
+                 returning 1)
+             select count(*)::int as n from gone`,
+            [retentionDays, PRUNE_BATCH],
+        )
+        batch = row?.n ?? 0
+        deleted += batch
+    } while (batch === PRUNE_BATCH)
+    return deleted
+}

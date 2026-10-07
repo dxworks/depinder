@@ -21,6 +21,7 @@ describe('loadConfig', () => {
             logLevel: 'info',
             fetchConcurrency: 64,
             payloadCacheMaxPackages: 50_000,
+            fetchLogRetentionDays: 3,
         })
     })
 
@@ -53,6 +54,7 @@ describe('loadConfig', () => {
             DATABASE_POOL_SIZE: '8',
             API_POOL_SIZE: '2',
             PAYLOAD_CACHE_MAX_PACKAGES: '0',
+            FETCH_LOG_RETENTION_DAYS: '14',
         })
         expect(config).toMatchObject({
             databaseSsl: false,
@@ -65,6 +67,7 @@ describe('loadConfig', () => {
             apiPoolSize: 2,
             // 0 switches the payload cache off; it is a bound, not a toggle, so it has no `false`.
             payloadCacheMaxPackages: 0,
+            fetchLogRetentionDays: 14,
         })
     })
 
@@ -91,6 +94,8 @@ describe('loadConfig', () => {
         expect(() => loadConfig({...base, API_POOL_SIZE: '0'})).toThrow(/API_POOL_SIZE/)
         expect(() => loadConfig({...base, PAYLOAD_CACHE_MAX_PACKAGES: 'loads'})).toThrow(/PAYLOAD_CACHE_MAX_PACKAGES/)
         expect(() => loadConfig({...base, PAYLOAD_CACHE_MAX_PACKAGES: '-1'})).toThrow(/>= 0/)
+        expect(() => loadConfig({...base, FETCH_LOG_RETENTION_DAYS: 'forever'})).toThrow(/FETCH_LOG_RETENTION_DAYS/)
+        expect(() => loadConfig({...base, FETCH_LOG_RETENTION_DAYS: '0'})).toThrow(/between 1 and 365/)
     })
 
     it('refuses an api pool that would leave the worker nothing', () => {
