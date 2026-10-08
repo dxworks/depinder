@@ -5,17 +5,15 @@ FROM aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9
 FROM anchore/grype:v0.118.0@sha256:8a93fc48da96bd6ec5981279d099b69de11541dc68fdf222fb9161f8ff284af7 AS grype
 
 # The build context is the monorepo root (the root .dockerignore lets in only what is copied here).
-# npm ci needs every workspace's package.json to match the root lockfile; it installs only the
-# server's dependencies, @depinder/core (a workspace link) and core's own dependencies.
+# npm ci --workspace depinder-server needs only the manifests of the server and of the workspaces it
+# links (@depinder/core); it installs the server's dependencies, the core link and core's own.
 
 # Build stage: dev dependencies and the TypeScript compiler, none of which ship.
 FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
-COPY packages/depinder-cli/package.json packages/depinder-cli/
 COPY packages/depinder-core/package.json packages/depinder-core/
 COPY packages/depinder-server/package.json packages/depinder-server/
-COPY bench/package.json bench/
 RUN npm ci --workspace depinder-server
 COPY packages/depinder-core/tsconfig.json packages/depinder-core/tsconfig.build.json packages/depinder-core/
 COPY packages/depinder-core/src packages/depinder-core/src
@@ -35,10 +33,8 @@ COPY --from=trivy /usr/local/bin/trivy /usr/local/bin/trivy
 COPY --from=grype /grype /usr/local/bin/grype
 
 COPY package.json package-lock.json ./
-COPY packages/depinder-cli/package.json packages/depinder-cli/
 COPY packages/depinder-core/package.json packages/depinder-core/
 COPY packages/depinder-server/package.json packages/depinder-server/
-COPY bench/package.json bench/
 RUN npm ci --omit=dev --workspace depinder-server && npm cache clean --force
 # node_modules/@depinder/core links here: the compiled core, no sources.
 COPY --from=build /app/packages/depinder-core/dist packages/depinder-core/dist

@@ -4,12 +4,10 @@
 !package.json
 !package-lock.json
 !tsconfig.base.json
-# Every workspace's package.json (the Dockerfile lists the same ones; no wildcards in folder names,
+# The manifests npm ci needs (the Dockerfile copies the same ones; no wildcards in folder names,
 # the classic builder would not look inside an excluded folder for them).
-!packages/depinder-cli/package.json
 !packages/depinder-core/package.json
 !packages/depinder-server/package.json
-!bench/package.json
 !packages/depinder-core/tsconfig.json
 !packages/depinder-core/tsconfig.build.json
 !packages/depinder-core/src
