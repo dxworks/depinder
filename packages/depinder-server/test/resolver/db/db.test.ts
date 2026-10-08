@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it} from 'vitest'
-import {MAX_DEADLINE_MS} from '../../../src/resolver/api/resolve/types.js'
+import {RESOLVE_MAX_DEADLINE_MS} from '@depinder/core'
 import {API_CONNECT_TIMEOUT_MS, createDb, DEFAULT_CONNECT_TIMEOUT_MS, type Db} from '../../../src/resolver/db/db.js'
 
 /**
@@ -36,6 +36,6 @@ describe('createDb', () => {
     it("lets the api's queries wait for a client as long as the longest /resolve deadline", () => {
         // Shorter, and a read that queues behind six cold chunks kills a stream that already sent
         // its 200: no trailer, and depinder gives the resolver up for the rest of the run.
-        expect(API_CONNECT_TIMEOUT_MS).toBeGreaterThanOrEqual(MAX_DEADLINE_MS)
+        expect(API_CONNECT_TIMEOUT_MS).toBeGreaterThanOrEqual(RESOLVE_MAX_DEADLINE_MS)
     })
 })

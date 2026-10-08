@@ -48,8 +48,8 @@ export function isDeadlock(e: unknown): boolean {
 export const DEFAULT_CONNECT_TIMEOUT_MS = 10_000
 
 /**
- * The same for the api's pool, and as long as the longest `/resolve` deadline (`MAX_DEADLINE_MS`,
- * 60 s, in `api/resolve/types.ts`; a test holds the two together). A request's reads are the only
+ * The same for the api's pool, and as long as the longest `/resolve` deadline (core's
+ * `RESOLVE_MAX_DEADLINE_MS`, 60 s; a test holds the two together). A request's reads are the only
  * thing it has to send, so a read that has to queue for a client should make the request slow, not
  * kill it: at ten seconds, six cold chunks on the api's clients queued past the bound, pg threw, and
  * a stream that had already sent its `200` ended without its trailer, which depinder takes as the

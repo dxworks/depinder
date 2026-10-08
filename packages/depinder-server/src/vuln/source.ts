@@ -1,3 +1,4 @@
+import type {VulnDatabaseBuild} from '@depinder/core'
 import type {DatabaseBuild} from './databases.js'
 import type {ScannerName} from './scanners.js'
 
@@ -72,7 +73,7 @@ export interface StaleHours {
 }
 
 /** What a build looks like in an answer: no folder, which is ours. */
-export function publicBuild(build: BuildInfo): DatabaseBuild & {age_seconds: number, stale: boolean} {
+export function publicBuild(build: BuildInfo): VulnDatabaseBuild {
     return {built_at: build.built_at, schema: build.schema, age_seconds: build.age_seconds, stale: build.stale}
 }
 

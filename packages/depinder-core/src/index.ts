@@ -53,6 +53,25 @@ export {
     type VersionPointer,
 } from './wire/package-record.js'
 export {
+    RESOLVE_DEFAULT_DEADLINE_MS,
+    RESOLVE_DEFAULT_MAX_AGE_S,
+    RESOLVE_MAX_DEADLINE_MS,
+    RESOLVE_MAX_PURLS,
+    type FeedFreshness,
+    type ResolveItem,
+    type ResolveLine,
+    type ResolveRequestBody,
+    type ResolveStatus,
+    type ResolveTrailer,
+} from './wire/resolve.js'
+export {
+    VULN_DEFAULT_MAX_PURLS,
+    type VulnDatabaseBuild,
+    type VulnRequestBody,
+    type VulnResponse,
+    type VulnUnsupportedReason,
+} from './wire/vulnerabilities.js'
+export {
     buildVulnerabilityIndex,
     type PackageKeyer,
     type PackageKeys,

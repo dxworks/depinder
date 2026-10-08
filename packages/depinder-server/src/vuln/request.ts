@@ -1,6 +1,6 @@
 import {PackageURL} from 'packageurl-js'
 import {BadRequestError} from '../shared/errors.js'
-import {isSupportedType, tryParsePurl} from '@depinder/core'
+import {isSupportedType, tryParsePurl, type VulnRequestBody, type VulnResponse, type VulnUnsupportedReason} from '@depinder/core'
 
 /**
  * The body of `POST /vulnerabilities`, validated and sorted into what can be scanned and what
@@ -12,8 +12,6 @@ import {isSupportedType, tryParsePurl} from '@depinder/core'
  * `BurntSushi` is looking for a different module. The scanners must see the raw decoded parts,
  * which is what matched scanning the real SBOMs.
  */
-
-type UnsupportedReason = 'invalid' | 'no_version' | 'unsupported_type'
 
 /** One distinct purl that goes into the scan. */
 export interface Scannable {
@@ -33,7 +31,7 @@ export interface Scannable {
 
 interface VulnRequest {
     scan: Scannable[]
-    unsupported: {purl: string, reason: UnsupportedReason}[]
+    unsupported: VulnResponse['unsupported']
 }
 
 /** More distinct purls than `VULN_MAX_PURLS`. A 413, with the limit, so the caller can split. */
@@ -48,7 +46,7 @@ export function parseVulnRequest(body: unknown, maxPurls: number): VulnRequest {
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
         throw new BadRequestError('body must be a JSON object')
     }
-    const purls = (body as {purls?: unknown}).purls
+    const purls = (body as {[K in keyof VulnRequestBody]?: unknown}).purls
     if (!Array.isArray(purls)) throw new BadRequestError('"purls" must be an array of strings')
     if (!purls.every((p): p is string => typeof p === 'string')) {
         throw new BadRequestError('"purls" must be an array of strings')
@@ -68,7 +66,7 @@ export function parseVulnRequest(body: unknown, maxPurls: number): VulnRequest {
     return request
 }
 
-function classify(purl: string): Scannable | UnsupportedReason {
+function classify(purl: string): Scannable | VulnUnsupportedReason {
     // Also what refuses a maven purl with no group and an empty name.
     const parsed = tryParsePurl(purl)
     if (!parsed.ok) return 'invalid'

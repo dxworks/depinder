@@ -9,12 +9,12 @@ import {freshnessCutoffMs} from '../src/cache/max-age'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
 import {LibraryInfo} from '../src/extension-points/library-info'
 import {Plugin} from '../src/extension-points/plugin'
-import {ItemHandler, PackageRecord, ResolvedEntry} from '../src/resolver/client'
+import type {PackageRecord} from '@depinder/core'
+import {ItemHandler, ResolvedEntry} from '../src/resolver/client'
 import {ResolverConfig} from '../src/resolver/config'
 import {getVulnerabilitiesFromGithub} from '../src/utils/vulnerabilities'
 
-// The blacklist is read from `./.blacklist` at import time, so the only way to exercise the filter
-// is to stand in for that file.
+// The blacklist is read from `./.blacklist` at import time: stand in for that file to exercise the filter.
 vi.mock('../src/utils/blacklist', () => ({blacklistedGlobs: ['@internal/*']}))
 vi.mock('../src/utils/vulnerabilities', () => ({getVulnerabilitiesFromGithub: vi.fn(async () => [])}))
 

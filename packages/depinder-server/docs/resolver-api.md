@@ -126,7 +126,8 @@ Package-level dates stay ISO — `latest` and `latest_prerelease` are derived fr
 way out. There is no per-purl `requested_version`: the caller finds its version in `versions`.
 
 The package shape is `PackageRecord` in `@depinder/core` (`src/wire/package-record.ts`), defined
-once for this server and the CLI. Core's `toPackageRecord` builds the same record straight from a
+once for this server and the CLI; the request body, its limits and the item and trailer lines are
+in `src/wire/resolve.ts`. Core's `toPackageRecord` builds the same record straight from a
 fetch, for the CLI's own fallback.
 
 ### `GET /feeds`

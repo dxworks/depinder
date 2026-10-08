@@ -2,7 +2,7 @@ import {mkdtemp, rm, writeFile} from 'node:fs/promises'
 import {join} from 'node:path'
 import Fastify, {type FastifyInstance} from 'fastify'
 import {BODY_LIMIT_BYTES, clientGone, registerAuth, registerCompress, registerErrorHandler} from '../shared/http-server.js'
-import {buildVulnerabilityIndex, type Logger, type Vulnerability} from '@depinder/core'
+import {buildVulnerabilityIndex, type Logger, type Vulnerability, type VulnResponse} from '@depinder/core'
 import type {VulnConfig} from './config.js'
 import {bomRefKeyer} from './bom-refs.js'
 import {BusyError, type ScanLimiter} from './limiter.js'
@@ -71,7 +71,7 @@ export async function createVulnServer(deps: VulnDeps): Promise<FastifyInstance>
 
         // The builds the answer names are the builds that were scanned: the lease's, never
         // whatever is current by the time the answer is written.
-        const answer = (lease: Lease, vulnerabilities: Record<string, Vulnerability[]>) => ({
+        const answer = (lease: Lease, vulnerabilities: Record<string, Vulnerability[]>): VulnResponse => ({
             vulnerabilities,
             unsupported: parsed.unsupported,
             databases: {trivy: publicBuild(lease.trivy), grype: publicBuild(lease.grype)},

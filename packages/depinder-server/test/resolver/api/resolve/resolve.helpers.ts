@@ -1,17 +1,20 @@
 import {expect} from 'vitest'
 import {handleResolve} from '../../../../src/resolver/api/resolve/handle.js'
 import {
-    DEFAULT_MAX_AGE_S,
     GATHER_MS,
     type ResolveDeps,
-    type ResolveItem,
-    type ResolveLine,
     type ResolveRequest,
     type ResolveSink,
-    type ResolveTrailer,
 } from '../../../../src/resolver/api/resolve/types.js'
 import type {ResolveStore} from '../../../../src/resolver/api/store.js'
-import type {CompactVersion, ParsedPurl} from '@depinder/core'
+import {
+    RESOLVE_DEFAULT_MAX_AGE_S,
+    type CompactVersion,
+    type ParsedPurl,
+    type ResolveItem,
+    type ResolveLine,
+    type ResolveTrailer,
+} from '@depinder/core'
 import type {
     PackageVersionsRow,
     QueueStats,
@@ -169,7 +172,7 @@ export class Collector implements ResolveSink {
 export const ask = (purls: string[], extra: Partial<ResolveRequest> = {}): ResolveRequest => ({
     purls,
     deadlineMs: 0,
-    maxAgeS: DEFAULT_MAX_AGE_S,
+    maxAgeS: RESOLVE_DEFAULT_MAX_AGE_S,
     ...extra,
 })
 

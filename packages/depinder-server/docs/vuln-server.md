@@ -78,6 +78,8 @@ ROLE=vuln RESOLVER_API_TOKEN=... VULN_DATA_DIR=/var/lib/vuln npm run dev
   the moment of the scan, and `stale` says it is past `VULN_*_STALE_HOURS`: old data is served and
   labelled, never refused, and the caller decides what to make of it.
 - `Server-Timing` carries the time spent waiting for a slot, in Trivy, in Grype, and in all.
+- The request and answer shapes are `VulnRequestBody` and `VulnResponse` in `@depinder/core`
+  (`src/wire/vulnerabilities.ts`), shared with the CLI.
 
 | status | when |
 |---|---|

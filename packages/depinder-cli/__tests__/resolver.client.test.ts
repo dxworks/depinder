@@ -1,15 +1,14 @@
 import {
     CHUNK_SIZE,
-    MAX_DEADLINE_MS,
     maxAgeFor,
     packageKeyOf,
     packChunks,
-    PackageRecord,
     resetResolverClient,
     ResolvedEntry,
     resolvePurls,
     resolverUnavailable,
 } from '../src/resolver/client'
+import {RESOLVE_MAX_DEADLINE_MS, type PackageRecord} from '@depinder/core'
 import {RESOLVER_CHUNK_CONCURRENCY, ResolverConfig} from '../src/resolver/config'
 
 /**
@@ -208,7 +207,7 @@ describe('the resolver client', () => {
         expect(calls[0].acceptEncoding).toBe('br, gzip')
         expect(calls[0].body.wait_ms).toBeUndefined()
         expect(calls[0].body.deadline_ms).toBeGreaterThan(59_000)
-        expect(calls[0].body.deadline_ms).toBeLessThanOrEqual(MAX_DEADLINE_MS)
+        expect(calls[0].body.deadline_ms).toBeLessThanOrEqual(RESOLVE_MAX_DEADLINE_MS)
         expect(answers.get('pkg:npm/left-pad@1.0.0')?.status).toBe('resolved')
         expect(answers.get('pkg:npm/left-pad@1.0.0')?.package?.name).toBe('left-pad')
         expect(warnings('')).toHaveLength(0)
@@ -220,7 +219,7 @@ describe('the resolver client', () => {
         await resolvePurls({...config, maxWaitMs: 10 * 60_000}, ['pkg:npm/a@1.0.0'], quiet)
         await resolvePurls({...config, maxWaitMs: 5000}, ['pkg:npm/b@1.0.0'], quiet)
 
-        expect(calls[0].body.deadline_ms).toBe(MAX_DEADLINE_MS)
+        expect(calls[0].body.deadline_ms).toBe(RESOLVE_MAX_DEADLINE_MS)
         expect(calls[1].body.deadline_ms).toBeGreaterThan(4000)
         expect(calls[1].body.deadline_ms).toBeLessThanOrEqual(5000)
     })

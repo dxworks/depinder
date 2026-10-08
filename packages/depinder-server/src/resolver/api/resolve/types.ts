@@ -1,28 +1,13 @@
 import type {ResolverEvents} from '../../events.js'
-import type {Logger, PackageRecord} from '@depinder/core'
+import type {Logger, ResolveLine} from '@depinder/core'
 import type {ResolveStore} from '../store.js'
 import type {VersionCache} from '../version-cache.js'
 
 /**
- * The limits of `POST /resolve` and the shapes that cross its edges: the request, the lines of
- * the answer, the sink they go to and what the handler is given. `handle.ts` is how it is answered.
+ * How `POST /resolve` is answered inside the server: its timings, the parsed request, the sink the
+ * lines go to and what the handler is given. The wire shapes and limits are core's (`wire/resolve.ts`).
  */
 
-export const MAX_PURLS = 5000
-/** How long a request may keep its stream open when it names no `deadline_ms`. */
-export const DEFAULT_DEADLINE_MS = 10_000
-/**
- * The longest a caller may ask for. Well inside undici's 300 s body timeout, and short enough that
- * no idle-timing proxy has been met that would cut a quiet stream first — which is why there are
- * no keepalive lines. If one ever is, a bare `\n` every 15 s, which clients skip, is the fix.
- */
-export const MAX_DEADLINE_MS = 60_000
-/**
- * The `max_age` a request gets when it names none: a day, which is depinder's own default. Below
- * six hours maven and cargo are stale on almost every request — their poll vouches for a package
- * every 6 h — so a caller asking for less gets those refetched, which is allowed, not advised.
- */
-export const DEFAULT_MAX_AGE_S = 86_400
 /**
  * How often the wait reads every key it is still waiting on, whatever it has heard.
  *
@@ -44,35 +29,6 @@ export const GATHER_MS = 100
  * never one per package.
  */
 export const VERSION_SLICE = 500
-
-export type ResultStatus = 'resolved' | 'refreshing' | 'not_found' | 'pending' | 'invalid' | 'error'
-
-export interface FeedPayload {
-    mode: 'feed' | 'poll'
-    lag_seconds: number | null
-    cursor_time: string | null
-}
-
-/** One line per package key, sent once per stream. See "POST /resolve" in docs/resolver-api.md. */
-export interface ResolveItem {
-    /** The canonical package key, or null for an `invalid` purl. */
-    key: string | null
-    /** The purls exactly as the caller sent them that belong to this package. */
-    purls: string[]
-    status: ResultStatus
-    /** Present for `resolved` and `refreshing`. */
-    package?: PackageRecord
-    /** Present for `error` and `invalid`. */
-    reason?: string
-}
-
-/** The last line, exactly once. A stream that ends without it was cut short. */
-export interface ResolveTrailer {
-    done: true
-    feeds: Record<string, FeedPayload>
-}
-
-export type ResolveLine = ResolveItem | ResolveTrailer
 
 /** Where the lines go. The route's writes bytes; a test's collects them. */
 export interface ResolveSink {

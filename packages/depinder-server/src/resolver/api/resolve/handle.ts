@@ -1,4 +1,11 @@
-import {isSupportedType, tryParsePurl, type ParsedPurl} from '@depinder/core'
+import {
+    isSupportedType,
+    tryParsePurl,
+    type FeedFreshness,
+    type ParsedPurl,
+    type ResolveItem,
+    type ResolveStatus,
+} from '@depinder/core'
 import type {ResolvePackageRow} from '../../db/rows.js'
 import {Abandoned, emit, send, stopIfGone, type Open, type ResolveContext, type Wanted} from './context.js'
 import {iso} from './payload.js'
@@ -6,13 +13,10 @@ import {
     GATHER_MS,
     POLL_INTERVAL_MS,
     VERSION_SLICE,
-    type FeedPayload,
     type ResolveDeps,
-    type ResolveItem,
     type ResolveOutcome,
     type ResolveRequest,
     type ResolveSink,
-    type ResultStatus,
 } from './types.js'
 import {waitForOpen} from './wait.js'
 
@@ -50,7 +54,7 @@ import {waitForOpen} from './wait.js'
 
 /** What the first read decided: what is final already, and what this request queued. */
 interface FirstRead {
-    ready: [key: string, status: ResultStatus][]
+    ready: [key: string, status: ResolveStatus][]
     refresh: string[]
     unknown: ParsedPurl[]
 }
@@ -164,7 +168,7 @@ async function lookUp(ctx: ResolveContext): Promise<FirstRead> {
     // can be, whatever `max_age` says — `max_age: 0` means "refresh what you had", not "refresh
     // what you just fetched".
     const cutoff = ctx.startedAt - ctx.request.maxAgeS * 1000
-    const ready: [key: string, status: ResultStatus][] = []
+    const ready: [key: string, status: ResolveStatus][] = []
     const refresh: string[] = []
     const unknown: ParsedPurl[] = []
     for (const key of keys) {
@@ -220,7 +224,7 @@ async function queueWork(ctx: ResolveContext, refresh: string[], unknown: Parsed
  * what is left as it stands, and closes with the trailer. Throws {@link Abandoned} the moment it
  * finds the caller gone.
  */
-async function serve(ctx: ResolveContext, ready: readonly [string, ResultStatus][]): Promise<void> {
+async function serve(ctx: ResolveContext, ready: readonly [string, ResolveStatus][]): Promise<void> {
     const {now, deadline, open} = ctx
     // The last moment a caller who has gone costs nothing: no 200, no line, no read.
     stopIfGone(ctx)
@@ -243,7 +247,7 @@ async function serve(ctx: ResolveContext, ready: readonly [string, ResultStatus]
     open.clear()
 
     stopIfGone(ctx)
-    const feeds: Record<string, FeedPayload> = {}
+    const feeds: Record<string, FeedFreshness> = {}
     for (const feed of await ctx.store.getFeeds()) {
         feeds[feed.type] = {
             mode: feed.mode,

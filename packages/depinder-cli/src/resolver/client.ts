@@ -1,6 +1,14 @@
 import {log as defaultLog} from '../utils/logging'
 import {count, countRequest} from '../utils/profile'
-import type {PackageRecord} from '@depinder/core'
+import {
+    RESOLVE_MAX_DEADLINE_MS,
+    type FeedFreshness,
+    type PackageRecord,
+    type ResolveItem,
+    type ResolveLine,
+    type ResolveRequestBody,
+    type ResolveStatus,
+} from '@depinder/core'
 import {ResolverConfig} from './config'
 
 /**
@@ -25,45 +33,6 @@ import {ResolverConfig} from './config'
  * the process.
  */
 
-/**
- * `error` is the server's fifth status: it could not read the registry after three tries. Like
- * `not_found` and `invalid` it carries no package, so it falls through to the registry fallback —
- * but it has to be counted, or the summary line silently loses purls.
- *
- * `refreshing` is a package the server holds but has not confirmed within the `max_age` it was
- * sent, and could not refetch before the deadline: it comes with its last known facts, and those
- * are the answer for this run. `pending` is the same for a package the server had never seen.
- */
-export type ResolveStatus = 'resolved' | 'refreshing' | 'not_found' | 'pending' | 'invalid' | 'error'
-
-// The wire shape of one package is core's, the same definition the server sends.
-export {VERSION_FLAG_PRERELEASE, VERSION_FLAG_YANKED, type CompactVersion, type PackageRecord} from '@depinder/core'
-
-export interface FeedRecord {
-    mode: 'feed' | 'poll'
-    lag_seconds: number | null
-    cursor_time: string | null
-}
-
-/**
- * One item line: one package, with every purl the client sent that belongs to it, spelled exactly
- * as sent. `key` is the server's canonical package key, `null` for an `invalid` purl (which gets an
- * item of its own).
- */
-interface ItemLine {
-    key: string | null
-    purls: string[]
-    status: ResolveStatus
-    package?: PackageRecord
-    reason?: string
-}
-
-/** The last line, exactly once. A stream without it was cut short. */
-interface TrailerLine {
-    done: true
-    feeds?: {[type: string]: FeedRecord}
-}
-
 /** What one purl came back as. `package` is present only for `resolved` and `refreshing`. */
 export interface ResolvedEntry {
     status: ResolveStatus
@@ -74,10 +43,8 @@ export interface ResolvedEntry {
 /** Called once per purl, as the line that answers it arrives — long before `resolvePurls` returns. */
 export type ItemHandler = (purl: string, entry: ResolvedEntry) => void
 
-/** The server caps a request at 5000 purls; stay well under it so one slow chunk is not the run. */
+/** Well under `RESOLVE_MAX_PURLS`, so one slow chunk is not the run. */
 export const CHUNK_SIZE = 2000
-/** The server's own cap on `deadline_ms`; more would be a 400. */
-export const MAX_DEADLINE_MS = 60_000
 /**
  * How long a single HTTP call may take beyond the `deadline_ms` it sent before it is abandoned.
  *
@@ -224,7 +191,7 @@ async function* lines(body: ReadableStream<Uint8Array>): AsyncGenerator<string> 
 
 /** How one post ended. `items` counts the item lines that arrived, whatever came after them. */
 type PostOutcome =
-    | {kind: 'done', items: number, feeds?: {[type: string]: FeedRecord}}
+    | {kind: 'done', items: number, feeds?: Record<string, FeedFreshness>}
     | {kind: 'http', items: 0, status: number}
     | {kind: 'broken', items: number, reason: string}
 
@@ -240,12 +207,12 @@ async function postOnce(
     config: ResolverConfig,
     purls: string[],
     deadlineMs: number,
-    onLine: (item: ItemLine) => void
+    onLine: (item: ResolveItem) => void
 ): Promise<PostOutcome> {
     count('resolver:request')
     const url = `${config.url}/resolve`
     countRequest(url)
-    const body: {purls: string[], max_age?: number, deadline_ms: number} = {purls, deadline_ms: deadlineMs}
+    const body: ResolveRequestBody = {purls, deadline_ms: deadlineMs}
     if (config.freshAfterMs !== undefined) body.max_age = maxAgeFor(config.freshAfterMs)
     let items = 0
     try {
@@ -269,10 +236,11 @@ async function postOnce(
         }
         if (!response.body) return {kind: 'broken', items, reason: 'empty response body'}
         for await (const line of lines(response.body)) {
-            const parsed = JSON.parse(line) as ItemLine | TrailerLine
+            const parsed = JSON.parse(line) as ResolveLine
+            // `feeds` is read leniently: a trailer without it is still a complete stream.
             if ('done' in parsed && parsed.done) return {kind: 'done', items, feeds: parsed.feeds}
             items++
-            onLine(parsed as ItemLine)
+            onLine(parsed as ResolveItem)
         }
         return {kind: 'broken', items, reason: 'stream ended without its last line'}
     } catch (e: any) {
@@ -281,7 +249,7 @@ async function postOnce(
     }
 }
 
-function logFeeds(feeds: {[type: string]: FeedRecord} | undefined, log: Logger): void {
+function logFeeds(feeds: Record<string, FeedFreshness> | undefined, log: Logger): void {
     if (!feeds || Object.keys(feeds).length === 0) return
     const described = Object.entries(feeds).map(([type, feed]) => {
         const lag = feed.lag_seconds === null || feed.lag_seconds === undefined
@@ -330,7 +298,7 @@ export async function resolvePurls(
      * again. `0` is valid and means "send what you have now", so a late chunk still gets every
      * fresh answer.
      */
-    const deadlineMs = () => Math.min(MAX_DEADLINE_MS, Math.max(0, deadline - Date.now()))
+    const deadlineMs = () => Math.min(RESOLVE_MAX_DEADLINE_MS, Math.max(0, deadline - Date.now()))
     let feedsLogged = false
 
     /**

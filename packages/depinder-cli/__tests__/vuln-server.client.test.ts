@@ -2,7 +2,6 @@ import type {MockInstance} from 'vitest'
 import {
     DEFAULT_VULN_MAX_WAIT_MS,
     fetchServerVulnerabilities,
-    MAX_VULN_CHUNK_SIZE,
     parseServerTiming,
     staleBuildWarnings,
     usesVulnServer,
@@ -10,6 +9,7 @@ import {
     vulnServerConfig,
     VulnServerConfig,
 } from '../src/vuln-sources/server'
+import {VULN_DEFAULT_MAX_PURLS} from '@depinder/core'
 import {ResolverConfig} from '../src/resolver/config'
 import {log} from '../src/utils/logging'
 
@@ -126,7 +126,7 @@ describe('the vulnerability server configuration', () => {
 
     it('is the resolver\'s address and token, with its own wait and chunk size', () => {
         expect(vulnServerConfig(resolver)).toEqual({
-            url: 'http://server.example', token: 'secret', maxWaitMs: DEFAULT_VULN_MAX_WAIT_MS, chunkSize: MAX_VULN_CHUNK_SIZE,
+            url: 'http://server.example', token: 'secret', maxWaitMs: DEFAULT_VULN_MAX_WAIT_MS, chunkSize: VULN_DEFAULT_MAX_PURLS,
         })
     })
 

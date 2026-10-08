@@ -1,7 +1,7 @@
 import type {ResolvePackageRow} from '../../db/rows.js'
 import {send, stopIfGone, type ResolveContext} from './context.js'
 import {time} from './payload.js'
-import type {ResultStatus} from './types.js'
+import type {ResolveStatus} from '@depinder/core'
 
 /**
  * Sends each open package as it lands, until none is left open or the deadline passes.
@@ -68,7 +68,7 @@ export async function waitForOpen(ctx: ResolveContext): Promise<void> {
             settled.clear()
 
             ctx.reads++
-            const landed: [string, ResultStatus][] = []
+            const landed: [string, ResolveStatus][] = []
             for (const row of await ctx.store.getPackages(batch)) {
                 const key = row.package_key
                 ctx.packages.set(key, row)
@@ -95,7 +95,7 @@ export async function waitForOpen(ctx: ResolveContext): Promise<void> {
  * scheduled, the facts it had are kept, and it goes out `refreshing` with them rather than
  * hold the stream for a retry that is an hour away.
  */
-function landedAs(ctx: ResolveContext, key: string, row: ResolvePackageRow): ResultStatus | null {
+function landedAs(ctx: ResolveContext, key: string, row: ResolvePackageRow): ResolveStatus | null {
     if (row.status === 'pending') return null
     if (ctx.open.get(key) === 'unknown' || row.status !== 'resolved') return row.status
     const before = ctx.first.get(key)!

@@ -1,9 +1,8 @@
-import type {ParsedPurl} from '@depinder/core'
-import type {CompactVersion} from '@depinder/core'
+import type {CompactVersion, ParsedPurl, ResolveItem, ResolveLine, ResolveStatus} from '@depinder/core'
 import type {ResolvePackageRow} from '../../db/rows.js'
 import type {ResolveStore} from '../store.js'
 import {toPackagePayload} from './payload.js'
-import type {ResolveDeps, ResolveItem, ResolveLine, ResolveRequest, ResolveSink, ResultStatus} from './types.js'
+import type {ResolveDeps, ResolveRequest, ResolveSink} from './types.js'
 
 /** A package the request asked about: how to create it, and every purl that named it. */
 export interface Wanted {
@@ -44,7 +43,7 @@ export interface ResolveContext {
     /** The rows as this request first found them: what a stale package's refetch is measured against. */
     first: Map<string, ResolvePackageRow>
     open: Map<string, Open>
-    counts: Record<ResultStatus, number>
+    counts: Record<ResolveStatus, number>
     reads: number
     versionsMs: number
     waitMs: number
@@ -93,7 +92,7 @@ async function versionsOf(ctx: ResolveContext, keys: readonly string[]): Promise
 function item(
     ctx: ResolveContext,
     key: string,
-    status: ResultStatus,
+    status: ResolveStatus,
     versions?: Map<string, CompactVersion[]>,
 ): ResolveItem {
     const row = ctx.packages.get(key)
@@ -111,10 +110,10 @@ function item(
  */
 export async function send(
     ctx: ResolveContext,
-    answers: readonly [string, ResultStatus][],
+    answers: readonly [string, ResolveStatus][],
     before: ResolveItem[] = [],
 ): Promise<void> {
-    const carries = (status: ResultStatus): boolean => status === 'resolved' || status === 'refreshing'
+    const carries = (status: ResolveStatus): boolean => status === 'resolved' || status === 'refreshing'
     await emit(ctx, [...before, ...answers.filter(([, s]) => !carries(s)).map(([key, s]) => item(ctx, key, s))])
     const full = answers.filter(([, s]) => carries(s))
     for (let i = 0; i < full.length; i += ctx.slice) {

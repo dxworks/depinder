@@ -20,13 +20,13 @@ import {
     scannerSummaryLine,
     scanSbomFileOnce,
 } from '../plugins/sbom/local-scan'
+import type {VulnDatabaseBuild} from '@depinder/core'
 import {log} from '../utils/logging'
 import {count, startPhase, timePhase} from '../utils/profile'
 import {
     describeServerScanners,
     fetchServerVulnerabilities,
     staleBuildWarnings,
-    VulnDatabaseBuild,
     VulnServerAnswer,
     VulnServerConfig,
 } from './server'

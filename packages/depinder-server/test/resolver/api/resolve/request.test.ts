@@ -1,22 +1,22 @@
 import {describe, expect, it} from 'vitest'
 import {parseResolveRequest} from '../../../../src/resolver/api/resolve/request.js'
-import {DEFAULT_DEADLINE_MS, DEFAULT_MAX_AGE_S, MAX_DEADLINE_MS} from '../../../../src/resolver/api/resolve/types.js'
+import {RESOLVE_DEFAULT_DEADLINE_MS, RESOLVE_DEFAULT_MAX_AGE_S, RESOLVE_MAX_DEADLINE_MS} from '@depinder/core'
 import {BadRequestError} from '../../../../src/shared/errors.js'
 
 describe('parseResolveRequest', () => {
     it('accepts a plain request', () => {
         expect(parseResolveRequest({purls: ['pkg:npm/express@4.18.2']})).toEqual({
             purls: ['pkg:npm/express@4.18.2'],
-            deadlineMs: DEFAULT_DEADLINE_MS,
-            maxAgeS: DEFAULT_MAX_AGE_S,
+            deadlineMs: RESOLVE_DEFAULT_DEADLINE_MS,
+            maxAgeS: RESOLVE_DEFAULT_MAX_AGE_S,
         })
-        expect(DEFAULT_DEADLINE_MS).toBe(10_000)
+        expect(RESOLVE_DEFAULT_DEADLINE_MS).toBe(10_000)
     })
 
     it('reads deadline_ms, up to a minute, and 0 for "what you have now"', () => {
         expect(parseResolveRequest({purls: [], deadline_ms: 0}).deadlineMs).toBe(0)
-        expect(parseResolveRequest({purls: [], deadline_ms: null}).deadlineMs).toBe(DEFAULT_DEADLINE_MS)
-        expect(parseResolveRequest({purls: [], deadline_ms: MAX_DEADLINE_MS}).deadlineMs).toBe(60_000)
+        expect(parseResolveRequest({purls: [], deadline_ms: null}).deadlineMs).toBe(RESOLVE_DEFAULT_DEADLINE_MS)
+        expect(parseResolveRequest({purls: [], deadline_ms: RESOLVE_MAX_DEADLINE_MS}).deadlineMs).toBe(60_000)
         expect(() => parseResolveRequest({purls: [], deadline_ms: 60_001})).toThrow(/deadline_ms/)
         expect(() => parseResolveRequest({purls: [], deadline_ms: -1})).toThrow(/deadline_ms/)
         expect(() => parseResolveRequest({purls: [], deadline_ms: '10s'})).toThrow(/deadline_ms/)
@@ -41,7 +41,7 @@ describe('parseResolveRequest', () => {
     })
 
     it('reads max_age in seconds, and gives a request without one a day', () => {
-        expect(DEFAULT_MAX_AGE_S).toBe(86_400)
+        expect(RESOLVE_DEFAULT_MAX_AGE_S).toBe(86_400)
         expect(parseResolveRequest({purls: []}).maxAgeS).toBe(86_400)
         expect(parseResolveRequest({purls: [], max_age: null}).maxAgeS).toBe(86_400)
         expect(parseResolveRequest({purls: [], max_age: 3600}).maxAgeS).toBe(3600)

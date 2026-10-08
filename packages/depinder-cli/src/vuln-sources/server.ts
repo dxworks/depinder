@@ -2,6 +2,13 @@ import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {log as defaultLog} from '../utils/logging'
 import {count, countRequest} from '../utils/profile'
 import {ResolverConfig} from '../resolver/config'
+import {
+    VULN_DEFAULT_MAX_PURLS,
+    type VulnDatabaseBuild,
+    type VulnRequestBody,
+    type VulnResponse,
+    type VulnUnsupportedReason,
+} from '@depinder/core'
 
 /**
  * The client for `POST {url}/vulnerabilities`: the purls of every SBOM in, Trivy and Grype findings
@@ -29,12 +36,10 @@ export interface VulnServerConfig {
     token: string
     /** One deadline for every chunk of the ask, from the first post. */
     maxWaitMs: number
-    /** Distinct purls per request, at most the server's own cap. */
+    /** Distinct purls per request, at most the server's default cap (`VULN_DEFAULT_MAX_PURLS`). */
     chunkSize: number
 }
 
-/** The server's default `VULN_MAX_PURLS`: past it a request is a 413. */
-export const MAX_VULN_CHUNK_SIZE = 5000
 export const DEFAULT_VULN_MAX_WAIT_MS = 30_000
 
 function positiveFromEnv(name: string, fallback: number, integer: boolean): number {
@@ -61,7 +66,7 @@ export function vulnServerConfig(resolver: ResolverConfig | undefined, options: 
         url: resolver.url,
         token: resolver.token,
         maxWaitMs: positiveFromEnv('DEPINDER_VULN_MAX_WAIT_MS', DEFAULT_VULN_MAX_WAIT_MS, false),
-        chunkSize: Math.min(MAX_VULN_CHUNK_SIZE, positiveFromEnv('DEPINDER_VULN_CHUNK_SIZE', MAX_VULN_CHUNK_SIZE, true)),
+        chunkSize: Math.min(VULN_DEFAULT_MAX_PURLS, positiveFromEnv('DEPINDER_VULN_CHUNK_SIZE', VULN_DEFAULT_MAX_PURLS, true)),
     }
 }
 
@@ -73,22 +78,12 @@ export function usesVulnServer(selection: {trivy: boolean, grype: boolean}): boo
     return selection.trivy && selection.grype
 }
 
-/** One database build, as the server reports what produced an answer. */
-export interface VulnDatabaseBuild {
-    built_at: string
-    schema?: string
-    age_seconds?: number
-    stale?: boolean
-}
-
-export type UnsupportedReason = 'invalid' | 'unsupported_type' | 'no_version'
-
 /** The answers of every chunk, put together. */
 export interface VulnServerAnswer {
     /** Findings per purl, exactly as sent; only vulnerable purls are present. */
     vulnerabilities: Map<string, Vulnerability[]>
     /** The purls the server did not scan, and why. */
-    unsupported: Map<string, UnsupportedReason | string>
+    unsupported: Map<string, VulnUnsupportedReason>
     /**
      * Every distinct build that answered a chunk, per tool, oldest first. One in practice; two only
      * when a database was swapped while the chunks were being scanned.
@@ -107,12 +102,8 @@ export type VulnServerResult =
     | {ok: true, answer: VulnServerAnswer}
     | {ok: false, reason: string}
 
-interface ChunkBody {
-    vulnerabilities: {[purl: string]: Vulnerability[]}
-    unsupported?: {purl: string, reason: string}[]
-    databases?: {trivy?: VulnDatabaseBuild, grype?: VulnDatabaseBuild}
-    scanners?: {trivy?: string, grype?: string}
-}
+/** One chunk's answer, read leniently: only `vulnerabilities` must be there. */
+type ChunkBody = Pick<VulnResponse, 'vulnerabilities'> & Partial<VulnResponse>
 
 class ChunkFailure extends Error {}
 
@@ -175,7 +166,7 @@ export async function fetchServerVulnerabilities(
     purls: Iterable<string>,
     log: Logger = defaultLog,
 ): Promise<VulnServerResult> {
-    const chunks = vulnChunks(purls, Math.max(1, Math.min(MAX_VULN_CHUNK_SIZE, config.chunkSize)))
+    const chunks = vulnChunks(purls, Math.max(1, Math.min(VULN_DEFAULT_MAX_PURLS, config.chunkSize)))
     const answer: VulnServerAnswer = {
         vulnerabilities: new Map(), unsupported: new Map(),
         databases: {trivy: [], grype: []}, scanners: {trivy: [], grype: []},
@@ -205,7 +196,7 @@ export async function fetchServerVulnerabilities(
                     // As for the resolver: undici decodes br, but only asks for gzip by itself.
                     'Accept-Encoding': 'br, gzip',
                 },
-                body: JSON.stringify({purls: chunk}),
+                body: JSON.stringify({purls: chunk} satisfies VulnRequestBody),
                 signal: controller.signal,
             })
             if (!response.ok) {

@@ -1,6 +1,6 @@
 import {availableParallelism, tmpdir} from 'node:os'
 import {ConfigError, requireLogLevel, requirePort, requireToken, str} from '../shared/config.js'
-import type {LogLevel} from '@depinder/core'
+import {VULN_DEFAULT_MAX_PURLS, type LogLevel} from '@depinder/core'
 import {normalizeRepository} from './upstream.js'
 
 /** Trivy's own default since 0.6x: Google's mirror, because anonymous pulls from ghcr are rate-limited. */
@@ -87,7 +87,7 @@ export function loadVulnConfig(env: NodeJS.ProcessEnv = process.env): VulnConfig
         trivyBin: str(env.TRIVY_BIN) ?? 'trivy',
         grypeBin: str(env.GRYPE_BIN) ?? 'grype',
         dataDir,
-        maxPurls: int(env, 'VULN_MAX_PURLS', 5000, 1, 50_000),
+        maxPurls: int(env, 'VULN_MAX_PURLS', VULN_DEFAULT_MAX_PURLS, 1, 50_000),
         maxScans,
         maxQueued: int(env, 'VULN_MAX_QUEUED', 4 * maxScans, 0, 1000),
         scanTimeoutMs: int(env, 'VULN_SCAN_TIMEOUT_MS', 60_000, 1000, 600_000),

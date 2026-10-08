@@ -6,7 +6,6 @@
     "packages/depinder-cli/src/blackduck/licenses.ts": 539,
     "packages/depinder-cli/src/blackduck/export.ts": 489,
     "packages/depinder-cli/src/commands/transformBlackDuckReports.ts": 477,
-    "packages/depinder-cli/src/resolver/client.ts": 425,
     "packages/depinder-cli/__tests__/resolver.bulk.test.ts": 953,
     "packages/depinder-cli/__tests__/blackduck.export.test.ts": 820,
     "packages/depinder-cli/__tests__/sbom.cyclonedx.test.ts": 768,

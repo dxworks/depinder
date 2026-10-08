@@ -1,7 +1,7 @@
-import {errorMessage, nullLogger, parsePurl, registryName} from '@depinder/core'
+import {errorMessage, nullLogger, parsePurl, registryName, type ResolveItem, type ResolveLine} from '@depinder/core'
 import {replayFetch, type LoadedFixtureCase} from '@depinder/core/testing'
 import {createRegistryClients, fetchLibraryInfo, toLibraryInfo, type LibraryInfo} from '@dxworks/depinder/fallback'
-import {createServer, runOnce, type ResolveItem, type ResolveLine} from 'depinder-server/in-process'
+import {createServer, runOnce} from 'depinder-server/in-process'
 import {vi} from 'vitest'
 import type {ParityDatabase} from './parity-database.js'
 

@@ -1,4 +1,4 @@
-import {CompactVersion, PackageRecord} from '../src/resolver/client'
+import type {CompactVersion, PackageRecord} from '@depinder/core'
 import {componentLinkOf, registryNameOf, toLibraryInfo} from '../src/resolver/adapter'
 import {LibraryInfo} from '../src/extension-points/library-info'
 import {newerVersionCounts} from '../src/blackduck/versions'
