@@ -116,6 +116,25 @@ describe('AdvisoryClient', () => {
         expect(call).toBe(3)
     })
 
+    it('waits as long as a 429\'s Retry-After asks, in seconds or as an HTTP date', async () => {
+        const retryAfters = ['7', new Date(Date.now() + 30_000).toUTCString()]
+        const waits: number[] = []
+        let call = 0
+        const client = new AdvisoryClient({
+            pool: testPool(['a', 'b']),
+            sleep: async ms => {
+                waits.push(ms)
+            },
+            fetch: async () => call < retryAfters.length
+                ? {status: 429, headers: {'retry-after': retryAfters[call++]}, body: 'slow down'}
+                : ok([]),
+        })
+        await client.getPage('https://api.github.com/advisories')
+        expect(waits[0]).toBe(7_000)
+        expect(waits[1]).toBeGreaterThan(28_000)
+        expect(waits[1]).toBeLessThanOrEqual(30_000)
+    })
+
     it('gives up after maxAttempts and says why', async () => {
         const pool = testPool(['a'])
         const client = new AdvisoryClient({

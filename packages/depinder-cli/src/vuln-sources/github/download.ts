@@ -1,3 +1,4 @@
+import {mapWithConcurrency} from '@depinder/core'
 import {GithubAdvisory} from './advisory'
 import {AdvisoryClient, HttpFetch} from './client'
 import {defaultCacheDir, DEFAULT_MAX_AGE_HOURS, staleEcosystems, writeEcosystem} from './cache'
@@ -76,14 +77,7 @@ export async function downloadEcosystems(
     log.info(`Downloading GitHub advisories for ${ecosystems.map(it => it.name).join(', ')}`
         + ` with ${tokens.length} token(s) at concurrency ${concurrency}`)
 
-    const results: EcosystemDownloadResult[] = []
-    let next = 0
-    await Promise.all(Array.from({length: Math.min(concurrency, ecosystems.length)}, async () => {
-        while (next < ecosystems.length) {
-            const ecosystem = ecosystems[next++]
-            results.push(await downloadOne(client, cacheDir, ecosystem.name))
-        }
-    }))
+    const results = await mapWithConcurrency(ecosystems, concurrency, ecosystem => downloadOne(client, cacheDir, ecosystem.name))
 
     const usage = pool.usage()
     for (const entry of usage) {

@@ -29,6 +29,7 @@ export {
     type RequestGate,
     type RequestOptions,
 } from './http/client.js'
+export {retryAfterMs} from './http/retry-after.js'
 export {
     createLimiter,
     createLimiterPool,

@@ -1,3 +1,4 @@
+import {retryAfterMs} from '@depinder/core'
 import https from 'https'
 import {GithubAdvisory} from './advisory'
 import {TokenPool} from './tokens'
@@ -120,8 +121,8 @@ export class AdvisoryClient {
 
             // `retry-after` is authoritative when present (secondary rate limits); otherwise back
             // off. Either way park the token so the retry prefers a different one.
-            const retryAfter = Number(response.headers['retry-after'])
-            const delay = Number.isFinite(retryAfter) ? retryAfter * 1000 : backoffDelay(attempt)
+            const retryAfter = response.headers['retry-after']
+            const delay = retryAfter ? retryAfterMs(retryAfter) : backoffDelay(attempt)
             this.pool.parkFor(token, delay)
             log.warn(`GitHub advisories ${lastError} — retrying in ${delay}ms (attempt ${attempt + 1}/${this.maxAttempts})`)
             await this.sleep(delay)

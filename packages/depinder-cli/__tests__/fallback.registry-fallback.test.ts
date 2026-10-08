@@ -1,6 +1,8 @@
-import {registryFallbackWith} from '../src/fallback/registry-fallback'
+import {HttpError} from '@depinder/core'
+import {isRateLimit, registryFallbackWith} from '../src/fallback/registry-fallback'
 import {librariesIoFallback, LibrariesIoFallback} from '../src/fallback/libraries-io'
-import {FallbackPackage, FallbackResult} from '../src/fallback/fetch-library-info'
+import {fetchLibraryInfo, FallbackPackage, FallbackResult} from '../src/fallback/fetch-library-info'
+import {createRegistryClients} from '../src/fallback/registry-clients'
 import {LibraryInfo} from '../src/extension-points/library-info'
 
 const library = (name: string, description: string): LibraryInfo => ({name, description, licenses: [], versions: []})
@@ -17,7 +19,7 @@ function fakeLibrariesIo(hasKey: boolean): LibrariesIoFallback & {retrieve: Retu
 
 function fallbackOver(result: FallbackResult, librariesIo: LibrariesIoFallback) {
     const fetchInfo = vi.fn(async (_pkg: FallbackPackage) => result)
-    return {fetchInfo, fallback: registryFallbackWith({fetchInfo, librariesIo, rateLimitDelaysMs: [1, 1]})}
+    return {fetchInfo, fallback: registryFallbackWith({fetchInfo, librariesIo})}
 }
 
 describe('registry fallback dispatch', () => {
@@ -62,12 +64,48 @@ describe('registry fallback dispatch', () => {
         expect(librariesIo.retrieve).not.toHaveBeenCalled()
     })
 
-    it('retries a lookup that stays rate limited, then gives up with the 429', async () => {
-        const error = Object.assign(new Error('429'), {status: 429})
+    it('does not run a lookup again when the registry stays rate limited', async () => {
+        const error = new HttpError('npm returned 429 for pkg', 'https://registry.npmjs.org/pkg', 429)
         const {fetchInfo, fallback} = fallbackOver({status: 'error', error}, fakeLibrariesIo(false))
 
         await expect(fallback.lookup({type: 'npm', name: 'pkg'})).rejects.toBe(error)
-        expect(fetchInfo).toHaveBeenCalledTimes(3)
+        expect(fetchInfo).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe('rate limits on the real registry clients', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals()
+        vi.useRealTimers()
+    })
+
+    it('waits out a 429 once, as long as Retry-After asks, then fails the lookup as rate limited', async () => {
+        vi.useFakeTimers()
+        let calls = 0
+        vi.stubGlobal('fetch', async () => {
+            calls++
+            return new Response('slow down', {status: 429, headers: {'retry-after': '2'}})
+        })
+        const clients = createRegistryClients({limits: {byType: {}, fallback: {concurrency: 8, minIntervalMs: 0}}})
+        const fallback = registryFallbackWith({fetchInfo: pkg => fetchLibraryInfo(pkg, {clients}), librariesIo: fakeLibrariesIo(false)})
+
+        const pending = fallback.lookup({type: 'npm', name: 'left-pad'}).catch((e: unknown) => e)
+        await vi.advanceTimersByTimeAsync(1_999)
+        expect(calls).toBe(1)
+        await vi.runAllTimersAsync()
+
+        const error = await pending
+        expect(isRateLimit(error)).toBe(true)
+        expect(calls).toBe(2)
+    })
+})
+
+describe('isRateLimit', () => {
+    it('recognises core\'s 429 and nothing else', () => {
+        expect(isRateLimit(new HttpError('429', 'https://x', 429))).toBe(true)
+        expect(isRateLimit(new HttpError('500', 'https://x', 500))).toBe(false)
+        expect(isRateLimit({response: {status: 429}})).toBe(false)
+        expect(isRateLimit(undefined)).toBe(false)
     })
 })
 

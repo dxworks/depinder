@@ -1,3 +1,4 @@
+import type {Logger as CoreLogger, LogLevel} from '@depinder/core'
 import {createLogger, format, transports} from 'winston'
 import path from 'path'
 import {depinderFolder} from './utils'
@@ -38,3 +39,18 @@ export const log = createLogger({
         }),
     ],
 })
+
+/** Core's `Logger` over the CLI log, so messages from core's fetchers land at their own level. */
+export function coreLogger(bindings: Record<string, unknown> = {}): CoreLogger {
+    const at = (level: LogLevel) => (message: string, fields?: Record<string, unknown>) => {
+        const context = {...bindings, ...fields}
+        log.log(level, Object.keys(context).length ? `${message} ${JSON.stringify(context)}` : message)
+    }
+    return {
+        debug: at('debug'),
+        info: at('info'),
+        warn: at('warn'),
+        error: at('error'),
+        child: extra => coreLogger({...bindings, ...extra}),
+    }
+}
