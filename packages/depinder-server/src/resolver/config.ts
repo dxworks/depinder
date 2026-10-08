@@ -60,25 +60,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // dashboard change; raise Pool Size there (or connect directly) and then set this to 32.
     const databasePoolSize = int(env, 'DATABASE_POOL_SIZE', 15, 1, 200)
 
-    // The api's share of the pool above, and the reason `/resolve` can no longer be starved by the
-    // worker. One pool for both halves meant 64 fetch slots queueing for the same 15 clients with a
-    // request's `getPackages` somewhere in that queue, and pg does not queue a waiter forever: after
-    // `connectionTimeoutMillis` it rejects with "timeout exceeded when trying to connect", which is
-    // an HTTP 500 for a caller who did nothing wrong.
-    //
-    // Eight, because of how depinder asks. It posts every chunk of a run at once
-    // (RESOLVER_CHUNK_CONCURRENCY is unbounded), up to 2 000 purls a chunk, so a 10 000-purl run is
-    // six requests in flight together, and it never retries one: a chunk whose stream dies is
-    // answered from the registries instead, package by package. On a cold version cache each chunk
-    // reads its versions in 500-package queries of 2-8 s against a hosted database, holding a
-    // client for one query at a time but asking for one again straight away. Six chunks on four
-    // clients queued past the old ten-second connect timeout, one stream ended without its
-    // trailer, and a 15 s run took 152 s. Eight gives each of those six chunks a client of its own
-    // and leaves two for /feeds, /health and a seventh chunk; the connect timeout is no longer ten
-    // seconds either (see `API_CONNECT_TIMEOUT_MS` in `db/db.ts`). It is carved OUT of
-    // DATABASE_POOL_SIZE rather than added to it, because the ceiling that matters is the pooler's
-    // and it counts the whole process: with DATABASE_POOL_SIZE=32 that is 8 for the api and 24 for
-    // the worker.
+    // The api's own pool, so `/resolve` never queues behind the worker's writes. Carved out of
+    // DATABASE_POOL_SIZE because the pooler's ceiling counts the whole process. Eight gives each
+    // chunk of a typical depinder run a client of its own: see `docs/configuration.md`.
     const apiPoolSize = int(env, 'API_POOL_SIZE', 8, 1, 200)
     if (apiPoolSize >= databasePoolSize) {
         throw new ConfigError(

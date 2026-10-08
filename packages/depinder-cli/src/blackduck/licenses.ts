@@ -158,10 +158,8 @@ const choice = (known: KnownRisk[], unreadable: boolean): LicenseRisk => {
 // --------------------------------------------------------------------------
 // Everything below reads ONE vocabulary: whatever a registry, an SBOM or a finished export
 // happens to hold. `Apache-2.0`, `Apache License 2.0`, `Apache License, Version 2.0`, `The Apache
-// Software License, Version 2.0` and `Apache 2` are the same licence written five ways, and only
-// the first two used to be readable -- everything else was copied into the CSV verbatim and
-// counted as UNKNOWN, which then reported the component at HIGH risk. Measured against the
-// reference export, that mislabelled 321 components whose licence we were in fact holding.
+// Software License, Version 2.0` and `Apache 2` are the same licence written five ways; a name
+// that is not read is counted as UNKNOWN, which reports the component at HIGH risk.
 //
 // The rules are deliberately conservative. A string that cannot be resolved to an entry in the
 // table stays unresolved and the risk becomes `UNKNOWN` -- guessing a licence is worse than

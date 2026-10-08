@@ -5,8 +5,8 @@ import {countRequest} from '../utils/profile'
 import {delay} from '../utils/utils'
 
 /**
- * Libraries.io, the CLI's last resort (D8): only for the four ecosystems old depinder chained it
- * behind, and only with a key. npm, gem, cargo and Go never had it.
+ * Libraries.io, the CLI's last resort: only for maven, pypi, nuget and composer, and only with
+ * a key.
  */
 
 /** Libraries.io's platform names for the ecosystems that may use it. */
@@ -35,7 +35,7 @@ export function librariesIoFallback(): LibrariesIoFallback {
     }
 }
 
-/** One project from https://libraries.io/api, spaced half a second apart as old depinder did. */
+/** One project from https://libraries.io/api, spaced half a second apart. */
 async function retrieveFromLibrariesIo(type: string, libraryName: string): Promise<LibraryInfo> {
     const platform = LIBRARIES_IO_PLATFORMS[type]
     await delay(500)

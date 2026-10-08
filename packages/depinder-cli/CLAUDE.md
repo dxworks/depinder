@@ -9,18 +9,12 @@ are in the root `CLAUDE.md`.
 
 ### What the code does today
 
-`scanFile()` (`packages/depinder-cli/src/plugins/sbom/local-scan.ts`) runs **both** scanners on **every**
-`*.cdx.json`, in parallel, regardless of which tool generated the file:
+Vulnerabilities come from the vulnerability server first. Local scanning is the fallback: it runs
+when no server is configured, with `--no-vuln-server`, or when the server fails. Then `scanFile()`
+(`src/plugins/sbom/local-scan.ts`) runs **both** selected scanners (`--vuln-source`) on **every**
+`*.cdx.json`, in parallel, regardless of which tool generated the file.
 
-```ts
-const [trivyJson, grypeJson] = await Promise.all([
-    runScanner('trivy', bin, ['sbom', '--format', 'json', sbomFile], sbomFile),
-    runScanner('grype', bin, [`sbom:${sbomFile}`, '-o', 'json'], sbomFile),
-])
-```
-
-So Syft-generated SBOMs are already being handed to Trivy, and Trivy-generated ones to
-Grype. **What is unverified is whether each tool actually reads the same set of
+So on that path Syft-generated SBOMs are handed to Trivy, and Trivy-generated ones to Grype. **What is unverified is whether each tool actually reads the same set of
 packages out of the other's output.**
 
 ### Why this is not obviously fine

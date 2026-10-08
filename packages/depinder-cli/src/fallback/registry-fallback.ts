@@ -9,7 +9,7 @@ import {packagesAtOnce, RegistryLimits} from './registry-limits'
 
 /**
  * How `analyse` looks up a package the resolver did not answer: core's fetch (the same road the
- * server takes), then Libraries.io where D8 allows it. A failed lookup throws, as the registrars did.
+ * server takes), then Libraries.io for the ecosystems that use it. A failed lookup throws.
  * Rate limits are core's to handle: its client waits out a 429 once, honouring `Retry-After`.
  */
 

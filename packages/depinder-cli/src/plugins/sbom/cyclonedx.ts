@@ -504,8 +504,8 @@ function reachableFrom(startRef: string, edges: Map<string, string[]>): Set<stri
  * Parses one CycloneDX file into DepinderProjects, keeping only components of `purlType`.
  *
  * One SBOM spans several ecosystems (on Zeppelin: maven, npm, gem, pypi), but a depinder Plugin
- * has exactly one registrar and one advisory ecosystem. So the SBOM is read once per ecosystem and
- * filtered, which lets each ecosystem reuse its existing registrar unchanged.
+ * has exactly one purl type and one advisory ecosystem. So the SBOM is read once per ecosystem and
+ * filtered.
  */
 export function parseCycloneDxFile(sbomFile: string, purlType: string): DepinderProject[] {
     const graph = readBomGraph(sbomFile)

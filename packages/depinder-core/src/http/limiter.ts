@@ -1,6 +1,6 @@
 /**
  * Per-ecosystem politeness: how many requests may be in flight at once and how far apart their
- * starts must be. The numbers always come from the caller (D18); this file has none of its own.
+ * starts must be. The numbers always come from the caller; this file has none of its own.
  */
 
 export interface LimitSpec {

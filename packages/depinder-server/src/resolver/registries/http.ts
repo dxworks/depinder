@@ -11,7 +11,7 @@ import {
 } from '@depinder/core'
 
 /**
- * The server's side of core's registry HTTP client: its own polite limits (D18), the order in
+ * The server's side of core's registry HTTP client: its own polite limits, the order in
  * which its limiters let waiting requests through, and the recording that becomes `fetch_log`.
  *
  * Order: when a limiter is full, the next request it lets through is the most important one

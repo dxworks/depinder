@@ -132,7 +132,7 @@ export const analyseCommand = createAnalyseCommand()
 
 
 function extractLicenses(dep: DepinderDependency) {
-    // Caches written before the npm registrar stopped emitting [undefined] hold [null]; skip it.
+    // Older cache entries can hold null licenses; skip them.
     return dep.libraryInfo?.licenses?.filter(it => it != null).map(it => {
         if (typeof it === 'string') return it.substring(0, 100); else return JSON.stringify(it)
     })
@@ -175,7 +175,7 @@ export function convertDepToRow(proj: DepinderProject, dep: DepinderDependency):
     ])
 }
 
-// FLOW 1b — one plugin's parse: its projects from every SBOM of the run, in file order.
+// Phase 1 — one plugin's parse: its projects from every SBOM of the run, in file order.
 async function parsePluginProjects(plugin: Plugin, sbomFiles: string[]): Promise<DepinderProject[]> {
     const projects: DepinderProject[] = []
     for (const sbomFile of sbomFiles) {
@@ -207,7 +207,7 @@ export function advisoriesMatchingVersion(lib: LibraryInfo, version: string): Vu
 /**
  * Two vulnerability shapes reach a dependency, and only one of them may be range-filtered:
  *  - a parser that scanned the artefact already matched this exact version -> take verbatim
- *  - otherwise, library-level advisories from the registrar -> narrow to this version
+ *  - otherwise, the library-level advisories on its LibraryInfo -> narrow to this version
  */
 export function resolveVulnerabilities(project: DepinderProject, dep: DepinderDependency, lib: LibraryInfo): Vulnerability[] {
     if (project.exactVersionVulnerabilities) return dep.vulnerabilities ?? []
@@ -215,10 +215,10 @@ export function resolveVulnerabilities(project: DepinderProject, dep: DepinderDe
 }
 
 /**
- * The license a library is grouped under. Library-level `licenses` is the field every registrar
- * fills (and the one libs.csv reports); the per-version list is optional and left empty by some —
- * the maven registrar sets `licenses: []` on every version — so grouping on it alone reported
- * everything as unknown. Fall back to the per-version list for registrars that only fill that.
+ * The license a library is grouped under. Library-level `licenses` is the field every registry
+ * fills (and the one libs.csv reports); the per-version list is optional and left empty by some
+ * (maven sets `licenses: []` on every version), so it is only the fallback, for registries that
+ * fill nothing else.
  * It is read the same way as the Black Duck licence columns, so both outputs agree.
  */
 export function licenseOf(lib: LibraryInfo): string {
@@ -300,8 +300,8 @@ export function confirmedAtMs(confirmedAt: string | null | undefined, now = Date
  * and every answer that was taken is kept here under its cache key, with the `updated_at` it was
  * written with, so a later source hands the very same object to its phase 3 — or, under a key the
  * earlier source did not write, the same answer written afresh (`answeredPurls`). A purl that was asked
- * and got no usable answer has nothing in here: its key is a cache hit if some registrar has since
- * filled it, and goes to the registrars otherwise.
+ * and got no usable answer has nothing in here: its key is a cache hit if the registry fallback has
+ * since filled it, and goes to the registry fallback otherwise.
  *
  * Reset per `analyseFiles`, next to `resetResolverClient`.
  */
@@ -352,9 +352,9 @@ export interface BulkResolveOutcome {
  * found it, so `sbom-java` reading a Trivy and a Syft SBOM of the same repository, or twenty projects sharing a
  * dependency, produce one entry and one question. What comes back `resolved` is written under
  * every cache key that purl belongs to — the key is per ecosystem, and two plugins can share one —
- * so `cacheHit` in phase 3 finds it and the registrar is never called. Everything else (`pending`,
- * `not_found`, `invalid`, or a resolver that never answered) is left alone and falls through to
- * the registrar chain and the miss cache exactly as before.
+ * so `cacheHit` in phase 3 finds it and the registry fallback is never called. Everything else
+ * (`pending`, `not_found`, `invalid`, or a resolver that never answered) is left alone and falls
+ * through to the registry fallback and the miss cache.
  *
  * Answers arrive as a stream, and each one is written as it arrives rather than after the last:
  * the phase returns once the stream has ended and every advisory lookup it started has finished.
@@ -363,7 +363,7 @@ export interface BulkResolveOutcome {
  *
  * `vulnerabilitiesReady`, when given, settles once every project's findings are attached — the
  * vulnerability server's, or the local scan's it fell back to. Until then a project without
- * `exactVersionVulnerabilities` is undecided rather than a reader of advisories: see FLOW 2g.
+ * `exactVersionVulnerabilities` is undecided rather than a reader of advisories: see phase 2g.
  */
 export async function bulkResolve(
     config: ResolverConfig,
@@ -372,7 +372,7 @@ export async function bulkResolve(
     options: {refresh?: boolean, vulnerabilitiesReady?: Promise<unknown>} = {},
     resolve: typeof resolvePurls = resolvePurls
 ): Promise<BulkResolveOutcome> {
-    // FLOW 2a — every purl in the run, deduped, with the (plugin, dep) pairs that own it.
+    // Phase 2a — every purl in the run, deduped, with the (plugin, dep) pairs that own it.
     const byPurl = new Map<string, {plugin: Plugin, dep: DepinderDependency}[]>()
     // The cache keys whose advisories phase 3 will actually read: those with at least one dependency
     // in a project no SBOM scan answered for (`exactVersionVulnerabilities` unset, see
@@ -380,7 +380,7 @@ export async function bulkResolve(
     // never looks at `lib.vulnerabilities`, so a GitHub call for it would be paid and thrown away.
     // The flag is set while parsing, in phase 1, so it is already known here — unless the findings
     // come from the vulnerability server, whose answer may still be on its way: then a project
-    // without the flag is only undecided (`advisoriesUndecided`, settled in FLOW 2g).
+    // without the flag is only undecided (`advisoriesUndecided`, settled in phase 2g).
     const advisoriesRead = new Set<string>()
     const advisoriesUndecided = new Map<string, DepinderProject[]>()
     for (const {plugin, projects} of pluginProjects) {
@@ -406,7 +406,7 @@ export async function bulkResolve(
         }
     }
 
-    // FLOW 2b — drop the purls this process already asked about, and those the local cache already
+    // Phase 2b — drop the purls this process already asked about, and those the local cache already
     // covers; what is left is the ask list.
     const written = new Set<string>()
     const libs = new Map<string, LibraryInfo>()
@@ -418,7 +418,7 @@ export async function bulkResolve(
         if (askedThisProcess.has(purl)) {
             // An earlier source asked, and the server's answer — or its silence — stands for the
             // process. What it answered is handed on under every key this source owns it by, once
-            // the write machinery below exists (FLOW 2f).
+            // the write machinery below exists (phase 2f).
             count('resolver:already-asked')
             alreadyAsked++
             reusedPurls.push(purl)
@@ -451,12 +451,11 @@ export async function bulkResolve(
     // Marked before the ask, not after it: whatever the server makes of them, they are not asked again.
     for (const purl of wanted) askedThisProcess.add(purl)
 
-    // FLOW 2c — THE SERVER CALL: resolver/client.ts POSTs these purls to <resolver-url>/resolve, in
+    // Phase 2c — the server call: resolver/client.ts POSTs these purls to <resolver-url>/resolve, in
     // chunks, all at once, and reads each answer as a stream. Every usable answer is taken and
-    // written to the cache the moment its line arrives (FLOW 2d), while the server is still fetching
+    // written to the cache the moment its line arrives (phase 2d), while the server is still fetching
     // the packages it did not know; the advisory lookups that are worth making follow behind it
-    // (FLOW 2e). Waiting for the last chunk first used to put all of that work after the slowest
-    // package of the run.
+    // (phase 2e), so none of that work waits for the slowest package of the run.
     let resolved = 0
     const taken = new Set<string>()
     type Lookup = {cacheKey: string, advisoryEcosystem: string, lib: LibraryInfo, updatedAt: number}
@@ -466,7 +465,7 @@ export async function bulkResolve(
     const workers = new Set<Promise<void>>()
     let writeFailure: {error: unknown} | undefined
 
-    // FLOW 2d — each usable answer → one cache write per (ecosystem, library) key it belongs to,
+    // Phase 2d — each usable answer → one cache write per (ecosystem, library) key it belongs to,
     // there and then. `take` runs inside the client's line handler, so the row is written — one
     // autocommit statement in SQLite — before the next line is even parsed: a run killed halfway
     // through the stream keeps every answer that had arrived. For the same reason it must not
@@ -480,7 +479,7 @@ export async function bulkResolve(
         // A `refreshing` package is one the server could not refetch before the deadline, and it
         // carries facts older than this run's cutoff. They are better than nothing — unless the run
         // said `--refresh`, which is exactly a request for nothing older than the run, and the
-        // registrar chain gets it.
+        // registry fallback gets it.
         const usable = answer.status === 'resolved' || (answer.status === 'refreshing' && !options.refresh)
         if (!usable || !answer.package) return
         resolved++
@@ -545,14 +544,14 @@ export async function bulkResolve(
         }
     }
 
-    // FLOW 2e — GHSA advisories, per key, and a second write with them filled in: the server returns
-    // registry facts only. The registrar path does the same lookup, on the same terms, because a
-    // resolved package is a cache hit in phase 3 and a cache hit has never fetched advisories:
-    // without it a cold run with GH_TOKEN would empty the vulnerability columns of every project no
-    // scanner covered. It is one GraphQL call per cache key, eight at a time, and only for a key
-    // phase 3 will read advisories from (`advisoriesRead`). A failed lookup keeps the row already
-    // written. The cost of writing first: a run killed between the two writes leaves a row with no
-    // advisories, which only matters when no scanner ran.
+    // Phase 2e — GHSA advisories, per key, and a second write with them filled in: the server
+    // returns registry facts only. The registry fallback path does the same lookup, on the same
+    // terms, because a resolved package is a cache hit in phase 3 and a cache hit has never fetched
+    // advisories: without it a cold run with GH_TOKEN would empty the vulnerability columns of
+    // every project no scanner covered. It is one GraphQL call per cache key, eight at a time, and
+    // only for a key phase 3 will read advisories from (`advisoriesRead`). A failed lookup keeps
+    // the row already written. The cost of writing first: a run killed between the two writes
+    // leaves a row with no advisories, which only matters when no scanner ran.
     async function drain(): Promise<void> {
         while (nextLookup < lookups.length) {
             const {cacheKey, advisoryEcosystem, lib, updatedAt} = lookups[nextLookup++]
@@ -568,7 +567,7 @@ export async function bulkResolve(
         }
     }
 
-    // FLOW 2f — the purls an earlier source already asked about: never sent again. Under a key the
+    // Phase 2f — the purls an earlier source already asked about: never sent again. Under a key the
     // earlier source wrote, its very object is handed on; under a key it did not (the same purl,
     // named differently by this source's parser), the earlier answer is written now, with the
     // `updated_at` the server gave it. Advisories follow the same rule as a fresh answer.
@@ -599,7 +598,7 @@ export async function bulkResolve(
     // not read a key while its advisories are still being added.
     while (workers.size > 0) await Promise.all(workers)
 
-    // FLOW 2g — the lookups held back for projects whose findings were not attached yet. Today's
+    // Phase 2g — the lookups held back for projects whose findings were not attached yet. The
     // rule, applied once the flags are final: a server answer, or a local scan that produced a
     // report, sets the flag and the lookup is never made; a fallback that found no scanner leaves
     // it unset, and the lookup is made exactly as it would have been without a server. Waiting
@@ -703,11 +702,10 @@ async function prepareSbomScans(runs: PlannedRun[], options: AnalyseOptions, vul
         vulnerabilities = startServerVulnerabilities(vulnServer, targets, {githubReady, prescanFiles, hasGithubToken})
     }
 
-    // Scanner preflight, before any parsing: the SBOM parsers shell out to Trivy and Grype, and a
-    // missing binary used to surface only as a mid-run warning per file — leaving the user with a
-    // completed run, empty vulnerability columns and nothing that said so. Run once, say it up
-    // front, and never abort: a run without scanners is degraded, not invalid. With a vulnerability
-    // server it runs only if the server fails.
+    // Scanner preflight, before any parsing: the SBOM parsers shell out to Trivy and Grype, so a
+    // missing binary is reported once, up front, rather than only as empty vulnerability columns.
+    // Never aborts: a run without scanners is degraded, not invalid. With a vulnerability server it
+    // runs only if the server fails.
     const runsLocalScanners = !vulnerabilities && (sources.trivy || sources.grype)
     const preflight = runsLocalScanners ? await localScannerPreflight(hasGithubToken) : undefined
 
@@ -852,10 +850,9 @@ export async function runAnalysis(
     }
     const progress = new MultiBar({}, Presets.shades_grey)
 
-    // FLOW 1 — parse (see parsePluginProjects above): SBOMs → DepinderProject[] per plugin. Nothing leaves the machine yet.
-    // Phase 1 — parse. Still one pass per plugin, side by side as before; what changed is that
-    // every plugin finishes parsing before any enrichment starts, because a bulk question is only
-    // worth asking once it can cover the whole run.
+    // Phase 1 — parse: SBOMs → DepinderProject[] per plugin, side by side. Nothing leaves the machine
+    // yet. Every plugin finishes parsing before any enrichment starts, because a bulk question is
+    // only worth asking once it can cover the whole run.
     const pluginProjects: PluginProjects[] = await Promise.all(
         plugins.map(async (plugin): Promise<PluginProjects> => {
             log.info(`Plugin ${plugin.name} starting`)
@@ -864,16 +861,14 @@ export async function runAnalysis(
             return {plugin, projects}
         }))
 
-    // FLOW 1b — assignPurls (see above): name every dep the way the server expects. Still no network.
     // Phase 1b — the purl for every dependency: the SBOM's own, else one spelled from its name.
     const named = assignPurls(pluginProjects)
 
-    // FLOW 2 — bulkResolve (see above): the main flow is local cache → our server → registries. What
-    // the cache cannot answer is asked of the server ONCE per purl per process, every chunk at once
-    // and bounded by the deadline, with no retries; whatever has no usable answer by then goes to the
-    // registrars in phase 3. It only fills the cache (and hands phase 3 what it took).
-    // Phase 2 — the bulk resolver, when one is configured. It fills the local cache; it never
-    // touches the dependencies, so nothing below can tell where an entry came from.
+    // Phase 2 — the bulk resolver, when one is configured: local cache → our server → registries.
+    // What the cache cannot answer is asked of the server once per purl per process, bounded by the
+    // deadline; whatever has no usable answer by then goes to the registry fallback in phase 3. It
+    // only fills the cache (and hands phase 3 what it took), so nothing below can tell where an
+    // entry came from.
     const bulk: BulkResolveOutcome = resolver
         ? await timePhase('resolve:bulk', async () => {
             log.info(`Asking the resolver about up to ${named} dependency purls`)
@@ -882,15 +877,15 @@ export async function runAnalysis(
         : {written: new Set<string>(), libs: new Map<string, LibraryInfo>(), requested: 0, resolved: 0}
     const bulkWritten = bulk.written
 
-    // FLOW 2h — the vulnerability server's answer, asked at the start of the run: phase 3 is the
+    // Phase 2h — the vulnerability server's answer, asked at the start of the run: phase 3 is the
     // first to read a finding or `exactVersionVulnerabilities`, so this is as late as the wait can
     // go. Usually long settled by now; if the server failed, this is where the local scan it fell
     // back to is waited for.
     if (vulnerabilities) await timePhase('vuln:server-wait', () => vulnerabilities)
 
-    // FLOW 3 — enrich: per dep, cache → miss cache → registry fallback. Whatever phase 2 wrote is a plain cache hit here.
-    // Phase 3 — enrichment. The plugins run side by side, each registry behind its ecosystem's
-    // limits (`registries`), so a registry that stalls no longer holds the others up. Whatever phase 2 cached is a cache hit here, and never reaches a registry.
+    // Phase 3 — enrichment: per dep, cache → miss cache → registry fallback. The plugins run side by
+    // side, each registry behind its ecosystem's limits, so a registry that stalls does not hold the
+    // others up. Whatever phase 2 cached is a plain cache hit here and never reaches a registry.
     const results = await Promise.all(pluginProjects.map(async ({plugin, projects}): Promise<AnalysisResult> => {
         // A library the resolver just refreshed counts as refreshed: without this, `--refresh`
         // would discard the answer that was fetched seconds ago and go back to the registry.
@@ -996,7 +991,7 @@ export async function runAnalysis(
         enrich.end()
         projectsBar.stop()
 
-        // ══ STOP HERE: everything below is CSV/report writing, untouched by this PR ══
+        // Everything below writes the CSV reports.
         const csv = startPhase(`csv:${plugin.name}`)
 
         const allLibsInfo = projects.flatMap(proj => Object.values(proj.dependencies).map(dep => dep.libraryInfo))
@@ -1026,7 +1021,7 @@ export async function runAnalysis(
                 const directDep: boolean = !dep.requestedBy || dep.requestedBy.some(it => it.startsWith(`${proj.name}@${proj.version}`))
 
                 // A missing date is NaN here, which no threshold below counts as outdated or out
-                // of support — the same answer the old `moment(undefined)` gave by measuring from now.
+                // of support.
                 return {
                     ...dep,
                     direct: directDep,

@@ -13,7 +13,7 @@ import {reportNow} from '../utils/report-clock'
  * zero newer versions carry Open Hub data, while 1,577 of the 1,586 that are OK carry none. Open
  * Hub is Black Duck's own; we have no equivalent and cannot reproduce that branch.
  *
- * When it has no telemetry it falls back to two fields every registrar gives us: how many newer
+ * When it has no telemetry it falls back to two fields every registry gives us: how many newer
  * versions exist, and how old the resolved version is. THAT is what this reproduces.
  *
  * The rule was read off a cross-tab of `Newer Versions` x age (as of 2026-09-10, the export's date)
@@ -54,7 +54,7 @@ const MEDIUM_BELOW_YEARS = 4
  * this -- an empty cell is not `OK`.
  *
  * @param releaseDate `YYYY-MM-DD`, the release date of the resolved version
- * @param newerVersions how many newer versions the registrar knows about, as written to the CSV
+ * @param newerVersions how many newer versions the registry lists, as written to the CSV
  * @param asOf the date the report is written for; defaults to `reportNow()`
  */
 export function operationalRisk(releaseDate: string, newerVersions: string, asOf: Date = reportNow()): OperationalRisk | '' {

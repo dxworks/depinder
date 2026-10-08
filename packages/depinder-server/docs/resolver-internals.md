@@ -18,7 +18,7 @@ src/
     db/db.ts                 pg pool, migration runner, transactions
     db/queue.ts  db/rows.ts  fetch_queue priorities; row shapes
     db/fetch-log.ts          every upstream request, for provenance, kept FETCH_LOG_RETENTION_DAYS
-    api/                     fastify server, /resolve, /feeds, /health
+    api/                     fastify server, /resolve, /feeds, /queue, /health
     registries/<type>-feed.ts  one change feed per ecosystem (maven-poll.ts, cargo-poll.ts poll
                              instead); fetching a package is @depinder/core's fetchPackage, latest rule included
     registries/http.ts       the server's limits, limiter order and fetch recording around core's client
@@ -57,8 +57,8 @@ statement costs a network hop whether it carries one row or five thousand. A res
 five statements: `begin`, the package upsert — which takes the `fetch_queue` row with it, in the
 same statement — one statement for every version it has, the `fetch_log` insert, `commit`. The
 versions travel as arrays through `unnest` and are upserted, with a `delete` of everything the
-registry no longer lists riding along as a CTE, so replacing 137 versions costs one round trip
-rather than the delete plus one insert per 200 rows it used to. The registry stays the whole truth
+registry no longer lists riding along as a CTE, so replacing 137 versions costs one round trip.
+The registry stays the whole truth
 about a package — a version that disappears upstream disappears here — and the package never
 sits versionless mid-transaction. Version lists past 5 000 rows take one more statement per chunk;
 the stale delete goes on the first of them and is told the whole list.

@@ -92,7 +92,7 @@ export function packageFromPackument(doc: Packument): FetchedPackage {
 }
 
 /**
- * The npm Component Link, as the CLI tuned it against Black Duck (D9): the top-level `homepage`,
+ * The npm Component Link, as the CLI tuned it to match Black Duck: the top-level `homepage`,
  * else the newest version that declares a `homepage` or a `repository`, homepage first. The
  * repository is kept as declared (`git+https://….git` included), as the CLI wrote it.
  */

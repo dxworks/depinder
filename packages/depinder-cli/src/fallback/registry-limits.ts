@@ -1,21 +1,21 @@
 import {isSupportedType, SUPPORTED_TYPES, type EcosystemLimits, type LimitSpec} from '@depinder/core'
 
 /**
- * The CLI's registry limits (D18): requests in flight at once, and the gap between their starts,
- * per purl type. Defaults are at least as fast as the registrars they replace; users override
- * them per ecosystem. Only the speed depends on these numbers, never the facts.
+ * The CLI's registry limits: requests in flight at once, and the gap between their starts, per
+ * purl type. Each caller of core sets its own; users override them per ecosystem. Only the speed
+ * depends on these numbers, never the facts.
  */
 
 export const REGISTRY_LIMITS_ENV = 'DEPINDER_REGISTRY_LIMITS'
 
-/** Dependencies one plugin looks up at once, as the registrars did before core. */
+/** Dependencies one plugin looks up at once. */
 export const DEFAULT_PACKAGES_AT_ONCE = 8
 
 const DEFAULT_LIMIT: LimitSpec = {concurrency: 8, minIntervalMs: 0}
 
 /**
- * Where one package costs several requests at once: the old Go registrar asked for 8 version
- * dates per module and the old NuGet one fetched every catalogue page together, 8 packages each.
+ * Where one package costs several requests at once: Go asks for one `.info` per version date and
+ * NuGet fetches its registration pages and catalog leaves together.
  */
 const DEFAULT_LIMITS_BY_TYPE: Readonly<Record<string, LimitSpec>> = {
     golang: {concurrency: 64, minIntervalMs: 0},

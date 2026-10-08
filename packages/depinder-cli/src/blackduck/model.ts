@@ -38,18 +38,17 @@ export interface ExportComponent {
     origin: Origin
     originId: string
     matchType: MatchType
-    /** SPDX ids as the registrar reported them; `licenses.ts` turns them into BD's two columns. */
+    /** SPDX ids as the registry reported them; `licenses.ts` turns them into BD's two columns. */
     licenses: string[]
     /** ISO `YYYY-MM-DD`, from the registry's timestamp for this exact version. */
     releaseDate: string
-    /** Registry versions ordered above this one. Empty when no registrar answered. */
     /** Versions released after this one -- Black Duck's count, see `newerVersionCounts`. */
     newerVersions: string
     /** Versions numbered above this one -- the upgrade count, written beside Black Duck's. */
     newerVersionsSemver: string
     homepageUrl?: string
     vulnerabilities: Vulnerability[]
-    /** Every version the registrar knows, ordered — the input to upgrade guidance. */
+    /** Every version the registry lists, ordered — the input to upgrade guidance. */
     registryVersions: string[]
     /** The `registryVersions` that are pre-releases, by the rule the resolver ships. */
     prereleaseVersions: ReadonlySet<string>
@@ -193,7 +192,7 @@ function toComponent(origin: Origin, purlType: string, id: string, dependency: D
     // relicensed mid-life carries both: `@cdxgen/cdxgen-plugins-bin` is Apache-2.0 up to 2.1.x and
     // MIT from 3.x, and the library-level field reports only the current one. Taking it would
     // relicense every older version in the report. The library-level list stays as the fallback,
-    // because some registrars fill only that one.
+    // because some registries fill only that one.
     const libraryLicenses = (library?.licenses ?? []).filter((it): it is string => typeof it === 'string' && !!it)
     const versionLicenses = ([] as (string | string[] | undefined)[])
         .concat(current?.licenses)

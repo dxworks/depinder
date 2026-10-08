@@ -70,7 +70,7 @@ export async function enqueue(
  * same for every writer, and so the thing that keeps two of them from deadlocking each other.
  *
  * The deduplication is not optional either — `on conflict do update` refuses to touch the same row
- * twice in one statement — which is what `select distinct` used to be there for.
+ * twice in one statement.
  */
 export function sortedUnique(keys: readonly string[]): string[] {
     return [...new Set(keys)].sort()

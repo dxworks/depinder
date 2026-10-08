@@ -1,6 +1,6 @@
 # depinder — working agreements
 
-The depinder Nx monorepo (npm workspaces, Node 24). The plan it follows: `../NX_MIGRATION.md`.
+The depinder Nx monorepo (npm workspaces, Node 24).
 Project notes: [packages/depinder-cli/CLAUDE.md](packages/depinder-cli/CLAUDE.md) (CLI, incl. open
 items) and [packages/depinder-server/CLAUDE.md](packages/depinder-server/CLAUDE.md) (server
 layout, its import rule, its commands).
@@ -10,13 +10,17 @@ layout, its import rule, its commands).
 ```
 packages/depinder-cli/      app, scope:client  -> npm @dxworks/depinder (esbuild bundle, CommonJS)
 packages/depinder-server/   app, scope:server  -> Docker image + deploy kit (ESM)
+packages/depinder-core/     lib, scope:shared  -> @depinder/core: registry fetchers, HTTP client,
+                                                  purls, wire shapes; bundled into the CLI
+packages/parity/            scope:test: every recorded registry case through the server and the
+                            CLI fallback, which must give the same LibraryInfo
 bench/                      depinder-bench, scope:bench: end-to-end bench (CLI runs, HTTP, SQL)
 tools/workspace-checks/     size guard, single-version dependency check, function-size lint config
 ```
 
-- The CLI and the server never import each other. `bench/` never imports `packages/`: it runs the
-  CLI as a program and talks to the server over HTTP and to its Postgres with plain SQL.
-- Coming (plan phases 3+): `packages/depinder-core` (scope:shared) and `packages/parity`.
+- Core imports only core. The CLI and the server import core, never each other; only parity
+  imports all three. `bench/` never imports `packages/`: it runs the CLI as a program and talks to
+  the server over HTTP and to its Postgres with plain SQL.
 - One version of every dependency in the workspace (`workspace-checks:dependency-check`); one test
   runner, vitest, everywhere.
 
@@ -34,13 +38,14 @@ comments short and summarising, never restating the code.
 npm ci
 npm run check                               # typecheck, lint, test, build, size guard, dependency check
 npx nx test-integration depinder-server     # + Postgres tests on the depinder-pg container
+TEST_DATABASE_URL=... npx nx test-parity parity   # parity on depinder-pg (see below)
 npx nx docker-build depinder-server         # the server image; build context is this root
 npm run bench -- --target dev --label <name> [--now <ISO>] [--keep-caches]
 npm run bench:compare -- <runA> <runB> [--pair cellA:cellB]
 npm run bench:reset -- --target dev
 ```
 
-Every phase/commit ends green: typecheck, unit tests, integration tests, builds. The local dev
+Every commit ends green: typecheck, unit tests, integration tests, builds. The local dev
 stack (resolver, vuln, caddy) runs from `packages/depinder-server` with `docker compose up -d`.
 
 ## Integration test database

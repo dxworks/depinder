@@ -117,7 +117,7 @@ export function pathSegment(origin: Origin, name: string, version: string): stri
  * `Contributors in Past 12 Months` — all project facts, none of them version facts. The version is
  * deliberately not a parameter here.
  *
- * What the registrar read off the registry is the only input. Where the registry declares no
+ * What the registry declares is the only input. Where the registry declares no
  * project URL, Black Duck writes nothing rather than falling back to the package's page — of 150
  * sampled npm components, every one of the 147 with a `homepage` had a Black Duck link and none of
  * them was empty — so a registry page is not a safe fallback: it is a different answer to a

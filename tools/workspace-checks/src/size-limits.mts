@@ -1,4 +1,4 @@
-// File-size rules for new and moved code (NX_MIGRATION.md D10). Files that were already too long
+// File-size rules for new and moved code. Files that were already too long
 // when the guard arrived are in size-baseline.json and may shrink but never grow.
 
 export const LIMITS = {

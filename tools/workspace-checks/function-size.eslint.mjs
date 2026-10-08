@@ -1,4 +1,4 @@
-// The function-size rule (~100 lines, NX_MIGRATION.md D10) as a flat config, for projects whose
+// The function-size rule (~100 lines) as a flat config, for projects whose
 // lint is only this rule. Files listed in size-baseline.json under longFunctions only warn.
 import tseslint from 'typescript-eslint'
 import {readFileSync} from 'node:fs'

@@ -50,12 +50,8 @@ export const CHUNK_SIZE = 2000
  *
  * This is a last resort, not a budget. The server enforces the deadline itself — at `deadline_ms`
  * it sends whatever is still open and the trailer — so the slack only has to cover the last flush
- * and the trip back. It used to be 60 s, when the server held every answer until the end and then
- * built one multi-megabyte body: a server restarted a moment earlier could take that long, and an
- * abort there cost more than the wait (the server built payloads nobody was reading, the retries
- * queued behind them and came back 500, and one 500 sends the whole run to the registries). With
- * the stream, lines are flushed as packages are read, so nothing large is left for the end. Thirty
- * seconds still covers a slow link, and `maxWaitMs` still ends the phase on time. An abort is a
+ * and the trip back: lines are flushed as packages are read, so nothing large is left for the end.
+ * Thirty seconds covers a slow link, and `maxWaitMs` still ends the phase on time. An abort is a
  * failed post like any other: what arrived before it is kept, and nothing is asked again.
  */
 const REQUEST_TIMEOUT_SLACK_MS = 30_000

@@ -50,13 +50,7 @@ export const DEFAULT_RESOLVER_MAX_WAIT_MS = 60_000
  * chunk before it — and then go out with whatever was left of that deadline, often nothing: its
  * cold packages were never urgent on the server, and came back `pending` for the registries to
  * fetch one by one. Posted together, every chunk gets the whole budget.
- *
- * The old reason for three no longer holds. It was the server's api pool (`API_POOL_SIZE`, four):
- * a chunk's answer used to be one aggregate held on a connection for the length of its wait, and
- * the fourth connection was kept for the retry a failed chunk was allowed. The answer is a stream
- * now, and a stream holds a client for one query at a time, never for the length of its deadline;
- * and the client no longer retries. `DEPINDER_RESOLVER_CONCURRENCY` still caps it, for a server
- * that turns out to need it.
+ * `DEPINDER_RESOLVER_CONCURRENCY` caps it, for a server that turns out to need it.
  */
 export const RESOLVER_CHUNK_CONCURRENCY = Infinity
 

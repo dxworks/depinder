@@ -16,7 +16,7 @@ import {RESOLVER_CHUNK_CONCURRENCY, ResolverConfig} from '../src/resolver/config
  * trailer last. What is worth pinning is not that it can parse a line — it is that every way the
  * stream can arrive or fail to arrive ends with the run continuing: a line split across two reads
  * is still one line, a stream cut short keeps what it delivered and leaves the rest to the
- * registrars, and any failed post — a 401, a 500, a network error, a timeout — is asked exactly
+ * registry fallback, and any failed post — a 401, a 500, a network error, a timeout — is asked exactly
  * once, turns the client off for the run, and fails nothing else.
  *
  * Every chunk is posted at once, so the second thing worth pinning is that this did not cost any of
@@ -372,7 +372,7 @@ describe('the resolver client', () => {
         expect(calls).toHaveLength(1)
         expect([...answers.keys()].sort()).toEqual(['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'])
         expect(seen.sort()).toEqual(['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'])
-        // c is the caller's to send to the registrars; the server is not asked about it again.
+        // c is the caller's to send to the registry fallback; the server is not asked about it again.
         expect(resolverUnavailable()).toBe(true)
         expect(warnings('Resolver unavailable (socket hang up after 2 package(s))')).toHaveLength(1)
         expect(quiet.info).toHaveBeenCalledWith(expect.stringMatching(/1 unanswered$/))
@@ -388,7 +388,7 @@ describe('the resolver client', () => {
         expect(resolverUnavailable()).toBe(true)
     })
 
-    it('leaves a purl a complete stream left out to the registrars, without asking again', async () => {
+    it('leaves a purl a complete stream left out to the registry fallback, without asking again', async () => {
         const calls = serve(() => ({parts: [ndjson([...items(['pkg:npm/a@1.0.0']), trailer])]}))
 
         const answers = await resolvePurls(config, ['pkg:npm/a@1.0.0', 'pkg:npm/b@1.0.0'], quiet)
@@ -549,7 +549,7 @@ describe('the resolver client', () => {
 
     it('keeps the answers of the other chunks when one of them turned the resolver off', async () => {
         // A 4xx is final for the run, but the chunks beside it have already been paid for: throwing
-        // their answers away would send those libraries to the registrars for nothing.
+        // their answers away would send those libraries to the registry fallback for nothing.
         const server = gatedServe((call, index) => index === 1 ? {status: 400} : answerAll(call.purls))
         const answers = resolvePurls(config, manyPurls(6), quiet)
 

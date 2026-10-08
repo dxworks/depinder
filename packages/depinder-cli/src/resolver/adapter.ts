@@ -2,18 +2,15 @@ import {LibraryInfo} from '../extension-points/library-info'
 import {type PackageRecord, registryName, VERSION_FLAG_PRERELEASE, VERSION_FLAG_YANKED} from '@depinder/core'
 
 /**
- * A resolver `PackageRecord` in the shape the rest of depinder already speaks, `LibraryInfo`.
+ * A `PackageRecord` in the shape the rest of depinder speaks, `LibraryInfo`.
  *
- * The cache, the CSV writers and `update` all read `LibraryInfo`, so a record that goes through
- * here is indistinguishable downstream from one a registrar produced — which is what lets phase 3
- * of `analyse` stay exactly as it was.
+ * The cache, the CSV writers and `update` all read `LibraryInfo`. The resolver's answers and the
+ * registry fallback's both come through here, so downstream cannot tell which source filled one.
  */
 
 /**
- * Epoch milliseconds, `NaN` when the registry has no date for a version — the same thing the Go
- * and Rust registrars produce (`Date.parse(...Time ?? '')`), so the CSV columns treat a dateless
- * version identically whichever source filled it. The wire carries epoch seconds, so the only
- * difference from the old ISO-string shape is that a timestamp is now second-precise.
+ * Epoch milliseconds, `NaN` when the registry has no date for a version. The wire carries epoch
+ * seconds, so a timestamp is second-precise.
  */
 function timestampOf(releasedAt: number | null): number {
     return releasedAt === null ? NaN : releasedAt * 1000
@@ -21,11 +18,11 @@ function timestampOf(releasedAt: number | null): number {
 
 /**
  * `homepageUrl` is what the Black Duck export writes as `Component Link`, so it carries the URL
- * each registrar put there before the resolver existed, chosen from the two the server sends.
+ * depinder has always written there, chosen from the two the server sends.
  * Composer and cargo prefer the repository: Black Duck holds the source repository for them
  * (packagist `source.url` matched 40% against 4% for `homepage`; a crate's `homepage` is usually
  * its docs site). Every other ecosystem prefers the declared homepage and falls back to the
- * repository, as the npm registrar does with `homepage` and `repository`.
+ * repository, as core's npm rule does with `homepage` and `repository`.
  */
 export function componentLinkOf(pkg: Pick<PackageRecord, 'type' | 'homepage_url' | 'repo_url'>): string {
     const homepage = pkg.homepage_url?.trim() || ''

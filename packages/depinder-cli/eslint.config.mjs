@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs'
 import {moduleBoundariesConfig} from '../../tools/workspace-checks/module-boundaries.eslint.mjs'
 import {registryFetchGuardConfig} from './registry-fetch-guard.eslint.mjs'
 
-// Functions stay under 100 lines (NX_MIGRATION.md D10); files that already had longer ones only warn.
+// Functions stay under 100 lines; files that already had longer ones only warn.
 const sizeBaseline = JSON.parse(readFileSync(new URL('../../tools/workspace-checks/size-baseline.json', import.meta.url), 'utf8'))
 const projectPrefix = 'packages/depinder-cli/'
 const filesWithLongFunctions = sizeBaseline.longFunctions

@@ -92,15 +92,15 @@ export function createDb(
         ssl: config.databaseSsl ? {rejectUnauthorized: false} : false,
         // How much of the worker can be writing at once. The database is hosted, so every statement
         // costs a round trip and a package that waits here for a client is a fetch slot standing
-        // still: see DATABASE_POOL_SIZE in .env.example for how this is sized against
+        // still: see DATABASE_POOL_SIZE in docs/configuration.md for how this is sized against
         // FETCH_CONCURRENCY.
         max: poolSize,
         idleTimeoutMillis: 30_000,
         // Waiting for a client is bounded, and the bound is a rejection: pg drops a waiter that has
         // sat in the pending queue this long with `timeout exceeded when trying to connect`, which
         // reaches a route as a plain Error and so as an HTTP 500, or, once a stream is open, as a
-        // stream without its trailer. That is the whole reason the api no longer queues behind the
-        // worker for one, and why its own bound is the longest deadline rather than ten seconds.
+        // stream without its trailer. That is why the api has a pool of its own, and why its bound
+        // is the longest deadline rather than ten seconds.
         connectionTimeoutMillis: connectTimeoutMs,
     })
 

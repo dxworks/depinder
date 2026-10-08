@@ -1,6 +1,6 @@
-// The import rules between projects (NX_MIGRATION.md section 3), enforced by Nx from the project
-// tags: core imports only core; the CLI and the server import core, never each other; only the
-// parity tests import all three; the bench and the tooling import no project.
+// The import rules between projects, enforced by Nx from the project tags: core imports only core;
+// the CLI and the server import core, never each other; only the parity tests import all three;
+// the bench and the tooling import no project.
 import nx from '@nx/eslint-plugin'
 import tseslint from 'typescript-eslint'
 

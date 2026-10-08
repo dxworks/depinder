@@ -2,7 +2,7 @@
   "name": "depinder-workspace",
   "version": "0.0.0",
   "private": true,
-  "description": "The depinder monorepo: the depinder CLI, the resolver server and, later, the shared core",
+  "description": "The depinder monorepo: the depinder CLI, the resolver and vulnerability server, and their shared core",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=24.0.0"

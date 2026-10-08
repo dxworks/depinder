@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest'
 import {npmProjectLink, packageFromPackument} from '../../src/registries/npm.js'
 import {fixtureJson} from './registry.helpers.js'
 
-// The npm Component Link rule copied from the CLI (D9).
+// The npm Component Link rule, tuned to match Black Duck.
 
 const time = {
     '1.0.0': '2020-01-01T00:00:00.000Z',

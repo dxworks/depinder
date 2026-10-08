@@ -34,7 +34,7 @@ describe('parseRegistryLimits', () => {
 })
 
 describe('resolveRegistryLimits', () => {
-    it('is at least as fast as the old registrars by default', () => {
+    it('allows 8 requests at once, unpaced, by default', () => {
         const {limits, overrides} = resolveRegistryLimits({})
         for (const type of ['npm', 'maven', 'pypi', 'gem', 'cargo', 'composer']) {
             expect(limitFor(limits, type)).toEqual({concurrency: 8, minIntervalMs: 0})
@@ -58,7 +58,7 @@ describe('resolveRegistryLimits', () => {
 })
 
 describe('packagesAtOnce', () => {
-    it('looks up the old 8 at once unless the user raised the limit', () => {
+    it('looks up 8 at once unless the user raised the limit', () => {
         const limits = resolveRegistryLimits({flag: 'npm=20,cargo=1'})
         expect(packagesAtOnce(limits, 'npm')).toBe(20)
         expect(packagesAtOnce(limits, 'cargo')).toBe(DEFAULT_PACKAGES_AT_ONCE)

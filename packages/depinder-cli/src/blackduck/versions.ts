@@ -18,7 +18,7 @@ type RegistryVersion = LibraryInfo['versions'][number]
  * it can be compared cell for cell, and `bySemver` beside it, which is the count a person wanting
  * to upgrade actually asks for.
  *
- * Empty, not `0`, when the registrar had no answer -- "we do not know" and "you are current" are
+ * Empty, not `0`, when the registry had no answer -- "we do not know" and "you are current" are
  * different statements, and Black Duck's column distinguishes them too. `byDate` is also empty when
  * the resolved version is not in the registry's list or carries no release date, because a count
  * against an unknown date would be a guess.

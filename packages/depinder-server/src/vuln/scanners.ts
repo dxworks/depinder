@@ -126,9 +126,9 @@ export function runScanner(
 /**
  * Why a scanner call failed, in one line, with the scanner's own last word kept.
  *
- * Ported from depinder's `local-scan.ts`. The head alone (`exit 1`) names the failure and never
- * the reason — an expired database the scanner could not re-download reads exactly like a corrupt
- * SBOM. The last stderr line that mentions a failure is the one the scanner meant as its verdict.
+ * The same rule as the CLI's `scannerFailureReason` (`plugins/sbom/local-scan.ts`). The head alone
+ * (`exit 1`) names the failure and never the reason — an expired database the scanner could not
+ * re-download reads exactly like a corrupt SBOM. The last stderr line that mentions a failure is the one the scanner meant as its verdict.
  * Grype colours its log lines; the escapes are dropped so the reason reads as text.
  */
 function scannerFailureReason(e: {message?: string, stderr?: string}): string {

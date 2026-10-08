@@ -43,16 +43,16 @@ command wrote it:
 | `Version id` | — | empty |
 | `Component Version Origin Id` | purl | `name/version` (npmjs, rubygems, pypi, nuget, crates), `name:version` (maven, packagist). Go: `owner/repo:version` under `github`, `go.googlesource.com/<name>#version` under `long_tail`, the module path under `unknown`; a pseudo-version is written as its 12-character commit |
 | `Origin name` | purl type | `npm`→`npmjs`, `gem`→`rubygems`, `composer`→`packagist`, `cargo`→`crates`. Go by host: `github.com/…`→`github`, `golang.org/x/…`→`long_tail`, any other host→`unknown` (Black Duck maps those to a GitHub repository, which an SBOM does not carry) |
-| `License names` | registrar, else SBOM | SPDX id → Black Duck display name; unmapped ids written as-is |
+| `License names` | registry, else SBOM | SPDX id → Black Duck display name; unmapped ids written as-is |
 | `License families` | same table | `PERMISSIVE` / `WEAK_RECIPROCAL` / `RECIPROCAL` / `RESTRICTED_PROPRIETARY` / `UNKNOWN` |
 | `License Risk` | families | `OK` / `MEDIUM` / `HIGH` / `UNKNOWN` — see [risk](#risk-columns) |
 | `Match type` | `requestedBy` | `Direct`, `Transitive`, or `Direct,Transitive` |
 | `Usage` | — | `DYNAMICALLY_LINKED` |
 | `Operational Risk` | date + newer versions | `OK` / `LOW` / `MEDIUM` / `HIGH` — see [risk](#risk-columns) |
 | Vulnerability counts | findings | Per severity, blank when zero; `Total` is every finding; `Critical and High` is the sum of those two. The run warns how many findings had no recognised severity |
-| `Release Date` | registrar | `\tYYYY-MM-DD` |
-| `Newer Versions` | registrar | Versions **published after** the installed one, Black Duck's rule. The count by version number is in `_component_versions.csv` |
-| `Component Link` | registrar | Declared project homepage, per component. Empty when none, as Black Duck. Go: derived from the module path |
+| `Release Date` | registry | `\tYYYY-MM-DD` |
+| `Newer Versions` | registry | Versions **published after** the installed one, Black Duck's rule. The count by version number is in `_component_versions.csv` |
+| `Component Link` | registry | Declared project homepage, per component. Empty when none, as Black Duck. Go: derived from the module path |
 | `Path` | `dependsOn` | `<project>/-<pm>/<name>/<version>/…` — see [paths](#paths) |
 | `ProjectPath` | — | Project name, plus `/<module>` when named |
 | `VerifiedPath`, `VerifiedPathMethod` | — | empty, `not-checked` |

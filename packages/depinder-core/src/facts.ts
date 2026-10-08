@@ -1,6 +1,6 @@
 /**
  * Settings that change the facts rather than the speed. Each has one fixed value, the same for the
- * CLI and the server (D17), so the two can never answer differently because of how they were set
+ * CLI and the server, so the two can never answer differently because of how they were set
  * up. Speed settings (limits, timeouts, concurrency) belong to each caller.
  */
 

@@ -166,9 +166,8 @@ describe('the resolver package record adapter', () => {
     })
 
     it('carries a version with no release date as an unparseable timestamp, not as epoch zero', () => {
-        // `Date.parse('')` is what the Go registrar produces for a version the proxy has no time
-        // for, and `moment(NaN)` formats as "Invalid date" — a blank cell, not January 1970. A
-        // `null` on the wire has to land in the same place, and emphatically not on 1970-01-01.
+        // A version the registry has no time for is `NaN`, and `moment(NaN)` formats as "Invalid
+        // date" — a blank cell. A `null` on the wire has to land there too, not on 1970-01-01.
         const info = toLibraryInfo(record({
             versions: [['1.2.0', null, 0]],
         }))
@@ -278,7 +277,7 @@ describe('the readers of an expanded record, against the shape they used to get'
     })
 
     it('still falls back to a per-version license when the package has none', () => {
-        // The maven registrar fills only the per-version lists, and `licenseOf` has always fallen
+        // Maven fills only the per-version lists, and `licenseOf` has always fallen
         // back to them. A package-level `[]` expands into every three-element tuple, so the
         // fallback has to find the version that shipped a fourth element.
         const perVersionOnly = toLibraryInfo(record({

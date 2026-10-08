@@ -72,13 +72,13 @@ describe('sbomPackageKeyer', () => {
         expect(v.source).toBe('trivy,grype')
     })
 
-    it('indexes a finding by stripped purl, registrar name@version and each tool\'s own name@version', () => {
+    it('indexes a finding by stripped purl, depinder name@version and each tool\'s own name@version', () => {
         const [v] = index.get('org.apache.logging.log4j:log4j-core@2.11.1')!
         expect(index.get(LOG4J)).toEqual([v])
         expect(index.get('log4j-core@2.11.1')).toEqual([v])
     })
 
-    it('keeps single-tool findings under their registrar keys', () => {
+    it('keeps single-tool findings under their depinder keys', () => {
         expect(index.get('com.example:only-trivy@1.0.0')).toHaveLength(1)
         expect(index.get('minimist@1.2.0')).toHaveLength(1)
     })

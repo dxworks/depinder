@@ -1,4 +1,4 @@
-// One version of every dependency across the workspace (NX_MIGRATION.md D16), so every project
+// One version of every dependency across the workspace, so every project
 // runs the same library code.
 
 export interface Manifest {

@@ -44,7 +44,7 @@ export interface VulnServerConfig {
 export const DEFAULT_VULN_MAX_WAIT_MS = 30_000
 
 /**
- * The vulnerability server for this run, or `undefined` to scan locally as before.
+ * The vulnerability server for this run, or `undefined` to scan locally.
  *
  * Same address and token as the resolver, so it exists exactly when the resolver does: no
  * token or `--no-resolver` (without `--vuln-server`) means no vulnerability server either.

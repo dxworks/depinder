@@ -1,5 +1,6 @@
-// The guard against the CLI fetching from a registry by itself (NX_MIGRATION.md phase 5): HTTP
-// libraries and `fetch` only in the allow-listed clients, core's registry fetchers only in src/fallback.
+// The guard against the CLI fetching from a registry by itself: registry data comes from the
+// resolver or, as the fallback, from core through src/fallback. HTTP libraries and `fetch` only in
+// the allow-listed clients, core's registry fetchers only in src/fallback.
 import {readFileSync} from 'node:fs'
 
 const guard = JSON.parse(readFileSync(new URL('./registry-fetch-guard.json', import.meta.url), 'utf8'))

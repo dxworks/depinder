@@ -2,7 +2,7 @@ import {createHttpClient, createLimiterPool, type EcosystemLimits, type HttpClie
 
 /**
  * The CLI's way to the registries: one core HTTP client per purl type, each behind that
- * ecosystem's limiter. The limits are the caller's (D18); this file has no numbers of its own.
+ * ecosystem's limiter. The limits come from registry-limits.ts; this file has no numbers of its own.
  */
 
 /** Hands out the HTTP client a package's registry requests go through. */

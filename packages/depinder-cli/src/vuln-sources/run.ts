@@ -33,7 +33,7 @@ import {vulnSources} from './selection'
 
 /**
  * Where an SBOM run's vulnerabilities come from: the vulnerability server, or — when it is not
- * configured, not selected, or fails — Trivy and Grype on this machine, exactly as before.
+ * configured, not selected, or fails — Trivy and Grype on this machine.
  *
  * With a server, the question is asked at the very start of the run, for every purl of every run,
  * and nothing waits for it until the findings are actually read: the cache load, the parse, the

@@ -19,7 +19,7 @@ export interface FallbackPackage {
 
 /**
  * `not_found` is the registry saying it has no such package; `error` is everything else that gave
- * no answer. Both are handed on to Libraries.io where it applies (D8), so they stay apart here.
+ * no answer. Both are handed on to Libraries.io for the ecosystems that use it, so they stay apart.
  */
 export type FallbackResult =
     | {status: 'found', info: LibraryInfo}

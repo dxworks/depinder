@@ -86,7 +86,7 @@ describe('normalizePurl', () => {
 })
 
 describe('purlCoordinates', () => {
-    it('renders maven coordinates as groupId:artifactId, which is what MavenCentralRegistrar splits on', () => {
+    it('renders maven coordinates as groupId:artifactId, depinder\'s maven name', () => {
         expect(purlCoordinates('pkg:maven/org.slf4j/slf4j-api@1.7.35'))
             .toEqual({type: 'maven', name: 'org.slf4j:slf4j-api', version: '1.7.35'})
     })
@@ -101,7 +101,7 @@ describe('purlCoordinates', () => {
             .toEqual({type: 'npm', name: 'side-channel', version: '1.1.0'})
     })
 
-    it('keeps the names as written, for display and the registrars', () => {
+    it('keeps the names as written, for display and the registry lookups', () => {
         expect(purlCoordinates('pkg:nuget/Newtonsoft.Json@13.0.3'))
             .toEqual({type: 'nuget', name: 'Newtonsoft.Json', version: '13.0.3'})
         expect(purlCoordinates('pkg:golang/github.com/BurntSushi/toml@v1.6.0'))

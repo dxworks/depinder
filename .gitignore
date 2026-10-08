@@ -130,7 +130,7 @@ dist
 
 # custom
 results
-# root-level runtime cache only - src/cache/ is source and must stay trackable
+# the runtime cache of a run from the root only; packages/depinder-cli/src/cache/ is source
 /cache/
 results-*
 /.blacklist

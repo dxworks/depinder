@@ -163,8 +163,7 @@ async function upsertResolved(
  * The registry is the whole truth about a package, so its version list replaces ours: a version
  * that disappeared upstream must disappear here too.
  *
- * That used to be a `delete` followed by an `insert`. It is now one statement: the rows travel as
- * arrays through `unnest` and are upserted, and a `delete` of everything the list does not mention
+ * One statement: the rows travel as arrays through `unnest` and are upserted, and a `delete` of everything the list does not mention
  * rides along as a CTE. The two halves cannot collide — the delete keeps exactly the purls the
  * insert is bringing — and a package costs one round trip instead of two, with none of the window
  * in which the package briefly had no versions at all.

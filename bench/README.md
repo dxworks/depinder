@@ -117,7 +117,7 @@ Per producer, trivy first, then syft:
    to the resolver, so it does not change the server's database. Repeated N times. summary.md adds
    its registry lookups and enrich time per ecosystem.
 
-**Cold then warm on one local cache** (plan phase 6, step 5): a cold run followed by a warm run on
+**Cold then warm on one local cache**: a cold run followed by a warm run on
 its SQLite cache must give identical CSVs. Each warm-after cell reruns depinder normally (resolver
 on) on a **copy** of its cold cell's cache, so the cold cache stays as it was for the compare:
 
@@ -193,8 +193,8 @@ each cold cell against its warm rerun (`empty:warm-after-empty`,
 `no-server@i:warm-after-no-server@i`; must be identical) and repeat 1 against every later repeat of
 each repeated cell (determinism).
 
-A is the reference. Every CSV difference is sorted by the regression rules of the monorepo plan
-(`NX_MIGRATION.md`, section 6), in `lib/allowed-differences.ts`:
+A is the reference. Every CSV difference is sorted into one of three classes by
+`lib/allowed-differences.ts`; only a regression means the code changed the output:
 
 - **newer release** — the row's library has a version that B's kept SQLite cache dates after A's
   `startedAt` (run.json), and the row differs only in Latest Version, its release date,

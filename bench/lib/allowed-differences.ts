@@ -4,8 +4,8 @@ import {KeptCache} from './kept-cache.js'
 import {newerRecommendations, recommendedVersionColumnOf} from './upgrade-guidance.js'
 
 /**
- * Sorts the CSV differences between a reference run (A) and a later run (B) by the regression
- * rules of NX_MIGRATION.md (section 6):
+ * Sorts the CSV differences between a reference run (A) and a later run (B) into what the world
+ * changed (a newer release, a newer vulnerability database) and what the code changed:
  *
  * - `newer-release`: the row's library has a version that B's cache dates after A started, and the
  *   row differs only in columns a newer release moves (latest version and its date, Newer

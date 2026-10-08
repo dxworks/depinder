@@ -117,7 +117,7 @@ describe('origins', () => {
         expect(goPseudoVersionCommit('v1.2.3-beta.1')).toBe('v1.2.3-beta.1')
     })
 
-    it('writes the project the registrar found, and nothing when there is none', () => {
+    it('writes the project the registry declares, and nothing when there is none', () => {
         expect(componentLink(origin('npm'), 'qs', 'https://example.test')).toBe('https://example.test')
         // No homepage is an empty cell, not the package's page on the registry: Black Duck leaves
         // the column blank for the 333 components its Knowledge Base has no project for.
