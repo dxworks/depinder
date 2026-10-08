@@ -24,8 +24,8 @@ import {remainingAt, upgradeGuidance} from './upgrade'
  * keeps Black Duck's raw `security_*.csv` header, byte for byte; `_dependency_edges.csv` and
  * `_component_versions.csv` are ours.
  *
- * Columns we cannot fill are written empty rather than guessed. Which ones, and why, is in the
- * README's column-mapping table.
+ * Columns we cannot fill are written empty rather than guessed; `docs/blackduck-export/index.md`
+ * lists which.
  */
 
 const DEPENDENCIES_FILE = '_dependencies.csv'

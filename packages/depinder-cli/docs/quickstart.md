@@ -12,6 +12,14 @@ A folder of CycloneDX SBOMs in, a folder of CSVs out.
 - Trivy and/or Grype on `PATH`, for vulnerabilities.
 - Optionally, `DEPINDER_RESOLVER_TOKEN` set, for our server (see [Installing](install.md#4-resolver-token-optional)).
 
+Without DepMiner, generate the SBOMs with Syft or Trivy yourself. Black Duck's path prefix then
+falls back to the project name ([why](commands/analyse.md#the-depminer-index)).
+
+```bash
+syft dir:<repo> -o cyclonedx-json=<repo>.cdx.json
+trivy fs <repo> --format cyclonedx --output <repo>.trivy.cdx.json
+```
+
 !!! tip "No token? No problem"
     Depinder works fully locally without the token: package data comes from the registries and
     vulnerabilities from your local Trivy and Grype. The results are the same; the run is only

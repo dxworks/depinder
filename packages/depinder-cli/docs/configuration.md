@@ -13,6 +13,7 @@ No configuration file: command-line options, environment variables, and a few fi
 | `DEPINDER_CACHE_DB` | SQLite cache path. Default `~/.dxw/depinder/cache/depinder.sqlite` |
 | `DEPINDER_CACHE_MAX_AGE` | How old a cached library may be before it is fetched again. Same as `--cache-max-age`. Default `1d` |
 | `DEPINDER_PROFILE` | `1` for the same output as `--profile` |
+| `DEPINDER_REPORT_NOW` | Fixes the date a report measures ages from, ISO 8601 (`2026-10-03`, `2026-10-03T14:30:00Z`), so a rerun writes the same CSVs: the `Now-Used` and `Now-latest` columns, the out-of-support counts and `Operational Risk`. Cache expiry keeps the real clock. Default: now |
 | `DEPINDER_RESOLVER_URL` | Base URL of the bulk purl resolver. Same as `--resolver-url`. Default `https://libs.dxworks.org` |
 | `DEPINDER_RESOLVER_TOKEN` | Bearer token for it and for the [vulnerability server](#vulnerability-server). Needed for the resolver; without it packages come from the registries, with a warning |
 | `DEPINDER_RESOLVER_MAX_WAIT_MS` | How long one run waits for the resolver in total. Default `60000` |

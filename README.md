@@ -7,7 +7,7 @@ This repository is an [Nx](https://nx.dev) monorepo (npm workspaces, Node 24):
 
 | Project | Path | What it is |
 |---|---|---|
-| `depinder-cli` | [`packages/depinder-cli`](packages/depinder-cli) | The `depinder` command line tool, published to npm as [`@dxworks/depinder`](https://www.npmjs.com/package/@dxworks/depinder). Usage: [its README](packages/depinder-cli/README.md) and the [documentation site](https://dxworks.org/depinder/). |
+| `depinder-cli` | [`packages/depinder-cli`](packages/depinder-cli) | The `depinder` command line tool, published to npm as [`@dxworks/depinder`](https://www.npmjs.com/package/@dxworks/depinder). Usage: the [documentation site](https://dxworks.org/depinder/), built from [its `docs/`](packages/depinder-cli/docs). |
 | `depinder-core` | [`packages/depinder-core`](packages/depinder-core) | What the CLI and the server share: the registry fetchers of all eight ecosystems, the HTTP client, purls, logging, the latest rule and the wire `PackageRecord`. Private, not published; the CLI bundles it. |
 | `depinder-server` | [`packages/depinder-server`](packages/depinder-server) | The purl resolver and vulnerability server depinder calls: Docker image and deploy kit. Not published to npm. [Its README](packages/depinder-server/README.md). |
 | `parity` | [`packages/parity`](packages/parity) | The parity test: every recorded registry case through the server (fill, Postgres, `/resolve`) and through the CLI's fallback; both must give the same `LibraryInfo`. Needs Postgres, so it is not part of `npm run check`. |

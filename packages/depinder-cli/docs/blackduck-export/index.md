@@ -41,15 +41,15 @@ command wrote it:
 | `Component name` | purl | Registry name. Black Duck's is a KB display name; join on the origin id |
 | `Component version name` | purl | verbatim |
 | `Version id` | — | empty |
-| `Component Version Origin Id` | purl | `name/version` (npmjs, rubygems, pypi, nuget, crates), `name:version` (maven, packagist). Go: `owner/repo:version` |
-| `Origin name` | purl type | `npm`→`npmjs`, `gem`→`rubygems`, `composer`→`packagist`, `cargo`→`crates`; Go by host (`github`, `long_tail`, `unknown`) |
+| `Component Version Origin Id` | purl | `name/version` (npmjs, rubygems, pypi, nuget, crates), `name:version` (maven, packagist). Go: `owner/repo:version` under `github`, `go.googlesource.com/<name>#version` under `long_tail`, the module path under `unknown`; a pseudo-version is written as its 12-character commit |
+| `Origin name` | purl type | `npm`→`npmjs`, `gem`→`rubygems`, `composer`→`packagist`, `cargo`→`crates`. Go by host: `github.com/…`→`github`, `golang.org/x/…`→`long_tail`, any other host→`unknown` (Black Duck maps those to a GitHub repository, which an SBOM does not carry) |
 | `License names` | registrar, else SBOM | SPDX id → Black Duck display name; unmapped ids written as-is |
 | `License families` | same table | `PERMISSIVE` / `WEAK_RECIPROCAL` / `RECIPROCAL` / `RESTRICTED_PROPRIETARY` / `UNKNOWN` |
 | `License Risk` | families | `OK` / `MEDIUM` / `HIGH` / `UNKNOWN` — see [risk](#risk-columns) |
 | `Match type` | `requestedBy` | `Direct`, `Transitive`, or `Direct,Transitive` |
 | `Usage` | — | `DYNAMICALLY_LINKED` |
 | `Operational Risk` | date + newer versions | `OK` / `LOW` / `MEDIUM` / `HIGH` — see [risk](#risk-columns) |
-| Vulnerability counts | findings | Per severity, blank when zero; `Total` is every finding; `Critical and High` is the sum of those two |
+| Vulnerability counts | findings | Per severity, blank when zero; `Total` is every finding; `Critical and High` is the sum of those two. The run warns how many findings had no recognised severity |
 | `Release Date` | registrar | `\tYYYY-MM-DD` |
 | `Newer Versions` | registrar | Versions **published after** the installed one, Black Duck's rule. The count by version number is in `_component_versions.csv` |
 | `Component Link` | registrar | Declared project homepage, per component. Empty when none, as Black Duck. Go: derived from the module path |
@@ -76,7 +76,7 @@ id, triage and CISA columns are dropped. The derivations are the same:
 | `CWE Ids` | `[CWE-400, CWE-834]` |
 | `Solution available` | `true` when a fixed version is named |
 | `CVSS Version` | `CVSS 3.x` / `CVSS 4` / `CVSS 2.x` |
-| `Match type` | Two-valued here, `Direct Dependency` / `Transitive Dependency`, in both files |
+| `Match type` | Two-valued here, `Direct Dependency` / `Transitive Dependency`, in both files; a component reached both ways is `Direct Dependency` |
 | `Remediation status` | `New` |
 | `Updated on`, `Overall score`, `Workaround`, `Exploit available`, tags, CISA | empty |
 
@@ -84,9 +84,12 @@ id, triage and CISA columns are dropped. The derivations are the same:
 
 `Path` is the shortest chain from the manifest to the component, one row per (component,
 project), as Black Duck writes it. Ties go to the greater parent. Segments join name and version
-like the origin id. The tag after the project is the package manager whose manifest was walked:
+like the origin id (`lodash/4.17.21`, `org.eclipse.angus:angus-mail:2.0.5`), except that a Go
+module keeps its full import path (`golang.org/x/sys:v0.47.0`). The project's own artifact is never
+a segment. The tag after the project is the package manager whose manifest was walked:
 `-yarn`, `-npm`, `-pnpm`, `-rubygems`, `-maven`, `-gradle`, `-packagist`, `-cargo`, `-go_mod`,
-`-nuget`, `-uv`, `-pip`. With the manifests from [DepMiner's index](../commands/analyse.md#the-depminer-index),
+`-nuget`, `-uv`, `-poetry`, `-pip`. It is read off the manifest's file name (Trivy's manifest node,
+Syft's `syft:location:0:path`), else it is the origin name. With the manifests from [DepMiner's index](../commands/analyse.md#the-depminer-index),
 found beside the input by default, the project segment becomes Black Duck's
 `<name>/<version>/<dir>/` prefix and own code leaves the chain. The DepMiner results are enough;
 the scanned repositories are not needed.
@@ -118,7 +121,9 @@ Rows with Open Hub data differ: Black Duck knows something we cannot.
 Short term: newest stable version on the installed major that clears every fixable finding, else
 the lowest clean version above. Long term: newest stable version overall. Each finding is fixed by
 the fix of its own line. Unfixed findings are left out of the choice and counted separately;
-a component with only unfixed findings gets an empty recommendation. No network.
+a component with only unfixed findings gets an empty recommendation. Pre-releases are recommended
+only when nothing stable clears the findings. No network: the candidates are the versions the run
+already fetched.
 
 ## Deliberate differences
 
