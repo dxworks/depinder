@@ -65,7 +65,7 @@ export function fakeDb(queued: readonly string[], wanted: ReadonlyMap<string, Da
  * What the dequeue statement does to an in-order queue: the first `limit` keys whose type still has
  * quota left, taken out. Its parameters are `[limit, types, quotas]`, as `dequeue` passes them.
  */
-export function takeDue(remaining: string[], params: readonly unknown[]): string[] {
+function takeDue(remaining: string[], params: readonly unknown[]): string[] {
     const [limit, types, ns] = params as [number, string[], number[]]
     const left = new Map(types.map((type, i) => [type, ns[i]!]))
     const taken: string[] = []
@@ -83,11 +83,11 @@ export function takeDue(remaining: string[], params: readonly unknown[]): string
 }
 
 /** `pkg:cargo/serde` -> `cargo`, as the generated `fetch_queue.type` column has it. */
-export function typeOf(packageKey: string): string {
+function typeOf(packageKey: string): string {
     return packageKey.slice('pkg:'.length, packageKey.indexOf('/'))
 }
 
-export function queueRow(packageKey: string, attempts = 0, wantedUntil: Date | null = null): Record<string, unknown> {
+function queueRow(packageKey: string, attempts = 0, wantedUntil: Date | null = null): Record<string, unknown> {
     const row: FetchQueueRow = {
         package_key: packageKey,
         priority: 10,

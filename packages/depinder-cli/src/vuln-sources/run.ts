@@ -81,7 +81,7 @@ export function collectSbomTargets(runs: {plugins: Plugin[], sboms: {file: strin
 }
 
 /** Per SBOM file, what the server's answer amounted to — the per-file half of the provenance. */
-export interface ServerFileRecord {
+interface ServerFileRecord {
     file: string
     /** Distinct purls of this file that were asked about. */
     purls: number

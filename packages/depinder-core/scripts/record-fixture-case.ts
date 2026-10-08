@@ -3,7 +3,7 @@ import {join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {createHttpClient, createLimiter, fetchPackage, nullLogger, parsePurl} from '../src/index.js'
 import type {ResolvedPackage} from '../src/index.js'
-import {FIXTURE_CASE_FILE, type FixtureCase, type RecordedResponse} from '../src/testing/index.js'
+import {FIXTURE_CASE_FILE, type FixtureCase, type RecordedResponse} from '../src/testing/fixture-case.js'
 
 /**
  * Records one fixture case: runs core's real `fetchPackage` live, with `fetch` wrapped so every

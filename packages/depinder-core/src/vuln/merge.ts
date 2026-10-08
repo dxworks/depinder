@@ -10,7 +10,7 @@ import {trivyFindings, type TrivyReport} from './trivy.js'
 import type {RawFinding, ScannedPackage, Vulnerability} from './vulnerability.js'
 
 /** Where a scanned package's findings go: one merge key, listed under every index key. */
-export interface PackageKeys {
+interface PackageKeys {
     /** Both tools' findings for one package must get the same merge key. */
     mergeKey: string
     indexKeys: string[]

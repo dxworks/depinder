@@ -1,7 +1,8 @@
 /**
- * One-line JSON logging on stdout. Small on purpose: the service has a handful of call sites and
- * no need for transports, serialisers or redaction, so a logging library would be one more
- * dependency to keep current for no gain.
+ * The `Logger` core's fetchers log through, and the server's one-line JSON logger on stdout (the
+ * CLI adapts winston to `Logger` instead). Small on purpose: the service has a handful of call
+ * sites and no need for transports, serialisers or redaction, so a logging library would be one
+ * more dependency to keep current for no gain.
  */
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'

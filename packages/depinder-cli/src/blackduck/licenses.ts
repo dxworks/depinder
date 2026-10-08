@@ -12,7 +12,7 @@
  */
 
 /** Black Duck's licence-family vocabulary, as observed in the reference export. */
-export type LicenseFamily = 'PERMISSIVE' | 'WEAK_RECIPROCAL' | 'RECIPROCAL' | 'RESTRICTED_PROPRIETARY' | 'UNKNOWN'
+type LicenseFamily = 'PERMISSIVE' | 'WEAK_RECIPROCAL' | 'RECIPROCAL' | 'RESTRICTED_PROPRIETARY' | 'UNKNOWN'
 
 interface KnownLicense {
     name: string

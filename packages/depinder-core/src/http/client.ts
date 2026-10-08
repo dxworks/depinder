@@ -10,7 +10,7 @@ import {sleep} from './limiter.js'
  * before we see it. Do not set `accept-encoding` by hand.
  */
 
-export const DEFAULT_TIMEOUT_MS = 15_000
+const DEFAULT_TIMEOUT_MS = 15_000
 export const DEFAULT_USER_AGENT = 'depinder (+https://github.com/dxworks/depinder)'
 
 /** One request as it went, successful or not. What a caller's `onRequest` hook receives. */
@@ -24,7 +24,7 @@ export interface RequestEvent {
     error: string | null
 }
 
-export interface RequestOptions {
+interface RequestOptions {
     method?: string
     headers?: Record<string, string>
     body?: string
@@ -55,7 +55,7 @@ export class HttpError extends Error {
 }
 
 /** Runs a request when the ecosystem's limits allow it: a `RequestLimiter`, or one wrapped by the caller. */
-export interface RequestGate {
+interface RequestGate {
     run<T>(task: () => Promise<T>): Promise<T>
 }
 

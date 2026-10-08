@@ -37,10 +37,10 @@ const MAX_SCANNER_OUTPUT_BYTES = 1024 * 1024 * 1024
 // Preflight: are the scanners there, and are they the versions we pinned?
 // ---------------------------------------------------------------------------
 
-export type ScannerName = 'trivy' | 'grype'
+type ScannerName = 'trivy' | 'grype'
 
 /** What one scanner is, as observed on this machine — the unit of both messaging and provenance. */
-export interface ScannerStatus {
+interface ScannerStatus {
     tool: ScannerName
     /** The resolved binary: TRIVY_BIN/GRYPE_BIN if set, else the bare name looked up on PATH. */
     bin: string
@@ -272,7 +272,7 @@ export function scannerSummaryLine(preflight: ScannerPreflight, hasGithubToken: 
 // ---------------------------------------------------------------------------
 
 /** What one SBOM file's scan actually produced — the per-file half of the provenance record. */
-export interface ScannedFileRecord {
+interface ScannedFileRecord {
     file: string
     trivy: 'ok' | 'skipped'
     grype: 'ok' | 'skipped'
@@ -377,7 +377,7 @@ let warmPromise: Promise<void> | undefined
  * current DB makes it a no-op — `trivy image --download-db-only` and `grype db update` both
  * return in milliseconds when there is nothing to fetch.
  */
-export function warmScannerDatabases(): Promise<void> {
+function warmScannerDatabases(): Promise<void> {
     if (!warmPromise) {
         warmPromise = (async () => {
             const preflight = await preflightScanners()

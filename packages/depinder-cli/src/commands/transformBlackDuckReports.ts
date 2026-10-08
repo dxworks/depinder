@@ -378,7 +378,7 @@ function validateRequiredFiles(entries: string[]): {
  * @param reportDir Directory containing Black Duck report files
  * @param options Command options including optional basePath and pathMappings
  */
-export async function transformBlackDuckReports(reportDir: string, options?: { basePath?: string, pathMappings?: string, repoCategories?: string }): Promise<void> {
+async function transformBlackDuckReports(reportDir: string, options?: { basePath?: string, pathMappings?: string, repoCategories?: string }): Promise<void> {
     try {
         // Find and validate required input files
         const entries = await fs.readdir(reportDir);

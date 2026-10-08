@@ -3,19 +3,17 @@ import {dotnetChecker, goChecker, javaChecker, npmChecker, phpChecker, pythonChe
 import {VulnerabilityChecker} from '../src/extension-points/vulnerability-checker'
 import {DepinderDependency} from '../src/extension-points/extract'
 import {assignPurl} from '../src/plugins/sbom/dependency-purl'
-import {
-    sbomDotnet,
-    sbomGo,
-    sbomJava,
-    sbomNpm,
-    sbomPhp,
-    sbomPlugins,
-    sbomPluginsForPurlTypes,
-    sbomPython,
-    sbomRuby,
-    sbomRust,
-} from '../src/plugins/sbom'
+import {sbomPlugins, sbomPluginsForPurlTypes} from '../src/plugins/sbom'
 import {getPluginsFromNames} from '../src/plugins'
+
+function sbomPlugin(name: string): Plugin {
+    const plugin = sbomPlugins.find(it => it.name === name)
+    if (!plugin) throw new Error(`No SBOM plugin named ${name}`)
+    return plugin
+}
+
+const [sbomJava, sbomNpm, sbomRuby, sbomPython, sbomPhp, sbomDotnet, sbomGo, sbomRust] =
+    ['sbom-java', 'sbom-npm', 'sbom-ruby', 'sbom-python', 'sbom-php', 'sbom-dotnet', 'sbom-go', 'sbom-rust'].map(sbomPlugin)
 
 /**
  * The cache key is `${ecosystem}:${name}`, and these namespaces are the ones every existing cache

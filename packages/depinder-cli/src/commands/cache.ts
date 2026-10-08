@@ -37,14 +37,14 @@ export function cacheInfoAction(options: CacheMaxAgeOptions = {}): void {
 const maxAgeOption = ['--cache-max-age <duration>',
     'Count libraries older than this as expired: <n>[s|m|h|d]; DEPINDER_CACHE_MAX_AGE when unset, else 1d'] as const
 
-export const cacheInfoCommand = new Command()
+const cacheInfoCommand = new Command()
     .name('info')
     .alias('i')
     .description('Show where the local SQLite cache is and what it holds')
     .option(...maxAgeOption)
     .action(cacheInfoAction)
 
-export const cacheImportCommand = new Command()
+const cacheImportCommand = new Command()
     .name('import')
     .description('Import a libs.json / misses.json folder into the local SQLite cache')
     .argument('<dir>', 'Folder holding the JSON files of the previous cache layout')

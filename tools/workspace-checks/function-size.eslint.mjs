@@ -4,7 +4,7 @@ import tseslint from 'typescript-eslint'
 import {readFileSync} from 'node:fs'
 
 const sizeBaseline = JSON.parse(readFileSync(new URL('./size-baseline.json', import.meta.url), 'utf8'))
-export const FUNCTION_LENGTH = {max: 100, skipBlankLines: true, skipComments: true}
+const FUNCTION_LENGTH = {max: 100, skipBlankLines: true, skipComments: true}
 
 /** `projectPrefix` is the project's repo-relative folder with a trailing slash; `files` are globs in it. */
 export function functionSizeConfig(projectPrefix, files) {

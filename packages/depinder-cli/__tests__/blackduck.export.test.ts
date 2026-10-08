@@ -7,7 +7,7 @@ import {cvss3SubScores} from '../src/blackduck/cvss'
 import {licenseColumns} from '../src/blackduck/licenses'
 import {AnalysedEcosystem, buildModel, comparatorForPurlType} from '../src/blackduck/model'
 import {canonicalProjectUrl, componentLink, goPseudoVersionCommit, originFor, originId} from '../src/blackduck/origins'
-import {packageManagerTag, sbomPaths, sbomTree} from '../src/blackduck/paths'
+import {packageManagerTag, sbomTree} from '../src/blackduck/paths'
 import {fixedBy, remainingAt, upgradeGuidance} from '../src/blackduck/upgrade'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
 import {Vulnerability} from '../src/extension-points/vulnerability-checker'
@@ -418,7 +418,7 @@ describe('dependency paths', () => {
                 {ref: 'a', dependsOn: ['b']},
             ],
         })
-        expect(sbomPaths(file, 'demo', new Set(['npm']))).toEqual([
+        expect(sbomTree(file, 'demo', new Set(['npm'])).paths).toEqual([
             {name: 'express', version: '4.18.0', purlType: 'npm', projectPath: 'demo',
                 matchType: 'Direct Dependency', path: 'demo/-yarn/express/4.18.0'},
             {name: 'qs', version: '6.10.2', purlType: 'npm', projectPath: 'demo',
@@ -443,7 +443,7 @@ describe('dependency paths', () => {
                 {ref: 'b', dependsOn: ['c']},
             ],
         })
-        const qs = sbomPaths(file, 'demo', new Set(['npm'])).filter(it => it.name === 'qs')
+        const qs = sbomTree(file, 'demo', new Set(['npm'])).paths.filter(it => it.name === 'qs')
         expect(qs.map(it => it.path)).toEqual(['demo/-npm/body-parser/1.20.0/qs/6.10.2'])
     })
 
@@ -464,7 +464,7 @@ describe('dependency paths', () => {
                 {ref: 'b', dependsOn: ['c']},
             ],
         })
-        const actionpack = sbomPaths(file, 'demo', new Set(['gem'])).find(it => it.name === 'actionpack')
+        const actionpack = sbomTree(file, 'demo', new Set(['gem'])).paths.find(it => it.name === 'actionpack')
         expect(actionpack?.path).toBe('demo/-rubygems/rspec-rails/8.0.4/actionpack/8.1.3.1')
     })
 
@@ -484,7 +484,7 @@ describe('dependency paths', () => {
                 {ref: 'a', dependsOn: ['b']},
             ],
         })
-        expect(sbomPaths(file, 'php-monica', new Set(['composer'])).map(it => it.path)).toEqual([
+        expect(sbomTree(file, 'php-monica', new Set(['composer'])).paths.map(it => it.path)).toEqual([
             'php-monica/-packagist/laravel/fortify:v1.28.0',
             'php-monica/-packagist/laravel/fortify:v1.28.0/bacon/bacon-qr-code:v3.0.1',
         ])
@@ -504,7 +504,7 @@ describe('dependency paths', () => {
                 {ref: 'main', dependsOn: ['a']},
             ],
         })
-        expect(sbomPaths(file, 'go-caddy', new Set(['golang']))).toEqual([
+        expect(sbomTree(file, 'go-caddy', new Set(['golang'])).paths).toEqual([
             {name: 'github.com/caddyserver/certmagic', version: 'v0.25.4', purlType: 'golang', projectPath: 'go-caddy',
                 matchType: 'Direct Dependency', path: 'go-caddy/-go_mod/github.com/caddyserver/certmagic:v0.25.4'},
         ])
@@ -524,7 +524,7 @@ describe('dependency paths', () => {
                 {ref: 'crate', dependsOn: ['a']},
             ],
         })
-        expect(sbomPaths(file, 'rust-ripgrep', new Set(['cargo']))[0]).toMatchObject({
+        expect(sbomTree(file, 'rust-ripgrep', new Set(['cargo'])).paths[0]).toMatchObject({
             projectPath: 'rust-ripgrep/fuzz', path: 'rust-ripgrep/fuzz/-cargo/libfuzzer-sys/0.4.7',
         })
     })
@@ -545,7 +545,7 @@ describe('dependency paths', () => {
             ],
             dependencies: [{ref: 'ws', dependsOn: ['a']}, {ref: 'a', dependsOn: ['b']}],
         })
-        expect(sbomPaths(file, 'demo', new Set(['npm', 'gem'])).map(it => [it.matchType, it.path])).toEqual([
+        expect(sbomTree(file, 'demo', new Set(['npm', 'gem'])).paths.map(it => [it.matchType, it.path])).toEqual([
             ['Direct Dependency', 'demo/-yarn/vite/7.3.1'],
             ['Transitive Dependency', 'demo/-yarn/vite/7.3.1/rollup/4.60.1'],
             ['Direct Dependency', 'demo/-yarn/cacheable/2.3.4'],
@@ -573,7 +573,7 @@ describe('dependency paths', () => {
                 {ref: 'c', dependsOn: ['d']},
             ],
         })
-        expect(sbomPaths(file, 'js-npm-nest', new Set(['npm'])).map(it => [it.matchType, it.path])).toEqual([
+        expect(sbomTree(file, 'js-npm-nest', new Set(['npm'])).paths.map(it => [it.matchType, it.path])).toEqual([
             ['Direct Dependency', 'js-npm-nest/-npm/supertest/7.2.2'],
             ['Transitive Dependency', 'js-npm-nest/-npm/supertest/7.2.2/superagent/10.2.3'],
             ['Transitive Dependency', 'js-npm-nest/-npm/supertest/7.2.2/superagent/10.2.3/formidable/3.5.4'],
@@ -609,7 +609,7 @@ describe('dependency paths', () => {
             metadata: {component: {'bom-ref': 'root', type: 'file'}},
             components: [{'bom-ref': 'a', purl: 'pkg:gem/nokogiri@1.13.8'}],
         })
-        expect(sbomPaths(file, 'demo', new Set(['gem']))[0].path).toBe('demo/-rubygems/nokogiri/1.13.8')
+        expect(sbomTree(file, 'demo', new Set(['gem'])).paths[0].path).toBe('demo/-rubygems/nokogiri/1.13.8')
     })
 
     it('tags a path by the manifest\'s package manager, as Black Duck does', () => {

@@ -8,7 +8,7 @@ import {MONOREPO_DIR, SERVER_DIR, type Target} from './targets.js'
  * be healthy, stopping and starting the resolver around a wipe, and saying which image it runs.
  */
 
-export const IMAGE = 'depinder-server:0.2.0'
+const IMAGE = 'depinder-server:0.2.0'
 
 /**
  * Runs a command with its output on the bench's terminal; throws if it fails or outlives
@@ -47,7 +47,7 @@ export interface Health {
     body: unknown
 }
 
-export async function getHealth(url: string): Promise<Health> {
+async function getHealth(url: string): Promise<Health> {
     try {
         const res = await fetch(url, {signal: AbortSignal.timeout(10_000)})
         const text = await res.text()

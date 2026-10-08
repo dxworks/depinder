@@ -59,7 +59,7 @@ export interface UpdaterDeps {
     log: Logger
 }
 
-export interface UpdaterStatus {
+interface UpdaterStatus {
     updating: boolean
     last_check_at: string | null
     last_ok_at: string | null

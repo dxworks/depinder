@@ -97,7 +97,7 @@ export function toPackageRecord(
 }
 
 /** A version with the purl it is stored and served under. */
-export interface DistinctVersion extends FetchedVersion {
+interface DistinctVersion extends FetchedVersion {
     purl: string
 }
 
@@ -121,7 +121,7 @@ export function distinctVersions(packageKey: string, versions: readonly FetchedV
  * The versions as tuples, one per {@link distinctVersions}: undated first, then by release date,
  * then by version in code-point order (the server's read sorts with `collate "C"` to match).
  */
-export function compactVersions(
+function compactVersions(
     packageKey: string,
     versions: readonly FetchedVersion[],
     packageLicenses: readonly string[],

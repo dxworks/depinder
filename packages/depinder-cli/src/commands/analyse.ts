@@ -58,8 +58,6 @@ import {
     vulnSummaryLine,
     writeServerProvenance,
 } from '../vuln-sources/run'
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-require('events').EventEmitter.prototype._maxListeners = 100
 
 export interface AnalyseOptions extends ResolverOptions, CacheMaxAgeOptions {
     plugins?: string[]
@@ -87,7 +85,6 @@ export function createAnalyseCommand(): Command {
     return new Command()
         .name('analyse')
         .argument('[folders...]', 'Folders to walk for CycloneDX SBOMs')
-        // .argument('[depext-files...]', 'A list of files to parse for dependency information')
         // Both value-taking options need a <value> placeholder: without one Commander registers
         // them as booleans, so `-r out` set `{R: true}` and left `out` to be walked as another
         // folder, and `--plugins` never reached getPluginsFromNames.
@@ -756,7 +753,7 @@ function openCacheSession(cutoffMs: number): CacheSession {
  * files under `<results>/<producer>/`; anything that is not a CycloneDX SBOM is ignored. A
  * subfolder exists only when its source had input.
  */
-export async function analyseFiles(folders: string[], options: AnalyseOptions): Promise<void> {
+async function analyseFiles(folders: string[], options: AnalyseOptions): Promise<void> {
     if (options.profile) enableProfile()
     // Read first, so a malformed fixed date stops the run before any work is done.
     const fixedNow = fixedReportNow()

@@ -18,19 +18,19 @@ export const guavaParentPom = fixture('maven-guava-parent.pom')
  * declares no licence at all, so believing `<release>` loses both the latest version and the
  * licence. See CR-5.
  */
-export const ccMetadataXml = fixture('maven-commons-collections-metadata.xml')
-export const ccListingHtml = fixture('maven-commons-collections-listing.html')
-export const ccStalePom = fixture('maven-commons-collections-20040616.pom')
-export const ccPom = fixture('maven-commons-collections-3.2.2.pom')
-export const commonsParentPom = fixture('maven-commons-parent.pom')
-export const apacheParentPom = fixture('maven-apache-parent.pom')
+const ccMetadataXml = fixture('maven-commons-collections-metadata.xml')
+const ccListingHtml = fixture('maven-commons-collections-listing.html')
+const ccStalePom = fixture('maven-commons-collections-20040616.pom')
+const ccPom = fixture('maven-commons-collections-3.2.2.pom')
+const commonsParentPom = fixture('maven-commons-parent.pom')
+const apacheParentPom = fixture('maven-apache-parent.pom')
 
 export const BASE = 'https://repo1.maven.org/maven2/com/google/guava/guava'
 export const PARENT_BASE = 'https://repo1.maven.org/maven2/com/google/guava/guava-parent'
 export const GUAVA = 'pkg:maven/com.google.guava/guava'
 
 export const CC_BASE = 'https://repo1.maven.org/maven2/commons-collections/commons-collections'
-export const COMMONS_PARENT = 'https://repo1.maven.org/maven2/org/apache/commons/commons-parent'
+const COMMONS_PARENT = 'https://repo1.maven.org/maven2/org/apache/commons/commons-parent'
 export const APACHE_PARENT = 'https://repo1.maven.org/maven2/org/apache/apache'
 export const CC = 'pkg:maven/commons-collections/commons-collections'
 

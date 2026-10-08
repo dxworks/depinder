@@ -72,6 +72,7 @@ export function resetResolverClient(): void {
     warned = false
 }
 
+/** For tests: whether this run has given up on the server. */
 export function resolverUnavailable(): boolean {
     return unavailable
 }

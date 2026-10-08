@@ -19,15 +19,11 @@ export {
 } from './purl.js'
 export {
     createHttpClient,
-    DEFAULT_TIMEOUT_MS,
     DEFAULT_USER_AGENT,
     HttpError,
     type HttpClient,
-    type HttpClientOptions,
     type HttpResponse,
     type RequestEvent,
-    type RequestGate,
-    type RequestOptions,
 } from './http/client.js'
 export {retryAfterMs} from './http/retry-after.js'
 export {
@@ -35,13 +31,11 @@ export {
     createLimiterPool,
     limitFor,
     type EcosystemLimits,
-    type LimiterPool,
     type LimitSpec,
     type RequestLimiter,
     type WaiterPicker,
 } from './http/limiter.js'
 export {mapWithConcurrency} from './concurrency.js'
-export {MAVEN_PER_VERSION_LICENSES} from './facts.js'
 export {canFetch, fetchPackage} from './fetch-package.js'
 export {isPrerelease} from './registries/latest.js'
 export {mavenMetadataUrl} from './registries/maven/index.js'
@@ -54,9 +48,7 @@ export {
     VERSION_FLAG_YANKED,
     versionPointer,
     type CompactVersion,
-    type DistinctVersion,
     type PackageRecord,
-    type VersionPointer,
 } from './wire/package-record.js'
 export {
     RESOLVE_DEFAULT_DEADLINE_MS,
@@ -77,12 +69,7 @@ export {
     type VulnResponse,
     type VulnUnsupportedReason,
 } from './wire/vulnerabilities.js'
-export {
-    buildVulnerabilityIndex,
-    type PackageKeyer,
-    type PackageKeys,
-    type VulnerabilityIndex,
-} from './vuln/merge.js'
+export {buildVulnerabilityIndex, type PackageKeyer} from './vuln/merge.js'
 export type {GrypeReport} from './vuln/grype.js'
 export type {TrivyReport} from './vuln/trivy.js'
 export {PINNED_SCANNER_VERSIONS} from './vuln/scanner-versions.js'

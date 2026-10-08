@@ -26,7 +26,7 @@ import {depinderFolder} from '../utils/utils'
  * <dir>` does the same for any folder into the global database.
  */
 
-export const DB_FILE_NAME = 'depinder.sqlite'
+const DB_FILE_NAME = 'depinder.sqlite'
 export const MISS_TTL_HOURS = 24
 
 export function defaultCacheDbFile(): string {

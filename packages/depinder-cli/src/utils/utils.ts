@@ -7,7 +7,6 @@ export const _package = require('../../package.json')
 
 
 export const depinderFolder = path.join(homedir(), '.dxw', 'depinder')
-export const depinderTempFolder = path.join(depinderFolder, 'temp')
 
 export function walkDir(dir: string): string[] {
     const allChildren = fs.readdirSync(dir)

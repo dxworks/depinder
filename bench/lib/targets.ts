@@ -14,14 +14,14 @@ export const MONOREPO_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.
 /** The server's project: its compose stack, env files and source. */
 export const SERVER_DIR = path.join(MONOREPO_DIR, 'packages', 'depinder-server')
 /** The folder holding the monorepo and input_data side by side. */
-export const WORKSPACE_DIR = path.resolve(MONOREPO_DIR, '..')
+const WORKSPACE_DIR = path.resolve(MONOREPO_DIR, '..')
 export const INPUT_DIR = process.env.BENCH_INPUT_DIR
     ?? path.join(WORKSPACE_DIR, 'input_data', 'zzw-v051-rerun', 'depminer', 'results')
 export const RUNS_DIR = path.join(MONOREPO_DIR, 'bench', 'runs')
 const DEPLOY_DB_OVERRIDE = path.join(MONOREPO_DIR, 'bench', 'compose.deploy-db.yml')
 
-export type TargetName = 'dev' | 'deploy' | 'hosted'
-export const TARGET_NAMES: readonly TargetName[] = ['dev', 'deploy', 'hosted']
+type TargetName = 'dev' | 'deploy' | 'hosted'
+const TARGET_NAMES: readonly TargetName[] = ['dev', 'deploy', 'hosted']
 
 export interface Target {
     name: TargetName

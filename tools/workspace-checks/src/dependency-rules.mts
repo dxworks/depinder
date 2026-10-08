@@ -21,7 +21,7 @@ export interface DependencyReport {
 const SECTIONS = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'] as const
 
 /** Every dependency a workspace project declares, with each project's range for it. */
-export function declaredRanges(manifests: Manifest[]): Map<string, Map<string, string>> {
+function declaredRanges(manifests: Manifest[]): Map<string, Map<string, string>> {
     const ranges = new Map<string, Map<string, string>>()
     for (const manifest of manifests) {
         for (const section of SECTIONS) {
@@ -36,7 +36,7 @@ export function declaredRanges(manifests: Manifest[]): Map<string, Map<string, s
 }
 
 /** The installed copies of a package: install path → version. */
-export function installedCopies(lock: LockPackages, name: string): Map<string, string> {
+function installedCopies(lock: LockPackages, name: string): Map<string, string> {
     const copies = new Map<string, string>()
     for (const [installPath, entry] of Object.entries(lock)) {
         if (entry.link || !entry.version) continue

@@ -2,7 +2,7 @@ import type {CompactVersion} from '@depinder/core'
 
 /** Row shapes as `pg` returns them: snake_case columns, `timestamptz` as Date, `text[]` as string[]. */
 
-export type PackageStatus = 'pending' | 'resolved' | 'not_found' | 'error'
+type PackageStatus = 'pending' | 'resolved' | 'not_found' | 'error'
 
 export interface PackageRow {
     package_key: string

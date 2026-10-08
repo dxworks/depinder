@@ -15,7 +15,7 @@ import {comparatorFor} from './versions'
  * and `Vulnerability Details` CSV columns are filled identically whichever source ran.
  */
 
-export const GITHUB_SOURCE = 'github'
+const GITHUB_SOURCE = 'github'
 
 export interface AdvisoryIndex {
     /** (ecosystem, normalised name) -> the advisory entries naming that package. */

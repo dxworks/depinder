@@ -1,7 +1,7 @@
 // File-size rules for new and moved code. Files that were already too long
 // when the guard arrived are in size-baseline.json and may shrink but never grow.
 
-export const LIMITS = {
+const LIMITS = {
     code: {soft: 350, hard: 400},
     test: {soft: 500, hard: 550},
 } as const

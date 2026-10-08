@@ -37,14 +37,14 @@ export interface BuildRecord {
     installed_at: string
 }
 
-export interface CurrentBuild {
+interface CurrentBuild {
     folder: string
     /** What the scanner is pointed at. */
     dir: string
     record: BuildRecord
 }
 
-export interface StoreOpened {
+interface StoreOpened {
     trivy?: BuildRecord
     grype?: BuildRecord
     /** Build folders that `current.json` did not reference, deleted. */

@@ -26,7 +26,7 @@ export interface DownloadOptions {
     safetyMargin?: number
 }
 
-export interface EcosystemDownloadResult {
+interface EcosystemDownloadResult {
     ecosystem: string
     count: number
     pages: number

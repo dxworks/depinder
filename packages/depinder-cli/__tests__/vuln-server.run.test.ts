@@ -3,12 +3,14 @@ import {PINNED_SCANNER_VERSIONS} from '@depinder/core'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {clearSbomCache, deferSbomFindings, parseSbomProjects, sbomNpm} from '../src/plugins/sbom'
+import {clearSbomCache, deferSbomFindings, parseSbomProjects, sbomPluginsForPurlTypes} from '../src/plugins/sbom'
 import {clearLocalScanCache, PROVENANCE_FILE} from '../src/plugins/sbom/local-scan'
 import {collectSbomTargets, startServerVulnerabilities, vulnSummaryLine, writeServerProvenance} from '../src/vuln-sources/run'
 import {VulnServerConfig} from '../src/vuln-sources/server'
 import {resetVulnSources} from '../src/vuln-sources/selection'
 import {log} from '../src/utils/logging'
+
+const [sbomNpm] = sbomPluginsForPurlTypes(['npm'])
 
 /**
  * Where an SBOM run's findings come from when a vulnerability server is configured: the server,

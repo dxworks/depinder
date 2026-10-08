@@ -12,7 +12,7 @@ export interface ParityDatabase {
 }
 
 /** Fails, never skips: a parity run without a database would pass having compared nothing. */
-export function testDatabaseUrl(): string {
+function testDatabaseUrl(): string {
     const url = process.env.TEST_DATABASE_URL
     if (!url) {
         throw new Error(`TEST_DATABASE_URL is not set: parity needs a throwaway Postgres. Locally, with depinder-pg: ${LOCAL_COMMAND}`)

@@ -60,7 +60,7 @@ export function goPseudoVersionCommit(version: string): string {
     return GO_PSEUDO_VERSION.exec(version)?.[1] ?? version
 }
 
-export const ORIGINS: readonly Origin[] = [
+const ORIGINS: readonly Origin[] = [
     {name: 'npmjs', purlType: 'npm', versionSeparator: '/'},
     {name: 'rubygems', purlType: 'gem', versionSeparator: '/'},
     {name: 'pypi', purlType: 'pypi', versionSeparator: '/'},
@@ -85,7 +85,7 @@ export const ORIGINS: readonly Origin[] = [
 ]
 
 /** Black Duck's own fallback for a component whose registry it cannot name. */
-export const UNKNOWN_ORIGIN: Origin = {name: 'unknown', purlType: '', versionSeparator: '/'}
+const UNKNOWN_ORIGIN: Origin = {name: 'unknown', purlType: '', versionSeparator: '/'}
 
 /** The origin Black Duck files a component under: by purl type, and for Go also by module host. */
 export function originFor(purlType: string, name: string): Origin {

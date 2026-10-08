@@ -19,7 +19,7 @@ import {GithubAdvisory} from './advisory'
  * database in `~/.dxw/depinder/cache/`.
  */
 
-export const CACHE_SUBDIR = 'github-advisories'
+const CACHE_SUBDIR = 'github-advisories'
 export const DEFAULT_MAX_AGE_HOURS = 24
 
 export interface EcosystemManifestEntry {

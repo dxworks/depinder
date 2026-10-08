@@ -70,7 +70,7 @@ export function fetchSlots(type: string): number {
  * The best rank, the earliest arrival among equals — unless the last `MAX_PASSES` grants all
  * overtook somebody, in which case the oldest waiter goes. A request with no rank is background.
  */
-export function rankedPicker(): WaiterPicker<Rank | undefined> {
+function rankedPicker(): WaiterPicker<Rank | undefined> {
     let overtakes = 0
     const rankOf = (rank: Rank | undefined): number => (rank ? rank() : BACKGROUND_RANK)
     return waiting => {

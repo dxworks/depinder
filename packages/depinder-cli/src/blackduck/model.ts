@@ -28,7 +28,7 @@ import {hasKnownLicense} from './licenses'
  * exports without a translation step on either side. `security.csv` already used these words; `_dependencies.csv` and `_dependencies_sources.csv`
  * used the bare `Direct` / `Transitive`, which made every shared row differ on this column alone.
  */
-export type MatchType =
+type MatchType =
     'Direct Dependency' | 'Transitive Dependency' | 'Direct Dependency,Transitive Dependency'
 
 export interface ExportComponent {

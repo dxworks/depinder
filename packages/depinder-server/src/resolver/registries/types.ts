@@ -61,7 +61,7 @@ export type FeedSpec =
 
 /** An ecosystem as the feed loops see it: its purl type and its feed. */
 export interface Registry {
-    /** purl type, e.g. `npm`. Must match the key in the `registries` map. */
+    /** purl type, e.g. `npm`: this registry's key in the `registries` map. */
     type: string
     feed: FeedSpec
 }

@@ -15,7 +15,7 @@ import {VersionComparator} from './versions'
  * vulnerable.
  */
 
-export type RangeOperator = '=' | '<' | '<=' | '>' | '>='
+type RangeOperator = '=' | '<' | '<=' | '>' | '>='
 
 export interface Constraint {
     operator: RangeOperator
@@ -40,7 +40,7 @@ export function parseRange(range: string): Constraint[] | undefined {
     return constraints
 }
 
-export function satisfiesConstraint(version: string, constraint: Constraint, compare: VersionComparator): boolean {
+function satisfiesConstraint(version: string, constraint: Constraint, compare: VersionComparator): boolean {
     const result = compare(version, constraint.version)
     switch (constraint.operator) {
         case '=': return result === 0

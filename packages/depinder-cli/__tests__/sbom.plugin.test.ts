@@ -1,9 +1,13 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {clearSbomCache, parseSbomProjects, sbomJava, sbomNpm} from '../src/plugins/sbom'
+import {clearSbomCache, parseSbomProjects, sbomPluginsForPurlTypes} from '../src/plugins/sbom'
 import {clearLocalScanCache} from '../src/plugins/sbom/local-scan'
 import {DepinderProject} from '../src/extension-points/extract'
+import {Plugin} from '../src/extension-points/plugin'
+
+const [sbomJava] = sbomPluginsForPurlTypes(['maven'])
+const [sbomNpm] = sbomPluginsForPurlTypes(['npm'])
 
 /**
  * Covers the sbom plugin wiring: whether a local scan ran is a property of the parsed project
@@ -63,7 +67,7 @@ function stubScanner(name: string, report: unknown, counterFile?: string): strin
     return file
 }
 
-async function parse(plugin: typeof sbomJava): Promise<DepinderProject> {
+async function parse(plugin: Plugin): Promise<DepinderProject> {
     const [project] = await parseSbomProjects(sbomFile, plugin.purlType)
     return project
 }

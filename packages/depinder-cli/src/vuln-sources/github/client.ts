@@ -22,8 +22,8 @@ export interface HttpResponse {
 
 export type HttpFetch = (url: string, headers: {[name: string]: string}) => Promise<HttpResponse>
 
-export const GITHUB_API_BASE = 'https://api.github.com'
-export const PAGE_SIZE = 100
+const GITHUB_API_BASE = 'https://api.github.com'
+const PAGE_SIZE = 100
 
 export interface AdvisoryPage {
     advisories: GithubAdvisory[]
@@ -166,7 +166,7 @@ export class AdvisoryClient {
  * The only place a real socket is opened. HTTP 3xx are not followed (the API issues none), and
  * pagination is pinned to `baseUrl`'s origin, so a request never carries a token off that host.
  */
-export const nodeHttpsFetch: HttpFetch = (url, headers) => new Promise((resolve, reject) => {
+const nodeHttpsFetch: HttpFetch = (url, headers) => new Promise((resolve, reject) => {
     countRequest(url)
     const request = https.get(url, {headers}, response => {
         const chunks: Buffer[] = []

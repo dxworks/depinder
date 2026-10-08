@@ -46,7 +46,7 @@ function chooseEcosystems(options: DownloadCommandOptions): string[] {
     return GITHUB_ECOSYSTEMS.map(it => it.name)
 }
 
-export async function downloadAction(options: DownloadCommandOptions): Promise<void> {
+async function downloadAction(options: DownloadCommandOptions): Promise<void> {
     const cacheDir = defaultCacheDir()
     const requested = chooseEcosystems(options)
     const {resolved, unknown} = resolveEcosystems(requested)
@@ -87,7 +87,7 @@ export async function downloadAction(options: DownloadCommandOptions): Promise<v
     }
 }
 
-export function statusAction(options: {tokenFile: string, maxAge: string}): void {
+function statusAction(options: {tokenFile: string, maxAge: string}): void {
     const cacheDir = defaultCacheDir()
     const manifest = readManifest(cacheDir)
     const maxAge = Number(options.maxAge)
@@ -111,7 +111,7 @@ export function statusAction(options: {tokenFile: string, maxAge: string}): void
     }
 }
 
-export const githubAdvisoriesDownloadCommand = new Command()
+const githubAdvisoriesDownloadCommand = new Command()
     .name('download')
     .description('Download GitHub reviewed security advisories into the local cache')
     .option('-e, --ecosystems <list>', 'Comma-separated ecosystems, in either GitHub or purl spelling (npm,gem,...)')
@@ -122,7 +122,7 @@ export const githubAdvisoriesDownloadCommand = new Command()
     .option('--force', 'Download even when the cache is fresh', false)
     .action(downloadAction)
 
-export const githubAdvisoriesStatusCommand = new Command()
+const githubAdvisoriesStatusCommand = new Command()
     .name('status')
     .description('Show the token pool and what the advisory cache holds')
     .option('--token-file <file>', 'Dotenv-style file holding GH_TOKEN_1, GH_TOKEN_2, ...', DEFAULT_TOKEN_FILE)

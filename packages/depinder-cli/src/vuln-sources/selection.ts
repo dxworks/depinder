@@ -19,7 +19,7 @@ export interface VulnSourceSelection {
 
 export const DEFAULT_VULN_SOURCE = 'trivy,grype'
 
-export const ALL_SOURCES: VulnSourceSelection = {trivy: true, grype: true, github: true}
+const ALL_SOURCES: VulnSourceSelection = {trivy: true, grype: true, github: true}
 
 export class UnknownVulnSourceError extends Error {
     constructor(name: string) {

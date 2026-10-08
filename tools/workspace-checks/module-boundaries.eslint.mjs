@@ -4,7 +4,7 @@
 import nx from '@nx/eslint-plugin'
 import tseslint from 'typescript-eslint'
 
-export const DEP_CONSTRAINTS = [
+const DEP_CONSTRAINTS = [
     {sourceTag: 'scope:shared', onlyDependOnLibsWithTags: ['scope:shared']},
     {sourceTag: 'scope:client', onlyDependOnLibsWithTags: ['scope:shared', 'scope:client']},
     {sourceTag: 'scope:server', onlyDependOnLibsWithTags: ['scope:shared', 'scope:server']},

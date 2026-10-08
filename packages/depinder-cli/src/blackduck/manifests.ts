@@ -66,7 +66,7 @@ const FAMILIES: {purlType: string, manifests: RegExp, lockfiles: RegExp}[] = [
 ]
 
 /** The family a `Path` tag (`-yarn`, `-uv`, `-gradle`, …) belongs to. */
-export function familyOfTag(tag: string): string {
+function familyOfTag(tag: string): string {
     switch (tag) {
     case 'npm': case 'yarn': case 'pnpm': return 'npm'
     case 'uv': case 'pip': case 'poetry': return 'pypi'

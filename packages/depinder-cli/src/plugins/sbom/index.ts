@@ -163,8 +163,6 @@ const SBOM_ECOSYSTEMS: readonly SbomEcosystem[] = [
 
 export const sbomPlugins: Plugin[] = SBOM_ECOSYSTEMS.map(sbomPluginFor)
 
-export const [sbomJava, sbomNpm, sbomRuby, sbomPython, sbomPhp, sbomDotnet, sbomGo, sbomRust] = sbomPlugins
-
 const sbomByContent = new Map<string, boolean>()
 
 /**

@@ -14,7 +14,7 @@ export class BusyError extends Error {
     }
 }
 
-export type Release = () => void
+type Release = () => void
 
 export interface ScanLimiter {
     /**

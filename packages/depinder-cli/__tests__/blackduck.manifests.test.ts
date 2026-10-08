@@ -3,7 +3,7 @@ import os from 'os'
 import path from 'path'
 import {readDepMinerIndex} from '../src/blackduck/depminer-index'
 import {blackDuckPrefix, manifestOfTree, ownCodeMatcher, pep440, readRepoManifests, RepoManifests} from '../src/blackduck/manifests'
-import {sbomPaths} from '../src/blackduck/paths'
+import {sbomTree} from '../src/blackduck/paths'
 
 /**
  * The two things `Path` takes from the scanned repository rather than from the SBOM: Black Duck's
@@ -190,7 +190,7 @@ describe('ownCodeMatcher', () => {
     })
 })
 
-describe('sbomPaths with the repository\'s manifests', () => {
+describe('sbomTree paths with the repository\'s manifests', () => {
     // excalidraw dev-docs: Trivy chains `docs@0.0.0 -> @docusaurus/core -> eta`; Black Duck writes
     // `js-yarn-excalidraw/dev-docs/-yarn/@docusaurus/core/2.2.0/eta/1.12.3` — the workspace is
     // the project, and `@docusaurus/core` is Direct.
@@ -214,13 +214,13 @@ describe('sbomPaths with the repository\'s manifests', () => {
                 {ref: 'core', dependsOn: ['eta']},
             ],
         })
-        const withoutRepo = sbomPaths(file, 'js-yarn-excalidraw', new Set(['npm']))
+        const withoutRepo = sbomTree(file, 'js-yarn-excalidraw', new Set(['npm'])).paths
         expect(withoutRepo.map(it => [it.path, it.matchType])).toEqual([
             ['js-yarn-excalidraw/dev-docs/-yarn/docs/0.0.0', 'Direct Dependency'],
             ['js-yarn-excalidraw/dev-docs/-yarn/docs/0.0.0/@docusaurus/core/2.2.0', 'Transitive Dependency'],
             ['js-yarn-excalidraw/dev-docs/-yarn/docs/0.0.0/@docusaurus/core/2.2.0/eta/1.12.3', 'Transitive Dependency'],
         ])
-        const withRepo = sbomPaths(file, 'js-yarn-excalidraw', new Set(['npm']), {manifests: indexedRepo()})
+        const withRepo = sbomTree(file, 'js-yarn-excalidraw', new Set(['npm']), {manifests: indexedRepo()}).paths
         expect(withRepo.map(it => [it.path, it.matchType, it.projectPath])).toEqual([
             ['js-yarn-excalidraw/dev-docs/-yarn/@docusaurus/core/2.2.0', 'Direct Dependency', 'js-yarn-excalidraw/dev-docs'],
             ['js-yarn-excalidraw/dev-docs/-yarn/@docusaurus/core/2.2.0/eta/1.12.3', 'Transitive Dependency', 'js-yarn-excalidraw/dev-docs'],
@@ -247,7 +247,7 @@ describe('sbomPaths with the repository\'s manifests', () => {
                 {ref: 'stubs', dependsOn: ['yaml']},
             ],
         })
-        const paths = sbomPaths(file, 'python-saleor', new Set(['pypi']), {manifests: indexedRepo()})
+        const paths = sbomTree(file, 'python-saleor', new Set(['pypi']), {manifests: indexedRepo()}).paths
         expect(paths.map(it => [it.path, it.matchType])).toEqual([
             ['saleor/3.24.0a0/python-saleor/-uv/django-stubs/5.2.2', 'Direct Dependency'],
             ['saleor/3.24.0a0/python-saleor/-uv/django-stubs/5.2.2/types-pyyaml/6.0.12', 'Transitive Dependency'],
@@ -263,7 +263,7 @@ describe('sbomPaths with the repository\'s manifests', () => {
             ],
             dependencies: [{ref: 'root', dependsOn: ['app']}, {ref: 'app', dependsOn: ['zx']}],
         })
-        expect(sbomPaths(file, 'js-pnpm-n8n', new Set(['npm'])).map(it => it.path))
+        expect(sbomTree(file, 'js-pnpm-n8n', new Set(['npm'])).paths.map(it => it.path))
             .toEqual(['js-pnpm-n8n/-pnpm/zx/8.8.5'])
     })
 })

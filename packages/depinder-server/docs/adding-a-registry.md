@@ -208,7 +208,7 @@ matches what upstream actually offers. See [Freshness](resolver-api.md#freshness
 
 ```ts
 // packages/depinder-core/src/registries/index.ts — the eight that are there today, plus yours
-export const fetchers: Readonly<Record<string, PackageFetcher>> = {
+const fetchers: Readonly<Record<string, PackageFetcher>> = {
     npm: npmFetcher,
     // ...
     swift: swiftFetcher, // <- your line

@@ -14,7 +14,7 @@ import {INPUT_DIR, MONOREPO_DIR} from './targets.js'
  */
 
 /** The CLI's Nx project in the monorepo; its build lands in dist/. */
-export const DEPINDER_CLI_DIR = path.join(MONOREPO_DIR, 'packages', 'depinder-cli')
+const DEPINDER_CLI_DIR = path.join(MONOREPO_DIR, 'packages', 'depinder-cli')
 const BUILD_COMMAND = ['npx', 'nx', 'build', 'depinder-cli']
 
 export interface GitInfo {

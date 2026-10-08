@@ -31,7 +31,7 @@ const KEY_COLUMNS = [
 ]
 
 /** RFC 4180-ish: quoted fields, doubled quotes inside them, and newlines inside quotes. */
-export function parseCsv(text: string): string[][] {
+function parseCsv(text: string): string[][] {
     const rows: string[][] = []
     let row: string[] = []
     let field = ''
@@ -78,13 +78,13 @@ function csvFiles(dir: string): string[] {
         .sort()
 }
 
-export interface ColumnDiff {
+interface ColumnDiff {
     count: number
     byClass: Record<DiffClass, number>
     examples: {key: string, a: string, b: string, class: DiffClass}[]
 }
 
-export interface FileDiff {
+interface FileDiff {
     file: string
     /** Set when the file is in one folder only. */
     onlyIn?: 'A' | 'B'

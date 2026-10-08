@@ -51,7 +51,7 @@ export interface ProjectPathInfo {
   verifiedPathMethod: VerifiedPathMethod;
 }
 
-export type VerifiedPathMethod =
+type VerifiedPathMethod =
   | 'exact'
   | 'mapping'
   | 'maven-artifact-parent'

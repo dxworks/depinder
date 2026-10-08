@@ -51,7 +51,7 @@ export interface ToolHealth {
     upstream_built_at?: string | null
 }
 
-export interface SourceHealth {
+interface SourceHealth {
     /** Both tools have a build: scans can run. */
     ready: boolean
     /** `stale` is still ready: old data is served and labelled, never refused. */

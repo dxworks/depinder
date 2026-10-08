@@ -2,7 +2,7 @@
   "name": "@depinder/core",
   "version": "0.0.0",
   "private": true,
-  "description": "What the depinder CLI and the server share: registry fetchers, the HTTP client, purls, logging, the latest rule, the /resolve and /vulnerabilities wire shapes and the Trivy/Grype merge",
+  "description": "What the depinder CLI and the server share: registry fetchers, the HTTP client, purls, the Logger interface, the latest rule, the /resolve and /vulnerabilities wire shapes and the Trivy/Grype merge",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {

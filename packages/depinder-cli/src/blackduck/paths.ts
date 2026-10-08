@@ -95,7 +95,7 @@ const PACKAGE_MANAGER_TAGS: readonly [RegExp, string][] = [
 ]
 
 /** What a component with no parent inside its tree is filed under, as `comparison-view` spells it. */
-export const EDGE_ROOT = '(root)'
+const EDGE_ROOT = '(root)'
 
 export function packageManagerTag(manifest: string | undefined): string | undefined {
     if (!manifest) return undefined
@@ -370,9 +370,4 @@ export function sbomTree(sbomFile: string, repo: string, purlTypes: Set<string>,
     const trees = [...purlTypes].flatMap(purlType =>
         findProjectNodes(graph, sbomFile, purlType).map(node => projectTree(graph, node, repo, purlType, options.manifests)))
     return {paths: trees.flatMap(it => it.paths), edges: trees.flatMap(it => it.edges)}
-}
-
-/** Just the chains, for a caller that only writes the `Path` column. */
-export function sbomPaths(sbomFile: string, repo: string, purlTypes: Set<string>, options: SbomTreeOptions = {}): SbomPath[] {
-    return sbomTree(sbomFile, repo, purlTypes, options).paths
 }

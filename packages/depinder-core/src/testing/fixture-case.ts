@@ -7,7 +7,7 @@ import {join} from 'node:path'
  * `fetch`, so any code that fetches the package through core can run offline.
  */
 
-export type FixtureExpectation = 'found' | 'not_found'
+type FixtureExpectation = 'found' | 'not_found'
 
 /** One response as the registry sent it. `body` names a file next to `case.json`. */
 export interface RecordedResponse {

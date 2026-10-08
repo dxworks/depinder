@@ -42,8 +42,7 @@ while IFS= read -r line || [ -n "$line" ]; do
 done < "$ENV_FILE"
 
 # The server's address is not kept in the env file (nor anywhere in the repo): it comes from
-# `--ip` or DEPINDER_SERVER_IP. A SERVER_IP line left in an older env file is ignored.
-[ -z "${SERVER_IP:-}" ] || echo "note: SERVER_IP in $ENV_FILE is ignored; the address comes from --ip or DEPINDER_SERVER_IP (you can delete that line)" >&2
+# `--ip` or DEPINDER_SERVER_IP.
 SERVER_IP="${ip_arg:-${DEPINDER_SERVER_IP:-}}"
 [ -n "$SERVER_IP" ] || die 'No server address. Run: export DEPINDER_SERVER_IP=<server ip>   (or pass --ip <server ip>)'
 [[ "$SERVER_IP" =~ ^[A-Za-z0-9.:-]+$ ]] || die "server address '$SERVER_IP' is not an IP or host name"

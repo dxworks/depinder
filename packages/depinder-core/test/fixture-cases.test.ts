@@ -2,7 +2,7 @@ import {fileURLToPath} from 'node:url'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 import {fetchPackage} from '../src/fetch-package.js'
 import {parsePurl, SUPPORTED_TYPES} from '../src/purl.js'
-import {listFixtureCases, replayFetch, UnrecordedRequestError} from '../src/testing/index.js'
+import {listFixtureCases, replayFetch, UnrecordedRequestError} from '../src/testing/fixture-case.js'
 import {testContext} from './registries/registry.helpers.js'
 
 // Every recorded case replays through the real fetchPackage with nothing but its own answers,

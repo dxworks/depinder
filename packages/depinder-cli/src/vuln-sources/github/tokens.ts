@@ -23,7 +23,7 @@ export const DEFAULT_TOKEN_FILE = '.github-tokens'
  * The margin exists because the counter we read is one response old and several workers share the
  * window: without it, the last few requests of a window race each other into 403s.
  */
-export const DEFAULT_SAFETY_MARGIN = 25
+const DEFAULT_SAFETY_MARGIN = 25
 
 /** Never open more than this many connections to api.github.com, however many tokens exist. */
 export const MAX_CONCURRENCY = 4

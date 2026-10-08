@@ -449,7 +449,7 @@ export interface VulnerabilityFindingsFile {
     components: VulnerableComponent[]
 }
 
-export type VulnerableComponent = Pick<ExportComponent, 'name' | 'version' | 'purlType' | 'origin' | 'originId' | 'vulnerabilities'>
+type VulnerableComponent = Pick<ExportComponent, 'name' | 'version' | 'purlType' | 'origin' | 'originId' | 'vulnerabilities'>
 
 export function vulnerabilityFindings(model: BlackDuckModel): VulnerabilityFindingsFile {
     return {
@@ -461,7 +461,7 @@ export function vulnerabilityFindings(model: BlackDuckModel): VulnerabilityFindi
     }
 }
 
-export function writeVulnerabilityFindings(model: BlackDuckModel, resultFolder: string): WrittenFile {
+function writeVulnerabilityFindings(model: BlackDuckModel, resultFolder: string): WrittenFile {
     const findings = vulnerabilityFindings(model)
     fs.mkdirSync(resultFolder, {recursive: true})
     fs.writeFileSync(path.resolve(resultFolder, VULNERABILITY_FINDINGS_FILE), JSON.stringify(findings, null, 2))

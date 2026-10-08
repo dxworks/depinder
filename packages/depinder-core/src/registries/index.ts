@@ -9,7 +9,7 @@ import {pypiFetcher} from './pypi.js'
 import type {PackageFetcher} from './types.js'
 
 /** Every implemented ecosystem's fetcher, keyed by purl type. All eight of `SUPPORTED_TYPES` are here. */
-export const fetchers: Readonly<Record<string, PackageFetcher>> = {
+const fetchers: Readonly<Record<string, PackageFetcher>> = {
     npm: npmFetcher,
     pypi: pypiFetcher,
     nuget: nugetFetcher,
