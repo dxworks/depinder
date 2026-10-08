@@ -299,7 +299,7 @@ const BY_SLUG: {[slug: string]: string} = (() => {
  * (an expression followed by the licence FILE), a bare URL, or, in one package, the entire licence
  * text pasted into the field.
  */
-export function canonicalId(raw: string): string {
+function canonicalId(raw: string): string {
     let text = stripOuterParens(raw.trim()).replace(/\+$/, '').trim()
     if (!text) return ''
 
@@ -408,45 +408,12 @@ function riskOf(parsed: {operands: Operand[], isChoice: boolean}): LicenseRisk {
  * over-reporting risk is the safe direction to be wrong in.
  */
 export function licenseRisk(licenses: string[]): LicenseRisk {
-    return riskOfMany(licenses)
-}
-
-/**
- * The same rule, read off a `License names` cell that has already been written.
- *
- * `licenseRisk` works on whatever the registries gave us; anything reading a finished export has
- * only the rendered cell -- `(MIT License OR Mozilla Public License 2.0)`. Both go through the
- * same reader, because it resolves Black Duck's display names as readily as SPDX ids.
- */
-export function licenseRiskFromNames(names: string): LicenseRisk {
-    return riskOfMany(splitTopLevel(names))
-}
-
-/** Several licences side by side are a conjunction -- see `licenseColumns` for why. */
-function riskOfMany(licenses: string[]): LicenseRisk {
     const present = licenses.map(it => it.trim()).filter(it => it.length > 0)
     if (present.length === 0) return 'UNKNOWN'
+    // Several licences side by side are a conjunction -- see `licenseColumns` for why.
     const risks = present.map(it => riskOf(parseExpression(it)))
     const readable = risks.filter(it => it !== 'UNKNOWN') as KnownRisk[]
     return conjunction(readable, readable.length !== risks.length)
-}
-
-function splitTopLevel(cell: string): string[] {
-    const parts: string[] = []
-    let depth = 0
-    let current = ''
-    for (const ch of cell) {
-        if (ch === '(') depth++
-        if (ch === ')') depth--
-        if (ch === ',' && depth === 0) {
-            parts.push(current)
-            current = ''
-            continue
-        }
-        current += ch
-    }
-    parts.push(current)
-    return parts.map(it => it.trim()).filter(it => it.length > 0)
 }
 
 /**
@@ -481,44 +448,45 @@ export function licenseColumns(licenses: string[]): {names: string, families: st
 }
 
 /**
- * The same columns, rebuilt from a cell this exporter already wrote.
- *
- * The offline recompute has no SBOM and no cache entry for every component, so for those the only
- * licence it holds is the one already in the file. That is not a dead end: the reader resolves
- * Black Duck's display names and a registry's raw wording alike, so a cell can be put back through
- * it and come out canonical -- which is exactly what the exporter would have written.
+ * The licence `<plugin>-licenses.csv` groups a library under: the same reading the Black Duck
+ * columns make, written as SPDX ids (`MIT OR Apache-2.0`) instead of display names. Text that
+ * names no licence is kept as it is, or is `unknown` when it is not a name at all.
  */
-export function licenseColumnsFromNames(names: string): {names: string, families: string} {
-    const cell = names.trim()
-    // Whole before parts, for the same reason an expression is: a licence NAME can contain a
-    // comma -- `Apache License, Version 2.0` is one licence, and splitting it yields two halves
-    // that name nothing.
-    if (cell && canonicalId(cell)) return licenseColumns([cell])
-    return licenseColumns(splitTopLevel(cell))
+export function licenseIdentity(license: string): string {
+    const {licenses, operator} = readLicenses(license)
+    if (licenses.length === 0) return unreadableName(license) ?? 'unknown'
+    return licenses.map(it => it.id).join(` ${operator} `)
 }
 
-/** Maps each operand of an expression and rebuilds it in Black Duck's shape and order. */
+/** Rebuilds an expression in Black Duck's shape and order, with its families. */
 function describeExpression(expression: string): {name: string, family: LicenseFamily[]} {
+    const {licenses, operator} = readLicenses(expression)
+    if (licenses.length === 0) return {name: unreadableName(expression) ?? UNKNOWN.name, family: ['UNKNOWN']}
+
+    const families = [...new Set(licenses.map(it => it.family))]
+    if (licenses.length === 1) return {name: licenses[0].name, family: families}
+    return {name: `(${licenses.map(it => it.name).join(` ${operator} `)})`, family: families}
+}
+
+/** The licences an expression names that we can read, de-duplicated and in Black Duck's order. */
+function readLicenses(expression: string): {licenses: Operand[], operator: 'OR' | 'AND'} {
     const {operands, isChoice} = parseExpression(expression)
-    const readable = operands.filter(it => it.id)
-    // Nothing in it we can read: keep the text, unless it is not a name at all, in which case
-    // saying `Unknown License` is both shorter and truer than pasting a URL or a licence file.
-    if (readable.length === 0) {
-        const text = stripOuterParens(expression.trim())
-        const usable = text.length > 0 && text.length <= MAX_NAME_LENGTH && !/https?:\/\//i.test(text)
-        return {name: usable ? text : UNKNOWN.name, family: ['UNKNOWN']}
+    const licenses: Operand[] = []
+    for (const operand of operands) {
+        if (operand.id && !licenses.some(it => it.id === operand.id)) licenses.push(operand)
     }
+    licenses.sort((a, b) => orderOf(a.name) - orderOf(b.name))
+    return {licenses, operator: isChoice ? 'OR' : 'AND'}
+}
 
-    const unique: Operand[] = []
-    for (const operand of readable) if (!unique.some(it => it.id === operand.id)) unique.push(operand)
-    unique.sort((a, b) => orderOf(a.name) - orderOf(b.name))
-
-    const families: LicenseFamily[] = []
-    for (const operand of unique) if (!families.includes(operand.family)) families.push(operand.family)
-    if (unique.length === 1) return {name: unique[0].name, family: families}
-
-    const operator = isChoice ? 'OR' : 'AND'
-    return {name: `(${unique.map(it => it.name).join(` ${operator} `)})`, family: families}
+/**
+ * Text naming no licence we can read, kept as written -- unless it is not a name at all (a URL,
+ * a pasted licence file), where `undefined` lets the caller say "unknown" instead.
+ */
+function unreadableName(expression: string): string | undefined {
+    const text = stripOuterParens(expression.trim())
+    const usable = text.length > 0 && text.length <= MAX_NAME_LENGTH && !/https?:\/\//i.test(text)
+    return usable ? text : undefined
 }
 
 const orderOf = (name: string): number => {

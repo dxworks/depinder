@@ -1,4 +1,4 @@
-import {licenseColumns, licenseRisk, licenseRiskFromNames} from '../src/blackduck/licenses'
+import {licenseColumns, licenseIdentity, licenseRisk} from '../src/blackduck/licenses'
 import {operationalRisk} from '../src/blackduck/risk'
 
 /**
@@ -60,36 +60,6 @@ describe('License Risk', () => {
 
     it('reads a mixed expression as a conjunction rather than modelling precedence', () => {
         expect(licenseRisk(['MIT OR Apache-2.0 AND GPL-3.0'])).toBe('HIGH')
-    })
-})
-
-describe('License Risk read off a written cell', () => {
-    it('agrees with the SPDX-id rule on the cells that rule produces', () => {
-        expect(licenseRiskFromNames('MIT License')).toBe('OK')
-        expect(licenseRiskFromNames('Mozilla Public License 2.0')).toBe('MEDIUM')
-        expect(licenseRiskFromNames('GNU General Public License v3.0')).toBe('HIGH')
-        expect(licenseRiskFromNames('Unknown License')).toBe('UNKNOWN')
-        expect(licenseRiskFromNames('')).toBe('UNKNOWN')
-    })
-
-    it('keeps the operator rule through the rendered parentheses', () => {
-        expect(licenseRiskFromNames('(BSD 2-clause "Simplified" License OR Ruby License)')).toBe('OK')
-        expect(licenseRiskFromNames('(BSD 2-clause "Simplified" License AND Ruby License)')).toBe('MEDIUM')
-    })
-
-    /** A comma joins several licences; it must not be read as a break inside one expression. */
-    it('splits on top-level commas only', () => {
-        expect(licenseRiskFromNames('MIT License,GNU General Public License v3.0')).toBe('HIGH')
-        expect(licenseRiskFromNames('(MIT License OR Apache License 2.0)')).toBe('OK')
-        expect(licenseRiskFromNames('(MIT License OR Apache License 2.0),MIT License')).toBe('OK')
-    })
-
-    it('is what the exporter would have written, for every cell it writes', () => {
-        for (const ids of [['MIT'], ['GPL-3.0'], ['MIT', 'MPL-2.0'], ['BSD-2-Clause OR Ruby'],
-            ['BSD-2-Clause AND Ruby'], ['Apache-2.0 OR EPL-2.0'], []]) {
-            const {names} = licenseColumns(ids)
-            expect(licenseRiskFromNames(names)).toBe(licenseRisk(ids))
-        }
     })
 })
 
@@ -188,7 +158,7 @@ describe('reading a licence however it is written', () => {
         // What a finished export holds: Black Duck display names, not SPDX ids.
         expect(names(['MIT License'])).toBe('MIT License')
         expect(names(['(MIT License OR Apache License 2.0)'])).toBe('(MIT License OR Apache License 2.0)')
-        expect(licenseRiskFromNames('(MIT License OR Apache License 2.0)')).toBe('OK')
+        expect(licenseRisk(['(MIT License OR Apache License 2.0)'])).toBe('OK')
     })
 
     it('takes the licence in front of a nuget licence URL, and only once', () => {
@@ -227,5 +197,38 @@ describe('reading a licence however it is written', () => {
     it('drops unreadable text that sits next to a licence it did read', () => {
         expect(names(['MIT', 'https://example.com/LICENSE'])).toBe('MIT License')
         expect(licenseColumns(['MIT', 'https://example.com/LICENSE']).families).toBe('PERMISSIVE')
+    })
+})
+
+/** `<plugin>-licenses.csv` groups by `licenseIdentity`; it must name what the Black Duck columns name. */
+describe('one licence identity for both outputs', () => {
+    it('writes the licence the Black Duck columns read, as SPDX ids', () => {
+        for (const spelling of ['MIT', 'The Apache Software License, Version 2.0', 'GPL-3.0',
+            'Eclipse Public License v2.0', 'GNU Lesser General Public License v2.1 or later', 'BSD', 'Expat',
+            'MIT/Apache-2.0', 'Unlicense OR MIT', 'gpl-3.0 or mit', 'GPL-2.0 WITH Classpath-exception-2.0',
+            'MIT https://www.nuget.org/packages/a/1.0/license']) {
+            expect(licenseColumns([licenseIdentity(spelling)]).names).toBe(licenseColumns([spelling]).names)
+        }
+    })
+
+    // Spellings a generic SPDX corrector misreads: GPL-3.0 as -or-later, a URL as MPL-2.0, and so on.
+    it.each([
+        ['GPL-3.0', 'GPL-3.0'],
+        ['Eclipse Public License v2.0', 'EPL-2.0'],
+        ['GNU Lesser General Public License v2.1 or later', 'LGPL-2.1-or-later'],
+        ['BSD', 'BSD-3-Clause'],
+        ['Expat', 'MIT-Expat'],
+        ['MIT/Apache-2.0', 'MIT OR Apache-2.0'],
+        ['Unlicense OR MIT', 'MIT OR Unlicense'],
+        ['(MIT License OR Apache License 2.0)', 'MIT OR Apache-2.0'],
+        ['BSD-like', 'BSD-like'],
+        ['SEE LICENSE IN LICENSE.txt', 'SEE LICENSE IN LICENSE.txt'],
+        ['https://example.com/LICENSE.txt', 'unknown'],
+    ])('reads %s as %s', (spelling, identity) => {
+        expect(licenseIdentity(spelling)).toBe(identity)
+    })
+
+    it('keeps an SPDX id the table does not list', () => {
+        expect(licenseIdentity('EUPL-1.2')).toBe('EUPL-1.2')
     })
 })

@@ -12,7 +12,6 @@ import {getVulnerabilitiesFromGithub} from '../utils/vulnerabilities'
 import {attachGithubAdvisories} from '../utils/library-advisories'
 import {Range} from 'semver'
 import _ from 'lodash'
-import spdxCorrect from 'spdx-correct'
 import moment from 'moment'
 import {ecosystemOf, Plugin} from '../extension-points/plugin'
 import {Cache, noCache} from '../cache/cache'
@@ -36,6 +35,7 @@ import {DEFAULT_MAX_AGE_HOURS} from '../vuln-sources/github/cache'
 import {DEFAULT_TOKEN_FILE} from '../vuln-sources/github/tokens'
 import {AnalysedEcosystem} from '../blackduck/model'
 import {writeBlackDuckForSource} from '../blackduck/run'
+import {licenseIdentity} from '../blackduck/licenses'
 import {classifyInputs, inputFolderOf, InputSources} from './sources'
 import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
@@ -58,9 +58,6 @@ import {
     vulnSummaryLine,
     writeServerProvenance,
 } from '../vuln-sources/run'
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const licenseIds = require('spdx-license-ids/')
-
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 require('events').EventEmitter.prototype._maxListeners = 100
 
@@ -224,15 +221,12 @@ export function resolveVulnerabilities(project: DepinderProject, dep: DepinderDe
  * fills (and the one libs.csv reports); the per-version list is optional and left empty by some —
  * the maven registrar sets `licenses: []` on every version — so grouping on it alone reported
  * everything as unknown. Fall back to the per-version list for registrars that only fill that.
+ * It is read the same way as the Black Duck licence columns, so both outputs agree.
  */
 export function licenseOf(lib: LibraryInfo): string {
     const license = lib.licenses?.find(it => typeof it === 'string' && it)
         ?? availableVersions(lib.versions).flatMap(it => it.licenses).find(it => typeof it === 'string' && it)
-    if (!license || typeof license !== 'string')
-        return 'unknown'
-    if (!licenseIds.includes(license))
-        return spdxCorrect(license) || 'unknown'
-    return license
+    return license ? licenseIdentity(license) : 'unknown'
 }
 
 async function cacheHit(cache: Cache, cacheKey: string, dep: DepinderDependency, refresh: boolean, refreshedLibs: any[]) {
