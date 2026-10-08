@@ -3,7 +3,7 @@ import * as fsSync from 'fs';
 import path from 'path';
 import { Command } from 'commander';
 import { parse } from 'csv-parse/sync';
-import { stringify } from 'csv-stringify/sync';
+import { csvDocumentFromRows, csvLines } from '../utils/csv';
 import { extractProjectInfo, PathMappings, createPathMappings } from '../utils/projectMapping';
 import { addCategoriesToBlackDuckReports } from '../utils/blackDuckReportCategories';
 import {
@@ -314,10 +314,10 @@ export function transformUpgradeGuidance(upgradeRaw: string): string {
         keepIndexes.map(i => row[i] ?? '')
     );
 
-    return stringify([
+    return csvLines([
         keepIndexes.map(i => modifiedHeaders[i]),
         ...transformedRows
-    ], { header: false });
+    ]);
 }
 
 /**
@@ -409,7 +409,7 @@ export async function transformBlackDuckReports(reportDir: string, options?: { b
             dependenciesSourcesRecords,
             DEPENDENCIES_SOURCES_COLUMN_ORDER
         );
-        const dependenciesSourcesCSV = stringify(formattedDependenciesSources, { header: true });
+        const dependenciesSourcesCSV = csvDocumentFromRows(formattedDependenciesSources);
         await fs.writeFile(path.join(reportDir, '_dependencies_sources.csv'), dependenciesSourcesCSV);
 
         // Transform and write _dependencies.csv
@@ -418,12 +418,12 @@ export async function transformBlackDuckReports(reportDir: string, options?: { b
             dependencyRecords,
             DEPENDENCIES_COLUMN_ORDER
         );
-        const dependenciesCSV = stringify(formattedDependencies, { header: true });
+        const dependenciesCSV = csvDocumentFromRows(formattedDependencies);
         await fs.writeFile(path.join(reportDir, '_dependencies.csv'), dependenciesCSV);
 
         // Transform and write _vulnerability_details.csv
         const vulnerabilityRecords = transformVulnerabilityDetails(securityRecords);
-        const vulnerabilityCSV = stringify(vulnerabilityRecords, { header: true });
+        const vulnerabilityCSV = csvDocumentFromRows(vulnerabilityRecords);
         await fs.writeFile(path.join(reportDir, '_vulnerability_details.csv'), vulnerabilityCSV);
 
         // Transform and write _upgrade_guidance.csv

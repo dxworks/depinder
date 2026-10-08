@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { parse } from 'csv-parse/sync';
-import { stringify } from 'csv-stringify/sync';
+import { csvDocumentFromRows } from './csv';
 
 const CSV_PARSE_OPTIONS = {
     columns: (headers: string[]) => headers.map(header => header.trim()),
@@ -38,11 +38,11 @@ export async function addCategoriesToBlackDuckReports(reportDir: string, repoCat
 
     await fs.writeFile(
         path.join(reportDir, DEPENDENCIES_SOURCES_BY_CATEGORY_FILE),
-        stringify(outputs.dependenciesSourcesByCategory, { header: true })
+        csvDocumentFromRows(outputs.dependenciesSourcesByCategory)
     );
     await fs.writeFile(
         path.join(reportDir, DEPENDENCIES_BY_CATEGORY_FILE),
-        stringify(outputs.dependenciesByCategory, { header: true })
+        csvDocumentFromRows(outputs.dependenciesByCategory)
     );
 }
 

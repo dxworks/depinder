@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { XMLParser } from 'fast-xml-parser';
 import { Command } from 'commander';
-import { stringify } from 'csv-stringify/sync';
+import { csvLines } from '../utils/csv';
 
 interface FrameworkVersionPerProject {
     programmingLanguage: string;
@@ -31,7 +31,7 @@ export function convertToCSV(data: FrameworkVersionPerProject[]): string {
             item.notes || ''
         ]);
 
-    return stringify([headers, ...rows]);
+    return csvLines([headers, ...rows]);
 }
 
 export async function extract(rootPath: string): Promise<FrameworkVersionPerProject[]> {

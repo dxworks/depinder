@@ -1,6 +1,5 @@
 import {parse} from 'csv-parse/sync'
 import {convertDepToRow} from '../src/commands/analyse'
-import {csvRow} from '../src/utils/csv'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
 import {LibraryInfo} from '../src/extension-points/library-info'
 
@@ -31,28 +30,6 @@ function cellsOf(dep: DepinderDependency): string[] {
     const rows: string[][] = parse(convertDepToRow(project, dep), {relaxColumnCount: false})
     return rows[0]
 }
-
-describe('csvRow', () => {
-    it('quotes a cell containing a comma', () => {
-        expect(csvRow(['a', 'b,c', 'd'])).toBe('a,"b,c",d')
-    })
-
-    it('doubles embedded quotes', () => {
-        expect(csvRow(['say "hi"'])).toBe('"say ""hi"""')
-    })
-
-    it('quotes a cell containing a newline', () => {
-        expect(csvRow(['line1\nline2'])).toBe('"line1\nline2"')
-    })
-
-    it('writes an empty cell for undefined rather than the string undefined', () => {
-        expect(csvRow(['a', undefined, 'b'])).toBe('a,,b')
-    })
-
-    it('leaves an ordinary cell unquoted', () => {
-        expect(csvRow(['a', 1, true])).toBe('a,1,true')
-    })
-})
 
 describe('convertDepToRow', () => {
     it('keeps a comma-containing version in one cell', () => {

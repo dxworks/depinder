@@ -1,7 +1,7 @@
 /**
- * RFC 4180 CSV writing, shared by every report depinder emits.
+ * RFC 4180 CSV writing, shared by every CSV file the CLI emits.
  *
- * A cell containing a comma, a quote or a newline must be quoted, and embedded quotes doubled.
+ * A cell containing a comma, a quote or a line break must be quoted, and embedded quotes doubled.
  * Versions carry commas in the wild — Maven range strings such as `[4.1,4.2000)` — and an unquoted
  * one splits into two cells, shifting every column after it for that row.
  */
@@ -15,16 +15,22 @@ export function csvRow(cells: unknown[]): string {
     return cells.map(csvCell).join(',')
 }
 
+/** Every row as one line, each ending with a newline; no rows give an empty file. */
+export function csvLines(rows: unknown[][]): string {
+    return rows.map(row => csvRow(row) + '\n').join('')
+}
+
 /** A row addressed by column name, as the Black Duck-shaped exports build them. */
 export interface NamedRow {
     [column: string]: string
 }
 
-/**
- * A complete file: the header line, then one line per row, in the header's column order, ending
- * with a newline like `csv-stringify` does — so a file from here and one from
- * `transformBlackDuckReports` diff byte for byte.
- */
+/** A complete file: the header line, then one line per row in the header's column order. */
 export function csvDocument(headers: readonly string[], rows: NamedRow[]): string {
-    return [csvRow([...headers]), ...rows.map(row => csvRow(headers.map(it => row[it])))].join('\n') + '\n'
+    return csvLines([[...headers], ...rows.map(row => headers.map(it => row[it]))])
+}
+
+/** A file whose columns are the first row's keys; no rows give an empty file, header included. */
+export function csvDocumentFromRows(rows: NamedRow[]): string {
+    return rows.length === 0 ? '' : csvDocument(Object.keys(rows[0]), rows)
 }
