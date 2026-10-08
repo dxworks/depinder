@@ -5,7 +5,6 @@ import {DepinderDependency} from '../src/extension-points/extract'
 import {assignPurl} from '../src/plugins/sbom/dependency-purl'
 import {
     purlTypeOfPlugin,
-    registryTypeOfPlugin,
     sbomDotnet,
     sbomGo,
     sbomJava,
@@ -54,7 +53,6 @@ describe('the sbom plugins', () => {
         expect(plugin.checker).toBe(checker)
         expect(plugin.aliases?.[0]).toBe(`sbom-${purlType}`)
         expect(purlTypeOfPlugin(plugin)).toBe(purlType)
-        expect(registryTypeOfPlugin(plugin)).toBe(purlType)
     })
 
     it.each(table)('select %p.name by each legacy plugin name', (plugin, _eco, _purl, _chk, aliases) => {
@@ -65,14 +63,10 @@ describe('the sbom plugins', () => {
     it('are selected by their purl types', () => {
         expect(sbomPluginsForPurlTypes(['golang', 'cargo']).map(it => it.name)).toEqual(['sbom-go', 'sbom-rust'])
     })
-
-    it('look a plugins.json plugin with no sbom alias up under its ecosystem', () => {
-        expect(registryTypeOfPlugin({name: 'custom', ecosystem: 'npm'} as Plugin)).toBe('npm')
-    })
 })
 
 describe('the vulnerability checkers and fallback purls', () => {
-    const dep = (name: string): DepinderDependency => ({id: `${name}@2.0.0`, name, version: '2.0.0', semver: null, requestedBy: []})
+    const dep = (name: string): DepinderDependency => ({id: `${name}@2.0.0`, name, version: '2.0.0', requestedBy: []})
 
     it.each([
         ['MAVEN', sbomJava, 'org.slf4j:slf4j-api', 'pkg:maven/org.slf4j/slf4j-api@2.0.0'],
@@ -88,11 +82,10 @@ describe('the vulnerability checkers and fallback purls', () => {
         expect(assignPurl(plugin, dep(name))).toBe(purl)
     })
 
-    it('keeps the SBOM purl, and spells none without a version, a purl type or a valid name', () => {
+    it('keeps the SBOM purl, and spells none without a version or a valid name', () => {
         const fromSbom = {...dep('github.com/Masterminds/semver/v3'), purl: 'pkg:golang/github.com/Masterminds/semver/v3@v3.4.0'}
         expect(assignPurl(sbomJava, fromSbom)).toBe('pkg:golang/github.com/Masterminds/semver/v3@v3.4.0')
         expect(assignPurl(sbomJava, {...dep('a:b'), version: ' '})).toBeUndefined()
-        expect(assignPurl({name: 'custom', extractor: sbomJava.extractor}, dep('a:b'))).toBeUndefined()
         expect(assignPurl(sbomJava, dep('no-group'))).toBeUndefined()
     })
 })

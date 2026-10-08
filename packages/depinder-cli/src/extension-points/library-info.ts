@@ -6,7 +6,6 @@ interface LibraryVersion {
     version: string
     timestamp: number
     licenses?: string | string[]
-    downloads?: number
     latest: boolean
     /**
      * The registry withdrew this version (a yanked crate, an unlisted NuGet package). It stays
@@ -27,17 +26,8 @@ export function availableVersions<T extends {yanked?: boolean}>(versions: T[]): 
 
 export interface LibraryInfo {
     name: string
-    description?: string
     versions: LibraryVersion[]
     licenses: string[]
-    keywords?: string[]
-    issuesUrl?: string[]
-    reposUrl?: string[]
     homepageUrl?: string
-    documentationUrl?: string
-    packageUrl?: string
-    downloads?: number
-    authors?: string[],
     vulnerabilities?: Vulnerability[]
-    requiresLicenseAcceptance?: boolean
 }

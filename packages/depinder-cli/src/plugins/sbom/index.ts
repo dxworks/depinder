@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import {minimatch} from 'minimatch'
 import {DependencyFileContext, DepinderDependency, DepinderProject, Extractor, Parser} from '../../extension-points/extract'
-import {ecosystemOf, Plugin} from '../../extension-points/plugin'
+import {Plugin} from '../../extension-points/plugin'
 import {Vulnerability, VulnerabilityChecker} from '../../extension-points/vulnerability-checker'
 import {parseCycloneDxFile} from './cyclonedx'
 import {scanSbomFileOnce} from './local-scan'
@@ -273,16 +273,12 @@ export function sbomFilesToParse(plugins: Plugin[], files: string[]): string[] {
 
 /**
  * The purl type an SBOM plugin filters on — `sbom-npm` -> `npm`. The alias is where that type is
- * already recorded, so reading it back beats a second table that could drift out of step. Returns
- * undefined for a plugin loaded from plugins.json that carries no `sbom-` alias.
+ * already recorded, so reading it back beats a second table that could drift out of step.
  */
-export function purlTypeOfPlugin(plugin: Plugin): string | undefined {
-    return plugin.aliases?.find(it => it.startsWith('sbom-'))?.slice('sbom-'.length)
-}
-
-/** The purl type a plugin's packages are looked up under; a plugins.json plugin falls back to its ecosystem. */
-export function registryTypeOfPlugin(plugin: Plugin): string {
-    return purlTypeOfPlugin(plugin) ?? ecosystemOf(plugin)
+export function purlTypeOfPlugin(plugin: Plugin): string {
+    const purlType = plugin.aliases?.find(it => it.startsWith('sbom-'))?.slice('sbom-'.length)
+    if (!purlType) throw new Error(`Plugin ${plugin.name} has no sbom-<purlType> alias`)
+    return purlType
 }
 
 /**
@@ -293,10 +289,7 @@ export function registryTypeOfPlugin(plugin: Plugin): string {
  */
 export function sbomPluginsForPurlTypes(purlTypes: Iterable<string>): Plugin[] {
     const wanted = new Set([...purlTypes].map(it => it.trim().toLowerCase()))
-    return sbomPlugins.filter(it => {
-        const purlType = purlTypeOfPlugin(it)
-        return !!purlType && wanted.has(purlType)
-    })
+    return sbomPlugins.filter(it => wanted.has(purlTypeOfPlugin(it)))
 }
 
 /** Exposed for tests, which need each parse to start from a clean slate. */

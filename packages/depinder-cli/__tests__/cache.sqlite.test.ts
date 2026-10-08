@@ -47,11 +47,11 @@ describe('the SQLite cache', () => {
         expect(sqliteCache.get('npm:left-pad')?.name).toBe('left-pad')
 
         // A second import (as `depinder cache import` would do) keeps what the database holds.
-        sqliteCache.set('npm:left-pad', {...library('left-pad'), description: 'refreshed'})
+        sqliteCache.set('npm:left-pad', {...library('left-pad'), homepageUrl: 'refreshed'})
         fs.writeFileSync(legacy, JSON.stringify({'npm:left-pad': library('left-pad'), 'npm:new': library('new')}))
         const counts = openCacheDb(dbFile).importLegacy(path.dirname(legacy))
         expect(counts.libs).toBe(1)
-        expect(sqliteCache.get('npm:left-pad')?.description).toBe('refreshed')
+        expect(sqliteCache.get('npm:left-pad')?.homepageUrl).toBe('refreshed')
         expect(sqliteCache.has('npm:new')).toBe(true)
     })
 

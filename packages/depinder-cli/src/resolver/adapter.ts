@@ -43,7 +43,6 @@ export function toLibraryInfo(pkg: PackageRecord): LibraryInfo {
     const packageLicenses = pkg.licenses ?? []
     return {
         name: registryName(pkg),
-        description: pkg.description ?? '',
         // A yanked version stays in the list, marked: a project can still be pinned to one (an
         // unlisted NuGet package, a yanked crate), and its row needs that version's release date
         // and licence. It is never `latest`, and the readers that count versions to upgrade to
@@ -62,10 +61,5 @@ export function toLibraryInfo(pkg: PackageRecord): LibraryInfo {
         }),
         licenses: packageLicenses,
         homepageUrl: componentLinkOf(pkg),
-        reposUrl: pkg.repo_url ? [pkg.repo_url] : [],
-        // The resolver serves registry facts only; advisories stay with the GitHub lookup in
-        // `analyse`, which is why this is empty rather than absent.
-        issuesUrl: [],
-        keywords: [],
     }
 }

@@ -17,7 +17,6 @@ function dependency(overrides: Partial<DepinderDependency> = {}): DepinderDepend
         id: 'lib@1.0.0',
         name: 'lib',
         version: '1.0.0',
-        semver: null,
         requestedBy: ['proj@1.0.0'],
         libraryInfo: {name: 'lib', versions: [], licenses: ['MIT']} as unknown as LibraryInfo,
         ...overrides,

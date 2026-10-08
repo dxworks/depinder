@@ -45,11 +45,8 @@ describe('the resolver package record adapter', () => {
         const info = toLibraryInfo(record({}))
 
         expect(info.name).toBe('left-pad')
-        expect(info.description).toBe('pads on the left')
         expect(info.licenses).toEqual(['MIT'])
         expect(info.homepageUrl).toBe('https://example.com')
-        expect(info.reposUrl).toEqual(['https://github.com/example/left-pad'])
-        expect(info.issuesUrl).toEqual([])
         expect(info.versions).toHaveLength(2)
         expect(info.versions[0]).toEqual({
             version: '1.2.0',
@@ -201,7 +198,6 @@ describe('the resolver package record adapter', () => {
         }))
         expect(info.versions).toEqual([])
         expect(info.licenses).toEqual([])
-        expect(info.reposUrl).toEqual([])
         expect(info.homepageUrl).toBe('')
     })
 })
@@ -232,7 +228,6 @@ describe('the readers of an expanded record, against the shape they used to get'
     /** What `toLibraryInfo` returned before the wire shape changed, spelled out. */
     const oldShape: LibraryInfo = {
         name: 'left-pad',
-        description: 'pads on the left',
         versions: [
             {version: '0.9.9', timestamp: Date.parse('2019-06-01T00:00:00Z'), latest: false, licenses: ['MIT'], yanked: true},
             {version: '1.0.0', timestamp: Date.parse('2020-01-01T00:00:00Z'), latest: false, licenses: ['MIT']},
@@ -242,9 +237,6 @@ describe('the readers of an expanded record, against the shape they used to get'
         ],
         licenses: ['MIT'],
         homepageUrl: 'https://example.com',
-        reposUrl: ['https://github.com/example/left-pad'],
-        issuesUrl: [],
-        keywords: [],
     }
 
     it('expands to exactly the old LibraryInfo', () => {

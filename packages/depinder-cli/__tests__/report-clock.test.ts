@@ -59,7 +59,7 @@ describe('ages under a fixed report date', () => {
         process.env[REPORT_NOW_ENV] = '2022-03-15T12:00:00Z'
         const project: DepinderProject = {name: 'proj', version: '1.0.0', path: '/repo', dependencies: {}}
         const dep: DepinderDependency = {
-            id: 'lib@1.0.0', name: 'lib', version: '1.0.0', semver: null, requestedBy: ['proj@1.0.0'],
+            id: 'lib@1.0.0', name: 'lib', version: '1.0.0', requestedBy: ['proj@1.0.0'],
             libraryInfo: {
                 name: 'lib', licenses: ['MIT'], versions: [
                     {version: '1.0.0', timestamp: Date.parse('2020-01-15T12:00:00Z'), latest: false},

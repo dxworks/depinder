@@ -325,11 +325,6 @@ describe('parseCycloneDxFile — Syft shape (no project nodes)', () => {
         expect(deps['org.slf4j:slf4j-api@1.7.35'].purl).toBe('pkg:maven/org.slf4j/slf4j-api@1.7.35')
         expect(deps['org.slf4j:slf4j-reload4j@1.7.35'].purl).toBe('pkg:maven/org.slf4j/slf4j-reload4j@1.7.35')
     })
-
-    it('leaves type undefined, because no SBOM format carries dependency scope', () => {
-        const deps = parseCycloneDxFile(writeBom('e.cdx.json', syftBom), 'maven')[0].dependencies
-        expect(deps['org.slf4j:slf4j-api@1.7.35'].type).toBeUndefined()
-    })
 })
 
 describe('parseCycloneDxFile — Syft maven monorepo (per-module reconstruction)', () => {
@@ -591,12 +586,6 @@ describe('parseCycloneDxFile — Trivy shape (application nodes are the projects
         expect(projects).toHaveLength(1)
         expect(projects[0].name).toBe('empty')
         expect(projects[0].dependencies).toEqual({})
-    })
-
-    it('parses semver where possible and yields null instead of throwing where not', () => {
-        const projects = parseCycloneDxFile(writeBom('i.trivy.cdx.json', trivyBom), 'maven')
-        const guava = projects.find(p => p.name === 'moduleA')!.dependencies['com.google.guava:guava@14.0.1']
-        expect(guava.semver?.version).toBe('14.0.1')
     })
 
     it('returns no projects for an ecosystem the SBOM does not contain', () => {

@@ -43,7 +43,6 @@ function dependency(overrides: Partial<DepinderDependency> = {}): DepinderDepend
         id: 'qs@6.10.2',
         name: 'qs',
         version: '6.10.2',
-        semver: null,
         requestedBy: ['js-npm-nest@1.0.0'],
         vulnerabilities: [advisory],
         libraryInfo: {

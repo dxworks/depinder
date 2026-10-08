@@ -53,10 +53,7 @@ async function retrieveFromLibrariesIo(type: string, libraryName: string): Promi
             licenses: [],
             ...(isPrerelease(type, it.number) ? {prerelease: true} : {}),
         })),
-        description: data?.description ?? '',
         licenses: data.licenses ? [data.licenses] : [],
         homepageUrl: data?.homepage ?? '',
-        keywords: data?.keywords ?? [],
-        reposUrl: data?.repository_url ? [data.repository_url] : [],
     }
 }

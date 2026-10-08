@@ -48,7 +48,7 @@ function fakeCache(): Cache & {entries: Map<string, LibraryInfo>, sets: {key: st
 }
 
 const dep = (name: string, version: string): DepinderDependency =>
-    ({id: `${name}@${version}`, name, version, semver: null, requestedBy: []})
+    ({id: `${name}@${version}`, name, version, requestedBy: []})
 
 function project(name: string, deps: DepinderDependency[]): DepinderProject {
     return {name, version: '1.0.0', path: `/repo/${name}`, dependencies: Object.fromEntries(deps.map(it => [it.id, it]))}
@@ -70,7 +70,7 @@ const npm = plugin('javascript', 'npm', 'npm', 'NPM')
 
 const record = (type: string, namespace: string | null, name: string): PackageRecord => ({
     type, namespace, name,
-    description: 'a package', homepage_url: null, repo_url: null,
+    description: 'a package', homepage_url: 'https://example.test/a-package', repo_url: null,
     licenses: ['Apache-2.0'],
     latest: {version: '2.0.0', released_at: '2024-01-01T00:00:00Z'},
     latest_prerelease: null,
@@ -115,16 +115,11 @@ describe('assignPurls', () => {
             .toBe('pkg:npm/%40types/node@20.1.0')
     })
 
-    it('leaves a dependency with no version, and a plugin with no purl type, unnamed', () => {
-        const noPurlType: Plugin = {...maven, aliases: undefined}
-        const projects: PluginProjects[] = [
-            {plugin: maven, projects: [project('app', [dep('a:b', '  ')])]},
-            {plugin: noPurlType, projects: [project('app', [dep('c:d', '1.0.0')])]},
-        ]
+    it('leaves a dependency with no version unnamed', () => {
+        const projects: PluginProjects[] = [{plugin: maven, projects: [project('app', [dep('a:b', '  ')])]}]
 
         expect(assignPurls(projects)).toBe(0)
         expect(projects[0].projects[0].dependencies['a:b@  '].purl).toBeUndefined()
-        expect(projects[1].projects[0].dependencies['c:d@1.0.0'].purl).toBeUndefined()
     })
 })
 
@@ -142,11 +137,10 @@ describe('assignPurls with purls from the SBOM', () => {
         expect(missing.purl).toBe('pkg:maven/com.google.guava/guava@32.1.2-jre')
     })
 
-    it('counts an SBOM purl even when the plugin has no purl type to fall back on', () => {
-        const noPurlType: Plugin = {...maven, aliases: undefined}
+    it('counts an SBOM purl that carries no version', () => {
         const versionless = {...dep('org.apache.phoenix:phoenix-core', 'UNKNOWN'),
             purl: 'pkg:maven/org.apache.phoenix/phoenix-core'}
-        const projects: PluginProjects[] = [{plugin: noPurlType, projects: [project('app', [versionless])]}]
+        const projects: PluginProjects[] = [{plugin: maven, projects: [project('app', [versionless])]}]
 
         expect(assignPurls(projects)).toBe(1)
         expect(versionless.purl).toBe('pkg:maven/org.apache.phoenix/phoenix-core')
@@ -248,7 +242,7 @@ describe('the bulk resolve phase', () => {
 
         expect(server.asked[0]).toEqual(['pkg:npm/left-pad@1.0.0'])
         expect(outcome.written.has('npm:left-pad')).toBe(true)
-        expect(cache.entries.get('npm:left-pad')?.description).toBe('a package')
+        expect(cache.entries.get('npm:left-pad')?.homepageUrl).toBe('https://example.test/a-package')
     })
 
     it('leaves blacklisted and unnamed dependencies out of the question', async () => {
@@ -847,7 +841,7 @@ describe('the bulk resolve phase with a cache max age', () => {
 
     function cachedAgo(key: string, ageMs: number) {
         const db = sharedCacheDb()
-        db.setLib(key, {name: key, description: 'cached', licenses: [], versions: []})
+        db.setLib(key, {name: key, homepageUrl: 'cached', licenses: [], versions: []})
         ;(db as any).db.prepare('UPDATE libs SET updated_at = ? WHERE key = ?').run(Date.now() - ageMs, key)
     }
 
@@ -868,11 +862,11 @@ describe('the bulk resolve phase with a cache max age', () => {
 
         expect(server.asked[0]).toEqual(['pkg:npm/left-pad@1.0.0'])
         expect(outcome.written.has('npm:left-pad')).toBe(true)
-        expect(sharedCacheDb().getLib('npm:left-pad')?.description).toBe('a package')
+        expect(sharedCacheDb().getLib('npm:left-pad')?.homepageUrl).toBe('https://example.test/a-package')
         // Stamped with the server's confirmation, not with the moment it was copied here.
         expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBe(Date.parse(confirmedAt))
         expect(cache.has('npm:left-pad')).toBe(true)
-        expect(sharedCacheDb().getLib('npm:right-pad')?.description).toBe('cached')
+        expect(sharedCacheDb().getLib('npm:right-pad')?.homepageUrl).toBe('cached')
     })
 
     it('stores a refreshing answer already expired, and still hands it to phase 3', async () => {
@@ -891,7 +885,7 @@ describe('the bulk resolve phase with a cache max age', () => {
         const outcome = await bulkResolve(config, projects, cache, {}, resolve)
 
         // This run uses it...
-        expect(outcome.libs.get('npm:old-pkg')?.description).toBe('a package')
+        expect(outcome.libs.get('npm:old-pkg')?.homepageUrl).toBe('https://example.test/a-package')
         // ...and the next one asks for it again: the row is there, but expired.
         expect(sharedCacheDb().libUpdatedAt('npm:old-pkg')).toBe(Date.parse(confirmedAt))
         expect(cache.has('npm:old-pkg')).toBe(false)

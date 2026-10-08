@@ -5,7 +5,7 @@ import {fetchLibraryInfo, FallbackPackage, FallbackResult} from '../src/fallback
 import {createRegistryClients} from '../src/fallback/registry-clients'
 import {LibraryInfo} from '../src/extension-points/library-info'
 
-const library = (name: string, description: string): LibraryInfo => ({name, description, licenses: [], versions: []})
+const library = (name: string, homepageUrl: string): LibraryInfo => ({name, homepageUrl, licenses: [], versions: []})
 const LIBRARIES_IO_TYPES = ['maven', 'pypi', 'nuget', 'composer']
 const NEVER_LIBRARIES_IO_TYPES = ['npm', 'gem', 'cargo', 'golang']
 
@@ -27,7 +27,7 @@ describe('registry fallback dispatch', () => {
         const librariesIo = fakeLibrariesIo(true)
         const {fetchInfo, fallback} = fallbackOver({status: 'found', info: library('a:b', 'from core')}, librariesIo)
 
-        await expect(fallback.lookup({type: 'maven', name: 'a:b'})).resolves.toMatchObject({description: 'from core'})
+        await expect(fallback.lookup({type: 'maven', name: 'a:b'})).resolves.toMatchObject({homepageUrl: 'from core'})
         expect(fetchInfo).toHaveBeenCalledWith({type: 'maven', name: 'a:b'})
         expect(librariesIo.retrieve).not.toHaveBeenCalled()
     })
@@ -36,7 +36,7 @@ describe('registry fallback dispatch', () => {
         const librariesIo = fakeLibrariesIo(true)
         const {fallback} = fallbackOver({status: 'not_found'}, librariesIo)
 
-        await expect(fallback.lookup({type, name: 'pkg'})).resolves.toMatchObject({description: 'from libraries.io'})
+        await expect(fallback.lookup({type, name: 'pkg'})).resolves.toMatchObject({homepageUrl: 'from libraries.io'})
         expect(librariesIo.retrieve).toHaveBeenCalledWith(type, 'pkg')
     })
 
@@ -44,7 +44,7 @@ describe('registry fallback dispatch', () => {
         const librariesIo = fakeLibrariesIo(true)
         const {fallback} = fallbackOver({status: 'error', error: new Error('boom')}, librariesIo)
 
-        await expect(fallback.lookup({type, name: 'pkg'})).resolves.toMatchObject({description: 'from libraries.io'})
+        await expect(fallback.lookup({type, name: 'pkg'})).resolves.toMatchObject({homepageUrl: 'from libraries.io'})
     })
 
     it.each(NEVER_LIBRARIES_IO_TYPES)('never sends a %s package to Libraries.io', async type => {
@@ -144,8 +144,7 @@ describe('librariesIoFallback', () => {
                     {version: '1.0.0', timestamp: Date.parse('2020-01-01T00:00:00Z'), latest: false, licenses: []},
                     {version: '2.0.0', timestamp: Date.parse('2021-01-01T00:00:00Z'), latest: true, licenses: []},
                 ],
-                description: 'logging', licenses: ['MIT'], homepageUrl: 'https://example.org',
-                keywords: ['log'], reposUrl: ['https://github.com/example/log'],
+                licenses: ['MIT'], homepageUrl: 'https://example.org',
             })
         } finally {
             vi.unstubAllGlobals()

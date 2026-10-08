@@ -17,7 +17,7 @@ function library(vulnerabilities?: Vulnerability[]): LibraryInfo {
 }
 
 function dependency(version: string, vulnerabilities?: Vulnerability[]): DepinderDependency {
-    return {id: `lib@${version}`, name: 'lib', version, semver: null, requestedBy: [], vulnerabilities}
+    return {id: `lib@${version}`, name: 'lib', version, requestedBy: [], vulnerabilities}
 }
 
 function project(exactVersionVulnerabilities?: boolean): DepinderProject {

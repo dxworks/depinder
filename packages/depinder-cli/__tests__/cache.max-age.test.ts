@@ -22,7 +22,7 @@ vi.mock('../src/utils/blacklist', () => ({blacklistedGlobs: []}))
 
 const DAY_MS = 86_400_000
 
-const library = (name: string, description = 'cached'): LibraryInfo => ({name, description, licenses: [], versions: []})
+const library = (name: string, homepageUrl = 'cached'): LibraryInfo => ({name, homepageUrl, licenses: [], versions: []})
 
 describe('parseDuration', () => {
     it.each([
@@ -131,7 +131,7 @@ describe('cached packages expire', () => {
             sharedCacheDb().setLib('npm:left-pad', library('left-pad', 'refreshed'))
 
             expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBeGreaterThanOrEqual(cutoff + DAY_MS)
-            expect(sharedCacheDb().getLib('npm:left-pad', cutoff)?.description).toBe('refreshed')
+            expect(sharedCacheDb().getLib('npm:left-pad', cutoff)?.homepageUrl).toBe('refreshed')
         })
 
         it('counts the rows written before a cutoff', () => {
@@ -229,10 +229,11 @@ describe('cached packages expire', () => {
 
         function fakePlugin(retrieve: (name: string) => Promise<LibraryInfo>): Plugin {
             registry = retrieve
-            leftPad = {id: 'left-pad@1.0.0', name: 'left-pad', version: '1.0.0', semver: null, requestedBy: []}
+            leftPad = {id: 'left-pad@1.0.0', name: 'left-pad', version: '1.0.0', requestedBy: []}
             return {
                 name: 'fake',
                 ecosystem: 'npm',
+                aliases: ['sbom-npm'],
                 extractor: {files: ['*.lock'], createContexts: files => files.map(it => ({root: path.dirname(it), lockFile: path.basename(it)} as any))},
                 parser: {
                     parseDependencyTree: () => ({
@@ -260,7 +261,7 @@ describe('cached packages expire', () => {
             const dep = await analyse(fakePlugin(retrieve), 86_400)
 
             expect(retrieve).not.toHaveBeenCalled()
-            expect(dep?.libraryInfo?.description).toBe('cached')
+            expect(dep?.libraryInfo?.homepageUrl).toBe('cached')
         })
 
         it('sends an expired entry to the registry fallback and rewrites it with a new age', async () => {
@@ -271,8 +272,8 @@ describe('cached packages expire', () => {
             const dep = await analyse(fakePlugin(retrieve), 86_400)
 
             expect(retrieve).toHaveBeenCalledWith('left-pad')
-            expect(dep?.libraryInfo?.description).toBe('from the registry')
-            expect(sharedCacheDb().getLib('npm:left-pad')?.description).toBe('from the registry')
+            expect(dep?.libraryInfo?.homepageUrl).toBe('from the registry')
+            expect(sharedCacheDb().getLib('npm:left-pad')?.homepageUrl).toBe('from the registry')
             expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBeGreaterThanOrEqual(runStart)
         })
 
@@ -307,7 +308,7 @@ describe('cached packages expire', () => {
             const dep = await analyse(fakePlugin(retrieve), 0)
 
             expect(retrieve).toHaveBeenCalledTimes(1)
-            expect(dep?.libraryInfo?.description).toBe('from the registry')
+            expect(dep?.libraryInfo?.homepageUrl).toBe('from the registry')
         })
     })
 

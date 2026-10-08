@@ -34,7 +34,7 @@ function record(type: string, versions: string[], flagged: (version: string) => 
 
 function guidanceFor(purlType: string, libraryInfo: LibraryInfo) {
     const dependency = {
-        id: 'lib@1.0.0', name: 'lib', version: '1.0.0', semver: null, requestedBy: ['app@1.0.0'],
+        id: 'lib@1.0.0', name: 'lib', version: '1.0.0', requestedBy: ['app@1.0.0'],
         vulnerabilities: [finding], libraryInfo,
     } as DepinderDependency
     const project = {name: 'app', version: '1.0.0', path: 'manifest', dependencies: {[dependency.id]: dependency}}

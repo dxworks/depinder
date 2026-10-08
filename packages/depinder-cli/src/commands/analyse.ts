@@ -2,7 +2,7 @@ import {Command} from 'commander'
 import fs from 'fs'
 import path from 'path'
 import {getPluginsFromNames} from '../plugins'
-import {deferSbomFindings, purlTypeOfPlugin, registryTypeOfPlugin, sbomFilesToParse, sbomPluginsForPurlTypes} from '../plugins/sbom'
+import {deferSbomFindings, purlTypeOfPlugin, sbomFilesToParse, sbomPluginsForPurlTypes} from '../plugins/sbom'
 import {assignPurl} from '../plugins/sbom/dependency-purl'
 import {SbomDescription} from '../plugins/sbom/describe'
 import {ScannerPreflight, scannerSummaryLine, writeScanProvenance} from '../plugins/sbom/local-scan'
@@ -153,6 +153,9 @@ function monthsBetween(later: moment.Moment | undefined, earlier: moment.Moment 
     return later && earlier ? later.diff(earlier, 'months') : undefined
 }
 
+/** The `Type` column of libs.csv stays blank: neither Syft nor Trivy records a dependency scope. */
+const NO_DEPENDENCY_SCOPE = ''
+
 export function convertDepToRow(proj: DepinderProject, dep: DepinderDependency): string {
     const latestVersion = dep.libraryInfo?.versions.find(it => it.latest)
     const currentVersion = dep.libraryInfo?.versions.find(it => it.version == dep.version.trim())
@@ -168,7 +171,7 @@ export function convertDepToRow(proj: DepinderProject, dep: DepinderDependency):
         currentVersionMoment?.format(dateFormat), latestVersionMoment?.format(dateFormat),
         monthsBetween(latestVersionMoment, currentVersionMoment),
         monthsBetween(now, currentVersionMoment), monthsBetween(now, latestVersionMoment),
-        dep.vulnerabilities?.length, vulnerabilities, directDep, dep.type, extractLicenses(dep),
+        dep.vulnerabilities?.length, vulnerabilities, directDep, NO_DEPENDENCY_SCOPE, extractLicenses(dep),
     ])
 }
 
@@ -910,13 +913,13 @@ export async function runAnalysis(
     // FLOW 3 — enrich: per dep, cache → miss cache → registry fallback. Whatever phase 2 wrote is a plain cache hit here.
     // Phase 3 — enrichment. The plugins run side by side, each registry behind its ecosystem's
     // limits (`registries`), so a registry that stalls no longer holds the others up. Whatever phase 2 cached is a cache hit here, and never reaches a registry.
-    const results = await Promise.all(pluginProjects.map(async ({plugin, projects}): Promise<AnalysisResult | undefined> => {
+    const results = await Promise.all(pluginProjects.map(async ({plugin, projects}): Promise<AnalysisResult> => {
         // A library the resolver just refreshed counts as refreshed: without this, `--refresh`
         // would discard the answer that was fetched seconds ago and go back to the registry.
         const keyPrefix = `${ecosystemOf(plugin)}:`
         const refreshedLibs = [...bulkWritten].filter(it => it.startsWith(keyPrefix)).map(it => it.slice(keyPrefix.length))
         const inFlight = new Map<string, Promise<LibraryInfo>>()
-        const registryType = registryTypeOfPlugin(plugin)
+        const purlType = purlTypeOfPlugin(plugin)
 
         const projectsBar = progress.create(projects.length, 0, {name: 'Projects', state: 'Analysing'})
 
@@ -972,7 +975,7 @@ export async function runAnalysis(
                             fetch = (async () => {
                                 let fetched: LibraryInfo
                                 try {
-                                    fetched = await registries.lookup({type: registryType, name: fallbackLookupName(dep)})
+                                    fetched = await registries.lookup({type: purlType, name: fallbackLookupName(dep)})
                                 } catch (e: any) {
                                     if (!isRateLimit(e)) session.misses.set(cacheKey)
                                     throw e
@@ -1001,7 +1004,7 @@ export async function runAnalysis(
 
             let nextDepIndex = 0
             await Promise.all(Array.from(
-                {length: Math.min(registries.packagesAtOnce(registryType), filteredDependencies.length)},
+                {length: Math.min(registries.packagesAtOnce(purlType), filteredDependencies.length)},
                 async () => {
                     while (nextDepIndex < filteredDependencies.length) {
                         const dep = filteredDependencies[nextDepIndex++]
@@ -1079,13 +1082,11 @@ export async function runAnalysis(
         }).join('\n'))
         csv.end()
 
-        const purlType = purlTypeOfPlugin(plugin)
-        return purlType ? {purlType, projects} : undefined
+        return {purlType, projects}
     }))
     progress.stop()
-    const analysed = results.filter((it): it is AnalysisResult => it !== undefined)
     log.info(`Results are written to ${resultFolder}`)
-    return analysed
+    return results
 }
 
 interface DependencyInfo extends DepinderDependency {

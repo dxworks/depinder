@@ -6,7 +6,7 @@ import {updateLibs} from '../src/commands/update'
 import {resetSharedCacheDb, sharedCacheDb} from '../src/cache/sqlite-cache'
 import {LibraryInfo} from '../src/extension-points/library-info'
 
-const lookup = vi.fn(async ({name}: {type: string, name: string}): Promise<LibraryInfo> => ({name, description: 'updated', licenses: [], versions: []}))
+const lookup = vi.fn(async ({name}: {type: string, name: string}): Promise<LibraryInfo> => ({name, homepageUrl: 'updated', licenses: [], versions: []}))
 
 // The registries are stubbed; the plugin names select fake plugins by ecosystem.
 vi.mock('../src/fallback/registry-fallback', () => ({
@@ -14,7 +14,7 @@ vi.mock('../src/fallback/registry-fallback', () => ({
 }))
 vi.mock('../src/plugins', () => ({
     getPluginsFromNames: (names: string[]) => names.map(ecosystem => ({
-        name: `fake-${ecosystem}`, ecosystem,
+        name: `fake-${ecosystem}`, ecosystem, aliases: [`sbom-${ecosystem}`],
         extractor: {files: [], createContexts: () => []},
     })),
 }))
@@ -35,7 +35,7 @@ describe('update with a date and plugins', () => {
     })
 
     function cachedOn(key: string, date: string) {
-        sharedCacheDb().setLib(key, {name: key.split(':')[1], description: 'cached', licenses: [], versions: []},
+        sharedCacheDb().setLib(key, {name: key.split(':')[1], homepageUrl: 'cached', licenses: [], versions: []},
             moment(date).valueOf())
     }
 
@@ -47,9 +47,9 @@ describe('update with a date and plugins', () => {
         await updateLibs('2023-09-23', ['gem'])
 
         expect(lookup.mock.calls).toEqual([[{type: 'gem', name: 'rails'}]])
-        expect(sharedCacheDb().getLib('gem:rails')?.description).toBe('updated')
-        expect(sharedCacheDb().getLib('gem:rack')?.description).toBe('cached')
-        expect(sharedCacheDb().getLib('npm:left-pad')?.description).toBe('cached')
+        expect(sharedCacheDb().getLib('gem:rails')?.homepageUrl).toBe('updated')
+        expect(sharedCacheDb().getLib('gem:rack')?.homepageUrl).toBe('cached')
+        expect(sharedCacheDb().getLib('npm:left-pad')?.homepageUrl).toBe('cached')
     })
 
     it('stamps a re-fetched row fresh, so the next run with the same date skips it', async () => {
@@ -67,6 +67,6 @@ describe('update with a date and plugins', () => {
 
         await updateLibs('2023-09-23', ['gem'])
 
-        expect(sharedCacheDb().getLib('gem:rails')?.description).toBe('cached')
+        expect(sharedCacheDb().getLib('gem:rails')?.homepageUrl).toBe('cached')
     })
 })

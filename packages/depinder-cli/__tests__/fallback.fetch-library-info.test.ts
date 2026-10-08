@@ -60,7 +60,6 @@ describe('fetchLibraryInfo', () => {
             status: 'found',
             info: {
                 name: '@acme/left-pad',
-                description: 'pads on the left',
                 versions: [
                     {version: '1.0.0', timestamp: Date.parse('2024-01-01T00:00:00Z'), latest: false, licenses: ['MIT']},
                     {version: '1.1.0', timestamp: Date.parse('2024-06-01T00:00:00Z'), latest: true, licenses: ['MIT']},
@@ -68,9 +67,6 @@ describe('fetchLibraryInfo', () => {
                 ],
                 licenses: ['MIT'],
                 homepageUrl: 'https://acme.example/left-pad',
-                reposUrl: ['https://github.com/acme/left-pad'],
-                issuesUrl: [],
-                keywords: [],
             },
         })
     })

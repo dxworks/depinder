@@ -67,8 +67,8 @@ export function collectSbomTargets(
     const seen = new Set<DepinderProject>()
     for (const run of runs) {
         for (const plugin of run.plugins) {
+            if (!sbomPlugins.includes(plugin)) continue
             const purlType = purlTypeOfPlugin(plugin)
-            if (!purlType || !sbomPlugins.includes(plugin)) continue
             for (const file of filesFor(plugin, run.files)) {
                 const absolute = path.resolve(file)
                 let projects: DepinderProject[]

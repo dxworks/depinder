@@ -5,7 +5,7 @@ import {updateLibs} from '../src/commands/update'
 import {resetSharedCacheDb, sharedCacheDb} from '../src/cache/sqlite-cache'
 import {LibraryInfo} from '../src/extension-points/library-info'
 
-const lookup = vi.fn(async ({name}: {type: string, name: string}): Promise<LibraryInfo> => ({name, description: 'updated', licenses: [], versions: []}))
+const lookup = vi.fn(async ({name}: {type: string, name: string}): Promise<LibraryInfo> => ({name, homepageUrl: 'updated', licenses: [], versions: []}))
 
 // No real registries: `update` would otherwise go to npm for every expired row.
 vi.mock('../src/fallback/registry-fallback', () => ({
@@ -13,7 +13,7 @@ vi.mock('../src/fallback/registry-fallback', () => ({
 }))
 vi.mock('../src/plugins', () => ({
     getPluginsFromNames: () => [{
-        name: 'fake', ecosystem: 'npm',
+        name: 'fake', ecosystem: 'npm', aliases: ['sbom-npm'],
         extractor: {files: [], createContexts: () => []},
     }],
 }))
@@ -35,7 +35,7 @@ describe('update with no date', () => {
 
     function cachedAgo(key: string, ageMs: number) {
         const db = sharedCacheDb()
-        db.setLib(key, {name: key, description: 'cached', licenses: [], versions: []})
+        db.setLib(key, {name: key, homepageUrl: 'cached', licenses: [], versions: []})
         ;(db as any).db.prepare('UPDATE libs SET updated_at = ? WHERE key = ?').run(Date.now() - ageMs, key)
     }
 
@@ -46,8 +46,8 @@ describe('update with no date', () => {
         await updateLibs('', [])
 
         expect(lookup.mock.calls).toEqual([[{type: 'npm', name: 'old'}]])
-        expect(sharedCacheDb().getLib('npm:old')?.description).toBe('updated')
-        expect(sharedCacheDb().getLib('npm:new')?.description).toBe('cached')
+        expect(sharedCacheDb().getLib('npm:old')?.homepageUrl).toBe('updated')
+        expect(sharedCacheDb().getLib('npm:new')?.homepageUrl).toBe('cached')
     })
 
     it('takes the max age from --cache-max-age', async () => {
