@@ -1,5 +1,5 @@
 import {availableParallelism, tmpdir} from 'node:os'
-import {ConfigError, requireLogLevel, requirePort, requireToken, str} from '../shared/config.js'
+import {ConfigError, int, requireLogLevel, requirePort, requireToken, str} from '../shared/config.js'
 import {VULN_DEFAULT_MAX_PURLS, type LogLevel} from '@depinder/core'
 import {normalizeRepository} from './upstream.js'
 
@@ -103,25 +103,4 @@ export function loadVulnConfig(env: NodeJS.ProcessEnv = process.env): VulnConfig
         trivyDbRepository,
         grypeDbUpdateUrl,
     }
-}
-
-/** Entry-point wrapper: a readable message on stderr and exit code 1 instead of a stack trace. */
-export function loadVulnConfigOrExit(env: NodeJS.ProcessEnv = process.env): VulnConfig {
-    try {
-        return loadVulnConfig(env)
-    } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        process.stderr.write(`depinder-server-side: configuration error\n  ${msg}\n`)
-        process.exit(1)
-    }
-}
-
-function int(env: NodeJS.ProcessEnv, name: string, fallback: number, min: number, max: number): number {
-    const raw = str(env[name])
-    if (raw === undefined) return fallback
-    const value = Number(raw)
-    if (!Number.isInteger(value) || value < min || value > max) {
-        throw new ConfigError(`${name} must be an integer between ${min} and ${max} (got "${raw}").`)
-    }
-    return value
 }

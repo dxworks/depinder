@@ -7,6 +7,7 @@ import {PRIORITY} from '../db/queue.js'
 import type {QueueGroupRow} from '../db/rows.js'
 import {BODY_LIMIT_BYTES, clientGone, registerAuth, registerCompress, registerErrorHandler} from '../../shared/http-server.js'
 import {handleResolve} from './resolve/handle.js'
+import {iso} from './resolve/payload.js'
 import {parseResolveRequest} from './resolve/request.js'
 import type {ResolveOutcome, ResolveSink} from './resolve/types.js'
 import {createResolveStore, type ResolveStore} from './store.js'
@@ -176,8 +177,4 @@ function addCounts(into: QueueCounts, group: QueueGroupRow): void {
     into.due += group.due
     into.retrying += group.retrying
     into.oldest_due_s = Math.max(into.oldest_due_s, group.oldest_due_s)
-}
-
-function iso(date: Date | null): string | null {
-    return date ? date.toISOString() : null
 }

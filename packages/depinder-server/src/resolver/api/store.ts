@@ -1,4 +1,4 @@
-import {isDeadlock, type Db} from '../db/db.js'
+import {retryOnceOnDeadlock, type Db} from '../db/db.js'
 import type {ResolverEvents} from '../events.js'
 import type {ParsedPurl} from '@depinder/core'
 import {enqueue, PRIORITY, sortedUnique} from '../db/queue.js'
@@ -176,16 +176,11 @@ export function createResolveStore(db: Db, events?: ResolverEvents): ResolveStor
                     }
                 })
 
-            try {
-                await insert()
-            } catch (e) {
-                // Sorting rules out a deadlock between two of these. It cannot rule out one against
-                // every other writer of the same two tables — a feed enqueue, the worker dropping a
-                // queue row — so a victim is still possible, and it is always worth exactly one
-                // more go: the transaction rolled back whole and both its statements are upserts.
-                if (!isDeadlock(e)) throw e
-                await insert()
-            }
+            // Sorting rules out a deadlock between two of these. It cannot rule out one against
+            // every other writer of the same two tables — a feed enqueue, the worker dropping a
+            // queue row — so a victim is still possible, and it is always worth exactly one
+            // more go: the transaction rolled back whole and both its statements are upserts.
+            await retryOnceOnDeadlock(insert)
             // After the commit: the pump goes to the queue the moment it hears this, and rows in
             // an open transaction are not there to be dequeued.
             events?.queued()
@@ -210,13 +205,8 @@ export function createResolveStore(db: Db, events?: ResolverEvents): ResolveStor
                          set wanted_until = greatest(fetch_queue.wanted_until, excluded.wanted_until)`,
                     [keys, PRIORITY.refresh, wantedUntil],
                 )
-            try {
-                await insert()
-            } catch (e) {
-                // As in `createPending`: one statement, rolled back whole, safe to run once more.
-                if (!isDeadlock(e)) throw e
-                await insert()
-            }
+            // As in `createPending`: one statement, rolled back whole, safe to run once more.
+            await retryOnceOnDeadlock(insert)
             events?.queued()
         },
 
@@ -224,14 +214,7 @@ export function createResolveStore(db: Db, events?: ResolverEvents): ResolveStor
             // Sorted for the same reason as everywhere else here: one lock order for every writer.
             const keys = sortedUnique(packageKeys)
             if (keys.length === 0) return
-            const update = (): Promise<unknown> =>
-                db.query(MARK_WANTED_SQL, [keys, wantedUntil])
-            try {
-                await update()
-            } catch (e) {
-                if (!isDeadlock(e)) throw e
-                await update()
-            }
+            await retryOnceOnDeadlock(() => db.query(MARK_WANTED_SQL, [keys, wantedUntil]))
             // After the commit, as ever.
             for (const key of keys) events?.wanted(key, wantedUntil.getTime())
         },

@@ -1,5 +1,6 @@
 import {createServer} from './resolver/api/server.js'
-import {loadConfigOrExit, poolSizes} from './resolver/config.js'
+import {loadConfig, poolSizes} from './resolver/config.js'
+import {loadConfigOrExit} from './shared/config.js'
 import {API_CONNECT_TIMEOUT_MS, createDb, migrate} from './resolver/db/db.js'
 import {createResolverEvents} from './resolver/events.js'
 import {createLogger, errorMessage} from '@depinder/core'
@@ -24,7 +25,7 @@ import {ensureFeedRows, startFeeds} from './resolver/worker/feeds.js'
 async function main(): Promise<void> {
     if (process.env.ROLE?.trim() === 'vuln') return startVuln()
 
-    const config = loadConfigOrExit()
+    const config = loadConfigOrExit(loadConfig)
     const log = createLogger(config.logLevel, {role: 'resolver'})
     const sizes = poolSizes(config)
     const apiDb = createDb(config, sizes.api, API_CONNECT_TIMEOUT_MS)

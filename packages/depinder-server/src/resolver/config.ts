@@ -1,4 +1,4 @@
-import {bool, ConfigError, requireLogLevel, requirePort, requireToken, str} from '../shared/config.js'
+import {bool, ConfigError, int, requireLogLevel, requirePort, requireToken, str} from '../shared/config.js'
 import type {LogLevel} from '@depinder/core'
 
 export interface Config {
@@ -24,7 +24,7 @@ export interface Config {
 
 /**
  * Reads config from an environment. Throws `ConfigError` with a message meant for a human
- * reading container logs. `loadConfigOrExit` is what the entry points use.
+ * reading container logs. The entry points call it through `loadConfigOrExit` (`shared/config.ts`).
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // The vulnerability server is a different process with a different config — no Postgres at
@@ -48,11 +48,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // 64 sits just above the ~49 concurrent requests the per-ecosystem limiters in `registries/http.ts` add
     // up to, so the limiters stay the real constraint and the pool is never what idles a registry
     // slot. The headroom covers packages parked in a limiter queue or waiting for a pg client.
-    const concurrencyRaw = str(env.FETCH_CONCURRENCY) ?? '64'
-    const fetchConcurrency = Number(concurrencyRaw)
-    if (!Number.isInteger(fetchConcurrency) || fetchConcurrency < 1 || fetchConcurrency > 512) {
-        throw new ConfigError(`FETCH_CONCURRENCY must be an integer between 1 and 512 (got "${concurrencyRaw}").`)
-    }
+    const fetchConcurrency = int(env, 'FETCH_CONCURRENCY', 64, 1, 512)
 
     // The other half of the fill: the pool above fetches, these connections write. A package spends
     // about as long on its write — five statements, each a round trip to a hosted database — as it
@@ -62,11 +58,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // outright (EMAXCONNSESSION) rather than queueing, and a stock project's is 15 — for the whole
     // process, api pool and migration lock included. 15 is therefore the most that needs no
     // dashboard change; raise Pool Size there (or connect directly) and then set this to 32.
-    const poolSizeRaw = str(env.DATABASE_POOL_SIZE) ?? '15'
-    const databasePoolSize = Number(poolSizeRaw)
-    if (!Number.isInteger(databasePoolSize) || databasePoolSize < 1 || databasePoolSize > 200) {
-        throw new ConfigError(`DATABASE_POOL_SIZE must be an integer between 1 and 200 (got "${poolSizeRaw}").`)
-    }
+    const databasePoolSize = int(env, 'DATABASE_POOL_SIZE', 15, 1, 200)
 
     // The api's share of the pool above, and the reason `/resolve` can no longer be starved by the
     // worker. One pool for both halves meant 64 fetch slots queueing for the same 15 clients with a
@@ -87,11 +79,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // DATABASE_POOL_SIZE rather than added to it, because the ceiling that matters is the pooler's
     // and it counts the whole process: with DATABASE_POOL_SIZE=32 that is 8 for the api and 24 for
     // the worker.
-    const apiPoolRaw = str(env.API_POOL_SIZE) ?? '8'
-    const apiPoolSize = Number(apiPoolRaw)
-    if (!Number.isInteger(apiPoolSize) || apiPoolSize < 1 || apiPoolSize > 200) {
-        throw new ConfigError(`API_POOL_SIZE must be an integer between 1 and 200 (got "${apiPoolRaw}").`)
-    }
+    const apiPoolSize = int(env, 'API_POOL_SIZE', 8, 1, 200)
     if (apiPoolSize >= databasePoolSize) {
         throw new ConfigError(
             `API_POOL_SIZE (${apiPoolSize}) is carved out of DATABASE_POOL_SIZE (${databasePoolSize}), ` +
@@ -104,18 +92,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // maybe 200 MB of tuples — big enough that a six-chunk run never evicts, small enough to be a
     // ceiling. The cache is only ever consulted against the `fetched_at` of a row read this
     // request, so 0 (off) changes nothing but the number of queries.
-    const cacheRaw = str(env.PAYLOAD_CACHE_MAX_PACKAGES) ?? '50000'
-    const payloadCacheMaxPackages = Number(cacheRaw)
-    if (!Number.isInteger(payloadCacheMaxPackages) || payloadCacheMaxPackages < 0) {
-        throw new ConfigError(`PAYLOAD_CACHE_MAX_PACKAGES must be an integer >= 0 (got "${cacheRaw}").`)
-    }
+    const payloadCacheMaxPackages = int(env, 'PAYLOAD_CACHE_MAX_PACKAGES', 50_000, 0)
 
     // The log is provenance for debugging and the bench, which reads only its own run's window.
-    const retentionRaw = str(env.FETCH_LOG_RETENTION_DAYS) ?? '3'
-    const fetchLogRetentionDays = Number(retentionRaw)
-    if (!Number.isInteger(fetchLogRetentionDays) || fetchLogRetentionDays < 1 || fetchLogRetentionDays > 365) {
-        throw new ConfigError(`FETCH_LOG_RETENTION_DAYS must be an integer between 1 and 365 (got "${retentionRaw}").`)
-    }
+    const fetchLogRetentionDays = int(env, 'FETCH_LOG_RETENTION_DAYS', 3, 1, 365)
 
     return {
         databaseUrl,
@@ -144,15 +124,4 @@ export function poolSizes(
 ): {api: number; worker: number} {
     const api = Math.max(1, Math.min(config.apiPoolSize, config.databasePoolSize - 1))
     return {api, worker: Math.max(1, config.databasePoolSize - api)}
-}
-
-/** Entry-point wrapper: a readable message on stderr and exit code 1 instead of a stack trace. */
-export function loadConfigOrExit(env: NodeJS.ProcessEnv = process.env): Config {
-    try {
-        return loadConfig(env)
-    } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        process.stderr.write(`depinder-server-side: configuration error\n  ${msg}\n`)
-        process.exit(1)
-    }
 }

@@ -41,12 +41,30 @@ export function requireLogLevel(env: NodeJS.ProcessEnv): LogLevel {
 
 /** `PORT`, default 8080. Shared with `loadVulnConfig`. */
 export function requirePort(env: NodeJS.ProcessEnv): number {
-    const portRaw = str(env.PORT) ?? '8080'
-    const port = Number(portRaw)
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-        throw new ConfigError(`PORT must be an integer between 1 and 65535 (got "${portRaw}").`)
+    return int(env, 'PORT', 8080, 1, 65535)
+}
+
+/** The integer setting `name`, or `fallback` when unset; no `max` means no upper bound. */
+export function int(env: NodeJS.ProcessEnv, name: string, fallback: number, min: number, max?: number): number {
+    const raw = str(env[name])
+    if (raw === undefined) return fallback
+    const value = Number(raw)
+    if (!Number.isInteger(value) || value < min || (max !== undefined && value > max)) {
+        const range = max === undefined ? `>= ${min}` : `between ${min} and ${max}`
+        throw new ConfigError(`${name} must be an integer ${range} (got "${raw}").`)
     }
-    return port
+    return value
+}
+
+/** Entry-point wrapper: a readable message on stderr and exit code 1 instead of a stack trace. */
+export function loadConfigOrExit<T>(load: (env: NodeJS.ProcessEnv) => T, env = process.env): T {
+    try {
+        return load(env)
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        process.stderr.write(`depinder-server-side: configuration error\n  ${msg}\n`)
+        process.exit(1)
+    }
 }
 
 export function str(v: string | undefined): string | undefined {

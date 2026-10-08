@@ -36,8 +36,21 @@ export interface Db extends Queryable {
 export const DEADLOCK_DETECTED = '40P01'
 
 /** True when `e` is the transaction Postgres killed to break a deadlock (SQLSTATE 40P01). */
-export function isDeadlock(e: unknown): boolean {
+function isDeadlock(e: unknown): boolean {
     return typeof e === 'object' && e !== null && (e as {code?: unknown}).code === DEADLOCK_DETECTED
+}
+
+/**
+ * Runs `write` and, if Postgres picked it as a deadlock victim, exactly once more. Only for writes
+ * that roll back whole and are safe to repeat; any other error, or a second deadlock, is thrown.
+ */
+export async function retryOnceOnDeadlock<T>(write: () => Promise<T>): Promise<T> {
+    try {
+        return await write()
+    } catch (e) {
+        if (!isDeadlock(e)) throw e
+        return write()
+    }
 }
 
 /**

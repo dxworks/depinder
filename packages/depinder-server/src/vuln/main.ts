@@ -1,6 +1,7 @@
 import {statfs} from 'node:fs/promises'
 import {createLogger, errorMessage, type Logger} from '@depinder/core'
-import {loadVulnConfigOrExit, type VulnConfig} from './config.js'
+import {loadConfigOrExit} from '../shared/config.js'
+import {loadVulnConfig, type VulnConfig} from './config.js'
 import {grypeStatusCommand, readGrypeBuild, readTrivyBuild} from './databases.js'
 import {createScanLimiter} from './limiter.js'
 import {downloadGrypeDb, downloadTrivyDb, removeLeftoverScanDirs, type ScannerName, scannerVersions, type ScannerVersions} from './scanners.js'
@@ -24,7 +25,7 @@ import {createUpdater, type Updater} from './updater.js'
 const BUILD_BYTES: Record<ScannerName, number> = {trivy: 1.6e9, grype: 3.3e9}
 
 export async function startVuln(): Promise<void> {
-    const config = loadVulnConfigOrExit()
+    const config = loadConfigOrExit(loadVulnConfig)
     const log = createLogger(config.logLevel, {role: 'vuln'})
 
     let versions: ScannerVersions
