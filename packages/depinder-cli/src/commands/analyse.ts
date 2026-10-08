@@ -2,7 +2,7 @@ import {Command} from 'commander'
 import fs from 'fs'
 import path from 'path'
 import {getPluginsFromNames} from '../plugins'
-import {deferSbomFindings, purlTypeOfPlugin, sbomFilesToParse, sbomPluginsForPurlTypes} from '../plugins/sbom'
+import {deferSbomFindings, parseSbomProjects, sbomFilesToParse, sbomPluginsForPurlTypes} from '../plugins/sbom'
 import {assignPurl} from '../plugins/sbom/dependency-purl'
 import {SbomDescription} from '../plugins/sbom/describe'
 import {ScannerPreflight, scannerSummaryLine, writeScanProvenance} from '../plugins/sbom/local-scan'
@@ -36,7 +36,7 @@ import {DEFAULT_TOKEN_FILE} from '../vuln-sources/github/tokens'
 import {AnalysedEcosystem} from '../blackduck/model'
 import {writeBlackDuckForSource} from '../blackduck/run'
 import {licenseIdentity} from '../blackduck/licenses'
-import {classifyInputs, inputFolderOf, InputSources} from './sources'
+import {classifyInputs, inputFolderOf, SbomSource} from './sources'
 import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
 import {count, enableProfile, logProfile, startPhase, timePhase, timePhaseSync} from '../utils/profile'
@@ -175,22 +175,15 @@ export function convertDepToRow(proj: DepinderProject, dep: DepinderDependency):
     ])
 }
 
-// FLOW 1b — one plugin's parse: the extractor groups the files it claims, the parser turns each group into a DepinderProject.
-async function extractProjects(plugin: Plugin, files: string[]) {
-    const projects = [] as DepinderProject[]
-
-    for (const context of plugin.extractor.createContexts(files)) {
-        log.info(`Parsing dependency tree information for ${JSON.stringify(context)}`)
+// FLOW 1b — one plugin's parse: its projects from every SBOM of the run, in file order.
+async function parsePluginProjects(plugin: Plugin, sbomFiles: string[]): Promise<DepinderProject[]> {
+    const projects: DepinderProject[] = []
+    for (const sbomFile of sbomFiles) {
+        log.info(`Parsing the ${plugin.purlType} projects of ${sbomFile}`)
         try {
-            if (!plugin.parser) {
-                log.info(`Plugin ${plugin.name} does not have a parser!`)
-                continue
-            }
-            const proj: DepinderProject = await plugin.parser.parseDependencyTree(context)
-            log.info(`Done parsing dependency tree information for ${JSON.stringify(context)}`)
-            projects.push(proj)
+            projects.push(...await parseSbomProjects(sbomFile, plugin.purlType))
         } catch (e: any) {
-            log.warn(`Exception parsing dependency tree information for ${JSON.stringify(context)}`)
+            log.warn(`Exception parsing the ${plugin.purlType} projects of ${sbomFile}`)
             log.error(e)
         }
     }
@@ -628,10 +621,7 @@ export async function bulkResolve(
     return {written, libs, requested: wanted.length, resolved}
 }
 
-/**
- * One results subfolder's worth of work: the plugins that run, the files their extractors see,
- * and — for an SBOM source — the SBOMs themselves, in walk order.
- */
+/** One results subfolder's worth of work: the plugins that run and the source's SBOMs, in walk order. */
 export interface PlannedRun {
     /** `trivy` or `syft`; also the subfolder under the results folder. */
     source: string
@@ -640,15 +630,7 @@ export interface PlannedRun {
     /** The input folder the source's files came from — the project-name fallback. */
     inputFolder: string
     plugins: Plugin[]
-    files: string[]
-    sboms?: SbomDescription[]
-}
-
-/** The files one plugin's extractor takes from a pool. */
-export function filesForPlugin(plugin: Plugin, files: string[]): string[] {
-    return files
-        .filter(it => plugin.extractor.filter ? plugin.extractor.filter(it) : true)
-        .filter(it => plugin.extractor.files.some(pattern => minimatch(it, pattern, {matchBase: true})))
+    sboms: SbomDescription[]
 }
 
 /**
@@ -656,10 +638,10 @@ export function filesForPlugin(plugin: Plugin, files: string[]): string[] {
  * source's purl types call for (an explicit `-p` selects the plugins it names instead), into
  * `<producer>/`.
  */
-export function planRuns(sources: InputSources, selected: Plugin[], options: AnalyseOptions, resultRoot: string, folders: string[]): PlannedRun[] {
+export function planRuns(sources: SbomSource[], selected: Plugin[], options: AnalyseOptions, resultRoot: string, folders: string[]): PlannedRun[] {
     const runs: PlannedRun[] = []
     const explicit = !!options.plugins?.length
-    for (const source of sources.sbom) {
+    for (const source of sources) {
         const purlTypes = new Set(source.sboms.flatMap(it => [...it.purlTypes]))
         const plugins = explicit ? selected : sbomPluginsForPurlTypes(purlTypes)
         if (plugins.length === 0) {
@@ -675,7 +657,6 @@ export function planRuns(sources: InputSources, selected: Plugin[], options: Ana
             folder: path.join(resultRoot, source.name),
             inputFolder: inputFolderOf(source, folders),
             plugins,
-            files: source.sboms.map(it => it.file),
             sboms: source.sboms,
         })
     }
@@ -699,16 +680,14 @@ interface SbomPreparation {
  * scanner preflight and the up-front scan of every SBOM any run will parse; and the GitHub advisory
  * refresh.
  */
-async function prepareSbomScans(runs: PlannedRun[], options: AnalyseOptions, vulnServer?: VulnServerConfig): Promise<SbomPreparation | undefined> {
+async function prepareSbomScans(runs: PlannedRun[], options: AnalyseOptions, vulnServer?: VulnServerConfig): Promise<SbomPreparation> {
     deferSbomFindings(false)
-    const sbomRuns = runs.filter(it => it.sboms)
-    if (sbomRuns.length === 0) return undefined
-    const sbomFiles = sbomRuns.flatMap(it => it.files)
+    const sbomFiles = runs.flatMap(it => it.sboms.map(sbom => sbom.file))
     const hasGithubToken = !!process.env.GH_TOKEN
     const sources = parseVulnSources(options.vulnSource ?? DEFAULT_VULN_SOURCE)
     setVulnSources(sources)
     log.info(`Vulnerability sources: ${describeVulnSources(sources)}`)
-    const prescanFiles = () => sbomRuns.flatMap(it => sbomFilesToParse(it.plugins, it.files))
+    const prescanFiles = () => runs.flatMap(it => sbomFilesToParse(it.plugins, it.sboms.map(sbom => sbom.file)))
 
     // The vulnerability server stands in for both local scanners at once, so only when both are
     // selected. Asked first, before the GitHub refresh and the cache load, because nothing has to
@@ -719,7 +698,7 @@ async function prepareSbomScans(runs: PlannedRun[], options: AnalyseOptions, vul
     const githubReady = new Promise<void>(resolve => { githubDone = resolve })
     let vulnerabilities: Promise<VulnOutcome> | undefined
     if (vulnServer && usesVulnServer(sources)) {
-        const targets = await timePhase('vuln:purls', () => collectSbomTargets(sbomRuns, filesForPlugin))
+        const targets = await timePhase('vuln:purls', () => collectSbomTargets(runs))
         deferSbomFindings(true)
         vulnerabilities = startServerVulnerabilities(vulnServer, targets, {githubReady, prescanFiles, hasGithubToken})
     }
@@ -819,30 +798,29 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions): 
     let vulnOutcome: VulnOutcome | undefined
     try {
         for (const run of runs) {
-            const analysed = await runAnalysis(run.files, run.plugins, run.folder, options, session, resolver, prep?.vulnerabilities, registries)
-            if (run.sboms) {
-                // Already settled: `runAnalysis` waited for it before reading any finding.
-                vulnOutcome = prep?.vulnerabilities ? await prep.vulnerabilities : undefined
-                const preflight = prep?.preflight
-                    ?? (vulnOutcome?.source === 'local' ? vulnOutcome.preflight : undefined)
-                // Only when some scanner ran, here or on the server: the file records their versions
-                // and DB builds, which is what makes a vulnerability count reproducible.
-                try {
-                    if (vulnOutcome?.source === 'server') {
-                        const provenanceFile = writeServerProvenance(run.folder, vulnOutcome, run.sboms)
-                        log.info(`Scan provenance written to ${provenanceFile}`)
-                    } else if (preflight) {
-                        const fallback = vulnOutcome?.source === 'local' && vulnOutcome.fallbackReason
-                            ? {reason: vulnOutcome.fallbackReason}
-                            : undefined
-                        const provenanceFile = await writeScanProvenance(run.folder, prep?.hasGithubToken ?? false, run.sboms, fallback)
-                        log.info(`Scan provenance written to ${provenanceFile}`)
-                    }
-                } catch (e: any) {
-                    log.warn(`Could not write scan provenance: ${e?.message ?? e}`)
+            const sbomFiles = run.sboms.map(it => it.file)
+            const analysed = await runAnalysis(sbomFiles, run.plugins, run.folder, options, session, resolver, prep.vulnerabilities, registries)
+            // Already settled: `runAnalysis` waited for it before reading any finding.
+            vulnOutcome = prep.vulnerabilities ? await prep.vulnerabilities : undefined
+            const preflight = prep.preflight
+                ?? (vulnOutcome?.source === 'local' ? vulnOutcome.preflight : undefined)
+            // Only when some scanner ran, here or on the server: the file records their versions
+            // and DB builds, which is what makes a vulnerability count reproducible.
+            try {
+                if (vulnOutcome?.source === 'server') {
+                    const provenanceFile = writeServerProvenance(run.folder, vulnOutcome, run.sboms)
+                    log.info(`Scan provenance written to ${provenanceFile}`)
+                } else if (preflight) {
+                    const fallback = vulnOutcome?.source === 'local' && vulnOutcome.fallbackReason
+                        ? {reason: vulnOutcome.fallbackReason}
+                        : undefined
+                    const provenanceFile = await writeScanProvenance(run.folder, prep.hasGithubToken, run.sboms, fallback)
+                    log.info(`Scan provenance written to ${provenanceFile}`)
                 }
-                writeBlackDuckForSource(run.sboms, analysed, run.folder, run.inputFolder, options)
+            } catch (e: any) {
+                log.warn(`Could not write scan provenance: ${e?.message ?? e}`)
             }
+            writeBlackDuckForSource(run.sboms, analysed, run.folder, run.inputFolder, options)
             log.info(`Results for ${run.source} are written to ${run.folder}`)
         }
     } finally {
@@ -851,20 +829,20 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions): 
 
     // Repeated here because the preflight banner is thousands of log lines back by now, and
     // because a CSV is only readable next to the matcher and DB build that produced it.
-    const summary = prep?.preflight
+    const summary = prep.preflight
         ? scannerSummaryLine(prep.preflight, prep.hasGithubToken)
-        : vulnOutcome && vulnSummaryLine(vulnOutcome, prep?.hasGithubToken ?? false)
+        : vulnOutcome && vulnSummaryLine(vulnOutcome, prep.hasGithubToken)
     if (summary) log[summary.level](summary.text)
     log.info('Done')
     logProfile()
 }
 
 /**
- * Runs `plugins` over `files` and writes each plugin's three CSVs into `resultFolder`. The
+ * Runs `plugins` over `sbomFiles` and writes each plugin's three CSVs into `resultFolder`. The
  * enrichment is shared by every source: this is the one place a dependency is looked up.
  */
 export async function runAnalysis(
-    files: string[], plugins: Plugin[], resultFolder: string, options: AnalyseOptions, session: CacheSession,
+    sbomFiles: string[], plugins: Plugin[], resultFolder: string, options: AnalyseOptions, session: CacheSession,
     resolver?: ResolverConfig, vulnerabilities?: Promise<unknown>,
     registries: RegistryFallback = createRegistryFallback(resolveRegistryLimits({env: process.env[REGISTRY_LIMITS_ENV]})),
 ): Promise<AnalysisResult[]> {
@@ -874,7 +852,7 @@ export async function runAnalysis(
     }
     const progress = new MultiBar({}, Presets.shades_grey)
 
-    // FLOW 1 — parse (see extractProjects above): files → DepinderProject[] per plugin. Nothing leaves the machine yet.
+    // FLOW 1 — parse (see parsePluginProjects above): SBOMs → DepinderProject[] per plugin. Nothing leaves the machine yet.
     // Phase 1 — parse. Still one pass per plugin, side by side as before; what changed is that
     // every plugin finishes parsing before any enrichment starts, because a bulk question is only
     // worth asking once it can cover the whole run.
@@ -882,7 +860,7 @@ export async function runAnalysis(
         plugins.map(async (plugin): Promise<PluginProjects> => {
             log.info(`Plugin ${plugin.name} starting`)
             const projects: DepinderProject[] = await timePhase(`parse:${plugin.name}`, () =>
-                extractProjects(plugin, filesForPlugin(plugin, files)))
+                parsePluginProjects(plugin, sbomFiles))
             return {plugin, projects}
         }))
 
@@ -919,7 +897,7 @@ export async function runAnalysis(
         const keyPrefix = `${ecosystemOf(plugin)}:`
         const refreshedLibs = [...bulkWritten].filter(it => it.startsWith(keyPrefix)).map(it => it.slice(keyPrefix.length))
         const inFlight = new Map<string, Promise<LibraryInfo>>()
-        const purlType = purlTypeOfPlugin(plugin)
+        const purlType = plugin.purlType
 
         const projectsBar = progress.create(projects.length, 0, {name: 'Projects', state: 'Analysing'})
 

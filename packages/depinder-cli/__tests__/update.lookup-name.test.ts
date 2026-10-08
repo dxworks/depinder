@@ -12,8 +12,7 @@ vi.mock('../src/fallback/registry-fallback', () => ({
 }))
 vi.mock('../src/plugins', () => ({
     getPluginsFromNames: () => [{
-        name: 'fake-go', ecosystem: 'go', aliases: ['sbom-golang'],
-        extractor: {files: [], createContexts: () => []},
+        name: 'fake-go', ecosystem: 'go', purlType: 'golang',
     }],
 }))
 

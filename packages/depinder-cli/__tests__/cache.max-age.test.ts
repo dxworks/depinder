@@ -16,9 +16,15 @@ import {cacheInfoAction} from '../src/commands/cache'
 import {LibraryInfo} from '../src/extension-points/library-info'
 import {DepinderDependency} from '../src/extension-points/extract'
 import {Plugin} from '../src/extension-points/plugin'
+import {parseSbomProjects} from '../src/plugins/sbom'
 import {log} from '../src/utils/logging'
 
 vi.mock('../src/utils/blacklist', () => ({blacklistedGlobs: []}))
+// The enrichment tests hand `runAnalysis` their project directly instead of parsing an SBOM.
+vi.mock('../src/plugins/sbom', async importOriginal => ({
+    ...await importOriginal<typeof import('../src/plugins/sbom')>(),
+    parseSbomProjects: vi.fn(),
+}))
 
 const DAY_MS = 86_400_000
 
@@ -215,14 +221,7 @@ describe('cached packages expire', () => {
      * info, exactly like a library that was never cached.
      */
     describe('enrichment', () => {
-        const input = () => {
-            const file = path.join(tmp, 'app.lock')
-            fs.writeFileSync(file, '')
-            return file
-        }
-
-        // `runAnalysis` returns results for `sbom-*` plugins only, so the test keeps its own handle on
-        // the dependency the parser hands out.
+        // The test keeps its own handle on the dependency it hands `runAnalysis`.
         let leftPad: DepinderDependency
         // Stands in for the registry fallback: the test's plugin answers what core would fetch.
         let registry: (name: string) => Promise<LibraryInfo>
@@ -230,18 +229,11 @@ describe('cached packages expire', () => {
         function fakePlugin(retrieve: (name: string) => Promise<LibraryInfo>): Plugin {
             registry = retrieve
             leftPad = {id: 'left-pad@1.0.0', name: 'left-pad', version: '1.0.0', requestedBy: []}
-            return {
-                name: 'fake',
-                ecosystem: 'npm',
-                aliases: ['sbom-npm'],
-                extractor: {files: ['*.lock'], createContexts: files => files.map(it => ({root: path.dirname(it), lockFile: path.basename(it)} as any))},
-                parser: {
-                    parseDependencyTree: () => ({
-                        name: 'app', version: '1.0.0', path: '/repo/app',
-                        dependencies: {'left-pad@1.0.0': leftPad},
-                    }),
-                },
-            }
+            vi.mocked(parseSbomProjects).mockResolvedValue([{
+                name: 'app', version: '1.0.0', path: '/repo/app',
+                dependencies: {'left-pad@1.0.0': leftPad},
+            }])
+            return {name: 'fake', ecosystem: 'npm', purlType: 'npm'}
         }
 
         async function analyse(plugin: Plugin, maxAgeSeconds: number) {
@@ -250,7 +242,7 @@ describe('cached packages expire', () => {
                 misses: missCache,
             }
             const registries = {lookup: ({name}: {name: string}) => registry(name), packagesAtOnce: () => 8}
-            await runAnalysis([input()], [plugin], path.join(tmp, 'out'), {results: 'out', refresh: false}, session, undefined, undefined, registries)
+            await runAnalysis([path.join(tmp, 'app.cdx.json')], [plugin], path.join(tmp, 'out'), {results: 'out', refresh: false}, session, undefined, undefined, registries)
             return leftPad
         }
 

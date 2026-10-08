@@ -14,8 +14,7 @@ vi.mock('../src/fallback/registry-fallback', () => ({
 }))
 vi.mock('../src/plugins', () => ({
     getPluginsFromNames: (names: string[]) => names.map(ecosystem => ({
-        name: `fake-${ecosystem}`, ecosystem, aliases: [`sbom-${ecosystem}`],
-        extractor: {files: [], createContexts: () => []},
+        name: `fake-${ecosystem}`, ecosystem, purlType: ecosystem,
     })),
 }))
 

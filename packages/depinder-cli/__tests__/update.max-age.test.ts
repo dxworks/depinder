@@ -13,8 +13,7 @@ vi.mock('../src/fallback/registry-fallback', () => ({
 }))
 vi.mock('../src/plugins', () => ({
     getPluginsFromNames: () => [{
-        name: 'fake', ecosystem: 'npm', aliases: ['sbom-npm'],
-        extractor: {files: [], createContexts: () => []},
+        name: 'fake', ecosystem: 'npm', purlType: 'npm',
     }],
 }))
 

@@ -6,7 +6,7 @@ import {classifyInputs, inputFolderOf} from '../src/commands/sources'
 import {planRuns} from '../src/commands/analyse'
 import {defaultProjectName} from '../src/blackduck/run'
 import {clearSbomDescriptions, describeSbom} from '../src/plugins/sbom/describe'
-import {clearSbomFileCache, isSbomFile} from '../src/plugins/sbom'
+import {clearSbomFileCache, isSbomFile, sbomProjectsOf} from '../src/plugins/sbom'
 import {getPluginsFromNames} from '../src/plugins'
 import {log} from '../src/utils/logging'
 
@@ -81,11 +81,10 @@ describe('classifyInputs', () => {
 
         const sources = classifyInputs([syft, lock, trivy, other])
 
-        expect(Object.keys(sources)).toEqual(['sbom'])
         expect(infos.filter(it => IGNORED.test(it))).toEqual(['Ignored 2 file(s) that are not CycloneDX SBOMs'])
-        expect(sources.sbom.map(it => it.name)).toEqual(['trivy', 'syft'])
-        expect(sources.sbom[0].sboms.map(it => it.file)).toEqual([trivy])
-        expect(sources.sbom[1].sboms.map(it => it.file)).toEqual([syft])
+        expect(sources.map(it => it.name)).toEqual(['trivy', 'syft'])
+        expect(sources[0].sboms.map(it => it.file)).toEqual([trivy])
+        expect(sources[1].sboms.map(it => it.file)).toEqual([syft])
         expect(warnings).toEqual([])
     })
 
@@ -99,7 +98,7 @@ describe('classifyInputs', () => {
         const sources = classifyInputs([broken, cdxgen, spdx, good])
 
         expect(infos.filter(it => IGNORED.test(it))).toEqual([])
-        expect(sources.sbom).toEqual([{name: 'trivy', sboms: [describeSbom(good)]}])
+        expect(sources).toEqual([{name: 'trivy', sboms: [describeSbom(good)]}])
         expect(warnings).toHaveLength(3)
         expect(warnings.find(it => it.startsWith('Skipping broken.cdx.json'))).toBeDefined()
         expect(warnings.find(it => it.startsWith('Skipping gen.cdx.json'))).toContain('written by cdxgen')
@@ -114,7 +113,7 @@ describe('classifyInputs', () => {
 
         const sources = classifyInputs([one, two, syft])
 
-        expect(sources.sbom.find(it => it.name === 'trivy')?.sboms).toHaveLength(2)
+        expect(sources.find(it => it.name === 'trivy')?.sboms).toHaveLength(2)
         expect(warnings).toEqual([expect.stringContaining('trivy has 2 SBOMs for repo repo: one.cdx.json, two.cdx.json')])
     })
 
@@ -129,17 +128,17 @@ describe('classifyInputs', () => {
         expect(isSbomFile(pkg)).toBe(false)
         const sources = classifyInputs([pkg, bom, lock, spdx])
         expect(infos).toContain('Ignored 3 file(s) that are not CycloneDX SBOMs')
-        expect(sources.sbom).toEqual([{name: 'trivy', sboms: [describeSbom(bom)]}])
-        // The extractor takes the same file, so it is parsed, not just classified.
+        expect(sources).toEqual([{name: 'trivy', sboms: [describeSbom(bom)]}])
+        // The planned plugin finds its project in the same file, so it is parsed, not just classified.
         const [run] = planRuns(sources, getPluginsFromNames(), {results: '/out', refresh: false}, '/out', [dir])
-        expect(run.plugins[0].extractor.createContexts([bom])).toHaveLength(1)
+        expect(sbomProjectsOf(bom, run.plugins[0].purlType)).toHaveLength(1)
         expect(warnings).toEqual([])
     })
 
     it('ignores a folder with no SBOMs, saying how many files it passed over', () => {
         const lock = write(path.join(tmpDir, 'manifests'), 'Gemfile.lock', '')
         const pom = write(path.join(tmpDir, 'manifests'), 'pom.xml', '<project/>')
-        expect(classifyInputs([lock, pom])).toEqual({sbom: []})
+        expect(classifyInputs([lock, pom])).toEqual([])
         expect(infos).toEqual(['Ignored 2 file(s) that are not CycloneDX SBOMs'])
     })
 })
@@ -164,10 +163,10 @@ describe('planRuns', () => {
         expect(runs.map(it => it.source)).toEqual(['trivy', 'syft'])
         expect(runs.map(it => it.folder)).toEqual(['/out/trivy', '/out/syft'])
         expect(runs[0].plugins.map(it => it.name)).toEqual(['sbom-npm'])
-        expect(runs[0].files).toEqual([trivy])
-        expect(runs[0].sboms?.map(it => it.repo)).toEqual(['repo'])
+        expect(runs[0].sboms.map(it => it.file)).toEqual([trivy])
+        expect(runs[0].sboms.map(it => it.repo)).toEqual(['repo'])
         expect(runs[1].plugins.map(it => it.name)).toEqual(['sbom-ruby'])
-        expect(runs[1].files).toEqual([syft])
+        expect(runs[1].sboms.map(it => it.file)).toEqual([syft])
     })
 
     it('honours an explicit plugin list, by sbom name or by a legacy alias', () => {

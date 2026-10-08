@@ -19,12 +19,8 @@ export interface SbomSource {
     sboms: SbomDescription[]
 }
 
-export interface InputSources {
-    /** Ordered as `KNOWN_PRODUCERS` lists them: trivy, then syft. */
-    sbom: SbomSource[]
-}
-
-export function classifyInputs(files: string[]): InputSources {
+/** The walked files' SBOMs, per producer, ordered as `KNOWN_PRODUCERS` lists them: trivy, then syft. */
+export function classifyInputs(files: string[]): SbomSource[] {
     let ignored = 0
     const byProducer = new Map<string, SbomDescription[]>(KNOWN_PRODUCERS.map(it => [it, []]))
     for (const file of files) {
@@ -49,12 +45,12 @@ export function classifyInputs(files: string[]): InputSources {
         }
         byProducer.get(sbom.producer)?.push(sbom)
     }
-    const sbom = KNOWN_PRODUCERS
+    const sources = KNOWN_PRODUCERS
         .map(name => ({name, sboms: byProducer.get(name) ?? []}))
         .filter(it => it.sboms.length > 0)
-    for (const source of sbom) warnDuplicateRepos(source)
+    for (const source of sources) warnDuplicateRepos(source)
     if (ignored > 0) log.info(`Ignored ${ignored} file(s) that are not CycloneDX SBOMs`)
-    return {sbom}
+    return sources
 }
 
 /**

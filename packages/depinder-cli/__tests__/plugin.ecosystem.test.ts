@@ -4,7 +4,6 @@ import {VulnerabilityChecker} from '../src/extension-points/vulnerability-checke
 import {DepinderDependency} from '../src/extension-points/extract'
 import {assignPurl} from '../src/plugins/sbom/dependency-purl'
 import {
-    purlTypeOfPlugin,
     sbomDotnet,
     sbomGo,
     sbomJava,
@@ -52,7 +51,7 @@ describe('the sbom plugins', () => {
     it.each(table)('enrich %p.name through the ecosystem checker, under its purl type', (plugin, _eco, purlType, checker) => {
         expect(plugin.checker).toBe(checker)
         expect(plugin.aliases?.[0]).toBe(`sbom-${purlType}`)
-        expect(purlTypeOfPlugin(plugin)).toBe(purlType)
+        expect(plugin.purlType).toBe(purlType)
     })
 
     it.each(table)('select %p.name by each legacy plugin name', (plugin, _eco, _purl, _chk, aliases) => {

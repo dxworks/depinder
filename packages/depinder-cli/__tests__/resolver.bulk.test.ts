@@ -58,8 +58,7 @@ function plugin(name: string, ecosystem: string, purlType: string, advisoryEcosy
     return {
         name,
         ecosystem,
-        aliases: [`sbom-${purlType}`],
-        extractor: {files: [], createContexts: () => []},
+        purlType,
         checker: {githubSecurityAdvisoryEcosystem: advisoryEcosystem},
     }
 }

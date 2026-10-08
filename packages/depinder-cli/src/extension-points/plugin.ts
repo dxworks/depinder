@@ -1,4 +1,3 @@
-import {Extractor, Parser} from './extract'
 import {VulnerabilityChecker} from './vulnerability-checker'
 
 export interface Plugin {
@@ -10,8 +9,8 @@ export interface Plugin {
      * fetched once per plugin. Defaults to `name`, which keeps every pre-existing cache entry valid.
      */
     ecosystem?: string
-    extractor: Extractor // defines which files to search for
-    parser?: Parser // defines how to parse the files specified by the extractor and returns a tree with all dependencies
+    /** The purl type of the SBOM components this plugin analyses, e.g. `maven`. */
+    purlType: string
     checker?: VulnerabilityChecker // checks for vulnerabilities for the found dependencies
 }
 

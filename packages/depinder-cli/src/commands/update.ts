@@ -4,7 +4,6 @@ import chalk from 'chalk'
 import {sharedCacheDb, sqliteCache} from '../cache/sqlite-cache'
 import moment from 'moment'
 import {getPluginsFromNames} from '../plugins'
-import {purlTypeOfPlugin} from '../plugins/sbom'
 import {attachGithubAdvisories} from '../utils/library-advisories'
 import {Presets, SingleBar} from 'cli-progress'
 import {ecosystemOf, Plugin} from '../extension-points/plugin'
@@ -78,7 +77,7 @@ function idsByPlugin(selectedPlugins: Plugin[], idsToUpdate: string[]): Map<Plug
 /** Re-fetches through the registry fallback `analyse` uses, as many at once per ecosystem as it allows. */
 async function updateLibrariesFor(selectedPlugins: Plugin[], idsToUpdate: string[], registries: RegistryFallback, progressBar: SingleBar) {
     await Promise.all([...idsByPlugin(selectedPlugins, idsToUpdate)].map(async ([plugin, ids]) => {
-        const type = purlTypeOfPlugin(plugin)
+        const type = plugin.purlType
         const prefixLength = ecosystemOf(plugin).length + 1
         await mapWithConcurrency(ids, registries.packagesAtOnce(type), async id => {
             const libraryName = id.substring(prefixLength)

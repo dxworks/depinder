@@ -14,7 +14,6 @@ import {
     writeScanProvenance,
 } from '../src/plugins/sbom/local-scan'
 import {log} from '../src/utils/logging'
-import {sbomFilesFor, sbomJava} from '../src/plugins/sbom'
 
 /**
  * The preflight is the only thing standing between a user with no scanners and a completed run
@@ -271,17 +270,6 @@ describe('scan provenance', () => {
 
         expect(provenance.vulnerabilityAnalysis).toBe('disabled')
         expect(provenance.githubAdvisoryFallback).toBe(false)
-    })
-})
-
-describe('sbomFilesFor', () => {
-    it('lists the SBOM files an sbom plugin selection would scan', () => {
-        const files = ['/x/zeppelin.cdx.json', '/x/zeppelin.trivy.cdx.json', '/x/pom.xml']
-        expect(sbomFilesFor([sbomJava], files)).toEqual(['/x/zeppelin.cdx.json', '/x/zeppelin.trivy.cdx.json'])
-    })
-
-    it('is empty when no plugin is selected, so an unknown --plugins name never preflights scanners', () => {
-        expect(sbomFilesFor([], ['/x/zeppelin.cdx.json'])).toEqual([])
     })
 })
 

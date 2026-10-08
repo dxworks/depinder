@@ -6,8 +6,6 @@ import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {
     attachLocalFindings,
     attachServerFindings,
-    purlTypeOfPlugin,
-    sbomPlugins,
     sbomProjectsOf,
 } from '../plugins/sbom'
 import {assignPurl} from '../plugins/sbom/dependency-purl'
@@ -48,32 +46,26 @@ import {vulnSources} from './selection'
 /** One project the SBOM route will parse, with the plugin and file it comes from. */
 export interface SbomTarget {
     plugin: Plugin
-    /** Absolute, as the parser resolves it. */
+    /** Absolute, as `parseSbomProjects` resolves it. */
     file: string
     project: DepinderProject
 }
 
 /**
- * Every project every run will parse, from the very parse the SBOM parser memoises — so the
- * parser later hands out these same objects, and whatever is attached to them here is what it
- * returns. `filesFor` is the extractor's own file filter (`filesForPlugin`). A file that does not
- * parse is skipped; the parser will report it, as it always has.
+ * Every project every run will parse, from the very parse `parseSbomProjects` memoises — so the
+ * analysis later gets these same objects, and whatever is attached to them here is what it reads.
+ * A file that does not parse is skipped; the analysis will report it.
  */
-export function collectSbomTargets(
-    runs: {plugins: Plugin[], files: string[]}[],
-    filesFor: (plugin: Plugin, files: string[]) => string[],
-): SbomTarget[] {
+export function collectSbomTargets(runs: {plugins: Plugin[], sboms: {file: string}[]}[]): SbomTarget[] {
     const targets: SbomTarget[] = []
     const seen = new Set<DepinderProject>()
     for (const run of runs) {
         for (const plugin of run.plugins) {
-            if (!sbomPlugins.includes(plugin)) continue
-            const purlType = purlTypeOfPlugin(plugin)
-            for (const file of filesFor(plugin, run.files)) {
+            for (const {file} of run.sboms) {
                 const absolute = path.resolve(file)
                 let projects: DepinderProject[]
                 try {
-                    projects = sbomProjectsOf(absolute, purlType)
+                    projects = sbomProjectsOf(absolute, plugin.purlType)
                 } catch {
                     continue
                 }

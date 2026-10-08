@@ -1,6 +1,5 @@
 import {DepinderDependency} from '../../extension-points/extract'
 import {Plugin} from '../../extension-points/plugin'
-import {purlTypeOfPlugin} from './index'
 import {purlFromRegistryName} from './purl'
 
 /**
@@ -13,6 +12,6 @@ export function assignPurl(plugin: Plugin, dep: DepinderDependency): string | un
     if (dep.purl) return dep.purl
     const version = dep.version?.trim()
     if (!version) return undefined
-    dep.purl = purlFromRegistryName(purlTypeOfPlugin(plugin), dep.name, version)
+    dep.purl = purlFromRegistryName(plugin.purlType, dep.name, version)
     return dep.purl
 }

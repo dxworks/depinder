@@ -3,10 +3,8 @@ import {PINNED_SCANNER_VERSIONS} from '@depinder/core'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {filesForPlugin} from '../src/commands/analyse'
-import {clearSbomCache, deferSbomFindings, sbomNpm} from '../src/plugins/sbom'
+import {clearSbomCache, deferSbomFindings, parseSbomProjects, sbomNpm} from '../src/plugins/sbom'
 import {clearLocalScanCache, PROVENANCE_FILE} from '../src/plugins/sbom/local-scan'
-import {DependencyFileContext} from '../src/extension-points/extract'
 import {collectSbomTargets, startServerVulnerabilities, vulnSummaryLine, writeServerProvenance} from '../src/vuln-sources/run'
 import {VulnServerConfig} from '../src/vuln-sources/server'
 import {resetVulnSources} from '../src/vuln-sources/selection'
@@ -113,17 +111,17 @@ afterEach(() => {
 const scannerCalls = () => fs.existsSync(callLog) ? fs.readFileSync(callLog, 'utf8').trim().split('\n') : []
 
 function start() {
-    const targets = collectSbomTargets([{plugins: [sbomNpm], files: [sbomFile]}], filesForPlugin)
+    const targets = collectSbomTargets([{plugins: [sbomNpm], sboms: [{file: sbomFile}]}])
     const outcome = startServerVulnerabilities(config, targets, {
         githubReady: Promise.resolve(), prescanFiles: () => [sbomFile], hasGithubToken: false,
     })
     return {targets, outcome}
 }
 
-/** The project the parser hands out for the file — deferred, so it must not scan anything. */
+/** The project the analysis gets for the file — deferred, so it must not scan anything. */
 async function parsed() {
-    const context: DependencyFileContext = {root: tmpDir, lockFile: 'web.cdx.json', type: 'cyclonedx:npm:0'}
-    return sbomNpm.parser!.parseDependencyTree(context)
+    const [project] = await parseSbomProjects(sbomFile, sbomNpm.purlType)
+    return project
 }
 
 describe('vulnerabilities from the server', () => {

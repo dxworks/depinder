@@ -1,27 +1,10 @@
 import {LibraryInfo} from './library-info'
 import {Vulnerability} from './vulnerability-checker'
 
-export interface Extractor {
-    files: string[]
-    filter?: (file: string) => boolean // function to filter out irrelevant files
-    createContexts: (files: string[]) => DependencyFileContext[]
-}
-
-export interface Parser {
-    parseDependencyTree: ParseDependencyTree
-}
-export type ParseDependencyTree = (context: DependencyFileContext) => DepinderProject | Promise<DepinderProject>
-
-export interface DependencyFileContext {
-    root: string // the root folder of the project
-    lockFile: string // the file to parse to get the dependency tree
-    type? :string // the type of the project, especially useful in Java where there are multiple types of projects  (e.g. maven, gradle, etc.)
-}
-
 export interface DepinderProject {
     name: string
     version: string
-    path: string // the same as DependencyFileContext.root
+    path: string // the project's location, as its SBOM records it
     dependencies: {
         [dependencyId: string]: DepinderDependency
     }

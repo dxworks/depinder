@@ -1,9 +1,9 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {clearSbomCache, sbomJava, sbomNpm} from '../src/plugins/sbom'
+import {clearSbomCache, parseSbomProjects, sbomJava, sbomNpm} from '../src/plugins/sbom'
 import {clearLocalScanCache} from '../src/plugins/sbom/local-scan'
-import {DependencyFileContext, DepinderProject} from '../src/extension-points/extract'
+import {DepinderProject} from '../src/extension-points/extract'
 
 /**
  * Covers the sbom plugin wiring: whether a local scan ran is a property of the parsed project
@@ -63,13 +63,10 @@ function stubScanner(name: string, report: unknown, counterFile?: string): strin
     return file
 }
 
-function contextsFor(plugin: typeof sbomJava): DependencyFileContext[] {
-    return plugin.extractor.createContexts([sbomFile])
+async function parse(plugin: typeof sbomJava): Promise<DepinderProject> {
+    const [project] = await parseSbomProjects(sbomFile, plugin.purlType)
+    return project
 }
-
-// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-const parse = (plugin: typeof sbomJava, context: DependencyFileContext): Promise<DepinderProject> =>
-    Promise.resolve(plugin.parser!.parseDependencyTree(context))
 
 beforeAll(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder-sbom-plugin-'))
@@ -99,7 +96,7 @@ describe('sbom parser and the local scan', () => {
         process.env.TRIVY_BIN = path.join(tmpDir, 'nonexistent-trivy')
         process.env.GRYPE_BIN = path.join(tmpDir, 'nonexistent-grype')
 
-        const project = await parse(sbomJava, contextsFor(sbomJava)[0])
+        const project = await parse(sbomJava)
 
         expect(project.exactVersionVulnerabilities).toBeFalsy()
         expect(Object.values(project.dependencies).length).toBeGreaterThan(0)
@@ -111,7 +108,7 @@ describe('sbom parser and the local scan', () => {
         process.env.TRIVY_BIN = stubScanner('trivy-stub.sh', trivyReport)
         process.env.GRYPE_BIN = path.join(tmpDir, 'nonexistent-grype')
 
-        const project = await parse(sbomJava, contextsFor(sbomJava)[0])
+        const project = await parse(sbomJava)
 
         expect(project.exactVersionVulnerabilities).toBe(true)
         const deps = project.dependencies
@@ -126,8 +123,8 @@ describe('sbom parser and the local scan', () => {
         process.env.TRIVY_BIN = stubScanner('trivy-counted.sh', trivyReport, counter)
         process.env.GRYPE_BIN = path.join(tmpDir, 'nonexistent-grype')
 
-        await parse(sbomJava, contextsFor(sbomJava)[0])
-        await parse(sbomNpm, contextsFor(sbomNpm)[0])
+        await parse(sbomJava)
+        await parse(sbomNpm)
 
         expect(fs.readFileSync(counter, 'utf8').trim().split('\n')).toHaveLength(1)
     })
