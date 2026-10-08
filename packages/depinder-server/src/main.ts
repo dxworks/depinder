@@ -76,6 +76,6 @@ async function main(): Promise<void> {
 }
 
 main().catch(e => {
-    process.stderr.write(`depinder-server-side: failed to start\n  ${errorMessage(e)}\n`)
+    process.stderr.write(`depinder-server: failed to start\n  ${errorMessage(e)}\n`)
     process.exit(1)
 })

@@ -19,8 +19,6 @@ import {
  * and sweep traffic that keeps the database current, however much of that is already queued.
  */
 
-export const USER_AGENT = 'depinder-server-side/0.1 (+https://github.com/dxworks/depinder)'
-
 /**
  * Per-purl-type politeness. crates.io asks for ~1 request/second from an identified client;
  * maven central and pypi are shared infrastructure worth being gentle with; the rest cope with 8.
@@ -133,7 +131,6 @@ export function createRegistryClient(options: RegistryClientOptions): HttpClient
     const recorder = options.recorder
     return createHttpClient({
         limiter: {run: task => limit.run(task, options.rank)},
-        userAgent: USER_AGENT,
         timeoutMs: options.timeoutMs,
         onRequest: recorder && (event => recorder({source: hostOf(event.url), ...event})),
     })

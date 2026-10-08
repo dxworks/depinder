@@ -62,7 +62,7 @@ export function loadConfigOrExit<T>(load: (env: NodeJS.ProcessEnv) => T, env = p
         return load(env)
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
-        process.stderr.write(`depinder-server-side: configuration error\n  ${msg}\n`)
+        process.stderr.write(`depinder-server: configuration error\n  ${msg}\n`)
         process.exit(1)
     }
 }

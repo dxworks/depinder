@@ -1,4 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
+import {DEFAULT_USER_AGENT} from '@depinder/core'
 import {
     createRankedLimiter,
     createRegistryClient,
@@ -8,7 +9,6 @@ import {
     RATE_LIMITS,
     type Rank,
     resetLimiters,
-    USER_AGENT,
     type FetchRecord,
 } from '../../../src/resolver/registries/http.js'
 
@@ -96,10 +96,10 @@ describe('limiter order', () => {
 })
 
 describe('createRegistryClient', () => {
-    it('sends the server user agent and records the request with its host', async () => {
+    it('sends core\'s user agent and records the request with its host', async () => {
         const records: FetchRecord[] = []
         vi.stubGlobal('fetch', (_url: string, init: RequestInit) => {
-            expect((init.headers as Record<string, string>)['user-agent']).toBe(USER_AGENT)
+            expect((init.headers as Record<string, string>)['user-agent']).toBe(DEFAULT_USER_AGENT)
             return Promise.resolve(new Response('{"ok":true}', {status: 200}))
         })
 
