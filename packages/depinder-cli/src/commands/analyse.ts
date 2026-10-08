@@ -441,7 +441,7 @@ export async function bulkResolve(
     }
     if (wanted.length > 0) {
         log.info(`Asking the resolver about ${wanted.length} purl(s): `
-            + `${wanted.length - expired} not cached${options.refresh ? ' (--refresh)' : ''}, ${expired} expired`
+            + (options.refresh ? 'every one re-checked' : `${wanted.length - expired} not cached, ${expired} expired`)
             + `${alreadyAsked ? `; ${alreadyAsked} already asked this run` : ''}`)
     } else {
         log.info(alreadyAsked

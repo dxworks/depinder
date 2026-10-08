@@ -57,14 +57,19 @@ than `--cache-max-age`) for the plugins named (default all), by name or
 [alias](../index.md#ecosystems): `sbom-java` and `java` both refresh the `java:` entries. With `GH_TOKEN` set, GitHub advisories are fetched too; a failed advisory lookup still keeps the registry data. To bypass the cache for a
 single run instead, use `analyse --refresh`.
 
-Each row is fetched the way `analyse` fetches a package the resolver did not answer: from its
-registry through the [registry fallback](../configuration.md#registry-fallback), Libraries.io
-included, with the same per-ecosystem limits.
+The rows go the way `analyse` sends an expired package: first, in one ask, to the
+[bulk resolver](../configuration.md#bulk-resolver), whose answer is taken only when the server has
+confirmed it since the date (an answer it could not reconfirm in time is not); then every row it did
+not answer to its registry through the [registry fallback](../configuration.md#registry-fallback),
+Libraries.io included, with the same per-ecosystem limits. Without `DEPINDER_RESOLVER_TOKEN`, or with
+`--no-resolver`, every row goes to the registries.
 
 | Option | Meaning | Default |
 |---|---|---|
 | `--cache-max-age <duration>` | Without a date, re-fetch the rows older than this; see [expiry](#expiry) | `DEPINDER_CACHE_MAX_AGE`, else `1d` |
 | `--registry-limits <limits>` | Registry requests at once per ecosystem, with an optional gap in ms: `npm=16,cargo=1:1000` | `DEPINDER_REGISTRY_LIMITS`, else 8 at once (`golang` 64, `nuget` 32) |
+| `--resolver-url <url>` | Where the bulk resolver is | `DEPINDER_RESOLVER_URL`, else `https://libs.dxworks.org` |
+| `--no-resolver` | Skip the resolver; re-fetch every row from the registries | resolver on |
 
 To pick plugins, give a date first:
 

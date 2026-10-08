@@ -97,7 +97,7 @@ The local scanners run instead:
 
 On by default. A resolver service answers thousands of package URLs in one call, from its own
 store of registry facts, instead of depinder asking each registry package by package. `analyse`
-calls the one at `https://libs.dxworks.org`; all it needs is its token, a secret you set once
+and `update` call the one at `https://libs.dxworks.org`; all it needs is its token, a secret you set once
 ([how](install.md#4-resolver-token-optional)):
 
 ```bash
@@ -148,7 +148,7 @@ SBOM scan findings — the only case in which they are read.
 Every package neither the cache nor the resolver answered (or every package, with
 `--no-resolver`) is fetched from its registry by the same code the resolver's server runs, so a
 package gets the same facts whichever road it came by. The answer is cached locally like a
-resolver answer. `depinder update` re-fetches cached rows the same way.
+resolver answer. `depinder update` re-fetches cached rows the same way, after asking the resolver.
 
 When the registry has no such package or fails, and `LIBRARIES_IO_API_KEY` is set, a **maven**,
 **pypi**, **nuget** or **composer** package is asked of [Libraries.io](https://libraries.io)
