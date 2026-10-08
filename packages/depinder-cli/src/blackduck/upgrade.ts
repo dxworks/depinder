@@ -1,5 +1,5 @@
 import {Vulnerability} from '../extension-points/vulnerability-checker'
-import {isPrerelease, majorOf, tokenizeVersion} from '../vuln-sources/github/versions'
+import {majorOf, tokenizeVersion} from '../vuln-sources/github/versions'
 import {ExportComponent} from './model'
 
 /**
@@ -31,9 +31,10 @@ import {ExportComponent} from './model'
  * component whose findings are ALL unfixed gets no recommendation and an empty row, which is what
  * Black Duck writes for the same case (`adm-zip 0.6.0` in the reference export).
  *
- * Pre-releases are never recommended while a stable candidate exists: Black Duck wrote 4 of 288
- * Short Term cells as pre-releases, we wrote 26 Long Term ones (`27.0.0-alpha.8`). They remain the
- * fallback when nothing stable clears the findings.
+ * Pre-releases, as the resolver flags them (core's `isPrerelease`), are never recommended while a
+ * stable candidate exists: Black Duck wrote 4 of 288 Short Term cells as pre-releases, we wrote 26
+ * Long Term ones (`27.0.0-alpha.8`). They remain the fallback when nothing stable clears the
+ * findings.
  */
 
 export interface UpgradeGuidance {
@@ -104,7 +105,7 @@ export function upgradeGuidance(components: ExportComponent[]): UpgradeGuidance[
             const clean = component.registryVersions.filter(candidate =>
                 component.compare(candidate, component.version) >= 0
                 && fixable.every(finding => fixedBy(component, finding, candidate)))
-            const stable = clean.filter(it => !isPrerelease(it))
+            const stable = clean.filter(it => !component.prereleaseVersions.has(it))
             const pool = stable.length > 0 ? stable : clean
             const currentMajor = majorOf(component.version)
             const sameLine = pool.filter(it => majorOf(it) === currentMajor)

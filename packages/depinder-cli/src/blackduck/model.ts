@@ -1,3 +1,4 @@
+import {isPrerelease} from '@depinder/core'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
 import {availableVersions} from '../extension-points/library-info'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
@@ -50,6 +51,8 @@ export interface ExportComponent {
     vulnerabilities: Vulnerability[]
     /** Every version the registrar knows, ordered — the input to upgrade guidance. */
     registryVersions: string[]
+    /** The `registryVersions` that are pre-releases, by the rule the resolver ships. */
+    prereleaseVersions: ReadonlySet<string>
     /** This ecosystem's version ordering, so upgrade guidance need not rediscover it. */
     compare: VersionComparator
 }
@@ -212,6 +215,17 @@ function toComponent(origin: Origin, purlType: string, id: string, dependency: D
         vulnerabilities: [...(dependency.vulnerabilities ?? [])],
         // The versions upgrade guidance may recommend: a withdrawn one is not among them.
         registryVersions: availableVersions(versions).map(it => it.version).sort(compare),
+        prereleaseVersions: prereleasesOf(purlType, versions),
         compare,
     }
+}
+
+/**
+ * The resolver marks pre-releases only, so an unmarked version (stable, or from a cache entry
+ * written without the flag) gets core's own rule, which agrees with the resolver on stable ones.
+ */
+function prereleasesOf(purlType: string, versions: {version: string, prerelease?: boolean}[]): Set<string> {
+    return new Set(versions
+        .filter(it => it.prerelease ?? isPrerelease(purlType, it.version))
+        .map(it => it.version))
 }

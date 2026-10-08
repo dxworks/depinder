@@ -760,7 +760,7 @@ describe('the written files', () => {
         // What the recompute script does: the sidecar plus the cache's version list, nothing else.
         const compare = comparatorForPurlType('npm')
         const rebuilt = sidecar.components.map((it: any) =>
-            ({...it, registryVersions: ['6.11.0', '6.10.2', '6.10.3'].sort(compare), compare}))
+            ({...it, registryVersions: ['6.11.0', '6.10.2', '6.10.3'].sort(compare), prereleaseVersions: new Set(), compare}))
         const before = readCsv(folder, '_upgrade_guidance.csv')
         const other = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder-bd-'))
         writeUpgradeGuidanceCsv(rebuilt, other)

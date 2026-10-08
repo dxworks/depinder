@@ -1,5 +1,5 @@
 import {LibraryInfo} from '../extension-points/library-info'
-import {type PackageRecord, registryName, VERSION_FLAG_YANKED} from '@depinder/core'
+import {type PackageRecord, registryName, VERSION_FLAG_PRERELEASE, VERSION_FLAG_YANKED} from '@depinder/core'
 
 /**
  * A resolver `PackageRecord` in the shape the rest of depinder already speaks, `LibraryInfo`.
@@ -50,12 +50,14 @@ export function toLibraryInfo(pkg: PackageRecord): LibraryInfo {
         // leave it out (`availableVersions`).
         versions: (pkg.versions ?? []).map(([version, releasedAt, flags, licenses]) => {
             const yanked = (flags & VERSION_FLAG_YANKED) !== 0
+            const prerelease = (flags & VERSION_FLAG_PRERELEASE) !== 0
             return {
                 version,
                 timestamp: timestampOf(releasedAt),
                 latest: !yanked && !!pkg.latest && version === pkg.latest.version,
                 licenses: licenses ?? packageLicenses,
                 ...(yanked ? {yanked: true} : {}),
+                ...(prerelease ? {prerelease: true} : {}),
             }
         }),
         licenses: packageLicenses,

@@ -64,7 +64,7 @@ describe('fetchLibraryInfo', () => {
                 versions: [
                     {version: '1.0.0', timestamp: Date.parse('2024-01-01T00:00:00Z'), latest: false, licenses: ['MIT']},
                     {version: '1.1.0', timestamp: Date.parse('2024-06-01T00:00:00Z'), latest: true, licenses: ['MIT']},
-                    {version: '2.0.0-beta.1', timestamp: Date.parse('2025-01-01T00:00:00Z'), latest: false, licenses: ['MIT']},
+                    {version: '2.0.0-beta.1', timestamp: Date.parse('2025-01-01T00:00:00Z'), latest: false, licenses: ['MIT'], prerelease: true},
                 ],
                 licenses: ['MIT'],
                 homepageUrl: 'https://acme.example/left-pad',

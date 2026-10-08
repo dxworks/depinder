@@ -42,6 +42,7 @@ export {
 export {mapWithConcurrency} from './concurrency.js'
 export {MAVEN_PER_VERSION_LICENSES} from './facts.js'
 export {canFetch, fetchPackage} from './fetch-package.js'
+export {isPrerelease} from './registries/latest.js'
 export {mavenMetadataUrl} from './registries/maven/index.js'
 export {stringOrUndefined, toDate} from './registries/normalise.js'
 export type {FetchContext, FetchedPackage, FetchedVersion, ResolvedPackage} from './registries/types.js'

@@ -1,3 +1,4 @@
+import {isPrerelease} from '@depinder/core'
 import moment from 'moment'
 import {LibraryInfo} from '../extension-points/library-info'
 import {countRequest} from '../utils/profile'
@@ -30,12 +31,13 @@ export function librariesIoFallback(): LibrariesIoFallback {
     return {
         // Without a key Libraries.io answers every request with `Forbidden`; do not ask.
         covers: type => type in LIBRARIES_IO_PLATFORMS && !!process.env.LIBRARIES_IO_API_KEY,
-        retrieve: (type, name) => retrieveFromLibrariesIo(LIBRARIES_IO_PLATFORMS[type], name),
+        retrieve: (type, name) => retrieveFromLibrariesIo(type, name),
     }
 }
 
 /** One project from https://libraries.io/api, spaced half a second apart as old depinder did. */
-async function retrieveFromLibrariesIo(platform: LibrariesIoPlatform, libraryName: string): Promise<LibraryInfo> {
+async function retrieveFromLibrariesIo(type: string, libraryName: string): Promise<LibraryInfo> {
+    const platform = LIBRARIES_IO_PLATFORMS[type]
     await delay(500)
     const url = `https://libraries.io/api/${platform}/${libraryName}?api_key=${process.env.LIBRARIES_IO_API_KEY}`
     countRequest(url)
@@ -49,6 +51,7 @@ async function retrieveFromLibrariesIo(platform: LibrariesIoPlatform, libraryNam
             timestamp: moment(it.published_at).valueOf(),
             latest: it.number === data.latest_release_number,
             licenses: [],
+            ...(isPrerelease(type, it.number) ? {prerelease: true} : {}),
         })),
         description: data?.description ?? '',
         licenses: data.licenses ? [data.licenses] : [],

@@ -97,10 +97,7 @@ describe('the resolver package record adapter', () => {
         expect(info.versions.some(it => it.latest)).toBe(false)
     })
 
-    it('reads the flag bits one at a time: prerelease is not yanked, yanked is, both is', () => {
-        // Bit 0 is prerelease and bit 1 is yanked, so 3 is both. `LibraryInfo` has nowhere to put
-        // "prerelease", and the registrars that produce it do not mark one either, so a
-        // prerelease is carried like any other version.
+    it('reads the flag bits one at a time: bit 0 is prerelease, bit 1 is yanked, 3 is both', () => {
         const info = toLibraryInfo(record({
             versions: [
                 ['1.0.0', at('2020-01-01T00:00:00Z'), 0],
@@ -109,8 +106,8 @@ describe('the resolver package record adapter', () => {
                 ['2.0.0-rc.2', at('2021-03-01T00:00:00Z'), 3],
             ],
         }))
-        expect(info.versions.map(it => [it.version, !!it.yanked])).toEqual([
-            ['1.0.0', false], ['2.0.0-rc.1', false], ['1.0.1', true], ['2.0.0-rc.2', true],
+        expect(info.versions.map(it => [it.version, !!it.prerelease, !!it.yanked])).toEqual([
+            ['1.0.0', false, false], ['2.0.0-rc.1', true, false], ['1.0.1', false, true], ['2.0.0-rc.2', true, true],
         ])
     })
 
@@ -240,7 +237,7 @@ describe('the readers of an expanded record, against the shape they used to get'
             {version: '0.9.9', timestamp: Date.parse('2019-06-01T00:00:00Z'), latest: false, licenses: ['MIT'], yanked: true},
             {version: '1.0.0', timestamp: Date.parse('2020-01-01T00:00:00Z'), latest: false, licenses: ['MIT']},
             {version: '1.1.0', timestamp: Date.parse('2021-01-01T00:00:00Z'), latest: false, licenses: ['Apache-2.0']},
-            {version: '2.0.0-rc.1', timestamp: Date.parse('2021-06-01T00:00:00Z'), latest: false, licenses: ['MIT']},
+            {version: '2.0.0-rc.1', timestamp: Date.parse('2021-06-01T00:00:00Z'), latest: false, licenses: ['MIT'], prerelease: true},
             {version: '2.0.0', timestamp: Date.parse('2022-01-01T00:00:00Z'), latest: true, licenses: ['MIT']},
         ],
         licenses: ['MIT'],
