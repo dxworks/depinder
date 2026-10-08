@@ -14,10 +14,10 @@ import {Range} from 'semver'
 import _ from 'lodash'
 import moment from 'moment'
 import {ecosystemOf, Plugin} from '../extension-points/plugin'
-import {Cache, noCache} from '../cache/cache'
+import {Cache} from '../cache/cache'
 import {sharedCacheDb, sqliteCacheWithCutoff} from '../cache/sqlite-cache'
 import {CacheMaxAgeOptions, cacheMaxAgeSeconds, formatDuration, freshnessCutoffMs} from '../cache/max-age'
-import {MISS_TTL_HOURS, missCache, MissCache, noMissCache} from '../cache/misses'
+import {MISS_TTL_HOURS, missCache, MissCache} from '../cache/misses'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {MultiBar, Presets} from 'cli-progress'
 import {walkDir} from '../utils/utils'
@@ -39,7 +39,7 @@ import {licenseIdentity} from '../blackduck/licenses'
 import {classifyInputs, inputFolderOf, InputSources} from './sources'
 import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
-import {count, enableProfile, logProfile, startPhase, timePhase} from '../utils/profile'
+import {count, enableProfile, logProfile, startPhase, timePhase, timePhaseSync} from '../utils/profile'
 import {DEFAULT_RESOLVER_URL, ResolverConfig, ResolverOptions, resolverConfig} from '../resolver/config'
 import type {PackageRecord} from '@depinder/core'
 import {ResolvedEntry, resetResolverClient, resolvePurls} from '../resolver/client'
@@ -123,7 +123,9 @@ export function createAnalyseCommand(): Command {
             'Registry requests at once per ecosystem, with an optional gap in ms: npm=16,cargo=1:1000; '
             + 'over DEPINDER_REGISTRY_LIMITS and the defaults')
         .option('--profile', 'Print a phase timing and request count summary at the end', false)
-        .action(analyseFiles)
+        // Only the two arguments: Commander also passes the Command itself, which must not leak
+        // into an optional parameter.
+        .action((folders: string[], options: AnalyseOptions) => analyseFiles(folders, options))
 }
 
 export const analyseCommand = createAnalyseCommand()
@@ -229,7 +231,7 @@ export function licenseOf(lib: LibraryInfo): string {
     return license ? licenseIdentity(license) : 'unknown'
 }
 
-async function cacheHit(cache: Cache, cacheKey: string, dep: DepinderDependency, refresh: boolean, refreshedLibs: any[]) {
+function cacheHit(cache: Cache, cacheKey: string, dep: DepinderDependency, refresh: boolean, refreshedLibs: string[]): boolean {
     if (refresh && !refreshedLibs.includes(dep.name)) {
         return false
     }
@@ -238,12 +240,6 @@ async function cacheHit(cache: Cache, cacheKey: string, dep: DepinderDependency,
 
 /** GitHub advisory lookups at once for answers the resolver gave. */
 const ADVISORY_LOOKUP_CONCURRENCY = 8
-/**
- * How often the caches are flushed mid-run, so a crash loses at most this much work. Time-based
- * rather than every N lookups because a flush serialises the whole positive cache (tens of MB),
- * and doing that every 50 lookups on a cold run cost more than the lookups it protected.
- */
-const CACHE_CHECKPOINT_MS = 60_000
 
 /**
  * What one plugin's pass produced: the purl type its components carry, and the projects it
@@ -275,19 +271,12 @@ export function assignPurls(pluginProjects: PluginProjects[]): number {
     return named
 }
 
-async function allCached(cache: Cache, keys: Set<string>): Promise<boolean> {
-    for (const key of keys) {
-        if (!await cache.has(key)) return false
-    }
-    return true
+function allCached(cache: Cache, keys: Set<string>): boolean {
+    return [...keys].every(key => cache.has(key))
 }
 
-async function anyExpired(cache: Cache, keys: Set<string>): Promise<boolean> {
-    if (!cache.isExpired) return false
-    for (const key of keys) {
-        if (await cache.isExpired(key)) return true
-    }
-    return false
+function anyExpired(cache: Cache, keys: Set<string>): boolean {
+    return [...keys].some(key => cache.isExpired(key))
 }
 
 /**
@@ -443,12 +432,12 @@ export async function bulkResolve(
         // Already cached under every key it would fill: phase 3 will hit the cache and never reach
         // a registry, so there is nothing to ask for. `--refresh` wants fresh facts, and the
         // resolver is the cheapest place to get them.
-        if (!options.refresh && await allCached(cache, keys)) {
+        if (!options.refresh && allCached(cache, keys)) {
             count('resolver:locally-cached')
             continue
         }
         // An expired entry is asked for like a missing one; counted apart only for the log line.
-        if (!options.refresh && await anyExpired(cache, keys)) {
+        if (!options.refresh && anyExpired(cache, keys)) {
             count('resolver:expired')
             expired++
         }
@@ -517,7 +506,7 @@ export async function bulkResolve(
         written.add(cacheKey)
         const lib = toLibraryInfo(pkg)
         try {
-            track(cache.set(cacheKey, lib, updatedAt))
+            cache.set(cacheKey, lib, updatedAt)
         } catch (error) {
             writeFailure ??= {error}
             return
@@ -540,16 +529,6 @@ export async function bulkResolve(
         if (lib.vulnerabilities !== undefined) return
         if (advisoriesRead.has(cacheKey)) lookups.push({cacheKey, advisoryEcosystem, lib, updatedAt})
         else if (advisoriesUndecided.has(cacheKey)) undecidedLookups.push({cacheKey, advisoryEcosystem, lib, updatedAt})
-    }
-
-    // A cache whose `set` is asynchronous still gets its write awaited before the phase ends, and
-    // its failure reported the same way as a synchronous one.
-    function track(write: void | Promise<void>): void {
-        if (!write) return
-        const worker: Promise<void> = Promise.resolve(write)
-            .catch(error => { writeFailure ??= {error} })
-            .finally(() => { workers.delete(worker) })
-        workers.add(worker)
     }
 
     // Up to ADVISORY_LOOKUP_CONCURRENCY workers drain the lookup queue; one that finds it empty ends, and
@@ -589,7 +568,7 @@ export async function bulkResolve(
             }
             // Same `updated_at` as the first write: the advisories are not a reconfirmation of the
             // registry facts.
-            await cache.set(cacheKey, lib, updatedAt)
+            cache.set(cacheKey, lib, updatedAt)
         }
     }
 
@@ -776,42 +755,16 @@ async function prepareSbomScans(runs: PlannedRun[], options: AnalyseOptions, vul
     return {preflight, hasGithubToken, vulnerabilities}
 }
 
-/** The process-wide cache handle: opened once, checkpointed mid-run, closed once at the end. */
+/** The caches a run reads and writes. Every write is durable on its own; misses are pruned at the end. */
 export interface CacheSession {
     cache: Cache
     misses: MissCache
-    checkpointIfDue: () => Promise<void>
-    /** The teardown write: flushes anything still pending and releases the cache's resources. */
-    close: () => Promise<void>
 }
 
-async function openCacheSession(useCache: boolean, cutoffMs: number): Promise<CacheSession> {
-    const cache: Cache = useCache ? sqliteCacheWithCutoff(cutoffMs) : noCache
-    if (useCache) log.info(`Using the local SQLite cache: ${sharedCacheDb().file}`)
-    const misses: MissCache = useCache ? missCache : noMissCache
-    await timePhase('cache:load', async () => {
-        await cache.load()
-        misses.load()
-    })
-    // Mid-run durability only: `cache.write()` is the teardown step and may release the cache's
-    // resources, so a checkpoint that called it could leave every later lookup in the run failing
-    // — and those failures are swallowed per dependency, so the run would still finish and write
-    // CSVs with the enrichment silently missing.
-    const checkpoint = () => timePhase('cache:write', async () => {
-        await cache.flush?.()
-        misses.write()
-    })
-    let lastCheckpoint = Date.now()
-    const checkpointIfDue = async () => {
-        if (Date.now() - lastCheckpoint < CACHE_CHECKPOINT_MS) return
-        lastCheckpoint = Date.now()
-        await checkpoint()
-    }
-    const close = () => timePhase('cache:write', async () => {
-        await cache.write()
-        misses.write()
-    })
-    return {cache, misses, checkpointIfDue, close}
+function openCacheSession(cutoffMs: number): CacheSession {
+    const file = timePhaseSync('cache:load', () => sharedCacheDb().file)
+    log.info(`Using the local SQLite cache: ${file}`)
+    return {cache: sqliteCacheWithCutoff(cutoffMs), misses: missCache}
 }
 
 /**
@@ -823,7 +776,7 @@ async function openCacheSession(useCache: boolean, cutoffMs: number): Promise<Ca
  * files under `<results>/<producer>/`; anything that is not a CycloneDX SBOM is ignored. A
  * subfolder exists only when its source had input.
  */
-export async function analyseFiles(folders: string[], options: AnalyseOptions, useCache = true): Promise<void> {
+export async function analyseFiles(folders: string[], options: AnalyseOptions): Promise<void> {
     if (options.profile) enableProfile()
     // Read first, so a malformed fixed date stops the run before any work is done.
     const fixedNow = fixedReportNow()
@@ -846,7 +799,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
     const runStartMs = Date.now()
     const maxAgeSeconds = cacheMaxAgeSeconds(options)
     const cutoffMs = freshnessCutoffMs(maxAgeSeconds, runStartMs)
-    if (useCache) log.info(`Cache max age: ${formatDuration(maxAgeSeconds)} (entries written before ${new Date(cutoffMs).toISOString()} are expired)`)
+    log.info(`Cache max age: ${formatDuration(maxAgeSeconds)} (entries written before ${new Date(cutoffMs).toISOString()} are expired)`)
 
     resetResolverClient()
     resetBulkResolve()
@@ -859,7 +812,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
         configured ?? (options.resolver === false && options.vulnServer === true ? resolverConfig({...options, resolver: true}) : undefined), options)
 
     const prep = await prepareSbomScans(runs, options, vulnServer)
-    const session = await openCacheSession(useCache, cutoffMs)
+    const session = openCacheSession(cutoffMs)
     let vulnOutcome: VulnOutcome | undefined
     try {
         for (const run of runs) {
@@ -890,7 +843,7 @@ export async function analyseFiles(folders: string[], options: AnalyseOptions, u
             log.info(`Results for ${run.source} are written to ${run.folder}`)
         }
     } finally {
-        await session.close()
+        timePhaseSync('cache:prune', () => session.misses.prune())
     }
 
     // Repeated here because the preflight banner is thousands of log lines back by now, and
@@ -947,7 +900,6 @@ export async function runAnalysis(
         })
         : {written: new Set<string>(), libs: new Map<string, LibraryInfo>(), requested: 0, resolved: 0}
     const bulkWritten = bulk.written
-    if (bulkWritten.size > 0) await session.checkpointIfDue()
 
     // FLOW 2h — the vulnerability server's answer, asked at the start of the run: phase 3 is the
     // first to read a finding or `exactVersionVulnerabilities`, so this is as late as the wait can
@@ -997,9 +949,9 @@ export async function runAnalysis(
                     if (justResolved) {
                         count('cache:hit')
                         lib = justResolved
-                    } else if (await cacheHit(session.cache, cacheKey, dep, options.refresh, refreshedLibs)) {
+                    } else if (cacheHit(session.cache, cacheKey, dep, options.refresh, refreshedLibs)) {
                         count('cache:hit')
-                        lib = await session.cache.get(cacheKey) as LibraryInfo
+                        lib = session.cache.get(cacheKey) as LibraryInfo
                     } else if (!options.refresh && session.misses.has(cacheKey)) {
                         // Same outcome as the failed lookup it remembers: the dependency
                         // keeps whatever the parser gave it, untouched.
@@ -1008,7 +960,7 @@ export async function runAnalysis(
                         return
                     } else {
                         // An expired entry is a miss like any other; the count only tells them apart.
-                        count(!options.refresh && await session.cache.isExpired?.(cacheKey) ? 'cache:expired' : 'cache:miss')
+                        count(!options.refresh && session.cache.isExpired(cacheKey) ? 'cache:expired' : 'cache:miss')
                         // log.info(`Getting remote information on ${dep.name}`)
                         let fetch = inFlight.get(cacheKey)
                         if (!fetch) {
@@ -1026,9 +978,8 @@ export async function runAnalysis(
                                     throw e
                                 }
                                 await attachGithubAdvisories(fetched, plugin)
-                                await session.cache.set(cacheKey, fetched)
+                                session.cache.set(cacheKey, fetched)
                                 if (options.refresh) refreshedLibs.push(dep.name)
-                                await session.checkpointIfDue()
                                 return fetched
                             })()
                             inFlight.set(cacheKey, fetch)

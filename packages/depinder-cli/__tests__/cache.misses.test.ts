@@ -22,7 +22,6 @@ describe('the negative cache', () => {
     })
 
     it('starts empty', () => {
-        missCache.load()
         expect(missCache.has('npm:left-pad')).toBe(false)
     })
 
@@ -41,14 +40,14 @@ describe('the negative cache', () => {
         expect(missCache.has('maven:com.example:gone')).toBe(false)
     })
 
-    it('drops expired entries when it writes, so the table does not grow forever', () => {
+    it('drops expired entries when pruned, so the table does not grow forever', () => {
         const stale = Date.now() - (MISS_TTL_HOURS + 1) * 60 * 60 * 1000
         const db = openCacheDb(dbFile)
         db.setMiss('npm:old', stale)
         db.close()
 
         missCache.set('npm:new')
-        missCache.write()
+        missCache.prune()
         resetSharedCacheDb()
         const after = openCacheDb(dbFile)
         expect(after.missKeys()).toEqual(['npm:new'])

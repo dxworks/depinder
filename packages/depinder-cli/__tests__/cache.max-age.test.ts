@@ -167,9 +167,9 @@ describe('cached packages expire', () => {
             expect(cache.get('npm:new')?.name).toBe('npm:new')
             expect(cache.has('npm:old')).toBe(false)
             expect(cache.get('npm:old')).toBeUndefined()
-            expect(cache.isExpired?.('npm:old')).toBe(true)
-            expect(cache.isExpired?.('npm:new')).toBe(false)
-            expect(cache.isExpired?.('npm:absent')).toBe(false)
+            expect(cache.isExpired('npm:old')).toBe(true)
+            expect(cache.isExpired('npm:new')).toBe(false)
+            expect(cache.isExpired('npm:absent')).toBe(false)
         })
 
         it('writes a row with the age it is given: one confirmed before the cutoff reads as expired', () => {
@@ -186,7 +186,7 @@ describe('cached packages expire', () => {
             expect(sharedCacheDb().libUpdatedAt('npm:stale')).toBe(confirmed)
             expect(cache.has('npm:stale')).toBe(false)
             expect(cache.get('npm:stale')).toBeUndefined()
-            expect(cache.isExpired?.('npm:stale')).toBe(true)
+            expect(cache.isExpired('npm:stale')).toBe(true)
             // Still there for `update` and `cache info`, which read any age.
             expect(sharedCacheDb().getLib('npm:stale')?.name).toBe('stale')
             expect(cache.has('npm:fresh')).toBe(true)
@@ -247,8 +247,6 @@ describe('cached packages expire', () => {
             const session: CacheSession = {
                 cache: sqliteCacheWithCutoff(freshnessCutoffMs(maxAgeSeconds)),
                 misses: missCache,
-                checkpointIfDue: async () => { /* nothing to checkpoint */ },
-                close: async () => { /* nothing to close */ },
             }
             const registries = {lookup: ({name}: {name: string}) => registry(name), packagesAtOnce: () => 8}
             await runAnalysis([input()], [plugin], path.join(tmp, 'out'), {results: 'out', refresh: false}, session, undefined, undefined, registries)

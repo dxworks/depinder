@@ -25,8 +25,8 @@ export {MISS_TTL_HOURS}
 export interface MissCache {
     has: (key: string) => boolean
     set: (key: string) => void
-    load: () => void
-    write: () => void
+    /** Drops the misses past their TTL; an analyse run calls it once, at the end. */
+    prune: () => void
 }
 
 export const missCache: MissCache = {
@@ -36,19 +36,7 @@ export const missCache: MissCache = {
     set(key: string): void {
         sharedCacheDb().setMiss(key)
     },
-    load(): void {
-        sharedCacheDb()
-    },
-    // A set is durable on its own; writing is the moment to drop what has expired.
-    write(): void {
+    prune(): void {
         sharedCacheDb().pruneMisses()
     },
-}
-
-/** The no-op twin of `noCache`, for runs that opt out of caching altogether. */
-export const noMissCache: MissCache = {
-    has: () => false,
-    set: () => { /* nothing to remember */ },
-    load: () => { /* nothing to load */ },
-    write: () => { /* nothing to write */ },
 }

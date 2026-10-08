@@ -43,9 +43,7 @@ function fakeCache(): Cache & {entries: Map<string, LibraryInfo>, sets: {key: st
             entries.set(key, value)
         },
         has: (key: string) => entries.has(key),
-        load: () => { /* nothing */ },
-        flush: () => { /* nothing */ },
-        write: () => { /* nothing */ },
+        isExpired: () => false,
     }
 }
 
@@ -182,7 +180,7 @@ describe('the bulk resolve phase', () => {
         expect([...outcome.written]).toEqual(['java:com.google.guava:guava'])
         // The key `processDep` builds is `${ecosystemOf(plugin)}:${dep.name}` — a hit here is a
         // registry call that never happens.
-        expect(await cache.has('java:com.google.guava:guava')).toBe(true)
+        expect(cache.has('java:com.google.guava:guava')).toBe(true)
         expect(cache.entries.get('java:com.google.guava:guava')?.name).toBe('com.google.guava:guava')
         expect(cache.entries.get('java:com.google.guava:guava')?.versions.map(it => it.version)).toEqual(['1.0.0', '2.0.0'])
     })
@@ -873,7 +871,7 @@ describe('the bulk resolve phase with a cache max age', () => {
         expect(sharedCacheDb().getLib('npm:left-pad')?.description).toBe('a package')
         // Stamped with the server's confirmation, not with the moment it was copied here.
         expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBe(Date.parse(confirmedAt))
-        expect(await cache.has('npm:left-pad')).toBe(true)
+        expect(cache.has('npm:left-pad')).toBe(true)
         expect(sharedCacheDb().getLib('npm:right-pad')?.description).toBe('cached')
     })
 
@@ -896,8 +894,8 @@ describe('the bulk resolve phase with a cache max age', () => {
         expect(outcome.libs.get('npm:old-pkg')?.description).toBe('a package')
         // ...and the next one asks for it again: the row is there, but expired.
         expect(sharedCacheDb().libUpdatedAt('npm:old-pkg')).toBe(Date.parse(confirmedAt))
-        expect(await cache.has('npm:old-pkg')).toBe(false)
-        expect(await cache.isExpired?.('npm:old-pkg')).toBe(true)
+        expect(cache.has('npm:old-pkg')).toBe(false)
+        expect(cache.isExpired('npm:old-pkg')).toBe(true)
     })
 
     it('keeps the confirmation time when the advisories are written in afterwards', async () => {
@@ -946,6 +944,6 @@ describe('the bulk resolve phase with a cache max age', () => {
         expect(server.asked[0]).toEqual(['pkg:npm/left-pad@1.0.0'])
         expect(outcome.written.size).toBe(0)
         expect(sharedCacheDb().libUpdatedAt('npm:left-pad')).toBe(before)
-        expect(await cache.has('npm:left-pad')).toBe(false)
+        expect(cache.has('npm:left-pad')).toBe(false)
     })
 })

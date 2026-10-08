@@ -257,8 +257,8 @@ resolver answer is the server's confirmation time, not the moment it was copied.
 left without data, like one never cached. The max age is `--cache-max-age <duration>` (`90s`,
 `30m`, `12h`, `7d`; a bare number is seconds), else `DEPINDER_CACHE_MAX_AGE`, else `1d`. The
 24-hour miss TTL is separate and unchanged.
-Every row is committed as it is written, so the 60-second checkpoint costs nothing; the previous
-`cache/libs.json` (94 MB on the twelve-repository run) was serialised whole at every one.
+Every row is committed as it is written, so a run that stops early keeps what it fetched; the
+previous `cache/libs.json` (94 MB on the twelve-repository run) had to be serialised whole to be saved.
 
 `DEPINDER_CACHE_DB=<file>` points a run at another database. The previous per-directory layout
 (`cache/libs.json`, `misses.json`) is not read by a run any more;

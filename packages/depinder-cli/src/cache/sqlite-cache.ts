@@ -10,9 +10,9 @@ import {depinderFolder} from '../utils/utils'
  *
  * It replaces `cache/libs.json` + `cache/misses.json` under the working directory. That pair had
  * two costs that grew with every run: `libs.json` reached 94 MB on a twelve-repository run and
- * was serialised WHOLE at every checkpoint, blocking the event loop for seconds; and a cache per
+ * was serialised WHOLE at every save, blocking the event loop for seconds; and a cache per
  * working directory meant the same packument was fetched once per project folder. This database
- * is written per row, so a checkpoint is free, and it lives in `~/.dxw/depinder/cache/`, so every
+ * is written per row, so there is nothing to save, and it lives in `~/.dxw/depinder/cache/`, so every
  * run on the machine shares it. It is the only cache: each machine has its own.
  *
  * `node:sqlite` is Node's own module (stable API, `ExperimentalWarning` still printed on Node 24;
@@ -281,16 +281,6 @@ export function sqliteCacheWithCutoff(cutoffMs: number | undefined): Cache {
             if (cutoffMs === undefined) return false
             const updatedAt = sharedCacheDb().libUpdatedAt(key)
             return updatedAt !== undefined && updatedAt < cutoffMs
-        },
-        load() {
-            sharedCacheDb()
-        },
-        // Each row is committed when it is set, so a checkpoint has nothing left to make durable.
-        flush() {
-            // durable already
-        },
-        write() {
-            // durable already; the connection stays open for the process
         },
     }
 }
