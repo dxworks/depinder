@@ -14,9 +14,13 @@
     "production": [
       "default",
       "!{projectRoot}/__tests__/**/*",
+      "!{projectRoot}/test/**/*",
       "!{projectRoot}/docs/**/*",
       "!{projectRoot}/vitest.config.*",
       "!{projectRoot}/eslint.config.*"
+    ],
+    "testFixtures": [
+      "{projectRoot}/test/fixtures/**/*"
     ]
   },
   "targetDefaults": {

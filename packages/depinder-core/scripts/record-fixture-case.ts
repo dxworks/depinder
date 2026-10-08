@@ -36,7 +36,10 @@ function recordingFetch(recordings: Recording[]): typeof fetch {
     }
 }
 
-/** A file name saying what the body is, e.g. `metadata.xml`, `packument.json`, `info-v1.2.0.json`. */
+/**
+ * A file name saying what the body is, e.g. `metadata.xml`, `packument.json`, `info-v1.2.0.json`.
+ * Never `project.json`: Nx would take the case directory for a project of its own.
+ */
 function bodyFileName(url: string, contentType: string): string {
     const {host, pathname} = new URL(url)
     const segments = pathname.split('/').filter(Boolean).map(decodeURIComponent)
@@ -46,7 +49,7 @@ function bodyFileName(url: string, contentType: string): string {
         return last === 'maven-metadata.xml' ? 'metadata.xml' : last
     }
     if (host === 'registry.npmjs.org') return 'packument.json'
-    if (host === 'pypi.org') return 'project.json'
+    if (host === 'pypi.org') return 'pypi-project.json'
     if (host === 'crates.io') return 'crate.json'
     if (host === 'rubygems.org') return segments.at(-2) === 'versions' ? 'versions.json' : 'gem.json'
     if (host === 'repo.packagist.org') return `p2-${last}`

@@ -20,6 +20,7 @@
     },
     "test": {
       "executor": "nx:run-script",
+      "inputs": ["default", "^production", {"input": "testFixtures", "projects": ["depinder-core"]}],
       "options": {"script": "test"}
     },
     "test-integration": {
