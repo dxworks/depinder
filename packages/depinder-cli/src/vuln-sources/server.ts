@@ -1,5 +1,6 @@
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {log as defaultLog} from '../utils/logging'
+import {positiveNumberFromEnv} from '../utils/number-from-env'
 import {count, countRequest} from '../utils/profile'
 import {ResolverConfig} from '../resolver/config'
 import {
@@ -42,17 +43,6 @@ export interface VulnServerConfig {
 
 export const DEFAULT_VULN_MAX_WAIT_MS = 30_000
 
-function positiveFromEnv(name: string, fallback: number, integer: boolean): number {
-    const raw = process.env[name]
-    if (!raw) return fallback
-    const parsed = Number(raw)
-    if (!Number.isFinite(parsed) || parsed <= 0 || (integer && !Number.isInteger(parsed))) {
-        defaultLog.warn(`Ignoring ${name}=${raw}: not a positive ${integer ? 'whole number' : 'number'}`)
-        return fallback
-    }
-    return parsed
-}
-
 /**
  * The vulnerability server for this run, or `undefined` to scan locally as before.
  *
@@ -65,8 +55,9 @@ export function vulnServerConfig(resolver: ResolverConfig | undefined, options: 
     return {
         url: resolver.url,
         token: resolver.token,
-        maxWaitMs: positiveFromEnv('DEPINDER_VULN_MAX_WAIT_MS', DEFAULT_VULN_MAX_WAIT_MS, false),
-        chunkSize: Math.min(VULN_DEFAULT_MAX_PURLS, positiveFromEnv('DEPINDER_VULN_CHUNK_SIZE', VULN_DEFAULT_MAX_PURLS, true)),
+        maxWaitMs: positiveNumberFromEnv('DEPINDER_VULN_MAX_WAIT_MS', DEFAULT_VULN_MAX_WAIT_MS, {unit: 'milliseconds'}),
+        chunkSize: Math.min(VULN_DEFAULT_MAX_PURLS,
+            positiveNumberFromEnv('DEPINDER_VULN_CHUNK_SIZE', VULN_DEFAULT_MAX_PURLS, {unit: 'purls', wholeNumber: true})),
     }
 }
 

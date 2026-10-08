@@ -1,4 +1,5 @@
 import {log} from '../utils/logging'
+import {positiveNumberFromEnv} from '../utils/number-from-env'
 
 /**
  * Where the bulk purl resolver lives, and how long a run is willing to wait for it.
@@ -67,28 +68,6 @@ function resolverUrl(options: ResolverOptions): string {
     return (configured ?? DEFAULT_RESOLVER_URL).replace(/\/+$/, '')
 }
 
-function maxWaitFromEnv(): number {
-    const raw = process.env.DEPINDER_RESOLVER_MAX_WAIT_MS
-    if (!raw) return DEFAULT_RESOLVER_MAX_WAIT_MS
-    const parsed = Number(raw)
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-        log.warn(`Ignoring DEPINDER_RESOLVER_MAX_WAIT_MS=${raw}: not a positive number of milliseconds`)
-        return DEFAULT_RESOLVER_MAX_WAIT_MS
-    }
-    return parsed
-}
-
-function chunkConcurrencyFromEnv(): number {
-    const raw = process.env.DEPINDER_RESOLVER_CONCURRENCY
-    if (!raw) return RESOLVER_CHUNK_CONCURRENCY
-    const parsed = Number(raw)
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-        log.warn(`Ignoring DEPINDER_RESOLVER_CONCURRENCY=${raw}: not a positive whole number of chunks`)
-        return RESOLVER_CHUNK_CONCURRENCY
-    }
-    return parsed
-}
-
 /**
  * The resolver to use for this run, or `undefined` for "no resolver, registry fallback only".
  *
@@ -108,7 +87,8 @@ export function resolverConfig(options: ResolverOptions = {}): ResolverConfig | 
     return {
         url,
         token,
-        maxWaitMs: maxWaitFromEnv(),
-        chunkConcurrency: chunkConcurrencyFromEnv(),
+        maxWaitMs: positiveNumberFromEnv('DEPINDER_RESOLVER_MAX_WAIT_MS', DEFAULT_RESOLVER_MAX_WAIT_MS, {unit: 'milliseconds'}),
+        chunkConcurrency: positiveNumberFromEnv('DEPINDER_RESOLVER_CONCURRENCY', RESOLVER_CHUNK_CONCURRENCY,
+            {unit: 'chunks', wholeNumber: true}),
     }
 }
