@@ -1,8 +1,8 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import {PINNED_SCANNER_VERSIONS} from '@depinder/core'
 import {
-    PINNED_SCANNER_VERSIONS,
     PROVENANCE_FILE,
     ScannerPreflight,
     clearLocalScanCache,

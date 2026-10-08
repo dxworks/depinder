@@ -4,10 +4,10 @@ import {join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import type {FastifyInstance} from 'fastify'
 import {afterAll, afterEach, beforeAll, describe, expect, it, vi} from 'vitest'
-import {nullLogger} from '@depinder/core'
+import {buildVulnerabilityIndex, nullLogger, type GrypeReport, type TrivyReport} from '@depinder/core'
+import {bomRefKeyer} from '../../src/vuln/bom-refs.js'
 import type {VulnConfig} from '../../src/vuln/config.js'
 import {createScanLimiter, type ScanLimiter} from '../../src/vuln/limiter.js'
-import {buildVulnerabilityIndex, type GrypeReport, type TrivyReport} from '../../src/vuln/merge/index.js'
 import type {ScanDirs, ScannerName, ScanReports} from '../../src/vuln/scanners.js'
 import {createVulnServer, type RunScan} from '../../src/vuln/server.js'
 import {createDatabaseSource, type ToolHealth} from '../../src/vuln/source.js'
@@ -186,7 +186,7 @@ describe('POST /vulnerabilities', () => {
 
         const trivy = JSON.parse(await readFile(TRIVY_FIXTURE, 'utf8')) as TrivyReport
         const grype = JSON.parse(await readFile(GRYPE_FIXTURE, 'utf8')) as GrypeReport
-        const expected = buildVulnerabilityIndex(trivy, grype, new Map(SCANNED.map((p, i) => [`c${i}`, p]))).index
+        const expected = buildVulnerabilityIndex(trivy, grype, bomRefKeyer(new Map(SCANNED.map((p, i) => [`c${i}`, p])))).index
         expect(body.vulnerabilities).toEqual(JSON.parse(JSON.stringify(Object.fromEntries(expected))))
         expect(Object.keys(body.vulnerabilities as object).sort()).toEqual([...SCANNED].sort())
 

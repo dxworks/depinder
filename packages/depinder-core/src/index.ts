@@ -52,3 +52,13 @@ export {
     type PackageRecord,
     type VersionPointer,
 } from './wire/package-record.js'
+export {
+    buildVulnerabilityIndex,
+    type PackageKeyer,
+    type PackageKeys,
+    type VulnerabilityIndex,
+} from './vuln/merge.js'
+export type {GrypeReport} from './vuln/grype.js'
+export type {TrivyReport} from './vuln/trivy.js'
+export {PINNED_SCANNER_VERSIONS} from './vuln/scanner-versions.js'
+export type {ScannedPackage, Vulnerability} from './vuln/vulnerability.js'

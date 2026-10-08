@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process'
 import {readdir, rm} from 'node:fs/promises'
 import {join} from 'node:path'
 import type {VulnConfig} from './config.js'
-import type {GrypeReport, TrivyReport} from './merge/index.js'
+import type {GrypeReport, TrivyReport} from '@depinder/core'
 
 /**
  * Running Trivy and Grype as child processes.

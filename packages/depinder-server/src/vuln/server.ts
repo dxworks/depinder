@@ -2,10 +2,10 @@ import {mkdtemp, rm, writeFile} from 'node:fs/promises'
 import {join} from 'node:path'
 import Fastify, {type FastifyInstance} from 'fastify'
 import {BODY_LIMIT_BYTES, clientGone, registerAuth, registerCompress, registerErrorHandler} from '../shared/http-server.js'
-import type {Logger} from '@depinder/core'
+import {buildVulnerabilityIndex, type Logger, type Vulnerability} from '@depinder/core'
 import type {VulnConfig} from './config.js'
+import {bomRefKeyer} from './bom-refs.js'
 import {BusyError, type ScanLimiter} from './limiter.js'
-import {buildVulnerabilityIndex, type Vulnerability} from './merge/index.js'
 import {parseVulnRequest, TooManyPurlsError} from './request.js'
 import {buildSbom} from './sbom.js'
 import {SCAN_DIR_PREFIX, scanBoth, type ScanDirs, ScanError, type ScanReports, type ScannerVersions} from './scanners.js'
@@ -156,7 +156,7 @@ export async function createVulnServer(deps: VulnDeps): Promise<FastifyInstance>
         parsed.scan.forEach((item, i) => {
             if (!purlRefs.has(item.bare)) purlRefs.set(item.bare, `c${i}`)
         })
-        const {index, unmapped} = buildVulnerabilityIndex(reports.trivy, reports.grype, refs, purlRefs)
+        const {index, unmapped} = buildVulnerabilityIndex(reports.trivy, reports.grype, bomRefKeyer(refs, purlRefs))
         if (unmapped > 0) log.warn('scanner findings with an unknown bom-ref were dropped', {count: unmapped})
 
         const totalMs = Date.now() - started

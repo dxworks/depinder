@@ -1,4 +1,5 @@
 import type {MockInstance} from 'vitest'
+import {PINNED_SCANNER_VERSIONS} from '@depinder/core'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -66,14 +67,14 @@ beforeAll(() => {
         ],
         dependencies: [{ref: 'root', dependsOn: ['a', 'b']}],
     }))
-    process.env.TRIVY_BIN = stub('trivy', `if [ "$1" = --version ]; then echo '{"Version":"0.72.0"}'; exit 0; fi
+    process.env.TRIVY_BIN = stub('trivy', `if [ "$1" = --version ]; then echo '{"Version":"${PINNED_SCANNER_VERSIONS.trivy}"}'; exit 0; fi
 if [ "$1" = image ]; then exit 0; fi
 cat <<'EOF'
 ${JSON.stringify(trivyReport)}
 EOF
 `)
     process.env.GRYPE_BIN = stub('grype', `case "$1" in
-  version) echo '{"version":"0.115.0"}'; exit 0 ;;
+  version) echo '{"version":"${PINNED_SCANNER_VERSIONS.grype}"}'; exit 0 ;;
   db) echo '{}'; exit 0 ;;
 esac
 echo '{"matches":[]}'

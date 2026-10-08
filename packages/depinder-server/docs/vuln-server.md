@@ -13,7 +13,7 @@ The purls are written into a dummy CycloneDX file, one `library` component each,
 Trivy's own SBOMs name them (maven and npm: group and name; composer and golang: the whole path as
 the name), and both scanners read that file side by side. Checked against scanning the real SBOMs
 of a 10,049-purl reference set, it gives the same 1,329 Trivy and 1,326 Grype findings. The merge of the two tools'
-findings is depinder's own (`src/plugins/sbom/local-scan.ts`), ported as is; a finding is tied back
+findings is the one the CLI's local scan runs (`@depinder/core`, `src/vuln/`); a finding is tied back
 to the purl that was sent by the component's `bom-ref`, which both tools echo, never by the purl
 they echo, which is their own spelling (Trivy lowercases a golang path).
 

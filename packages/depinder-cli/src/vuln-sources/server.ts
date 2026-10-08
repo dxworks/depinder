@@ -15,8 +15,8 @@ import {ResolverConfig} from '../resolver/config'
  * clean bill of health. Nothing is retried, not even a 503 busy with its `Retry-After`: the local
  * scan is the retry.
  *
- * The server's findings are already depinder's `Vulnerability`, merged Trivy + Grype with the same
- * code as `plugins/sbom/local-scan.ts`, and keyed by the purl exactly as it was sent. A sent purl
+ * The server's findings are already depinder's `Vulnerability`, merged Trivy + Grype by the same
+ * core code as a local scan, and keyed by the purl exactly as it was sent. A sent purl
  * that is under neither `vulnerabilities` nor `unsupported` was scanned and is clean.
  *
  * Its state is its own: a failure here never turns the resolver off, nor the other way round.

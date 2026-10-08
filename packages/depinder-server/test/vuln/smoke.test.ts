@@ -2,8 +2,8 @@ import {mkdtemp, readdir, readFile, rm, writeFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {afterAll, beforeAll, describe, expect, it} from 'vitest'
+import type {GrypeReport, TrivyReport} from '@depinder/core'
 import {CANARIES, type Canary} from '../../src/vuln/canaries.js'
-import type {GrypeReport, TrivyReport} from '../../src/vuln/merge/index.js'
 import {countGrype, countTrivy, judgeSmoke, SmokeError, smokeTest} from '../../src/vuln/smoke.js'
 
 /**

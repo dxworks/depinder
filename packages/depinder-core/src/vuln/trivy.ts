@@ -1,9 +1,6 @@
-import type {RawFinding} from './index.js'
+import type {RawFinding} from './vulnerability.js'
 
-// ---------------------------------------------------------------------------
-// Scanner output model — only the fields we read.
-// ---------------------------------------------------------------------------
-
+/** A Trivy JSON report: only the fields we read. */
 export interface TrivyReport {
     Results?: {
         Vulnerabilities?: {
@@ -12,7 +9,6 @@ export interface TrivyReport {
             VendorIDs?: string[]
             PkgName?: string
             InstalledVersion?: string
-            /** `BOMRef` is the component's `bom-ref`: the package, see the header of `index.ts`. */
             PkgIdentifier?: { PURL?: string, BOMRef?: string }
             FixedVersion?: string
             Severity?: string
@@ -26,10 +22,6 @@ export interface TrivyReport {
         }[]
     }[]
 }
-
-// ---------------------------------------------------------------------------
-// Parser (pure, unit-testable)
-// ---------------------------------------------------------------------------
 
 /** `2.15.0, 2.12.2` -> `['2.15.0', '2.12.2']`; empty and blank cells give `undefined`. */
 function fixedVersions(cell: string | undefined): string[] | undefined {
@@ -46,11 +38,10 @@ interface ChosenCvss {
 }
 
 /**
- * Trivy reports one CVSS block per scoring source (`ghsa`, `nvd`, `redhat`, …). GHSA's block wins
- * — it is the catalogue that knows the package, and the one our ids are named after — then NVD's,
- * then whatever else scores highest. Within a block the newest CVSS wins: `V40Score` (trivy 0.6x+;
- * older reports put a `CVSS:4.0` vector under `V3Vector`), then `V3Score`, then `V2Score`. Score
- * and vector always come from the same block, so they agree.
+ * Trivy reports one CVSS block per scoring source (`ghsa`, `nvd`, `redhat`, …). GHSA's block wins,
+ * then NVD's, then whatever else scores highest. Within a block the newest CVSS wins: `V40Score`
+ * (older reports put a `CVSS:4.0` vector under `V3Vector`), then `V3Score`, then `V2Score`. Score
+ * and vector always come from the same block.
  */
 export function trivyCvss(cvss: TrivyCvss | undefined): ChosenCvss {
     const entries = Object.entries(cvss ?? {})
@@ -86,8 +77,12 @@ export function trivyFindings(report: TrivyReport): RawFinding[] {
 
             const timestamp = vuln.PublishedDate ? Date.parse(vuln.PublishedDate) : NaN
             findings.push({
-                // A finding with no ref is kept, and dropped as unmapped where it is counted.
-                ref: vuln.PkgIdentifier?.BOMRef ?? '',
+                package: {
+                    ref: vuln.PkgIdentifier?.BOMRef,
+                    purl: vuln.PkgIdentifier?.PURL,
+                    name: vuln.PkgName,
+                    version: vuln.InstalledVersion,
+                },
                 ids: [vuln.VulnerabilityID, ...(vuln.VendorIDs ?? [])],
                 severity: vuln.Severity?.toUpperCase(),
                 score,
@@ -96,11 +91,10 @@ export function trivyFindings(report: TrivyReport): RawFinding[] {
                 timestamp: Number.isNaN(timestamp) ? undefined : timestamp,
                 permalink: vuln.PrimaryURL,
                 references: vuln.References ?? [],
-                // Trivy reports no vulnerable range against an SBOM, only the fix versions — one
-                // per maintained line, highest first (`2.15.0, 2.12.2`). All of them are kept.
+                // No vulnerable range against an SBOM, only the fix versions: one per maintained
+                // line, highest first (`2.15.0, 2.12.2`).
                 firstPatchedVersion: vuln.FixedVersion?.split(',')[0]?.trim() || undefined,
                 patchedVersions: fixedVersions(vuln.FixedVersion),
-                installedVersion: vuln.InstalledVersion,
                 source: 'trivy',
                 cvssVector,
                 cvssVersion,

@@ -9,7 +9,7 @@ are in the root `CLAUDE.md`.
 
 ### What the code does today
 
-`scanFile()` (`packages/depinder-cli/src/plugins/sbom/local-scan.ts:764`) runs **both** scanners on **every**
+`scanFile()` (`packages/depinder-cli/src/plugins/sbom/local-scan.ts`) runs **both** scanners on **every**
 `*.cdx.json`, in parallel, regardless of which tool generated the file:
 
 ```ts
@@ -26,7 +26,7 @@ packages out of the other's output.**
 ### Why this is not obviously fine
 
 The normalization helpers already document real shape differences between the two
-generators — see `packageKeys()` (`local-scan.ts:100`) and `cyclonedx.ts`:
+generators — see `packageKeys()` (`package-keys.ts`) and `cyclonedx.ts`:
 
 - Syft purls carry a `package-id` qualifier; Trivy's do not.
 - Grype's `artifact.name` for Maven is the **bare artifactId**, not `groupId:artifactId`.
@@ -55,7 +55,7 @@ The preflight banner does not catch this: it only checks that the binaries exist
 ### What to actually measure
 
 Not exit codes — **package counts**. The harness already exists:
-`sbom-scan-provenance.json` (`PROVENANCE_FILE`, `local-scan.ts:638`) records
+`sbom-scan-provenance.json` (`PROVENANCE_FILE`, `local-scan.ts`) records
 `packageKeys` and `findingEntries` per file per tool.
 
 Take one repo, generate both SBOMs, and fill in the 2×2:
@@ -72,7 +72,7 @@ since that is the most likely root cause if a cell comes back empty.
 
 ### DB refresh — this half is ALREADY ANSWERED (recorded here so it is not re-asked)
 
-`warmScannerDatabases()` (`local-scan.ts:715`) refreshes both DBs **once per process**,
+`warmScannerDatabases()` (`local-scan.ts`) refreshes both DBs **once per process**,
 before the first scan reads either:
 
 - `trivy image --download-db-only` and `grype db update`, run **side by side**
@@ -91,7 +91,8 @@ DB build dates are read at preflight and written to provenance:
 - **grype** — version from `grype version -o json`, build date from a *separate*
   `grype db status -o json` call
 
-Pinned reference pair: **trivy 0.72.0, grype 0.115.0** (`PINNED_SCANNER_VERSIONS`).
+Pinned reference pair: `PINNED_SCANNER_VERSIONS` in `@depinder/core`, the versions the vuln
+server's image ships (a server test checks its Dockerfile against it).
 The pin is verified and recorded, never enforced — a mismatch warns, it does not fail.
 
 **Gap worth noting while here:** there is **no staleness threshold** on either scanner DB.
