@@ -3,11 +3,10 @@ import {
     BomGraph,
     findProjectNodes,
     locationOf,
-    ParsedPurl,
-    parsePurl,
     ProjectNode,
     readBomGraph,
 } from '../plugins/sbom/cyclonedx'
+import {purlCoordinates, type PurlCoordinates} from '../plugins/sbom/purl'
 import {log} from '../utils/logging'
 import {blackDuckPrefix, manifestOfTree, ownCodeMatcher, RepoManifests} from './manifests'
 import {originFor, pathSegment} from './origins'
@@ -263,9 +262,9 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
                 .map(([ref, children]) => [ref, children.filter(child => scope.has(child))])),
         }
     }
-    const coordinatesOf = (ref: string): ParsedPurl | undefined => {
+    const coordinatesOf = (ref: string): PurlCoordinates | undefined => {
         const purl = graph.byRef.get(ref)?.purl
-        const parsed = purl ? parsePurl(purl) : undefined
+        const parsed = purl ? purlCoordinates(purl) : undefined
         return parsed && parsed.type === purlType ? parsed : undefined
     }
     const projectPath = node.module ? `${repo}/${node.module}` : repo
@@ -274,7 +273,7 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
     // The project's own artifacts: the anchors the SBOM marks, and what the repository's manifests declare.
     const isOwn = (ref: string) => anchors.has(ref) || ownCode(coordinatesOf(ref))
     // Trivy's node is the manifest; a Syft component knows the manifest it was read from.
-    const tagOf = (ref: string, target: ParsedPurl) =>
+    const tagOf = (ref: string, target: PurlCoordinates) =>
         packageManagerTag(node.path)
         ?? packageManagerTag(locationOf(graph.byRef.get(ref) ?? {'bom-ref': ref}))
         ?? originFor(purlType, target.name).name
@@ -290,7 +289,7 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
         const segments = chain
             .filter(ref => !isOwn(ref))
             .map(coordinatesOf)
-            .filter((it): it is ParsedPurl => !!it)
+            .filter((it): it is PurlCoordinates => !!it)
         if (segments.length === 0) return
         const tag = tagOf(last, target)
         const rendered = `${prefixOf(tag)}-${tag}/`

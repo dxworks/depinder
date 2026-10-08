@@ -60,11 +60,9 @@ function plugin(name: string, ecosystem: string, purlType: string, advisoryEcosy
     return {
         name,
         ecosystem,
+        aliases: [`sbom-${purlType}`],
         extractor: {files: [], createContexts: () => []},
-        checker: {
-            githubSecurityAdvisoryEcosystem: advisoryEcosystem,
-            getPURL: (lib, ver) => `pkg:${purlType}/${lib.replace(':', '/').replace('@', '%40')}@${ver}`,
-        },
+        checker: {githubSecurityAdvisoryEcosystem: advisoryEcosystem},
     }
 }
 
@@ -119,11 +117,11 @@ describe('assignPurls', () => {
             .toBe('pkg:npm/%40types/node@20.1.0')
     })
 
-    it('leaves a dependency with no version, and a plugin with no checker, unnamed', () => {
-        const noChecker: Plugin = {...maven, checker: undefined}
+    it('leaves a dependency with no version, and a plugin with no purl type, unnamed', () => {
+        const noPurlType: Plugin = {...maven, aliases: undefined}
         const projects: PluginProjects[] = [
             {plugin: maven, projects: [project('app', [dep('a:b', '  ')])]},
-            {plugin: noChecker, projects: [project('app', [dep('c:d', '1.0.0')])]},
+            {plugin: noPurlType, projects: [project('app', [dep('c:d', '1.0.0')])]},
         ]
 
         expect(assignPurls(projects)).toBe(0)
@@ -133,9 +131,9 @@ describe('assignPurls', () => {
 })
 
 describe('assignPurls with purls from the SBOM', () => {
-    it('keeps a purl the parser already set, and fills a missing one via getPURL', () => {
+    it('keeps a purl the parser already set, and fills a missing one from the name', () => {
         // Trivy's golang purl would lowercase the module; the parser restored the case, and
-        // getPURL must not undo that.
+        // the fallback must not undo that.
         const fromSbom = {...dep('github.com/Masterminds/semver/v3', 'v3.4.0'),
             purl: 'pkg:golang/github.com/Masterminds/semver/v3@v3.4.0'}
         const missing = dep('com.google.guava:guava', '32.1.2-jre')
@@ -146,11 +144,11 @@ describe('assignPurls with purls from the SBOM', () => {
         expect(missing.purl).toBe('pkg:maven/com.google.guava/guava@32.1.2-jre')
     })
 
-    it('counts an SBOM purl even when the plugin has no checker to fall back on', () => {
-        const noChecker: Plugin = {...maven, checker: undefined}
+    it('counts an SBOM purl even when the plugin has no purl type to fall back on', () => {
+        const noPurlType: Plugin = {...maven, aliases: undefined}
         const versionless = {...dep('org.apache.phoenix:phoenix-core', 'UNKNOWN'),
             purl: 'pkg:maven/org.apache.phoenix/phoenix-core'}
-        const projects: PluginProjects[] = [{plugin: noChecker, projects: [project('app', [versionless])]}]
+        const projects: PluginProjects[] = [{plugin: noPurlType, projects: [project('app', [versionless])]}]
 
         expect(assignPurls(projects)).toBe(1)
         expect(versionless.purl).toBe('pkg:maven/org.apache.phoenix/phoenix-core')

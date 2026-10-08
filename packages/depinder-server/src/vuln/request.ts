@@ -1,12 +1,19 @@
-import {PackageURL} from 'packageurl-js'
 import {BadRequestError} from '../shared/errors.js'
-import {isSupportedType, tryParsePurl, type VulnRequestBody, type VulnResponse, type VulnUnsupportedReason} from '@depinder/core'
+import {
+    canonicalPurl,
+    isSupportedType,
+    splitPurl,
+    type PurlParts,
+    type VulnRequestBody,
+    type VulnResponse,
+    type VulnUnsupportedReason,
+} from '@depinder/core'
 
 /**
  * The body of `POST /vulnerabilities`, validated and sorted into what can be scanned and what
  * cannot.
  *
- * What goes into the dummy SBOM is the purl as the caller wrote it, decoded — NOT `parsePurl`'s
+ * What goes into the dummy SBOM is the purl as the caller wrote it, decoded (`splitPurl`) — NOT its
  * canonical form. That form is a database key: it lowercases npm, nuget and composer names and
  * PEP-503s pypi ones, and a scanner given `pkg:golang/github.com/burntsushi/toml` instead of
  * `BurntSushi` is looking for a different module. The scanners must see the raw decoded parts,
@@ -67,22 +74,23 @@ export function parseVulnRequest(body: unknown, maxPurls: number): VulnRequest {
 }
 
 function classify(purl: string): Scannable | VulnUnsupportedReason {
-    // Also what refuses a maven purl with no group and an empty name.
-    const parsed = tryParsePurl(purl)
-    if (!parsed.ok) return 'invalid'
-    if (!isSupportedType(parsed.purl.type)) return 'unsupported_type'
-    if (!parsed.purl.version) return 'no_version'
+    let parts: PurlParts
+    try {
+        parts = splitPurl(purl)
+        // Validation only: also what refuses a maven purl with no group and an empty name.
+        canonicalPurl(parts)
+    } catch {
+        return 'invalid'
+    }
+    if (!isSupportedType(parts.type)) return 'unsupported_type'
+    if (!parts.version?.trim()) return 'no_version'
 
-    // The same split `parsePurl` makes, without its canonicalisation. It has just succeeded on
-    // this string, so it cannot throw here.
-    const raw = purl.trim()
-    const [, namespace, name, version] = PackageURL.parseString(raw)
     return {
         purl,
-        bare: raw.split('?')[0]!.split('#')[0]!,
-        type: parsed.purl.type,
-        namespace: namespace || null,
-        name: name!,
-        version: version!,
+        bare: purl.trim().split('?')[0]!.split('#')[0]!,
+        type: parts.type,
+        namespace: parts.namespace,
+        name: parts.name,
+        version: parts.version,
     }
 }

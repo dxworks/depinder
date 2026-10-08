@@ -1,3 +1,5 @@
+import {normalisePypiName} from '@depinder/core'
+
 /**
  * The mapping between GitHub's advisory ecosystem names, Package URL types, and the version
  * comparator family each ecosystem needs.
@@ -84,7 +86,7 @@ export function resolveEcosystems(names: string[]): {resolved: GithubEcosystem[]
  *
  *  - pip: PEP 503, the only rule that is genuinely lossy (`Foo_Bar` and `foo.bar` are one project).
  *  - maven: `group:artifact`. Advisories already use the colon form; purls decode to it in
- *    `parsePurl`, but a raw `group/artifact` is accepted here too.
+ *    `purlCoordinates`, but a raw `group/artifact` is accepted here too.
  *  - everything else: case folding. npm, composer and go names are lowercase by registry rule;
  *    nuget is explicitly case-insensitive; gem and cargo names may carry capitals (`Ascii85`), and
  *    folding both sides of the comparison is safe because no two gems differ only by case.
@@ -93,7 +95,7 @@ export function normalizeName(ecosystem: string, name: string): string {
     const trimmed = name.trim()
     switch (ecosystem) {
         case 'pip':
-            return trimmed.toLowerCase().replace(/[-_.]+/g, '-')
+            return normalisePypiName(trimmed)
         case 'maven':
             return trimmed.includes(':') ? trimmed : trimmed.replace('/', ':')
         default:

@@ -3,6 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import {getPluginsFromNames} from '../plugins'
 import {deferSbomFindings, purlTypeOfPlugin, registryTypeOfPlugin, sbomFilesToParse, sbomPluginsForPurlTypes} from '../plugins/sbom'
+import {assignPurl} from '../plugins/sbom/dependency-purl'
 import {SbomDescription} from '../plugins/sbom/describe'
 import {ScannerPreflight, scannerSummaryLine, writeScanProvenance} from '../plugins/sbom/local-scan'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
@@ -264,27 +265,16 @@ export interface PluginProjects {
 }
 
 /**
- * Phase 1b: makes sure every dependency carries its purl.
- *
- * The SBOM is the source: the CycloneDX parser already set `dep.purl` from the component's own
- * purl, normalised (see `normalizePurl`), so a golang module keeps the case Syft recorded and
- * `pkg:cargo/tikv-jemalloc-sys@0.7.1%2B5.3.1-...` stays exactly as both tools wrote it. `checker.getPURL`
- * is only the fallback, for a component whose purl did not parse; it needs a version to spell one, so a dependency with
- * neither keeps no purl and takes the registrar path. Returns how many dependencies end up with a
- * purl, from either source.
+ * Phase 1b: makes sure every dependency carries its purl (`assignPurl`): the SBOM's own, as the
+ * CycloneDX parser set it, else one spelled from the plugin's purl type. Returns how many
+ * dependencies end up with a purl, from either source.
  */
 export function assignPurls(pluginProjects: PluginProjects[]): number {
     let named = 0
     for (const {plugin, projects} of pluginProjects) {
-        const getPURL = plugin.checker?.getPURL
         for (const project of projects) {
             for (const dep of Object.values(project.dependencies)) {
-                if (!dep.purl && getPURL) {
-                    const version = dep.version?.trim()
-                    if (!version) continue
-                    dep.purl = getPURL(dep.name, version)
-                }
-                if (dep.purl) named++
+                if (assignPurl(plugin, dep)) named++
             }
         }
     }
@@ -947,7 +937,7 @@ export async function runAnalysis(
         }))
 
     // FLOW 1b — assignPurls (see above): name every dep the way the server expects. Still no network.
-    // Phase 1b — the purl for every dependency: the SBOM's own, else the checker's spelling of it.
+    // Phase 1b — the purl for every dependency: the SBOM's own, else one spelled from its name.
     const named = assignPurls(pluginProjects)
 
     // FLOW 2 — bulkResolve (see above): the main flow is local cache → our server → registries. What

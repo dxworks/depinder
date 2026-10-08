@@ -1,5 +1,5 @@
 import {LibraryInfo} from '../extension-points/library-info'
-import {type PackageRecord, VERSION_FLAG_YANKED} from '@depinder/core'
+import {type PackageRecord, registryName, VERSION_FLAG_YANKED} from '@depinder/core'
 
 /**
  * A resolver `PackageRecord` in the shape the rest of depinder already speaks, `LibraryInfo`.
@@ -8,21 +8,6 @@ import {type PackageRecord, VERSION_FLAG_YANKED} from '@depinder/core'
  * here is indistinguishable downstream from one a registrar produced — which is what lets phase 3
  * of `analyse` stay exactly as it was.
  */
-
-/**
- * The name a package is known by in its registry, and therefore the name depinder's parsers
- * produced and the cache is keyed on: `group:artifact` for maven, `@scope/name` for npm,
- * `vendor/package` for composer, the full module path for golang, the bare name for the rest.
- */
-export function registryNameOf(pkg: PackageRecord): string {
-    const namespace = pkg.namespace?.trim()
-    if (!namespace) return pkg.name
-    if (pkg.type === 'maven') return `${namespace}:${pkg.name}`
-    // An npm namespace is a scope and always carries its `@`; a server that dropped it would
-    // otherwise produce a name no parser ever emits, and so a cache entry nothing reads.
-    if (pkg.type === 'npm' && !namespace.startsWith('@')) return `@${namespace}/${pkg.name}`
-    return `${namespace}/${pkg.name}`
-}
 
 /**
  * Epoch milliseconds, `NaN` when the registry has no date for a version — the same thing the Go
@@ -57,7 +42,7 @@ export function toLibraryInfo(pkg: PackageRecord): LibraryInfo {
     // when every version carried its own copy.
     const packageLicenses = pkg.licenses ?? []
     return {
-        name: registryNameOf(pkg),
+        name: registryName(pkg),
         description: pkg.description ?? '',
         // A yanked version stays in the list, marked: a project can still be pinned to one (an
         // unlisted NuGet package, a yanked crate), and its row needs that version's release date

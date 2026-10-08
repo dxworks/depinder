@@ -3,7 +3,7 @@ import path from 'path'
 import {SemVer} from 'semver'
 import {DepinderDependency, DepinderProject} from '../../extension-points/extract'
 import {log} from '../../utils/logging'
-import {normalizePurl} from './purl'
+import {normalizePurl, purlCoordinates, type PurlCoordinates} from './purl'
 
 /**
  * Parses CycloneDX SBOMs produced offline by Syft and Trivy into DepinderProjects.
@@ -89,58 +89,6 @@ export function projectNameOf(bom: CycloneDxBom, sbomFile: string): string {
     return metadataProjectName(bom) ?? repoNameFromFile(sbomFile)
 }
 
-/** A parsed purl, reduced to what depinder's model needs. */
-export interface ParsedPurl {
-    type: string  // maven, npm, gem, pypi, nuget, composer, ...
-    name: string  // normalised to the name the registry fallback expects
-    version: string
-}
-
-/**
- * Parses a Package URL into the (type, name, version) triple depinder needs.
- *
- * The name must match what the registry fallback expects or lookups silently return nothing:
- *  - maven wants `groupId:artifactId` (core splits it on ':')
- *  - npm wants the scope preserved as `@scope/name`
- *  - everything else uses the bare name
- *
- * Returns undefined for anything unparseable rather than guessing.
- */
-export function parsePurl(purl: string): ParsedPurl | undefined {
-    if (!purl?.startsWith('pkg:')) return undefined
-
-    // Strip qualifiers (?a=b) and subpath (#...) — neither contributes to identity here.
-    const withoutQualifiers = purl.slice('pkg:'.length).split('?')[0].split('#')[0]
-
-    const slash = withoutQualifiers.indexOf('/')
-    if (slash < 0) return undefined
-
-    const type = withoutQualifiers.slice(0, slash).toLowerCase()
-    const rest = withoutQualifiers.slice(slash + 1)
-
-    // The version is after the LAST '@' — but npm scoped names start with '@', so a leading '@'
-    // must not be mistaken for a version separator.
-    const at = rest.lastIndexOf('@')
-    if (at <= 0) return undefined
-
-    const namePart = decodeURIComponent(rest.slice(0, at))
-    const version = decodeURIComponent(rest.slice(at + 1))
-    if (!namePart || !version) return undefined
-
-    let name: string
-    if (type === 'maven') {
-        // pkg:maven/<groupId>/<artifactId> -> groupId:artifactId
-        const lastSlash = namePart.lastIndexOf('/')
-        if (lastSlash < 0) return undefined
-        name = `${namePart.slice(0, lastSlash)}:${namePart.slice(lastSlash + 1)}`
-    } else {
-        // npm scoped names arrive as '%40scope/name' and decode to '@scope/name' — keep as-is.
-        name = namePart
-    }
-
-    return {type, name, version}
-}
-
 /** The manifest a component was read from — Syft records it; Trivy's components carry none. */
 export function locationOf(component: CycloneDxComponent): string | undefined {
     return component.properties?.find(p => p.name === 'syft:location:0:path')?.value
@@ -153,13 +101,13 @@ export function locationOf(component: CycloneDxComponent): string | undefined {
  * in a `dependencyManagement` block. Trivy's rare versionless purls carry no component version
  * either, so this fallback never fires for them.
  */
-function parseComponentPurl(component: CycloneDxComponent): ParsedPurl | undefined {
+function parseComponentPurl(component: CycloneDxComponent): PurlCoordinates | undefined {
     if (!component.purl) return undefined
-    const direct = parsePurl(component.purl)
+    const direct = purlCoordinates(component.purl)
     if (direct) return direct
     if (!component.version) return undefined
     const base = component.purl.split('?')[0].split('#')[0]
-    return parsePurl(`${base}@${encodeURIComponent(component.version)}`)
+    return purlCoordinates(`${base}@${encodeURIComponent(component.version)}`)
 }
 
 function firstLicense(component: CycloneDxComponent): string | undefined {
@@ -587,7 +535,7 @@ export function parseCycloneDxFile(sbomFile: string, purlType: string): Depinder
         const anchorRefs = new Set<string>(node.anchorRefs)
 
         // Resolve each in-scope ref to a purl of the requested ecosystem.
-        const parsedByRef = new Map<string, ParsedPurl>()
+        const parsedByRef = new Map<string, PurlCoordinates>()
         for (const ref of inScope) {
             const component = byRef.get(ref)
             if (!component?.purl) continue // no purl -> not a package (GitHub Actions, directories)

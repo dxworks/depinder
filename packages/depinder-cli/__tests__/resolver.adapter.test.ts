@@ -1,5 +1,5 @@
 import type {CompactVersion, PackageRecord} from '@depinder/core'
-import {componentLinkOf, registryNameOf, toLibraryInfo} from '../src/resolver/adapter'
+import {componentLinkOf, toLibraryInfo} from '../src/resolver/adapter'
 import {LibraryInfo} from '../src/extension-points/library-info'
 import {newerVersionCounts} from '../src/blackduck/versions'
 import {comparatorForPurlType} from '../src/blackduck/model'
@@ -189,26 +189,13 @@ describe('the resolver package record adapter', () => {
         expect(new Date(info.versions[0].timestamp).toISOString()).toBe('2018-04-11T20:27:13.000Z')
     })
 
-    it('names a maven package group:artifact, the way the java parser does', () => {
-        const pkg = record({type: 'maven', namespace: 'com.google.guava', name: 'guava'})
-        expect(registryNameOf(pkg)).toBe('com.google.guava:guava')
-        expect(toLibraryInfo(pkg).name).toBe('com.google.guava:guava')
-    })
-
-    it('keeps an npm scope in the name, including when the server dropped the @', () => {
-        expect(registryNameOf(record({namespace: '@types', name: 'node'}))).toBe('@types/node')
-        expect(registryNameOf(record({namespace: 'types', name: 'node'}))).toBe('@types/node')
-    })
-
-    it('names composer vendor/package and golang by full module path', () => {
-        expect(registryNameOf(record({type: 'composer', namespace: 'symfony', name: 'console'})))
-            .toBe('symfony/console')
-        expect(registryNameOf(record({type: 'golang', namespace: 'github.com/spf13', name: 'cobra'})))
-            .toBe('github.com/spf13/cobra')
-    })
-
-    it('leaves a namespace-less package name alone', () => {
-        expect(registryNameOf(record({type: 'pypi', namespace: null, name: 'requests'}))).toBe('requests')
+    it('names a package the way its registry does: group:artifact, @scope/name, vendor/package, module path', () => {
+        const nameOf = (fields: Partial<PackageRecord>) => toLibraryInfo(record(fields)).name
+        expect(nameOf({type: 'maven', namespace: 'com.google.guava', name: 'guava'})).toBe('com.google.guava:guava')
+        expect(nameOf({namespace: '@types', name: 'node'})).toBe('@types/node')
+        expect(nameOf({type: 'composer', namespace: 'symfony', name: 'console'})).toBe('symfony/console')
+        expect(nameOf({type: 'golang', namespace: 'github.com/spf13', name: 'cobra'})).toBe('github.com/spf13/cobra')
+        expect(nameOf({type: 'pypi', namespace: null, name: 'requests'})).toBe('requests')
     })
 
     it('survives a package with no versions, licenses or urls', () => {

@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
-import {CycloneDxBom, metadataProjectName, parsePurl, repoNameFromFile} from './cyclonedx'
+import {CycloneDxBom, metadataProjectName, repoNameFromFile} from './cyclonedx'
+import {purlCoordinates} from './purl'
 
 /**
  * What one CycloneDX file says about itself, read once per process.
@@ -77,7 +78,7 @@ export function producerOf(bom: CycloneDxBom): {producer: string, toolVersion?: 
 export function purlTypesOf(bom: CycloneDxBom): Set<string> {
     const types = new Set<string>()
     for (const component of bom.components ?? []) {
-        const parsed = component.purl ? parsePurl(component.purl) : undefined
+        const parsed = component.purl ? purlCoordinates(component.purl) : undefined
         if (parsed) types.add(parsed.type)
     }
     return types

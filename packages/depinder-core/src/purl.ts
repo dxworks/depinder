@@ -37,21 +37,48 @@ export interface ParsedPurl {
     packageKey: string
 }
 
+/** A purl's components, percent-decoded but not canonicalised: the spelling the input used. */
+export interface PurlParts {
+    /** Lowercased: purl types are case-insensitive. */
+    type: string
+    namespace: string | null
+    name: string
+    /** As written; null when the input carried none. */
+    version: string | null
+}
+
 class PurlError extends Error {}
 
 export function isSupportedType(type: string): type is SupportedType {
     return (SUPPORTED_TYPES as readonly string[]).includes(type)
 }
 
+/** Types whose names `canonicalise` folds to lowercase; see there. */
+const CASE_FOLDED_TYPES = new Set(['npm', 'nuget', 'pypi', 'composer'])
+
+/** A supported type whose registry tells two names apart by case alone. */
+export function isCaseSensitiveType(type: string): boolean {
+    return isSupportedType(type) && !CASE_FOLDED_TYPES.has(type)
+}
+
 /** Parses and canonicalises. Throws `PurlError` on anything that is not a usable purl. */
 export function parsePurl(input: string): ParsedPurl {
+    return canonicalPurl(splitPurl(input))
+}
+
+/**
+ * Splits and percent-decodes a purl, dropping qualifiers and subpath, without canonicalising
+ * anything but the type. For callers that need the name as written, such as a scanner or a
+ * display name. Throws `PurlError` when there is no type or name to split out.
+ */
+export function splitPurl(input: string): PurlParts {
     const raw = input?.trim()
     if (!raw) throw new PurlError('empty purl')
 
     // `parseString` splits and percent-decodes the components; `fromString` would additionally
     // run packageurl-js's own per-type normalisation, which we do not want. We canonicalise
-    // ourselves below (its pypi rule is not PEP 503, for one), and as of 2.0.1 its golang
-    // validator throws a ReferenceError on versions like `v1` that are not valid semver.
+    // ourselves (its pypi rule is not PEP 503, for one), and as of 2.0.1 its golang validator
+    // throws a ReferenceError on versions like `v1` that are not valid semver.
     let parts: [string?, string?, string?, string?, unknown?, unknown?]
     try {
         parts = PackageURL.parseString(raw)
@@ -62,9 +89,13 @@ export function parsePurl(input: string): ParsedPurl {
     const [rawType, rawNamespace, rawName, rawVersion] = parts
     if (!rawType) throw new PurlError('purl has no type')
     if (!rawName) throw new PurlError('purl has no name')
+    return {type: rawType.toLowerCase(), namespace: rawNamespace || null, name: rawName, version: rawVersion || null}
+}
 
-    const type = rawType.toLowerCase()
-    const {namespace, name} = canonicalise(type, rawNamespace || null, rawName)
+/** Canonicalises split parts into the database key form. Throws `PurlError` when unusable. */
+export function canonicalPurl(parts: PurlParts): ParsedPurl {
+    const {type} = parts
+    const {namespace, name} = canonicalise(type, parts.namespace, parts.name)
     if (!name) throw new PurlError('purl has no name')
     if (type === 'maven' && !namespace) throw new PurlError('a maven purl needs its group id as the namespace')
 
@@ -72,7 +103,7 @@ export function parsePurl(input: string): ParsedPurl {
         type,
         namespace,
         name,
-        version: rawVersion?.trim() || null,
+        version: parts.version?.trim() || null,
         packageKey: buildPackageKey(type, namespace, name),
     }
 }

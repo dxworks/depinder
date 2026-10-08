@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import {DepinderDependency, DepinderProject} from '../extension-points/extract'
+import {DepinderProject} from '../extension-points/extract'
 import {Plugin} from '../extension-points/plugin'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {
@@ -10,6 +10,7 @@ import {
     sbomPlugins,
     sbomProjectsOf,
 } from '../plugins/sbom'
+import {assignPurl} from '../plugins/sbom/dependency-purl'
 import {SbomDescription} from '../plugins/sbom/describe'
 import {
     PreflightMessage,
@@ -87,18 +88,6 @@ export function collectSbomTargets(
     return targets
 }
 
-/**
- * The purl a dependency is looked up by: the SBOM's own, else the one `assignPurls` will give it
- * later from the plugin's `getPURL` — computed the same way, so the purl asked about up front is
- * the purl the dependency ends up with.
- */
-export function vulnLookupPurl(plugin: Plugin, dep: DepinderDependency): string | undefined {
-    if (dep.purl) return dep.purl
-    const version = dep.version?.trim()
-    const getPURL = plugin.checker?.getPURL
-    return version && getPURL ? getPURL(dep.name, version) : undefined
-}
-
 /** Per SBOM file, what the server's answer amounted to — the per-file half of the provenance. */
 export interface ServerFileRecord {
     file: string
@@ -149,7 +138,7 @@ function attachFromServer(targets: SbomTarget[], answer: VulnServerAnswer): Serv
         if (!stats) perFile.set(file, stats = {purls: new Set(), vulnerable: new Set(), findings: 0})
         const record = stats
         attachServerFindings(file, project, dep => {
-            const purl = vulnLookupPurl(plugin, dep)
+            const purl = assignPurl(plugin, dep)
             if (!purl) return none
             const findings = answer.vulnerabilities.get(purl)
             if (!record.purls.has(purl)) {
@@ -183,7 +172,7 @@ export function startServerVulnerabilities(
     const purls = new Set<string>()
     for (const {plugin, project} of targets) {
         for (const dep of Object.values(project.dependencies)) {
-            const purl = vulnLookupPurl(plugin, dep)
+            const purl = assignPurl(plugin, dep)
             if (purl) purls.add(purl)
         }
     }

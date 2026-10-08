@@ -1,7 +1,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {parseCycloneDxFile, parsePurl} from '../src/plugins/sbom/cyclonedx'
+import {parseCycloneDxFile} from '../src/plugins/sbom/cyclonedx'
 
 /**
  * Fixtures reproduce the two shapes we actually observed in offline Syft/Trivy output:
@@ -174,28 +174,6 @@ const syftMonorepoBom = {
         {ref: 'anchor-b', dependsOn: ['dep-degenerate']},
     ],
 }
-
-describe('parsePurl', () => {
-    it('renders maven coordinates as groupId:artifactId, which is what MavenCentralRegistrar splits on', () => {
-        expect(parsePurl('pkg:maven/org.slf4j/slf4j-api@1.7.35'))
-            .toEqual({type: 'maven', name: 'org.slf4j:slf4j-api', version: '1.7.35'})
-    })
-
-    it('keeps npm scopes intact and url-decodes them', () => {
-        expect(parsePurl('pkg:npm/%40babel%2Fcore@7.20.0'))
-            .toEqual({type: 'npm', name: '@babel/core', version: '7.20.0'})
-    })
-
-    it('ignores qualifiers such as Syft package-id', () => {
-        expect(parsePurl('pkg:npm/side-channel@1.1.0?package-id=ccc'))
-            .toEqual({type: 'npm', name: 'side-channel', version: '1.1.0'})
-    })
-
-    it('returns undefined rather than guessing for non-purls and versionless purls', () => {
-        expect(parsePurl('not-a-purl')).toBeUndefined()
-        expect(parsePurl('pkg:maven/org.slf4j/slf4j-api')).toBeUndefined()
-    })
-})
 
 describe('parseCycloneDxFile — Syft shape (no project nodes)', () => {
     it('produces exactly one project even though the root has no edges', () => {

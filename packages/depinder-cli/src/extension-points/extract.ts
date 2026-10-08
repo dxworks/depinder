@@ -63,8 +63,8 @@ export interface DepinderDependency {
      * The package URL for this exact name and version, e.g. `pkg:maven/com.google.guava/guava@32.1.2-jre`.
      *
      * Filled by the CycloneDX parser from the component's own purl, normalised so Syft and Trivy
-     * spell one package identically (`normalizePurl`); `analyse` falls back to the plugin's
-     * `checker.getPURL` for a dependency that arrives without one. It is the key the bulk resolver
+     * spell one package identically (`normalizePurl`); `assignPurl` spells one from the name for
+     * a dependency that arrives without one. It is the key the bulk resolver
      * speaks, and the one identifier that means the same thing across plugins, which is what lets
      * one dependency shared by two plugins be asked about once.
      */

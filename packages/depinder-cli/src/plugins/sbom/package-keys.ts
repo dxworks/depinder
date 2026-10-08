@@ -1,5 +1,5 @@
 import type {PackageKeyer} from '@depinder/core'
-import {parsePurl} from './cyclonedx'
+import {purlCoordinates} from './purl'
 
 /**
  * All the keys under which one scanned package is findable, plus the canonical key used to
@@ -16,7 +16,7 @@ export function packageKeys(purl: string | undefined, name?: string, version?: s
     let dedupKey: string | undefined
     if (purl) {
         keys.push(purl.split('?')[0].split('#')[0])
-        const parsed = parsePurl(purl)
+        const parsed = purlCoordinates(purl)
         if (parsed) {
             dedupKey = `${parsed.name}@${parsed.version}`
             keys.push(dedupKey)

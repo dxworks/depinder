@@ -1,6 +1,8 @@
 import {ecosystemOf, Plugin} from '../src/extension-points/plugin'
 import {dotnetChecker, goChecker, javaChecker, npmChecker, phpChecker, pythonChecker, rubyChecker, rustChecker} from '../src/plugins/vulnerability-checkers'
 import {VulnerabilityChecker} from '../src/extension-points/vulnerability-checker'
+import {DepinderDependency} from '../src/extension-points/extract'
+import {assignPurl} from '../src/plugins/sbom/dependency-purl'
 import {
     purlTypeOfPlugin,
     registryTypeOfPlugin,
@@ -69,18 +71,28 @@ describe('the sbom plugins', () => {
     })
 })
 
-describe('the vulnerability checkers', () => {
+describe('the vulnerability checkers and fallback purls', () => {
+    const dep = (name: string): DepinderDependency => ({id: `${name}@2.0.0`, name, version: '2.0.0', semver: null, requestedBy: []})
+
     it.each([
-        ['MAVEN', javaChecker, 'org.slf4j:slf4j-api', 'pkg:maven/org.slf4j/slf4j-api@2.0.0'],
-        ['NPM', npmChecker, '@babel/core', 'pkg:npm/%40babel/core@2.0.0'],
-        ['RUBYGEMS', rubyChecker, 'rails', 'pkg:gem/rails@2.0.0'],
-        ['PIP', pythonChecker, 'requests', 'pkg:pypi/requests@2.0.0'],
-        ['COMPOSER', phpChecker, 'monolog/monolog', 'pkg:composer/monolog/monolog@2.0.0'],
-        ['NUGET', dotnetChecker, 'Newtonsoft.Json', 'pkg:nuget/Newtonsoft.Json@2.0.0'],
-        ['GO', goChecker, 'golang.org/x/net', 'pkg:golang/golang.org/x/net@2.0.0'],
-        ['RUST', rustChecker, 'regex', 'pkg:cargo/regex@2.0.0'],
-    ] as [string, VulnerabilityChecker, string, string][])('ask GitHub for %s advisories with a purl', (ecosystem, checker, name, purl) => {
-        expect(checker.githubSecurityAdvisoryEcosystem).toBe(ecosystem)
-        expect(checker.getPURL?.(name, '2.0.0')).toBe(purl)
+        ['MAVEN', sbomJava, 'org.slf4j:slf4j-api', 'pkg:maven/org.slf4j/slf4j-api@2.0.0'],
+        ['NPM', sbomNpm, '@babel/core', 'pkg:npm/%40babel/core@2.0.0'],
+        ['RUBYGEMS', sbomRuby, 'rails', 'pkg:gem/rails@2.0.0'],
+        ['PIP', sbomPython, 'Django_Filter', 'pkg:pypi/django-filter@2.0.0'],
+        ['COMPOSER', sbomPhp, 'monolog/monolog', 'pkg:composer/monolog/monolog@2.0.0'],
+        ['NUGET', sbomDotnet, 'Newtonsoft.Json', 'pkg:nuget/newtonsoft.json@2.0.0'],
+        ['GO', sbomGo, 'golang.org/x/net', 'pkg:golang/golang.org/x/net@2.0.0'],
+        ['RUST', sbomRust, 'regex', 'pkg:cargo/regex@2.0.0'],
+    ] as [string, Plugin, string, string][])('ask GitHub for %s advisories, and spell a purl from the name', (ecosystem, plugin, name, purl) => {
+        expect(plugin.checker?.githubSecurityAdvisoryEcosystem).toBe(ecosystem)
+        expect(assignPurl(plugin, dep(name))).toBe(purl)
+    })
+
+    it('keeps the SBOM purl, and spells none without a version, a purl type or a valid name', () => {
+        const fromSbom = {...dep('github.com/Masterminds/semver/v3'), purl: 'pkg:golang/github.com/Masterminds/semver/v3@v3.4.0'}
+        expect(assignPurl(sbomJava, fromSbom)).toBe('pkg:golang/github.com/Masterminds/semver/v3@v3.4.0')
+        expect(assignPurl(sbomJava, {...dep('a:b'), version: ' '})).toBeUndefined()
+        expect(assignPurl({name: 'custom', extractor: sbomJava.extractor}, dep('a:b'))).toBeUndefined()
+        expect(assignPurl(sbomJava, dep('no-group'))).toBeUndefined()
     })
 })

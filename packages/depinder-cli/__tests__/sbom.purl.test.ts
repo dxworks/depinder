@@ -1,4 +1,4 @@
-import {normalizePurl} from '../src/plugins/sbom/purl'
+import {normalizePurl, purlCoordinates} from '../src/plugins/sbom/purl'
 
 /**
  * `normalizePurl` is what makes a Syft and a Trivy SBOM of the same repo name each package with the
@@ -82,5 +82,36 @@ describe('normalizePurl', () => {
         expect(normalizePurl('github.com/foo/bar@v1')).toBeUndefined()
         expect(normalizePurl('pkg:npm')).toBeUndefined()
         expect(normalizePurl('pkg:npm/')).toBeUndefined()
+    })
+})
+
+describe('purlCoordinates', () => {
+    it('renders maven coordinates as groupId:artifactId, which is what MavenCentralRegistrar splits on', () => {
+        expect(purlCoordinates('pkg:maven/org.slf4j/slf4j-api@1.7.35'))
+            .toEqual({type: 'maven', name: 'org.slf4j:slf4j-api', version: '1.7.35'})
+    })
+
+    it('keeps npm scopes intact and url-decodes them', () => {
+        expect(purlCoordinates('pkg:npm/%40babel%2Fcore@7.20.0'))
+            .toEqual({type: 'npm', name: '@babel/core', version: '7.20.0'})
+    })
+
+    it('ignores qualifiers such as Syft package-id', () => {
+        expect(purlCoordinates('pkg:npm/side-channel@1.1.0?package-id=ccc'))
+            .toEqual({type: 'npm', name: 'side-channel', version: '1.1.0'})
+    })
+
+    it('keeps the names as written, for display and the registrars', () => {
+        expect(purlCoordinates('pkg:nuget/Newtonsoft.Json@13.0.3'))
+            .toEqual({type: 'nuget', name: 'Newtonsoft.Json', version: '13.0.3'})
+        expect(purlCoordinates('pkg:golang/github.com/BurntSushi/toml@v1.6.0'))
+            .toEqual({type: 'golang', name: 'github.com/BurntSushi/toml', version: 'v1.6.0'})
+    })
+
+    it('returns undefined rather than guessing for non-purls, versionless purls and bad escapes', () => {
+        expect(purlCoordinates('not-a-purl')).toBeUndefined()
+        expect(purlCoordinates('pkg:maven/org.slf4j/slf4j-api')).toBeUndefined()
+        expect(purlCoordinates('pkg:maven/slf4j-api@1.7.35')).toBeUndefined()
+        expect(purlCoordinates('pkg:npm/left-pad@1.0%zz')).toBeUndefined()
     })
 })

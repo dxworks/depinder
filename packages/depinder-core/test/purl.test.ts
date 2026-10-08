@@ -1,9 +1,11 @@
 import {describe, expect, it} from 'vitest'
 import {
     fromRegistryName,
+    isCaseSensitiveType,
     normalisePypiName,
     parsePurl,
     registryName,
+    splitPurl,
     SUPPORTED_TYPES,
     tryParsePurl,
     versionPurl,
@@ -65,6 +67,29 @@ describe('parsePurl', () => {
     it('parses unsupported types without complaint; the API decides what to do with them', () => {
         expect(parsePurl('pkg:deb/debian/curl@7.50').type).toBe('deb')
         expect(SUPPORTED_TYPES).toHaveLength(8)
+    })
+})
+
+describe('splitPurl', () => {
+    it('decodes the parts and keeps their spelling', () => {
+        expect(splitPurl('pkg:NPM/%40Types/Node@20.1.0?a=b#c'))
+            .toEqual({type: 'npm', namespace: '@Types', name: 'Node', version: '20.1.0'})
+        expect(splitPurl('pkg:golang/github.com/BurntSushi/toml@v1.6.0'))
+            .toEqual({type: 'golang', namespace: 'github.com/BurntSushi', name: 'toml', version: 'v1.6.0'})
+        expect(splitPurl('pkg:cargo/wasi@0.14.2%2Bwasi-0.2.4').version).toBe('0.14.2+wasi-0.2.4')
+        expect(splitPurl('pkg:maven/guava').version).toBeNull()
+    })
+
+    it('throws on what has no type or name, or a bad escape', () => {
+        expect(() => splitPurl('pkg:npm')).toThrow()
+        expect(() => splitPurl('pkg:npm/x@1%zz')).toThrow()
+    })
+})
+
+describe('isCaseSensitiveType', () => {
+    it('is true where canonicalisation keeps the case', () => {
+        expect(['golang', 'maven', 'gem', 'cargo'].every(isCaseSensitiveType)).toBe(true)
+        expect(['npm', 'nuget', 'pypi', 'composer', 'deb'].some(isCaseSensitiveType)).toBe(false)
     })
 })
 

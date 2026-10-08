@@ -1,25 +1,20 @@
+import {canonicalPurl, fromRegistryName, registryName, splitPurl, type PurlParts} from '@depinder/core'
+
 /**
- * Normalises an SBOM component's purl into the one spelling depinder keys dependencies by.
- *
- * Syft and Trivy both write a purl for every package, and it is the only identifier either tool
- * gets right for every ecosystem — but the two do not always spell the same package the same way:
+ * The SBOM side of purls: what Syft and Trivy write, turned into the one spelling depinder keys
+ * dependencies by. Parsing and canonicalisation (case folding, PEP 503) are core's; only the rules
+ * that come from the SBOM tools live here:
  *
  *  - Trivy lowercases golang module paths in the purl (`pkg:golang/github.com/masterminds/semver/v3`)
  *    while keeping the real case in the component `name`; Syft keeps `Masterminds` in both. On
- *    the zzw-v051 mined SBOMs this is the only spelling difference between the two tools: 8 of
- *    go-caddy's modules, against 13,351 purls that already match byte for byte.
+ *    the zzw-v051 mined SBOMs this is the only spelling difference between the two tools.
  *  - Syft writes a versionless purl, with `version: 'UNKNOWN'` on the component, for what it could
  *    not pin: nuget local projects, npm workspace packages, the gradle wrapper.
- *  - Qualifiers and subpaths are dropped although neither tool writes them in `purl` today. Syft's
- *    `?package-id=` lives in the `bom-ref` only, which is exactly where it is easy to pick up by
- *    mistake — and a purl with it would never match the other tool's.
- *
- * The rules mirror the resolver server's canonicalisation (depinder-server-side `src/purl.ts`), so
- * the purl sent is already the key the server stores under: npm, composer and nuget names are
- * lowercased, pypi names are PEP 503-normalised, and maven, gem, golang and cargo — case-sensitive
- * upstream — are left as given. Unlike the server, `@` in an npm scope is written `%40`, which is
- * what both tools already emit (`pkg:npm/%40babel/core@7.24.0`); the server reads either spelling
- * to the same key.
+ *  - Qualifiers and subpaths are dropped. Syft's `?package-id=` lives in the `bom-ref` only, and a
+ *    purl with it would never match the other tool's.
+ *  - Every segment is percent-encoded the way both tools write it (`pkg:npm/%40babel/core@7.24.0`,
+ *    `pkg:cargo/wasi@0.14.2%2Bwasi-0.2.4`), so a purl that needed no fixing stays byte for byte as
+ *    written. The servers read this spelling and core's `@`-keeping key form alike.
  */
 
 export interface PurlComponent {
@@ -28,66 +23,68 @@ export interface PurlComponent {
     version?: string
 }
 
+/** A purl reduced to what depinder's model needs; `name` is the registry form (`registryName`). */
+export interface PurlCoordinates {
+    type: string
+    name: string
+    version: string
+}
+
 /**
  * The normalised purl — `pkg:type/namespace/name@version`, never with qualifiers or a subpath —
- * or undefined for anything that is not a purl.
+ * or undefined for anything that is not a usable purl.
  *
  * The version is kept verbatim (a golang `v0.25.1` keeps its `v`). A purl without one takes the
  * component's own `version`; when neither knows the version the result is versionless
  * (`pkg:maven/org.apache.zeppelin/zeppelin-interpreter`), never `@UNKNOWN`, which no registry has.
  */
 export function normalizePurl(purl: string | undefined, component?: PurlComponent): string | undefined {
-    if (!purl?.startsWith('pkg:')) return undefined
-
-    const body = purl.slice('pkg:'.length).split('?')[0].split('#')[0]
-    const slash = body.indexOf('/')
-    if (slash <= 0) return undefined
-    const type = body.slice(0, slash).toLowerCase()
-    const rest = body.slice(slash + 1)
-
-    // The version follows the LAST '@', except that an npm scope may begin the name with one
-    // (`@types/node`, unencoded, is legal): a '@' at position 0 is never the separator.
-    const at = rest.lastIndexOf('@')
-    const pathPart = at > 0 ? rest.slice(0, at) : rest
-    const rawVersion = at > 0 ? rest.slice(at + 1) : ''
-
-    let segments = pathPart.split('/').filter(it => it.length > 0).map(decode)
-    if (segments.length === 0) return undefined
-    segments = foldCase(type, segments, component)
-
-    let version = decode(rawVersion).trim()
-    if (!version) version = component?.version?.trim() ?? ''
-    if (version.toUpperCase() === 'UNKNOWN') version = ''
-
-    const key = `pkg:${type}/${segments.map(encodeURIComponent).join('/')}`
-    return version ? `${key}@${encodeURIComponent(version)}` : key
-}
-
-/** Percent-decodes, leaving a malformed escape (`%zz`) as written rather than failing the purl. */
-function decode(segment: string): string {
+    const parts = purl?.startsWith('pkg:') ? splitOrUndefined(purl) : undefined
+    if (!parts) return undefined
+    const version = knownVersion(parts.version) ?? knownVersion(component?.version)
     try {
-        return decodeURIComponent(segment)
+        return spellPurl(canonicalPurl(golangCase(parts, component)), version)
     } catch {
-        return segment
+        return undefined
     }
 }
 
-/** Per-ecosystem case rules; see the file header. `segments` are decoded namespace + name. */
-function foldCase(type: string, segments: string[], component?: PurlComponent): string[] {
-    switch (type) {
-        case 'npm':
-        case 'composer':
-        case 'nuget':
-            return segments.map(it => it.toLowerCase())
-        case 'pypi': {
-            const name = segments[segments.length - 1]
-            return [...segments.slice(0, -1), name.replace(/[-_.]+/g, '-').toLowerCase()]
-        }
-        case 'golang':
-            return golangCase(segments, component)
-        default:
-            return segments
+/**
+ * The (type, registry name, version) a purl names, with the names as written. Undefined for
+ * anything unparseable or versionless, rather than a guess.
+ */
+export function purlCoordinates(purl: string): PurlCoordinates | undefined {
+    const parts = splitOrUndefined(purl)
+    const version = parts?.version?.trim()
+    if (!parts || !version) return undefined
+    if (parts.type === 'maven' && !parts.namespace) return undefined
+    return {type: parts.type, name: registryName(parts), version}
+}
+
+/**
+ * The purl for a dependency whose SBOM component had none that parsed, spelled from its registry
+ * name the way `normalizePurl` spells a parsed one. Undefined when the name is not one of `type`.
+ */
+export function purlFromRegistryName(type: string, name: string, version: string): string | undefined {
+    try {
+        return spellPurl(fromRegistryName(type, name), version)
+    } catch {
+        return undefined
     }
+}
+
+function splitOrUndefined(purl: string): PurlParts | undefined {
+    try {
+        return splitPurl(purl)
+    } catch {
+        return undefined
+    }
+}
+
+/** `UNKNOWN` is Syft's word for no version. */
+function knownVersion(version: string | null | undefined): string | undefined {
+    const trimmed = version?.trim()
+    return trimmed && trimmed.toUpperCase() !== 'UNKNOWN' ? trimmed : undefined
 }
 
 /**
@@ -96,11 +93,17 @@ function foldCase(type: string, segments: string[], component?: PurlComponent): 
  * so when the name spells the same path ignoring case, the name's spelling wins — which makes
  * Trivy's purl equal to Syft's. A name that is a different path is ignored.
  */
-function golangCase(segments: string[], component?: PurlComponent): string[] {
-    if (!component?.name) return segments
+function golangCase(parts: PurlParts, component?: PurlComponent): PurlParts {
+    if (parts.type !== 'golang' || !component?.name) return parts
     const spelled = component.group ? `${component.group}/${component.name}` : component.name
-    const path = segments.join('/')
-    return spelled !== path && spelled.toLowerCase() === path.toLowerCase()
-        ? spelled.split('/').filter(it => it.length > 0)
-        : segments
+    const path = registryName(parts)
+    if (spelled === path || spelled.toLowerCase() !== path.toLowerCase()) return parts
+    const slash = spelled.lastIndexOf('/')
+    return {...parts, namespace: slash > 0 ? spelled.slice(0, slash) : null, name: spelled.slice(slash + 1)}
+}
+
+function spellPurl(parsed: {type: string, namespace: string | null, name: string}, version: string | undefined): string {
+    const segments = [...(parsed.namespace?.split('/') ?? []), parsed.name].filter(it => it.length > 0)
+    const key = `pkg:${parsed.type}/${segments.map(encodeURIComponent).join('/')}`
+    return version ? `${key}@${encodeURIComponent(version)}` : key
 }

@@ -1,4 +1,4 @@
-import {errorMessage, registryName, tryParsePurl} from '@depinder/core'
+import {errorMessage, isCaseSensitiveType, registryName, tryParsePurl} from '@depinder/core'
 import {log} from '../utils/logging'
 
 /**
@@ -8,9 +8,6 @@ import {log} from '../utils/logging'
  * restored into the purl (see `normalizePurl`) is what the resolver is asked with, and the
  * fallback asks with the same spelling. Cache keys stay on the dependency's own name.
  */
-
-/** Ecosystems whose registries tell names apart by case; the others fold them in the purl. */
-const CASE_SENSITIVE_TYPES = new Set(['golang', 'maven', 'gem', 'cargo'])
 
 /** The dependency's name as its purl spells it, when that is the same name in another case. */
 export function fallbackLookupName(dep: {name: string, purl?: string}): string {
@@ -30,7 +27,7 @@ export function refetchLookupName(type: string, keyName: string, cachedName: str
 
 function sameNameOtherCase(type: string, name: string, candidate: string): string | undefined {
     const differsOnlyInCase = candidate !== name && candidate.toLowerCase() === name.toLowerCase()
-    return CASE_SENSITIVE_TYPES.has(type) && differsOnlyInCase ? candidate : undefined
+    return isCaseSensitiveType(type) && differsOnlyInCase ? candidate : undefined
 }
 
 /** One line saying which lookup failed and why; a bare `log.error(e)` printed only "error". */

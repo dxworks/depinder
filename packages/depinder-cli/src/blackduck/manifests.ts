@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import {ParsedPurl} from '../plugins/sbom/cyclonedx'
+import type {PurlCoordinates} from '../plugins/sbom/purl'
 
 /**
  * What the scanned repository says about itself, read off its manifests (see `depminer-index.ts`).
@@ -240,7 +240,7 @@ export function blackDuckPrefix(tag: string, projectPath: string, manifest: Repo
  * code — declared by a manifest of the same family inside the tree, and not inside a nested tree
  * of that family. A manifest without a version claims the name alone.
  */
-export function ownCodeMatcher(repo: RepoManifests | undefined, treeDir: string, purlType: string): (component: ParsedPurl | undefined) => boolean {
+export function ownCodeMatcher(repo: RepoManifests | undefined, treeDir: string, purlType: string): (component: PurlCoordinates | undefined) => boolean {
     if (!repo) return () => false
     const family = purlType
     const inTree = (dir: string) => treeDir === '' || dir === treeDir || dir.startsWith(`${treeDir}/`)

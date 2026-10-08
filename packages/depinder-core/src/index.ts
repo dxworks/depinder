@@ -3,15 +3,19 @@
 
 export {createLogger, errorMessage, nullLogger, type Logger, type LogLevel} from './log.js'
 export {
+    canonicalPurl,
     fromRegistryName,
+    isCaseSensitiveType,
     isSupportedType,
     normalisePypiName,
     parsePurl,
     registryName,
+    splitPurl,
     SUPPORTED_TYPES,
     tryParsePurl,
     versionPurl,
     type ParsedPurl,
+    type PurlParts,
 } from './purl.js'
 export {
     createHttpClient,

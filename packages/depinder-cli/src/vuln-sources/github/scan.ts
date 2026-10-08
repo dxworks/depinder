@@ -1,7 +1,8 @@
 import fs from 'fs'
 import path from 'path'
 import {Vulnerability} from '../../extension-points/vulnerability-checker'
-import {CycloneDxBom, parsePurl} from '../../plugins/sbom/cyclonedx'
+import {CycloneDxBom} from '../../plugins/sbom/cyclonedx'
+import {purlCoordinates} from '../../plugins/sbom/purl'
 import {packageKeys} from '../../plugins/sbom/package-keys'
 import {defaultCacheDir, readEcosystem, readManifest} from './cache'
 import {ecosystemForPurlType} from './ecosystems'
@@ -36,7 +37,7 @@ function componentPurls(sbomFile: string): {type: string, name: string, version:
     const parsed: {type: string, name: string, version: string, purl: string}[] = []
     for (const component of bom.components ?? []) {
         if (!component.purl) continue
-        const purl = parsePurl(component.purl)
+        const purl = purlCoordinates(component.purl)
         if (purl) parsed.push({...purl, purl: component.purl})
     }
     return parsed
