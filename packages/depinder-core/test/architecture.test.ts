@@ -5,12 +5,10 @@ import {fileURLToPath} from 'node:url'
 import {describe, expect, it} from 'vitest'
 
 // What core may hold, checked: only what both the CLI and the server use (no feeds, polls,
-// database or fetch_log), imports of nothing but itself, Node and its declared dependencies, code
-// the CLI can bundle, and the size ceilings of the root CLAUDE.md.
+// database or fetch_log), imports of nothing but itself, Node and its declared dependencies, and
+// code the CLI can bundle.
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const MAX_SRC_LINES = 400
-const MAX_TEST_LINES = 550
 const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)['"]([^'"]+)['"]/g
 
 /** Paths relative to core, with `/`, of the `.ts` files under `dir`, fixtures left out. */
@@ -26,7 +24,6 @@ function walk(dir: string): string[] {
 }
 
 const read = (file: string) => readFileSync(join(ROOT, file), 'utf8')
-const lineCount = (file: string) => read(file).split('\n').length - (read(file).endsWith('\n') ? 1 : 0)
 const src = walk('src')
 
 /** The files whose text matches `pattern`, as "file: match". */
@@ -54,18 +51,5 @@ describe('core architecture', () => {
 
     it('is bundleable by the CLI: no top-level await, no import.meta in its sources', () => {
         expect(matching(src, /^await\b|import\.meta/gm)).toEqual([])
-    })
-})
-
-describe('core file sizes', () => {
-    const oversized = (files: string[], max: number) =>
-        files.filter(file => lineCount(file) > max).map(file => `${file} (${lineCount(file)})`)
-
-    it(`keeps every src/ file within ${MAX_SRC_LINES} lines`, () => {
-        expect(oversized(src, MAX_SRC_LINES)).toEqual([])
-    })
-
-    it(`keeps every test/ file within ${MAX_TEST_LINES} lines (fixtures exempt)`, () => {
-        expect(oversized(walk('test'), MAX_TEST_LINES)).toEqual([])
     })
 })

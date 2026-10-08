@@ -3,23 +3,19 @@ import {dirname, join, relative, resolve, sep} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {describe, expect, it} from 'vitest'
 
-// The layout rule and the size ceilings from CLAUDE.md, checked. The ceilings sit a little above
-// the soft targets (code ~350 lines, tests ~500), so ordinary growth does not trip them.
+// The layout rule from CLAUDE.md, checked. Nx tags do not police folders inside one project.
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const MAX_SRC_LINES = 400
-const MAX_TEST_LINES = 550
-const CODE = /\.(ts|cjs|mjs|js)$/
 // `from '…'`, `import '…'`, `import('…')`, `require('…')`; `export … from` is covered by `from`.
 const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)['"]([^'"]+)['"]/g
 
 /** Repo-relative paths, with `/`, of the files under `dir` that match `pattern`. */
-function walk(dir: string, pattern: RegExp, skip: string[] = []): string[] {
+function walk(dir: string, pattern: RegExp): string[] {
     const out: string[] = []
     for (const entry of readdirSync(join(ROOT, dir), {withFileTypes: true})) {
         const path = `${dir}/${entry.name}`
-        if (skip.includes(path) || entry.name === 'node_modules') continue
-        if (entry.isDirectory()) out.push(...walk(path, pattern, skip))
+        if (entry.name === 'node_modules') continue
+        if (entry.isDirectory()) out.push(...walk(path, pattern))
         else if (pattern.test(entry.name)) out.push(path)
     }
     return out.sort()
@@ -35,11 +31,6 @@ function relativeImports(file: string): {specifier: string; target: string}[] {
         out.push({specifier, target})
     }
     return out
-}
-
-function lineCount(file: string): number {
-    const text = readFileSync(join(ROOT, file), 'utf8')
-    return text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
 }
 
 const under = (path: string, dir: string) => path === dir || path.startsWith(`${dir}/`)
@@ -67,22 +58,5 @@ describe('architecture', () => {
 
     it('keeps src/shared free of src/resolver and src/vuln', () => {
         expect(violations(src.filter((f) => under(f, 'src/shared')), ['src/resolver', 'src/vuln'])).toEqual([])
-    })
-})
-
-/** The files over `max` lines, as "file (lines)". */
-function oversized(files: string[], max: number): string[] {
-    return files.map((file) => ({file, lines: lineCount(file)}))
-        .filter(({lines}) => lines > max)
-        .map(({file, lines}) => `${file} (${lines})`)
-}
-
-describe('file sizes', () => {
-    it(`keeps every src/ file within ${MAX_SRC_LINES} lines`, () => {
-        expect(oversized(walk('src', /\.ts$/), MAX_SRC_LINES)).toEqual([])
-    })
-
-    it(`keeps every test/ file within ${MAX_TEST_LINES} lines (fixtures exempt)`, () => {
-        expect(oversized(walk('test', CODE, ['test/fixtures']), MAX_TEST_LINES)).toEqual([])
     })
 })

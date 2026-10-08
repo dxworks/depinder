@@ -24,9 +24,9 @@ deploy/          the deploy kit (Hetzner, compose.server.yml); the server addres
 ## Size targets
 
 Code files ~350 lines at most, functions ~100, test files ~500 (fixtures exempt). Split along
-the seams that are already there before going over. `test/architecture.test.ts` enforces the
-import rule and hard ceilings of 400 lines (src/) and 550 (test/); the workspace size guard and
-`nx lint depinder-server` (function length) check the same limits repo-wide.
+the seams that are already there before going over. The workspace size guard enforces the hard
+ceilings (400 lines for code, 550 for tests) and `nx lint depinder-server` the function length;
+`test/architecture.test.ts` enforces the import rule.
 
 ## Commands
 
