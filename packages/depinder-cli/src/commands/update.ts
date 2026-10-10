@@ -15,7 +15,8 @@ import {REGISTRY_LIMITS_ENV, resolveRegistryLimits} from '../fallback/registry-l
 import {logLookupFailure, refetchLookupName} from '../fallback/lookup-name'
 import {DEFAULT_RESOLVER_URL, ResolverOptions, resolverConfig} from '../resolver/config'
 import {resetResolverClient} from '../resolver/client'
-import {bulkResolve, PluginProjects, resetBulkResolve} from './analyse'
+import {bulkResolve, PluginProjects} from '../resolver/bulk-resolve'
+import {resetBulkResolve} from '../resolver/bulk-memory'
 
 export interface UpdateOptions extends ResolverOptions, CacheMaxAgeOptions {
     /** `npm=16,cargo=1:1000`: per-ecosystem registry limits over `DEPINDER_REGISTRY_LIMITS` and the defaults. */
