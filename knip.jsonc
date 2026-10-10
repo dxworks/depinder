@@ -1,0 +1,26 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  // Entries knip already finds are not repeated here: package.json bin, exports and scripts (core's
+  // index, ./testing and recorder, the server's main.ts and ./in-process, the CLI's ./fallback, the
+  // root's bench scripts), plus the vitest and eslint configs and test files of every package.
+  "workspaces": {
+    // The root workspace also holds tools/workspace-checks, which has no package.json.
+    ".": {
+      // Run by Nx run-commands, which knip does not follow.
+      "entry": [
+        "tools/workspace-checks/src/size-guard.mts",
+        "tools/workspace-checks/src/dependency-check.mts",
+        "tools/workspace-checks/eslint.config.mjs",
+        "tools/workspace-checks/vitest.config.mts"
+      ]
+    },
+    "packages/depinder-cli": {
+      // The bin and the dxw command module; package.json points both at dist.
+      "entry": ["src/index.ts", "src/depinder.ts"],
+      // A runtime dependency of the bundled core, kept external by thirdParty: false.
+      "ignoreDependencies": ["packageurl-js"],
+      // The docs build's Python tool.
+      "ignoreBinaries": ["mkdocs"]
+    }
+  }
+}

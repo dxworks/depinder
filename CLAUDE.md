@@ -15,7 +15,8 @@ packages/depinder-core/     lib, scope:shared  -> @depinder/core: registry fetch
 packages/parity/            scope:test: every recorded registry case through the server and the
                             CLI fallback, which must give the same LibraryInfo
 bench/                      depinder-bench, scope:bench: end-to-end bench (CLI runs, HTTP, SQL)
-tools/workspace-checks/     size guard, single-version dependency check, function-size lint config
+tools/workspace-checks/     size guard, single-version dependency check, function-size lint config,
+                            knip target (unused files, exports, dependencies; config in knip.jsonc)
 ```
 
 - Core imports only core. The CLI and the server import core, never each other; only parity
@@ -36,7 +37,7 @@ comments short and summarising, never restating the code.
 
 ```bash
 npm ci
-npm run check                               # typecheck, lint, test, build, size guard, dependency check
+npm run check                               # typecheck, lint, test, build, size guard, dependency check, knip
 npx nx test-integration depinder-server     # + Postgres tests on the depinder-pg container
 TEST_DATABASE_URL=... npx nx test-parity parity   # parity on depinder-pg (see below)
 npx nx docker-build depinder-server         # the server image; build context is this root

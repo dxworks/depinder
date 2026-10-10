@@ -26,7 +26,7 @@ depinder --help
 ```bash
 nvm use                       # Node 24, from .nvmrc
 npm ci
-npx nx run-many -t typecheck lint test build size-guard dependency-check   # what CI runs (npm run check)
+npx nx run-many -t typecheck lint test build size-guard dependency-check knip   # what CI runs (npm run check)
 npx nx build depinder-cli     # packages/depinder-cli/dist
 npx nx run depinder-cli:docs  # MkDocs site, needs `pip install -r packages/depinder-cli/requirements-docs.txt`
 npx nx test-integration depinder-server   # server tests plus Postgres ones, on the depinder-pg container
@@ -40,7 +40,8 @@ Size limits for new and moved code: files ~350 lines (hard 400), tests ~500 (har
 functions ~100. `workspace-checks:size-guard` measures files and the `max-lines-per-function` lint
 rule measures functions; files that were already longer are listed in
 `tools/workspace-checks/size-baseline.json` and may shrink but not grow.
-`workspace-checks:dependency-check` fails when the workspace holds two versions of a dependency.
+`workspace-checks:dependency-check` fails when the workspace holds two versions of a dependency;
+`workspace-checks:knip` fails on unused files, exports and dependencies (config: `knip.jsonc`).
 Lint enforces the import rules (Nx module boundaries, by project tag): core imports no other
 project; the CLI and the server import core, never each other; only parity imports all three; the
 bench and the tooling import no project.

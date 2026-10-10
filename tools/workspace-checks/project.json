@@ -13,6 +13,11 @@
       "executor": "nx:run-commands",
       "options": {"cwd": "{projectRoot}", "command": "node src/dependency-check.mts"}
     },
+    "knip": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {"cwd": "{workspaceRoot}", "command": "knip --no-progress"}
+    },
     "lint": {
       "executor": "nx:run-commands",
       "options": {"cwd": "{projectRoot}", "command": "eslint src __tests__"}

@@ -24,7 +24,7 @@ jobs:
           node-version: '24.x'
           cache: 'npm'
 
-      # typecheck, lint, test, build, size guard and dependency check of every Nx project
+      # typecheck, lint, test, build, size guard, dependency check and knip of every Nx project
       - name: Check and build
         run: |
           npm ci
