@@ -10,15 +10,10 @@ import {
 } from '../plugins/sbom'
 import {assignPurl} from '../plugins/sbom/dependency-purl'
 import {SbomDescription} from '../plugins/sbom/describe'
-import {
-    PreflightMessage,
-    PROVENANCE_FILE,
-    preflightScanners,
-    ScannerPreflight,
-    scannerPreflightMessages,
-    scannerSummaryLine,
-    scanSbomFileOnce,
-} from '../plugins/sbom/local-scan'
+import {scanSbomFileOnce} from '../plugins/sbom/local-scan'
+import {PreflightMessage, scannerPreflightMessages, scannerSummaryLine} from '../plugins/sbom/preflight-messages'
+import {PROVENANCE_FILE} from '../plugins/sbom/scan-provenance'
+import {preflightScanners, ScannerPreflight} from '../plugins/sbom/scanner-preflight'
 import type {VulnDatabaseBuild} from '@depinder/core'
 import {log} from '../utils/logging'
 import {count, startPhase, timePhase} from '../utils/profile'

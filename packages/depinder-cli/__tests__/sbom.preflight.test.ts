@@ -2,17 +2,10 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import {PINNED_SCANNER_VERSIONS} from '@depinder/core'
-import {
-    PROVENANCE_FILE,
-    ScannerPreflight,
-    clearLocalScanCache,
-    preflightScanners,
-    scanSbomFileOnce,
-    scannerFailureReason,
-    scannerPreflightMessages,
-    scannerSummaryLine,
-    writeScanProvenance,
-} from '../src/plugins/sbom/local-scan'
+import {clearLocalScanCache, scanSbomFileOnce} from '../src/plugins/sbom/local-scan'
+import {scannerPreflightMessages, scannerSummaryLine} from '../src/plugins/sbom/preflight-messages'
+import {PROVENANCE_FILE, writeScanProvenance} from '../src/plugins/sbom/scan-provenance'
+import {ScannerPreflight, preflightScanners, scannerFailureReason} from '../src/plugins/sbom/scanner-preflight'
 import {log} from '../src/utils/logging'
 
 /**

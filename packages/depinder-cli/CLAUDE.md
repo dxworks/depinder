@@ -49,7 +49,7 @@ The preflight banner does not catch this: it only checks that the binaries exist
 ### What to actually measure
 
 Not exit codes — **package counts**. The harness already exists:
-`sbom-scan-provenance.json` (`PROVENANCE_FILE`, `local-scan.ts`) records
+`sbom-scan-provenance.json` (`PROVENANCE_FILE`, `scan-provenance.ts`) records
 `packageKeys` and `findingEntries` per file per tool.
 
 Take one repo, generate both SBOMs, and fill in the 2×2:
@@ -66,7 +66,7 @@ since that is the most likely root cause if a cell comes back empty.
 
 ### DB refresh — this half is ALREADY ANSWERED (recorded here so it is not re-asked)
 
-`warmScannerDatabases()` (`local-scan.ts`) refreshes both DBs **once per process**,
+`warmScannerDatabases()` (`scanner-preflight.ts`) refreshes both DBs **once per process**,
 before the first scan reads either:
 
 - `trivy image --download-db-only` and `grype db update`, run **side by side**
