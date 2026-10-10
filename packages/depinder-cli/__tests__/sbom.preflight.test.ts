@@ -5,7 +5,7 @@ import {PINNED_SCANNER_VERSIONS} from '@depinder/core'
 import {clearLocalScanCache, scanSbomFileOnce} from '../src/plugins/sbom/local-scan'
 import {scannerPreflightMessages, scannerSummaryLine} from '../src/plugins/sbom/preflight-messages'
 import {PROVENANCE_FILE, writeScanProvenance} from '../src/plugins/sbom/scan-provenance'
-import {ScannerPreflight, preflightScanners, scannerFailureReason} from '../src/plugins/sbom/scanner-preflight'
+import {ScannerPreflight, preflightScanners} from '../src/plugins/sbom/scanner-preflight'
 import {log} from '../src/utils/logging'
 
 /**
@@ -374,14 +374,5 @@ echo '{"matches":[]}'
         } finally {
             warn.mockRestore()
         }
-    })
-
-    it('reads the last failing stderr line, not the scanner\'s progress chatter', () => {
-        const reason = scannerFailureReason({
-            message: 'Command failed: trivy sbom --format json /x/p.cdx.json\nFATAL\tinit error',
-            stderr: 'INFO\tNeed to update DB\nINFO\tDownloading vulnerability DB...\nFATAL\tinit error: DB error: failed to download\n',
-        })
-
-        expect(reason).toBe('Command failed: trivy sbom --format json /x/p.cdx.json \u2014 FATAL\tinit error: DB error: failed to download')
     })
 })

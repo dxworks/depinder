@@ -1,6 +1,6 @@
 import {execFile} from 'child_process'
 import {promisify} from 'util'
-import {PINNED_SCANNER_VERSIONS} from '@depinder/core'
+import {PINNED_SCANNER_VERSIONS, scannerFailureReason} from '@depinder/core'
 import {vulnSources} from '../../vuln-sources/selection'
 import {log} from '../../utils/logging'
 import {timePhase} from '../../utils/profile'
@@ -147,22 +147,6 @@ export function preflightScanners(): Promise<ScannerPreflight> {
         })()
     }
     return preflightPromise
-}
-
-/**
- * Why a scanner call failed, in one line, with the scanner's own last word kept.
- *
- * `execFile` rejects with `Command failed: trivy sbom --format json <file>` on its first line and
- * the child's stderr under it. Reporting only that first line named the command and never the
- * reason — an expired database the scanner could not re-download reads exactly like a corrupt
- * SBOM. The last stderr line that mentions a failure is the one the scanner meant as its verdict.
- */
-export function scannerFailureReason(e: any): string {
-    const head = `${e?.message ?? e}`.split('\n')[0]
-    const lines = `${e?.stderr ?? ''}`.split('\n').map((it: string) => it.trim()).filter(Boolean)
-    const detail = [...lines].reverse().find((it: string) => /error|fatal|failed|denied/i.test(it))
-        ?? lines[lines.length - 1]
-    return detail ? `${head} — ${detail}` : head
 }
 
 let warmPromise: Promise<void> | undefined

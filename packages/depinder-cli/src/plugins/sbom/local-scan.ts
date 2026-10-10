@@ -2,7 +2,13 @@ import {execFile} from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import {promisify} from 'util'
-import {buildVulnerabilityIndex, type GrypeReport, type TrivyReport, type Vulnerability} from '@depinder/core'
+import {
+    buildVulnerabilityIndex,
+    scannerFailureReason,
+    type GrypeReport,
+    type TrivyReport,
+    type Vulnerability,
+} from '@depinder/core'
 import {vulnSources} from '../../vuln-sources/selection'
 import {log} from '../../utils/logging'
 import {timePhase} from '../../utils/profile'
@@ -12,7 +18,6 @@ import {
     MAX_SCANNER_OUTPUT_BYTES,
     preflightScanners,
     resetScannerPreflight,
-    scannerFailureReason,
     warmScannerDatabases,
 } from './scanner-preflight'
 

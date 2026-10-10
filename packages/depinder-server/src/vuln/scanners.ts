@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process'
 import {readdir, rm} from 'node:fs/promises'
 import {join} from 'node:path'
 import type {VulnConfig} from './config.js'
-import type {GrypeReport, TrivyReport} from '@depinder/core'
+import {scannerFailureReason, type GrypeReport, type TrivyReport} from '@depinder/core'
 
 /**
  * Running Trivy and Grype as child processes.
@@ -121,21 +121,6 @@ export function runScanner(
             }
         })
     })
-}
-
-/**
- * Why a scanner call failed, in one line, with the scanner's own last word kept.
- *
- * The same rule as the CLI's `scannerFailureReason` (`plugins/sbom/scanner-preflight.ts`). The head alone
- * (`exit 1`) names the failure and never the reason — an expired database the scanner could not
- * re-download reads exactly like a corrupt SBOM. The last stderr line that mentions a failure is the one the scanner meant as its verdict.
- * Grype colours its log lines; the escapes are dropped so the reason reads as text.
- */
-function scannerFailureReason(e: {message?: string, stderr?: string}): string {
-    const head = `${e.message ?? ''}`.split('\n')[0] ?? ''
-    const lines = `${e.stderr ?? ''}`.replace(/\x1b\[[0-9;]*m/g, '').split('\n').map(it => it.trim()).filter(Boolean)
-    const detail = [...lines].reverse().find(it => /error|fatal|failed|denied/i.test(it)) ?? lines[lines.length - 1]
-    return detail ? `${head} — ${detail}` : head
 }
 
 export interface ScanReports {
