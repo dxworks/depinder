@@ -106,6 +106,29 @@ describe('composer fetchPackage', () => {
         expect(result!.registryLatest).toBeUndefined()
     })
 
+    it('takes the repo link from the newest version that declares one', () => {
+        // phpstan/phpstan: the newest releases carry `source: null`, which minification carries forward.
+        const releases = {
+            minified: 'composer/2.0',
+            packages: {
+                'phpstan/phpstan': [
+                    {version: '2.2.0', source: null, license: ['MIT']},
+                    {version: '2.1.30'},
+                    {version: '2.1.29', source: {url: 'https://github.com/phpstan/phpstan.git', type: 'git'}},
+                    {version: '2.1.28', source: {url: 'https://github.com/phpstan/old-home.git', type: 'git'}},
+                ],
+            },
+        }
+        const branches = {
+            minified: 'composer/2.0',
+            packages: {'phpstan/phpstan': [{version: '2.2.x-dev', source: {url: 'https://github.com/phpstan/dev.git'}}]},
+        }
+
+        expect(packageFromMetadata('phpstan/phpstan', releases, branches).repoUrl).toBe(
+            'https://github.com/phpstan/phpstan',
+        )
+    })
+
     it('expands by carrying keys forward, which is why it only runs on minified files', () => {
         const raw = [{version: '2.0.0', license: ['MIT']}, {version: '1.0.0'}]
         expect(expandMinified(raw)).toEqual([

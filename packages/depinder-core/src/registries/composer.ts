@@ -1,6 +1,6 @@
 import {HttpError} from '../http/client.js'
 import {registryName} from '../purl.js'
-import {highest, isPrerelease} from './latest.js'
+import {compareVersions, highest, isPrerelease} from './latest.js'
 import {normaliseLicenses, normaliseRepoUrl, stringOrUndefined, toDate} from './normalise.js'
 import type {FetchContext, FetchedPackage, FetchedVersion, PackageFetcher} from './types.js'
 
@@ -97,7 +97,7 @@ export function packageFromMetadata(
     return {
         description: stringOrUndefined(newestEntry?.description),
         homepageUrl: stringOrUndefined(newestEntry?.homepage),
-        repoUrl: normaliseRepoUrl(newestEntry?.source),
+        repoUrl: declaredRepoUrl(versions, byVersion),
         licenses: newest?.licenses ?? [],
         versions,
         // No "latest" designation on Packagist — see the file header.
@@ -143,4 +143,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** The highest release that is not a branch or a pre-release — the version `computeLatest` picks. */
 function newestStable(versions: FetchedVersion[]): FetchedVersion | undefined {
     return highest(versions.filter(v => !v.prerelease))
+}
+
+/**
+ * The repo link of the newest version that declares one, stable releases first, each group by
+ * version order. Packagist entries can drop `source`: phpstan/phpstan >= 2.1.30 ships `source: null`.
+ */
+function declaredRepoUrl(
+    versions: FetchedVersion[],
+    byVersion: Map<string, Record<string, unknown>>,
+): string | undefined {
+    const descending = [...versions].sort((a, b) => compareVersions(b.version, a.version))
+    const candidates = [...descending.filter(v => !v.prerelease), ...descending.filter(v => v.prerelease)]
+    return candidates
+        .map(v => normaliseRepoUrl(byVersion.get(v.version)?.source))
+        .find(url => url !== undefined)
 }
