@@ -29,7 +29,7 @@ describe('toPackageRecord on recorded registry answers', () => {
             repo_url: 'https://github.com/expressjs/express',
             licenses: ['MIT'],
             latest: {version: '4.18.2', released_at: '2022-10-08T20:46:50.000Z'},
-            latest_prerelease: {version: '4.19.0', released_at: '2024-03-25T17:50:00.000Z'},
+            latest_prerelease: {version: '5.0.0-alpha.8', released_at: '2020-03-25T15:30:00.000Z'},
             versions: [
                 ['0.14.0', 1304893397, 0],
                 ['4.17.1', 1558801952, 0],

@@ -41,7 +41,7 @@ export interface FetchedPackage {
 export interface ResolvedPackage extends FetchedPackage {
     /** The version depinder calls latest. See `computeLatest` in `latest.ts`. */
     latest?: string
-    /** The newest version overall, only when it differs from `latest`. */
+    /** The highest pre-release that orders above `latest`. */
     latestPrerelease?: string
 }
 

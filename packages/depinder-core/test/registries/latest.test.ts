@@ -113,9 +113,33 @@ describe('computeLatest', () => {
         expect(computeLatest('nuget', versions)).toEqual({latest: '1.1.0', latestPrerelease: undefined})
     })
 
-    it('reports a newer stable version the registry has not promoted yet', () => {
+    it('never reports a stable version as latest_prerelease, even one the registry has not promoted', () => {
         const versions = [v('1.0.0', '2021-01-01'), v('1.1.0', '2023-01-01')]
-        expect(computeLatest('npm', versions, '1.0.0')).toEqual({latest: '1.0.0', latestPrerelease: '1.1.0'})
+        expect(computeLatest('npm', versions, '1.0.0')).toEqual({latest: '1.0.0', latestPrerelease: undefined})
+    })
+
+    it('ignores a backport published after the current line', () => {
+        // vite: 6.4.4 shipped after 8.3.3, the registry's latest.
+        const versions = [
+            v('6.4.3', '2026-06-01'),
+            v('8.0.0-beta.2', '2026-07-01', {prerelease: true}),
+            v('8.3.3', '2026-09-20'),
+            v('6.4.4', '2026-10-01'),
+        ]
+        expect(computeLatest('npm', versions, '8.3.3')).toEqual({latest: '8.3.3', latestPrerelease: undefined})
+    })
+
+    it('ignores a backport pre-release and takes the highest one above latest', () => {
+        // express: 4.22.3 and a 4.x beta shipped after 5.1.0, alongside the 6.x pre-releases.
+        const versions = [
+            v('5.1.0', '2026-03-01'),
+            v('6.0.0-beta.1', '2026-04-01', {prerelease: true}),
+            v('6.0.0-beta.3', '2026-05-01', {prerelease: true}),
+            v('6.0.0-beta.2', '2026-08-01', {prerelease: true}), // a respin, published last
+            v('4.23.0-beta.1', '2026-09-01', {prerelease: true}),
+            v('4.22.3', '2026-09-15'),
+        ]
+        expect(computeLatest('npm', versions, '5.1.0')).toEqual({latest: '5.1.0', latestPrerelease: '6.0.0-beta.3'})
     })
 
     it('falls back to the newest of all when every version looks like a pre-release', () => {

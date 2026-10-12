@@ -82,7 +82,7 @@ export function packageWriteTests(postgres: () => Postgres): void {
             expect(pkg!.status).toBe('resolved')
             expect(pkg!.licenses).toEqual(['MIT'])
             expect(pkg!.latest_version).toBe('4.18.2')
-            expect(pkg!.latest_prerelease_version).toBe('4.19.0')
+            expect(pkg!.latest_prerelease_version).toBe('5.0.0-alpha.8')
             expect(pkg!.source).toBe('registry.npmjs.org')
             expect(pkg!.repo_url).toBe('https://github.com/expressjs/express')
             // Stamped when the fetch started, and nothing but the fetch vouches for it yet.

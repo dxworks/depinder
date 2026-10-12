@@ -16,7 +16,7 @@ describe('fetchPackage', () => {
 
         expect(pkg!.registryLatest).toBe('4.18.2')
         expect(pkg!.latest).toBe('4.18.2')
-        expect(pkg!.latestPrerelease).toBe('4.19.0')
+        expect(pkg!.latestPrerelease).toBe('5.0.0-alpha.8')
         expect(pkg!.versions).toHaveLength(5)
     })
 

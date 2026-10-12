@@ -18,10 +18,10 @@
  *  - A maven latest with a letter-led `-qualifier` gives way to its plain sibling when one exists:
  *    byte-buddy deploys `1.18.14` and `1.18.14-jdk5`, and the plain one is the main artifact.
  *    Guava's `-jre` / `-android` have no plain sibling and are untouched.
- *  - `latestPrerelease` is the newest version overall (highest, for nuget and composer),
- *    reported only when it differs from `latest`. It is therefore not always a pre-release: a
- *    package whose newest publish is a stable version that the registry has not promoted to
- *    `latest` yet shows up here too, which is what a consumer wants to know.
+ *  - `latestPrerelease` is the highest pre-release, by version order in every ecosystem, that
+ *    orders above `latest`; none means unset. Release dates are the wrong key here too: a
+ *    backport published after the current line (vite 6.4.x while latest is 8.x) is not a preview
+ *    of anything.
  *  - Yanked / unlisted versions never win either slot, and neither do composer branches
  *    (`dev-master`, `1.x-dev`): a branch is not a release, even when it is all a package has
  *    besides pre-releases.
@@ -118,10 +118,14 @@ export function computeLatest(
     }
     if (latest && type === 'maven') latest = plainSibling(usable, latest)
 
-    const newestOverall = pick(usable)?.version
-    const latestPrerelease = newestOverall && newestOverall !== latest ? newestOverall : undefined
-
+    const latestPrerelease = latest ? highestPrereleaseAbove(usable, latest) : undefined
     return {latest, latestPrerelease}
+}
+
+/** The highest pre-release that orders above `latest`, if any. */
+function highestPrereleaseAbove(versions: readonly VersionLike[], latest: string): string | undefined {
+    const above = versions.filter(v => v.prerelease && compareVersions(v.version, latest) > 0)
+    return highest(above)?.version
 }
 
 /**

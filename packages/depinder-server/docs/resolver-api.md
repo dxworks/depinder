@@ -193,9 +193,9 @@ Depinder shows this number to users, so the policy is explicit:
   branches (`dev-master`, `0.x-dev`) — not even for a package whose tags are all pre-releases.
   Unlisted nuget versions still carry their release date (the catalog leaf's `created`; the
   registration's `published` is a `1900-01-01` sentinel for them).
-- `latest_prerelease` is the newest version overall (the highest, for nuget and composer) when it
-  differs from `latest`. It is therefore not always a pre-release: a stable version the registry
-  has not promoted yet shows up here too.
+- `latest_prerelease` is the highest pre-release, by version order in every ecosystem, that orders
+  above `latest`, or null when there is none. A backport published after the current line (vite
+  6.4.x while `latest` is 8.x) never shows up here.
 - If every version looks like a pre-release, `latest` is the newest of them rather than nothing.
 
 Both values are stored, so a caller can choose.
