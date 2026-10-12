@@ -11,6 +11,7 @@ import {packageWriteTests} from './integration/writes.js'
 import {feedTests} from './integration/feeds.js'
 import {queueTests} from './integration/queue.js'
 import {freshnessTests} from './integration/freshness.js'
+import {recheckTests} from './integration/recheck.js'
 import {url, type Postgres} from './db.integration.helpers.js'
 
 /**
@@ -93,6 +94,7 @@ describe.skipIf(!url)('postgres', () => {
     feedTests(postgres)
     queueTests(postgres)
     freshnessTests(postgres)
+    recheckTests(postgres)
 
     it('backfills freshness when 0002 lands on a database written by the old code', async () => {
         // A schema of its own, so the rows the old code would have written can be staged under
@@ -138,6 +140,7 @@ describe.skipIf(!url)('postgres', () => {
                 '0006_fetch_queue_wanted.sql',
                 '0007_drop_unused_columns.sql',
                 '0008_fetch_log_started_at.sql',
+                '0009_fetch_queue_recheck.sql',
             ])
 
             const rows = new Map(

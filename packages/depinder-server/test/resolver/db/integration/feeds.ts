@@ -56,6 +56,8 @@ export function feedTests(postgres: () => Postgres): void {
             const queue = await db.query<FetchQueueRow>('select * from fetch_queue order by package_key')
             expect(queue.map(q => q.package_key)).toEqual(['pkg:npm/@babel/core', 'pkg:npm/express'])
             expect(queue[0]!.priority).toBe(PRIORITY.feed)
+            // Each fetch these trigger owes a second look.
+            expect(queue.every(q => q.feed_event)).toBe(true)
 
             const feeds = await createResolveStore(db).getFeeds()
             expect(feeds.find(f => f.type === 'npm')!.lag_seconds).toBeGreaterThanOrEqual(0)
@@ -103,6 +105,8 @@ export function feedTests(postgres: () => Postgres): void {
             expect(seen.find(s => s.packageKey === 'pkg:maven/org.slf4j/slf4j-api')!.fetchedAt).toEqual(fetchedAt)
             const queue = await db.query<FetchQueueRow>('select * from fetch_queue')
             expect(queue.map(q => q.package_key)).toEqual(['pkg:maven/com.google.guava/guava'])
+            // Poll ecosystems are unchanged: a change they find owes no second look.
+            expect(queue[0]!.feed_event).toBe(false)
 
             const row = async (key: string): Promise<PackageRow> =>
                 (await db.query<PackageRow>('select * from package where package_key = $1', [key]))[0]!

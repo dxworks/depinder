@@ -4,6 +4,8 @@ import type {FeedEvent, FeedResult, FeedSpec} from './types.js'
 /** composer's freshness: Packagist's metadata change list, read from a timestamp cursor. */
 
 const CHANGES_URL = 'https://packagist.org/metadata/changes.json'
+/** Packagist's metadata files are cached for up to 900 s. */
+const RECHECK_AFTER_MS = 16 * 60_000
 
 /** Packagist's cursor is unix seconds × 10 000. Its own `timestamp` field is in the same unit. */
 const CURSOR_SCALE = 10_000
@@ -17,6 +19,7 @@ interface ChangesResponse {
 export const composerFeed: FeedSpec = {
     mode: 'feed',
     intervalMs: 60_000,
+    recheckAfterMs: RECHECK_AFTER_MS,
 
     /**
      * Packagist will not hand out its clock on its own, so the head is read by asking for a

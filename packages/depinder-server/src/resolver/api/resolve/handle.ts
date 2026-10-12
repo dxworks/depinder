@@ -189,8 +189,9 @@ async function lookUp(ctx: ResolveContext): Promise<FirstRead> {
             if (row.next_retry_at.getTime() > deadline) ready.push([key, 'refreshing'])
             else open.set(key, 'stale')
         } else {
-            // Queued, unless a fetch of it is already on its way — then that is the one waited for.
-            if (!row.queued) refresh.push(key)
+            // Queued even when a queue row exists: that row may be a second look minutes ahead,
+            // which `queueRefresh` makes due now. A fetch already due or running is left alone.
+            refresh.push(key)
             open.set(key, 'stale')
         }
     }
@@ -210,11 +211,14 @@ async function queueWork(ctx: ResolveContext, refresh: string[], unknown: Parsed
     if (refresh.length > 0) await store.queueRefresh(refresh, wantedUntil)
     // [3] Unknown package → insert 'pending' and enqueue it. Nothing in this file ever calls a registry.
     if (unknown.length > 0) await store.createPending(unknown, wantedUntil)
-    // What another request already queued — a package pending on its fetch, or a stale one already
-    // being refreshed — is waited for here too, and perhaps for longer.
+    // What was queued before this request — a package pending on another's fetch, or a stale one
+    // already queued — is waited for here too, and perhaps for longer.
     if (wantedUntil) {
-        const queuedByOthers = new Set([...refresh, ...unknown.map(p => p.packageKey)])
-        const others = [...ctx.open.keys()].filter(key => !queuedByOthers.has(key))
+        const queuedHere = new Set([
+            ...refresh.filter(key => !ctx.packages.get(key)!.queued),
+            ...unknown.map(p => p.packageKey),
+        ])
+        const others = [...ctx.open.keys()].filter(key => !queuedHere.has(key))
         if (others.length > 0) await store.markWanted(others, wantedUntil)
     }
 }

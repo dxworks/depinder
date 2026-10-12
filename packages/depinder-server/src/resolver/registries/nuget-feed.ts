@@ -12,6 +12,8 @@ import type {FeedEvent, FeedResult, FeedSpec} from './types.js'
 
 const CATALOG_INDEX_URL = 'https://api.nuget.org/v3/catalog0/index.json'
 const SOURCE = 'api.nuget.org'
+/** The registration a package's fetch reads lags its catalog commit by 4-10 min. */
+const RECHECK_AFTER_MS = 15 * 60_000
 
 /** Catalog pages fetched at once. The limiter caps the total anyway. */
 const PAGE_CONCURRENCY = 4
@@ -41,6 +43,7 @@ interface CatalogPage {
 export const nugetFeed: FeedSpec = {
     mode: 'feed',
     intervalMs: 60_000,
+    recheckAfterMs: RECHECK_AFTER_MS,
 
     /** The catalog's head commit. Everything committed before it is already in our packages. */
     async initialCursor(ctx: FetchContext): Promise<string> {

@@ -13,10 +13,13 @@ const SOURCE = 'pypi.org'
 
 /** PyPI's XML-RPC endpoint is the same path as the JSON API; the method is what distinguishes it. */
 const XMLRPC_URL = 'https://pypi.org/pypi'
+/** PyPI's CDN keeps the JSON API's answer for up to 900 s. */
+const RECHECK_AFTER_MS = 16 * 60_000
 
 export const pypiFeed: FeedSpec = {
     mode: 'feed',
     intervalMs: 60_000,
+    recheckAfterMs: RECHECK_AFTER_MS,
 
     /** The current changelog serial. Everything below it is already in the packages we hold. */
     async initialCursor(ctx: FetchContext): Promise<string> {

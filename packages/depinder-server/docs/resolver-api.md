@@ -90,13 +90,14 @@ that, a reset socket, a crash — was cut short: every line already received is 
 and only the purls that got no line need asking again.
 
 **Staleness.** A stale package is queued for a refetch below first-time fetches and feed events,
-unless a fetch of it is already queued (that one is waited for) or a refetch is already scheduled
-(`next_retry_at`: a failed refresh waiting out its retry, or a golang re-check), which a request
-never pulls forward. A stream holds a stale package back while its refetch can still land, and
-sends it `resolved` when its `fetched_at` moves — or `refreshing` at the deadline. Keep `max_age` at
-six hours or more: maven and cargo are confirmed by a poll every 6 h, so below that they are
-refetched on nearly every request — allowed, not advised. `not_found` and `error` keep their own
-retry schedules, whatever `max_age` asks.
+unless a fetch of it is already queued (that one is waited for, and a second look after a feed
+event that is still ahead is made due now) or a refetch is already scheduled (`next_retry_at`: a
+failed refresh waiting out its retry, or a golang re-check), which a request never pulls forward.
+A stream holds a stale package back while its refetch can still land, and sends it `resolved` when
+its `fetched_at` moves — or `refreshing` at the deadline. Keep `max_age` at six hours or more:
+maven and cargo are confirmed by a poll every 6 h, so below that they are refetched on nearly every
+request — allowed, not advised. `not_found` and `error` keep their own retry schedules, whatever
+`max_age` asks.
 
 **How it waits.** The worker announces every package it commits — they share a process in the
 default `ROLE=resolver` — and the stream gathers those announcements for 100 ms, then reads every
@@ -152,6 +153,9 @@ The fetch queue at a glance, read live (one query, not memoised):
 }
 ```
 
+`queued` includes the second looks that follow feed-triggered fetches (`by_priority.recheck`, not
+due until the ecosystem's settle time has passed; see
+[The fetch queue](resolver-internals.md#the-fetch-queue)).
 `urgent` is what a `/resolve` caller is waiting for right now (its deadline has not passed);
 `in_flight` is held by a worker under a live lease; `due` is waiting for a free slot (or for the
 cap its ecosystem is at); `retrying` has failed at least once; `oldest_due_s` is how long the oldest
@@ -238,7 +242,9 @@ fetches, the two modes vouch for a package differently:
     was fetched, so it cannot have missed a change in between (`covered_since` is set when the
     cursor is first initialised);
   - `error` is null — the last attempt to refresh it did not fail;
-  - it has no `fetch_queue` row — no event about it is still waiting to be fetched.
+  - it has no `fetch_queue` row — no event about it is still waiting to be fetched, and no second
+    look: a fetch a feed event triggers is followed by another a few minutes later, because the
+    first may have got the registry's cached previous document.
 
 **`confirmed_at`** is what a package's age is measured from: the latest instant we can show its facts
 matched the registry, in every ecosystem. It is computed, never stored (`PACKAGES_SQL` in

@@ -46,7 +46,8 @@ describe('handleResolve, against a max age', () => {
             {call: 'createPending', until},
             {call: 'markWanted', until},
         ])
-        expect(store.refreshed).toEqual([['pkg:npm/stale']])
+        // The queued one too: a refresh only pulls forward a second look its row may be waiting for.
+        expect(store.refreshed).toEqual([['pkg:npm/refreshing', 'pkg:npm/stale']])
         expect(store.created).toEqual([['pkg:npm/new']])
         expect(store.markedWanted).toEqual([['pkg:npm/others', 'pkg:npm/refreshing']])
     })
@@ -187,7 +188,7 @@ describe('handleResolve, against a max age', () => {
         expect(day.items[0]!.status).toBe('resolved')
     })
 
-    it('does not queue a stale package that is already queued, and waits for that fetch instead', async () => {
+    it('asks for a stale package that is already queued once more, and waits for that fetch', async () => {
         const store = new FakeStore()
         known(store, 'pkg:npm/queued', {confirmed_at: at(48 * HOUR), queued: true})
         const deps = clock(store)
@@ -197,7 +198,10 @@ describe('handleResolve, against a max age', () => {
 
         const sink = await resolve(ask(['pkg:npm/queued'], {deadlineMs: 10_000, maxAgeS: 86_400}), deps)
 
-        expect(store.refreshed).toEqual([])
+        // The refresh's conflict branch makes a second look still ahead due now; it neither counts
+        // as an ask nor touches a fetch that is due or running. The deadline goes by markWanted.
+        expect(store.refreshed).toEqual([['pkg:npm/queued']])
+        expect(store.markedWanted).toEqual([['pkg:npm/queued']])
         expect(sink.item('pkg:npm/queued')!.status).toBe('resolved')
     })
 

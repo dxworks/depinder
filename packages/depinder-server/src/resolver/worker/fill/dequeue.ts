@@ -52,7 +52,7 @@ export function quotas(inFlight: ReadonlyMap<string, number>): Quota[] {
  * [6] The other end of [3]: the pool drains fetch_queue most important first, within each
  * ecosystem's free slots. Most important is a row somebody is waiting for — `wanted_until` still
  * ahead — and of those the one whose caller gives up soonest; then priority, demand and feed 20 >
- * refresh 30 > retry 50; then age.
+ * recheck 25 > refresh 30 > retry 50; then age.
  *
  * Still one statement: each ecosystem offers up to its quota of due rows, best first, and the best
  * `limit` of everything offered are leased. Rows offered but not taken were only locked, and the

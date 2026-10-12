@@ -12,6 +12,8 @@ import type {FeedEvent, FeedResult, FeedSpec} from './types.js'
 
 const REPLICATE_URL = 'https://replicate.npmjs.com'
 const CHANGES_LIMIT = 1000
+/** The registry's CDN caches a packument for up to 300 s (`max-age=300`). */
+const RECHECK_AFTER_MS = 6 * 60_000
 
 interface ChangesResponse {
     results?: {seq?: number | string; id?: string; deleted?: boolean}[]
@@ -22,6 +24,7 @@ interface ChangesResponse {
 export const npmFeed: FeedSpec = {
     mode: 'feed',
     intervalMs: 30_000,
+    recheckAfterMs: RECHECK_AFTER_MS,
 
     /**
      * The head sequence. `since=now` is rejected by replicate.npmjs.com, so the head is read

@@ -99,6 +99,8 @@ function queueRow(packageKey: string, attempts = 0, wantedUntil: Date | null = n
         type: typeOf(packageKey),
         leased: true,
         wanted_until: wantedUntil,
+        feed_event: false,
+        recheck_at: null,
     }
     return row as unknown as Record<string, unknown>
 }

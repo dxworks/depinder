@@ -223,7 +223,7 @@ describe('queueRefresh', () => {
     }
     const events = () => ({queued: vi.fn(), settled: vi.fn(), onSettled: vi.fn(), onQueued: vi.fn(), wanted: vi.fn(), onWanted: vi.fn(), listeners: 0})
 
-    it('queues at refresh priority, in key order, and only keeps the later deadline of a queued row', async () => {
+    it('queues at refresh priority, in key order, and keeps the later deadline of a queued row', async () => {
         const {db, calls} = queryDb()
         const told = events()
         const until = new Date('2026-10-01T12:00:30Z')
@@ -233,10 +233,11 @@ describe('queueRefresh', () => {
         expect(calls).toHaveLength(1)
         expect(calls[0]!.text).toMatch(/insert into fetch_queue/)
         // Not `enqueue`'s conflict branch: a counted ask on a row mid-fetch would fetch it twice.
-        // The deadline is all a conflict changes.
+        // A conflict keeps the later deadline, and makes only a pending second look due now.
         const conflict = calls[0]!.text.slice(calls[0]!.text.indexOf('on conflict'))
-        expect(conflict).toMatch(/do update\s+set wanted_until = greatest\(fetch_queue\.wanted_until,\s*excluded\.wanted_until\)/)
-        expect(conflict).not.toMatch(/requests|priority|next_attempt_at/)
+        expect(conflict).toMatch(/do update\s+set wanted_until\s+= greatest\(fetch_queue\.wanted_until,\s*excluded\.wanted_until\)/)
+        expect(conflict).not.toMatch(/requests|priority/)
+        expect(conflict).toMatch(/when fetch_queue\.recheck_at is not null\s+and fetch_queue\.attempts = 0\s+and not fetch_queue\.leased\s+then least\(fetch_queue\.next_attempt_at, now\(\)\)/)
         expect(calls[0]!.params).toEqual([['pkg:npm/express', 'pkg:npm/react'], PRIORITY.refresh, until])
         expect(told.queued).toHaveBeenCalledTimes(1)
     })

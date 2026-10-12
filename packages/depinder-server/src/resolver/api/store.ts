@@ -20,8 +20,8 @@ export interface ResolveStore {
     createPending(purls: readonly ParsedPurl[], wantedUntil: Date | null): Promise<void>
     /**
      * Queues stale packages at refresh priority, wanted until `wantedUntil`. A package that already
-     * has a queue row keeps its priority, its schedule and its `requests` count; only the later
-     * deadline is kept.
+     * has a queue row keeps its priority, its `requests` count and its schedule, except that a
+     * second look still ahead becomes due now; the later deadline is kept.
      */
     queueRefresh(packageKeys: readonly string[], wantedUntil: Date | null): Promise<void>
     /**
@@ -87,8 +87,9 @@ const VERSIONS_SQL = `select v.package_key,
  * simply by moving on without naming it — but that is written nowhere per package, because it would
  * mean rewriting every row every 30 s. So it is read here, as the feed's `cursor_time`, and only
  * when the feed can be believed about this package: the feed was already running when it was
- * fetched (`covered_since`), its last refresh did not fail, and no event about it is still waiting
- * in the queue. Otherwise the package is as fresh as `as_of` says, no fresher.
+ * fetched (`covered_since`), its last refresh did not fail, and nothing about it is still waiting
+ * in the queue — an event, or the second look that follows a feed-triggered fetch. Otherwise the
+ * package is as fresh as `as_of` says, no fresher.
  *
  * The joins are `left` so that a package is never lost to a missing feed row or a missing queue
  * row: it comes back with `as_of` and `queued = false`.
@@ -193,8 +194,9 @@ export function createResolveStore(db: Db, events?: ResolverEvents): ResolveStor
             if (keys.length === 0) return
             // Not `enqueue`. Its conflict branch counts the ask, and a counted ask on a row that is
             // being fetched right now makes the worker fetch the package a second time. A queued
-            // package already has the refresh this would ask for, so a conflict only keeps the
-            // later deadline.
+            // package already has the refresh this would ask for, so a conflict keeps the later
+            // deadline and does not wait for a second look (`recheck_at`) that is still ahead. A
+            // backoff (`attempts`) and a fetch in flight (`leased`) are left alone.
             const insert = (): Promise<unknown> =>
                 db.query(
                     `insert into fetch_queue (package_key, priority, requested_at, attempts, next_attempt_at,
@@ -202,7 +204,14 @@ export function createResolveStore(db: Db, events?: ResolverEvents): ResolveStor
                      select t.key, $2::int, now(), 0, now(), $3::timestamptz
                      from unnest($1::text[]) as t(key)
                      on conflict (package_key) do update
-                         set wanted_until = greatest(fetch_queue.wanted_until, excluded.wanted_until)`,
+                         set wanted_until    = greatest(fetch_queue.wanted_until, excluded.wanted_until),
+                             next_attempt_at = case
+                                                   when fetch_queue.recheck_at is not null
+                                                       and fetch_queue.attempts = 0
+                                                       and not fetch_queue.leased
+                                                       then least(fetch_queue.next_attempt_at, now())
+                                                   else fetch_queue.next_attempt_at
+                                                   end`,
                     [keys, PRIORITY.refresh, wantedUntil],
                 )
             // As in `createPending`: one statement, rolled back whole, safe to run once more.

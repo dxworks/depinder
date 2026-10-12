@@ -12,10 +12,13 @@ import type {FeedEvent, FeedResult, FeedSpec} from './types.js'
 
 const COMPACT_INDEX_URL = 'https://rubygems.org/versions'
 const SOURCE = 'rubygems.org'
+/** rubygems.org's CDN caches a gem's metadata for up to 60 s. */
+const RECHECK_AFTER_MS = 3 * 60_000
 
 export const gemFeed: FeedSpec = {
     mode: 'feed',
     intervalMs: 120_000,
+    recheckAfterMs: RECHECK_AFTER_MS,
 
     /**
      * The current size of the compact index, in bytes: everything before it is already in the

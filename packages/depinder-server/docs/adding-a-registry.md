@@ -145,6 +145,7 @@ matches what upstream actually offers. See [Freshness](resolver-api.md#freshness
 {
     mode: 'feed'
     intervalMs: number
+    recheckAfterMs: number
     initialCursor(ctx): Promise<string>
     poll(cursor: string, ctx): Promise<FeedResult>
 }
@@ -165,6 +166,11 @@ matches what upstream actually offers. See [Freshness](resolver-api.md#freshness
   either when the feed gives you nothing to base it on; the stored value is then left alone.
 - Intervals in use: npm 30 s, pypi/nuget/composer/golang 60 s, gem 120 s. A feed loop makes its
   first read one interval after boot; the cursor is stored, so a skipped tick costs nothing.
+- `recheckAfterMs` is how long after a feed-triggered fetch the package is fetched once more: that
+  fetch often gets the registry's cached previous document. Make it outlast the registry's cache
+  for the documents the fetcher reads (`Cache-Control: max-age`, or a known index lag), with a
+  margin, in one constant next to the spec. In use: npm 6 min, gem 3, golang 2, nuget 15, pypi and
+  composer 16.
 
 ### `mode: 'poll'` — no change stream (maven, cargo)
 

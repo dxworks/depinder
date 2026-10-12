@@ -104,4 +104,8 @@ export interface FetchQueueRow {
     leased: boolean
     /** Until when a `/resolve` caller waits for this package; urgent while it is in the future. */
     wanted_until: Date | null
+    /** A feed event named the package since its last fetch began; see `enqueueFeedEvents`. */
+    feed_event: boolean
+    /** When the second look after a feed-triggered fetch is due; see `settleQueueRow`. */
+    recheck_at: Date | null
 }

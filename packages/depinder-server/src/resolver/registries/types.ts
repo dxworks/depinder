@@ -49,6 +49,11 @@ export type FeedSpec =
           mode: 'feed'
           /** How often the loop runs. */
           intervalMs: number
+          /**
+           * How long after a feed-triggered fetch the package is fetched once more. That fetch
+           * often gets the registry's cached previous document; this outlasts the cache.
+           */
+          recheckAfterMs: number
           /** Cursor to start from when nothing is stored yet: the current head, not the beginning. */
           initialCursor(ctx: FetchContext): Promise<string>
           poll(cursor: string, ctx: FetchContext): Promise<FeedResult>

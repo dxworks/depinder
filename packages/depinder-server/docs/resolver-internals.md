@@ -82,6 +82,7 @@ only ever add rows to it; the demand-fill worker is the only thing that fetches.
   |---|---|
   | urgent | a caller is waiting; the soonest deadline first |
   | 20 | asked for, its caller gone (`demand`) — level with news from a feed (`feed`) |
+  | 25 | the second look after a feed-triggered fetch, once due (`recheck`) |
   | 30 | a stale package nobody waits for (`refresh`) |
   | 50 | a retry (`retry`) |
   | 100 | feed polls and poll-sweep checks, which look for news rather than fetch it (limiters only) |
@@ -99,6 +100,16 @@ only ever add rows to it; the demand-fill worker is the only thing that fetches.
   that every 30 s for as long as the fetch runs. A live fetch never loses its row; a worker that
   died gives its rows back after 2 minutes. Any number of workers can share the queue
   (`FOR UPDATE SKIP LOCKED`).
+- **A second look after every feed event.** A fetch a change feed triggered often gets the
+  registry's cached previous document (npm's CDN `max-age=300`, NuGet's registration lagging its
+  catalog by minutes), so it does not drop its row: the row waits the ecosystem's `recheckAfterMs`
+  (npm 6 min, gem 3, golang 2, nuget 15, pypi and composer 16; next to each feed spec) and is fetched
+  once more. `feed_event` marks a row a feed asked for, and the fetch that answers it clears the
+  flag and sets `recheck_at`; the second look then drops the row unless a new event set the flag
+  again meanwhile. While the row waits, the feed does not vouch for the package (`confirmed_at` is
+  `as_of`). A request that finds the package fresh enough is answered at once; one that needs it
+  refetched makes the row due now (`queueRefresh`), and that fetch hands the row back to
+  `recheck_at`. Polls (maven, cargo) and giving up after three attempts owe no second look.
 - **Retries.** A failed fetch backs off 30 s, then 2 min, and after three attempts the package is
   marked `error` (keeping any good data it had). The sweeper re-queues it an hour later, and
   `not_found` a day later.

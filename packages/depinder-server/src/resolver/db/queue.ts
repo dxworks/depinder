@@ -12,14 +12,16 @@ import type {Queryable} from './db.js'
  * Urgency is not one of them. A package somebody is waiting for right now is urgent because of its
  * `wanted_until` — the deadline of the `/resolve` that asked — and outranks every one of these
  * until that deadline passes; see `dequeue`. After that nobody is waiting, and what is left is
- * this order: something asked for, or news from a feed, before the refresh of a package a request
- * found stale, before a scheduled retry. An ask whose caller has stopped waiting is worth exactly
- * what a feed event is — both are a known reason to fetch — while a stale package may well not
- * have changed at all, and its caller already has its last facts.
+ * this order: something asked for, or news from a feed, before the second look that follows a
+ * feed-triggered fetch, before the refresh of a package a request found stale, before a scheduled
+ * retry. An ask whose caller has stopped waiting is worth exactly what a feed event is — both are a
+ * known reason to fetch — while a stale package may well not have changed at all, and its caller
+ * already has its last facts.
  */
 export const PRIORITY = {
     demand: 20,
     feed: 20,
+    recheck: 25,
     refresh: 30,
     retry: 50,
 } as const
@@ -50,18 +52,39 @@ export async function enqueue(
     priority: number,
     wantedUntil: Date | null = null,
 ): Promise<void> {
+    await insertQueueRows(db, packageKeys, priority, wantedUntil, false)
+}
+
+/**
+ * Queues the packages a change feed named, as {@link enqueue} does at feed priority, and marks each
+ * row `feed_event`: the fetch that answers it schedules a second look once the ecosystem's settle
+ * time has passed, since the registry may still have served its cached previous document. A row
+ * waiting for such a look keeps its schedule, and the look then schedules another.
+ */
+export async function enqueueFeedEvents(db: Queryable, packageKeys: readonly string[]): Promise<void> {
+    await insertQueueRows(db, packageKeys, PRIORITY.feed, null, true)
+}
+
+async function insertQueueRows(
+    db: Queryable,
+    packageKeys: readonly string[],
+    priority: number,
+    wantedUntil: Date | null,
+    feedEvent: boolean,
+): Promise<void> {
     const keys = sortedUnique(packageKeys)
     if (keys.length === 0) return
     await db.query(
-        `insert into fetch_queue (package_key, priority, requested_at, attempts, next_attempt_at, wanted_until)
-         select t.key, $2::int, now(), 0, now(), $3::timestamptz
+        `insert into fetch_queue (package_key, priority, requested_at, attempts, next_attempt_at, wanted_until, feed_event)
+         select t.key, $2::int, now(), 0, now(), $3::timestamptz, $4::boolean
          from unnest($1::text[]) as t(key)
          on conflict (package_key) do update
              set priority     = least(fetch_queue.priority, excluded.priority),
                  requested_at = least(fetch_queue.requested_at, excluded.requested_at),
                  requests     = fetch_queue.requests + 1,
-                 wanted_until = greatest(fetch_queue.wanted_until, excluded.wanted_until)`,
-        [keys, priority, wantedUntil],
+                 wanted_until = greatest(fetch_queue.wanted_until, excluded.wanted_until),
+                 feed_event   = fetch_queue.feed_event or excluded.feed_event`,
+        [keys, priority, wantedUntil, feedEvent],
     )
 }
 

@@ -28,4 +28,10 @@ export const registries: Record<string, Registry> = Object.fromEntries(
     Object.entries(feeds).map(([type, feed]) => [type, {type, feed}]),
 )
 
+/** How long after a feed-triggered fetch of a `type` package its second look comes. 0 in poll mode. */
+export function recheckAfterMs(type: string): number {
+    const feed = registries[type]?.feed
+    return feed?.mode === 'feed' ? feed.recheckAfterMs : 0
+}
+
 export * from './types.js'

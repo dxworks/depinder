@@ -5,6 +5,8 @@ import type {FetchRecord} from '../../registries/http.js'
 import {distinctVersions, type Logger, type ParsedPurl, type ResolvedPackage} from '@depinder/core'
 import type {FetchQueueRow} from '../../db/rows.js'
 import {insertFetchLog} from '../../db/fetch-log.js'
+import {PRIORITY} from '../../db/queue.js'
+import {recheckAfterMs} from '../../registries/index.js'
 import {chunk} from '../loop.js'
 
 /**
@@ -56,12 +58,13 @@ export async function writeResult(
     records: readonly FetchRecord[],
     fetchedAt: Date,
 ): Promise<void> {
+    const recheckAfterS = recheckAfterMs(key.type) / 1000
     await job.db.withTransaction(async tx => {
         if (!fetched) {
-            await markNotFound(tx, key, fetchedAt, row.requests)
+            await markNotFound(tx, key, fetchedAt, row.requests, recheckAfterS)
         } else {
             const source = fetched.sources.join(', ')
-            await upsertResolved(tx, key, fetched, source, fetchedAt, row.requests)
+            await upsertResolved(tx, key, fetched, source, fetchedAt, row.requests, recheckAfterS)
             await replaceVersions(tx, key, fetched)
         }
         await insertFetchLog(tx, key.packageKey, records)
@@ -73,28 +76,64 @@ export async function writeResult(
 }
 
 /**
- * The tail every package write ends in: the queue row goes, unless somebody asked for the package
- * again after it was dequeued — a feed event, a poll, a request — in which case it stays and is
- * made due at once, because this fetch may have been too early to see what they were told about.
- * `enqueue` counts every ask in `requests`, so "again" is the count having moved. The two halves
- * are disjoint, so they can share a statement.
+ * The tail every package write ends in. The queue row goes, unless:
  *
- * `$1` is the package key; `requests` names the parameter holding the count that was dequeued.
+ *  - somebody asked for the package again after it was dequeued — a feed event, a poll, a request.
+ *    The row stays and is due at once, because this fetch may have been too early to see what they
+ *    were told about. `enqueue` counts every ask in `requests`, so "again" is the count having moved;
+ *  - a second look is owed (only with `recheckAfter`). A feed event triggered this fetch, which may
+ *    have got the registry's cached previous document, so the row waits `recheckAfter` seconds and
+ *    runs once more; or this was a request's fetch that jumped a second look still ahead, and the
+ *    row goes back to waiting for it.
+ *
+ * The branches are disjoint, so they can share a statement. `$1` is the package key; `requests`
+ * names the parameter holding the count that was dequeued, `recheckAfter` the settle time's.
  */
-export function settleQueueRow(requests: string): string {
-    return `done as (delete from fetch_queue
-                     where package_key = $1
-                       and requests = ${requests}::int)
-         update fetch_queue
+export function settleQueueRow(requests: string, recheckAfter?: string): string {
+    const unchanged = `package_key = $1 and requests = ${requests}::int`
+    const askedAgain = `update fetch_queue
          set next_attempt_at = now(),
              attempts        = 0,
              leased          = false
          where package_key = $1
            and requests <> ${requests}::int`
+    if (!recheckAfter) return `done as (delete from fetch_queue where ${unchanged}) ${askedAgain}`
+
+    const lookAt = `now() + make_interval(secs => ${recheckAfter}::double precision)`
+    return `done as (delete from fetch_queue
+                     where ${unchanged}
+                       and not feed_event
+                       and (recheck_at is null or recheck_at <= now())),
+         scheduled as (update fetch_queue
+                       set recheck_at      = ${lookAt},
+                           next_attempt_at = ${lookAt},
+                           requested_at    = ${lookAt},
+                           priority        = ${PRIORITY.recheck},
+                           feed_event      = false,
+                           wanted_until    = null,
+                           attempts        = 0,
+                           leased          = false
+                       where ${unchanged}
+                         and feed_event),
+         resumed as (update fetch_queue
+                     set next_attempt_at = recheck_at,
+                         wanted_until    = null,
+                         attempts        = 0,
+                         leased          = false
+                     where ${unchanged}
+                       and not feed_event
+                       and recheck_at > now())
+         ${askedAgain}`
 }
 
 /** The package row, and with it the queue row that asked for it. */
-async function markNotFound(tx: Queryable, key: ParsedPurl, fetchedAt: Date, requests: number): Promise<void> {
+async function markNotFound(
+    tx: Queryable,
+    key: ParsedPurl,
+    fetchedAt: Date,
+    requests: number,
+    recheckAfterS: number,
+): Promise<void> {
     await tx.query(
         `with saved as (
              insert into package (package_key, type, namespace, name, status, error, fetched_at, as_of, next_retry_at)
@@ -105,8 +144,8 @@ async function markNotFound(tx: Queryable, key: ParsedPurl, fetchedAt: Date, req
                          fetched_at    = excluded.fetched_at,
                          as_of         = excluded.as_of,
                          next_retry_at = excluded.next_retry_at),
-         ${settleQueueRow('$6')}`,
-        [key.packageKey, key.type, key.namespace, key.name, fetchedAt, requests],
+         ${settleQueueRow('$6', '$7')}`,
+        [key.packageKey, key.type, key.namespace, key.name, fetchedAt, requests, recheckAfterS],
     )
 }
 
@@ -118,6 +157,7 @@ async function upsertResolved(
     source: string,
     fetchedAt: Date,
     requests: number,
+    recheckAfterS: number,
 ): Promise<void> {
     await tx.query(
         `with saved as (
@@ -139,7 +179,7 @@ async function upsertResolved(
                          as_of                     = excluded.as_of,
                          -- A registry that knows its facts are incomplete asks to be fetched again.
                          next_retry_at             = excluded.next_retry_at),
-         ${settleQueueRow('$13')}`,
+         ${settleQueueRow('$13', '$15')}`,
         [
             key.packageKey,
             key.type,
@@ -155,6 +195,7 @@ async function upsertResolved(
             fetchedAt,
             requests,
             fetched.recheckAt ?? null,
+            recheckAfterS,
         ],
     )
 }

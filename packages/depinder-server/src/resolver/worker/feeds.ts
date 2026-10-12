@@ -2,7 +2,7 @@ import type {Config} from '../config.js'
 import type {Db} from '../db/db.js'
 import {createRegistryClient, type FetchRecord} from '../registries/http.js'
 import {errorMessage, parsePurl, type FetchContext, type Logger} from '@depinder/core'
-import {enqueue, PRIORITY} from '../db/queue.js'
+import {enqueue, enqueueFeedEvents, PRIORITY} from '../db/queue.js'
 import {registries} from '../registries/index.js'
 import type {FeedSpec, Registry} from '../registries/types.js'
 import {insertFetchLog} from '../db/fetch-log.js'
@@ -12,7 +12,8 @@ import {startLoop, type Loop} from './loop.js'
  * Keeping stored packages fresh (A5, A6). One loop per implemented ecosystem, in one of two modes:
  *
  *  - `feed`: the registry publishes a change stream with a cursor. We read from the stored cursor,
- *    keep the events that name a package we track, queue those, and advance the cursor.
+ *    keep the events that name a package we track, queue those, and advance the cursor. Each of
+ *    those fetches is followed by a second look after the registry's `recheckAfterMs`.
  *  - `poll`: the registry has no feed (maven, cargo). We walk our own tracked packages and make a
  *    conditional GET per package; a 200 means something changed and the package is re-queued, and
  *    a 304 vouches for the package, moving its `as_of` up to the time of the check. The first
@@ -156,7 +157,8 @@ async function runCursorFeed(
     const stored = await storedPackages(db, keys)
 
     await db.withTransaction(async tx => {
-        await enqueue(tx, stored, PRIORITY.feed)
+        // Each fetch these trigger is followed by a second look: see `enqueueFeedEvents`.
+        await enqueueFeedEvents(tx, stored)
         await tx.query(
             `update registry_feed
              set cursor             = $2,

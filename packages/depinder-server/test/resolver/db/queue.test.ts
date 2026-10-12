@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest'
 import type {Queryable} from '../../../src/resolver/db/db.js'
-import {enqueue, PRIORITY, sortedUnique} from '../../../src/resolver/db/queue.js'
+import {enqueue, enqueueFeedEvents, PRIORITY, sortedUnique} from '../../../src/resolver/db/queue.js'
 
 /**
  * The SQL itself belongs to `db.integration.test.ts`. What matters here is the array the statement
@@ -69,5 +69,20 @@ describe('enqueue', () => {
         const {db, calls} = recordingDb()
         await enqueue(db, [], PRIORITY.demand)
         expect(calls).toEqual([])
+    })
+
+    it('owes no second look: only a change feed\'s events do', async () => {
+        const {db, calls} = recordingDb()
+        await enqueue(db, ['pkg:maven/g/a'], PRIORITY.feed)
+        await enqueueFeedEvents(db, ['pkg:npm/b', 'pkg:npm/a'])
+        expect(calls[0]!.params[3]).toBe(false)
+        expect(calls[1]!.params).toEqual([['pkg:npm/a', 'pkg:npm/b'], PRIORITY.feed, null, true])
+        // A conflict keeps a feed event already waiting, whoever asks next.
+        expect(calls[1]!.text).toMatch(/feed_event\s+= fetch_queue\.feed_event or excluded\.feed_event/)
+    })
+
+    it('ranks a second look after news, before a refresh', () => {
+        expect(PRIORITY.feed).toBeLessThan(PRIORITY.recheck)
+        expect(PRIORITY.recheck).toBeLessThan(PRIORITY.refresh)
     })
 })

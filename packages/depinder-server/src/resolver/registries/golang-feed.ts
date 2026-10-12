@@ -9,6 +9,8 @@ import type {FeedEvent, FeedResult, FeedSpec} from './types.js'
 
 const INDEX_URL = 'https://index.golang.org/index'
 const INDEX_LIMIT = 2000
+/** proxy.golang.org answers `@v/list` and `@latest` with `max-age=60`. */
+const RECHECK_AFTER_MS = 2 * 60_000
 
 interface IndexRow {
     Path?: string
@@ -19,6 +21,7 @@ interface IndexRow {
 export const golangFeed: FeedSpec = {
     mode: 'feed',
     intervalMs: 60_000,
+    recheckAfterMs: RECHECK_AFTER_MS,
 
     /** The index is addressed by time, so the head is simply "now". */
     async initialCursor(): Promise<string> {
