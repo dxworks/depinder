@@ -17,7 +17,8 @@
       "!{projectRoot}/test/**/*",
       "!{projectRoot}/docs/**/*",
       "!{projectRoot}/vitest.config.*",
-      "!{projectRoot}/eslint.config.*"
+      "!{projectRoot}/eslint.config.*",
+      "!{projectRoot}/scripts/**/*"
     ],
     "testFixtures": [
       "{projectRoot}/test/fixtures/**/*"

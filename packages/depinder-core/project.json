@@ -4,17 +4,6 @@
   "projectType": "library",
   "sourceRoot": "packages/depinder-core/src",
   "tags": ["scope:shared"],
-  "namedInputs": {
-    "production": [
-      "default",
-      "!{projectRoot}/scripts/**/*",
-      "!{projectRoot}/__tests__/**/*",
-      "!{projectRoot}/test/**/*",
-      "!{projectRoot}/docs/**/*",
-      "!{projectRoot}/vitest.config.*",
-      "!{projectRoot}/eslint.config.*"
-    ]
-  },
   "targets": {
     "build": {
       "executor": "nx:run-script",
