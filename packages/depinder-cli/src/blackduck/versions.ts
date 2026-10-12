@@ -1,4 +1,4 @@
-import {availableVersions, LibraryInfo} from '../extension-points/library-info'
+import {availableVersions, LibraryInfo, usedVersionTimestamp} from '../extension-points/library-info'
 import {VersionComparator} from '../vuln-sources/github/versions'
 
 type RegistryVersion = LibraryInfo['versions'][number]
@@ -20,7 +20,7 @@ type RegistryVersion = LibraryInfo['versions'][number]
  *
  * Empty, not `0`, when the registry had no answer -- "we do not know" and "you are current" are
  * different statements, and Black Duck's column distinguishes them too. `byDate` is also empty when
- * the resolved version is not in the registry's list or carries no release date, because a count
+ * the resolved version has no known release date (see `usedVersionTimestamp`), because a count
  * against an unknown date would be a guess.
  *
  * A yanked version is looked up as the resolved one (a project can be pinned to it) but never
@@ -30,8 +30,7 @@ export function newerVersionCounts(
     versions: RegistryVersion[], currentVersion: string, compare: VersionComparator,
 ): {byDate: string, bySemver: string} {
     if (versions.length === 0) return {byDate: '', bySemver: ''}
-    const current = versions.find(it => it.version === currentVersion.trim())
-    const released = current?.timestamp
+    const released = usedVersionTimestamp(versions, currentVersion)
     const candidates = availableVersions(versions)
     return {
         byDate: released

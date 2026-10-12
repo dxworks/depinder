@@ -1,6 +1,6 @@
 {
   "files": {
-    "packages/depinder-cli/src/commands/analyse.ts": 707,
+    "packages/depinder-cli/src/commands/analyse.ts": 705,
     "packages/depinder-cli/src/plugins/sbom/cyclonedx.ts": 641,
     "packages/depinder-cli/src/blackduck/licenses.ts": 507,
     "packages/depinder-cli/src/blackduck/export.ts": 489,

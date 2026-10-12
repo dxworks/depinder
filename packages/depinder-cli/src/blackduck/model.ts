@@ -1,6 +1,6 @@
 import {isPrerelease} from '@depinder/core'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
-import {availableVersions} from '../extension-points/library-info'
+import {availableVersions, usedVersionTimestamp} from '../extension-points/library-info'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {ecosystemForPurlType} from '../vuln-sources/github/ecosystems'
 import {comparatorFor, VersionComparator} from '../vuln-sources/github/versions'
@@ -40,7 +40,7 @@ export interface ExportComponent {
     matchType: MatchType
     /** SPDX ids as the registry reported them; `licenses.ts` turns them into BD's two columns. */
     licenses: string[]
-    /** ISO `YYYY-MM-DD`, from the registry's timestamp for this exact version. */
+    /** ISO `YYYY-MM-DD`, when this exact version was released (see `usedVersionTimestamp`). */
     releaseDate: string
     /** Versions released after this one -- Black Duck's count, see `newerVersionCounts`. */
     newerVersions: string
@@ -207,7 +207,7 @@ function toComponent(origin: Origin, purlType: string, id: string, dependency: D
         originId: id,
         matchType: 'Transitive Dependency',
         licenses: preferredLicenses(versionLicenses, libraryLicenses),
-        releaseDate: isoDate(current?.timestamp),
+        releaseDate: isoDate(usedVersionTimestamp(versions, dependency.version)),
         newerVersions: newer.byDate,
         newerVersionsSemver: newer.bySemver,
         homepageUrl: library?.homepageUrl || undefined,

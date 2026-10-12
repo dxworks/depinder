@@ -111,6 +111,11 @@ describe('convertDepToRow', () => {
             expect([cells[5], cells[7], cells[8]]).toEqual(['', '', ''])
         })
 
+        it('dates a Go pseudo-version the registry does not list from its commit time', () => {
+            const cells = cellsOf(dependency({version: 'v0.0.0-20200410095643-abcdef123456', libraryInfo: versions({})}))
+            expect([cells[5], cells[6], cells[7]]).toEqual(['Apr 2020', 'Mar 2021', '11'])
+        })
+
         it('writes every date column blank when nothing is known', () => {
             const cells = cellsOf(dependency())
             expect(DATES.map(it => cells[it])).toEqual(['', '', '', '', ''])

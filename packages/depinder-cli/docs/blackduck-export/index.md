@@ -50,7 +50,7 @@ command wrote it:
 | `Usage` | — | `DYNAMICALLY_LINKED` |
 | `Operational Risk` | date + newer versions | `OK` / `LOW` / `MEDIUM` / `HIGH` — see [risk](#risk-columns) |
 | Vulnerability counts | findings | Per severity, blank when zero; `Total` is every finding; `Critical and High` is the sum of those two. The run warns how many findings had no recognised severity |
-| `Release Date` | registry | `\tYYYY-MM-DD` |
+| `Release Date` | registry | `\tYYYY-MM-DD`. Go pseudo-versions, which the proxy never lists: the commit time they carry |
 | `Newer Versions` | registry | Versions **published after** the installed one, Black Duck's rule. The count by version number is in `_component_versions.csv` |
 | `Component Link` | registry | Declared project homepage, per component. Empty when none, as Black Duck. Go: derived from the module path |
 | `Path` | `dependsOn` | `<project>/-<pm>/<name>/<version>/…` — see [paths](#paths) |

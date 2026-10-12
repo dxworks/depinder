@@ -9,7 +9,7 @@ import {scannerSummaryLine} from '../plugins/sbom/preflight-messages'
 import {writeScanProvenance} from '../plugins/sbom/scan-provenance'
 import {ScannerPreflight} from '../plugins/sbom/scanner-preflight'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
-import {availableVersions, LibraryInfo} from '../extension-points/library-info'
+import {availableVersions, LibraryInfo, usedVersionTimestamp} from '../extension-points/library-info'
 import {attachGithubAdvisories} from '../utils/library-advisories'
 import {Range} from 'semver'
 import _ from 'lodash'
@@ -156,9 +156,8 @@ const NO_DEPENDENCY_SCOPE = ''
 
 export function convertDepToRow(proj: DepinderProject, dep: DepinderDependency): string {
     const latestVersion = dep.libraryInfo?.versions.find(it => it.latest)
-    const currentVersion = dep.libraryInfo?.versions.find(it => it.version == dep.version.trim())
     const latestVersionMoment = releaseMoment(latestVersion?.timestamp)
-    const currentVersionMoment = releaseMoment(currentVersion?.timestamp)
+    const currentVersionMoment = releaseMoment(usedVersionTimestamp(dep.libraryInfo?.versions, dep.version))
     const now = moment(reportNow())
 
     const dateFormat = 'MMM YYYY'
@@ -650,9 +649,8 @@ export async function runAnalysis(
         fs.writeFileSync(path.resolve(resultFolder, `${plugin.name}-project-stats.csv`), projectStatsHeader + projects.map(proj => {
             const enhancedDeps: DependencyInfo[] = Object.values(proj.dependencies).map(dep => {
                 const latestVersion = dep.libraryInfo?.versions.find(it => it.latest)
-                const currentVersion = dep.libraryInfo?.versions.find(it => it.version == dep.version.trim())
                 const latestVersionMoment = releaseMoment(latestVersion?.timestamp)
-                const currentVersionMoment = releaseMoment(currentVersion?.timestamp)
+                const currentVersionMoment = releaseMoment(usedVersionTimestamp(dep.libraryInfo?.versions, dep.version))
                 const now = moment(reportNow())
                 const directDep: boolean = !dep.requestedBy || dep.requestedBy.some(it => it.startsWith(`${proj.name}@${proj.version}`))
 

@@ -1,3 +1,4 @@
+import {pseudoVersionTime} from '@depinder/core'
 import {Vulnerability} from './vulnerability-checker'
 
 /** What depinder knows about one library, as the local cache stores it and the reports read it. */
@@ -22,6 +23,17 @@ interface LibraryVersion {
 /** The versions a project could move to: every version the registry has not withdrawn. */
 export function availableVersions<T extends {yanked?: boolean}>(versions: T[]): T[] {
     return versions.filter(it => !it.yanked)
+}
+
+/**
+ * When the version a project uses was released: the registry's date for it, or, for a Go
+ * pseudo-version the proxy never lists, the commit time the version string carries. `undefined` or
+ * `NaN` when neither is known.
+ */
+export function usedVersionTimestamp(versions: LibraryVersion[] | undefined, version: string): number | undefined {
+    const listed = versions?.find(it => it.version === version.trim())?.timestamp
+    if (listed !== undefined && Number.isFinite(listed)) return listed
+    return pseudoVersionTime(version.trim())?.getTime() ?? listed
 }
 
 export interface LibraryInfo {
