@@ -2,7 +2,7 @@
  * The "today" a report is written for: the Now-Used and Now-latest columns, the Out of Support
  * counts and Black Duck's Operational Risk all measure age from it.
  *
- * `DEPINDER_REPORT_NOW` fixes it, so tests and the bench get CSVs that do not change by themselves
+ * `DEPINDER_REPORT_NOW` fixes it, so tests and repeated runs get CSVs that do not change by themselves
  * over time. It moves nothing else: cache freshness, the resolver's `max_age`, logs and folder
  * names keep reading the real clock.
  */

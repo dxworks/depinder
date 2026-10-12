@@ -1,4 +1,4 @@
-// What another workspace project may drive in-process (the parity tests): the api, one fill pass,
+// What another workspace project may drive in-process: the api, one fill pass,
 // and the database it needs. The running server never imports this file.
 
 export {createServer} from './api/server.js'

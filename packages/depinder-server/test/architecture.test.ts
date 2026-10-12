@@ -3,7 +3,8 @@ import {dirname, join, relative, resolve, sep} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {describe, expect, it} from 'vitest'
 
-// The layout rule from CLAUDE.md, checked. Nx tags do not police folders inside one project.
+// The server's import rule, checked: `shared` <- `resolver`, `shared` <- `vuln`, never `vuln` ->
+// `resolver`. Nx tags do not police folders inside one project.
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 // `from '…'`, `import '…'`, `import('…')`, `require('…')`; `export … from` is covered by `from`.

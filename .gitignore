@@ -140,6 +140,8 @@ results-*
 # MkDocs output of the docs target
 site/
 
-# Bench run folders (logs, CSVs, SQLite caches)
-/bench/runs/
+# Local-only tools and agent notes
+/bench/
+/packages/parity/
+CLAUDE.md
 .DS_Store

@@ -6,7 +6,7 @@ import {listFixtureCases, replayFetch, UnrecordedRequestError} from '../src/test
 import {testContext} from './registries/registry.helpers.js'
 
 // Every recorded case replays through the real fetchPackage with nothing but its own answers,
-// which proves each case is complete before the parity test relies on it.
+// which proves each case is complete.
 
 const CASES_DIR = fileURLToPath(new URL('./fixtures/cases/', import.meta.url))
 const cases = listFixtureCases(CASES_DIR)

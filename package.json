@@ -9,17 +9,14 @@
   },
   "workspaces": [
     "packages/*",
-    "bench"
+    "!packages/parity"
   ],
   "scripts": {
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",
     "lint": "nx run-many -t lint",
     "typecheck": "nx run-many -t typecheck",
-    "check": "nx run-many -t typecheck lint test build size-guard dependency-check knip",
-    "bench": "tsx bench/run.ts",
-    "bench:compare": "tsx bench/compare.ts",
-    "bench:reset": "tsx bench/reset.ts"
+    "check": "nx run-many -t typecheck lint test build size-guard dependency-check knip"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
@@ -29,7 +26,6 @@
     "eslint": "^9.0.0",
     "knip": "6.41.0",
     "nx": "23.2.1",
-    "tsx": "^4.19.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.0.0",
     "vitest": "^5.0.3"

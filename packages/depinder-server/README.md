@@ -74,7 +74,6 @@ at the deadline.
 - [docs/vuln-server.md](docs/vuln-server.md) — the vulnerability server (`ROLE=vuln`)
 - [docs/configuration.md](docs/configuration.md) — environment variables, Docker
 - [docs/development.md](docs/development.md) — tests, integration tests, typecheck, build
-- [docs/benchmarks.md](docs/benchmarks.md) — where the end-to-end bench lives
 - [docs/adding-a-registry.md](docs/adding-a-registry.md) — the contract every registry holds to
 - The dev database: bring your own Postgres (`DATABASE_URL` in your local env file), or ask Alex
   for access to the shared dev database

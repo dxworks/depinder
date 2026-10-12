@@ -78,7 +78,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // request, so 0 (off) changes nothing but the number of queries.
     const payloadCacheMaxPackages = int(env, 'PAYLOAD_CACHE_MAX_PACKAGES', 50_000, 0)
 
-    // The log is provenance for debugging and the bench, which reads only its own run's window.
+    // The log is provenance for debugging, read by time window.
     const fetchLogRetentionDays = int(env, 'FETCH_LOG_RETENTION_DAYS', 3, 1, 365)
 
     return {

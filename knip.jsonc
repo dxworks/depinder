@@ -1,8 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
   // Entries knip already finds are not repeated here: package.json bin, exports and scripts (core's
-  // index, ./testing and recorder, the server's main.ts and ./in-process, the CLI's ./fallback, the
-  // root's bench scripts), plus the vitest and eslint configs and test files of every package.
+  // index, ./testing and recorder, the server's main.ts and ./in-process, the CLI's ./fallback),
+  // plus the vitest and eslint configs and test files of every package.
   "workspaces": {
     // The root workspace also holds tools/workspace-checks, which has no package.json.
     ".": {

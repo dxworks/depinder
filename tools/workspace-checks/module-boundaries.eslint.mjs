@@ -1,6 +1,5 @@
 // The import rules between projects, enforced by Nx from the project tags: core imports only core;
-// the CLI and the server import core, never each other; only the parity tests import all three;
-// the bench and the tooling import no project.
+// the CLI and the server import core, never each other; the tooling imports no project.
 import nx from '@nx/eslint-plugin'
 import tseslint from 'typescript-eslint'
 
@@ -8,14 +7,12 @@ const DEP_CONSTRAINTS = [
     {sourceTag: 'scope:shared', onlyDependOnLibsWithTags: ['scope:shared']},
     {sourceTag: 'scope:client', onlyDependOnLibsWithTags: ['scope:shared', 'scope:client']},
     {sourceTag: 'scope:server', onlyDependOnLibsWithTags: ['scope:shared', 'scope:server']},
-    {sourceTag: 'scope:test', onlyDependOnLibsWithTags: ['scope:shared', 'scope:client', 'scope:server', 'scope:test']},
-    {sourceTag: 'scope:bench', onlyDependOnLibsWithTags: ['scope:bench']},
     {sourceTag: 'scope:tooling', onlyDependOnLibsWithTags: ['scope:tooling']},
 ]
 
 /**
  * `files` are globs relative to the project folder that lints them. `appImports` are the import
- * paths of an app this project may use anyway; Nx forbids importing apps, and only parity may.
+ * paths of an app this project may use anyway; Nx forbids importing apps.
  */
 export function moduleBoundariesConfig(files, appImports = []) {
     return [

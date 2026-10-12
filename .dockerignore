@@ -1,5 +1,5 @@
 # Build context of packages/depinder-server/Dockerfile, which is the monorepo root: an allowlist,
-# so env files, node_modules, bench runs and the other projects' sources never reach the image.
+# so env files, node_modules and the other projects' sources never reach the image.
 *
 !package.json
 !package-lock.json
