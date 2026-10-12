@@ -41,6 +41,31 @@ describe('isPrerelease', () => {
     }
 })
 
+describe('isPrerelease for maven qualifiers', () => {
+    const prereleases = [
+        '1.1.0-nightly', '1.1.0-NIGHTLY', '2.0-canary', '2.0-canary.3', '3.0-unstable', '4.0.0-next',
+        '4.0.0-next.2', '1.90.0-insiders', '0.9-experimental', '1.0-pre', '1.0.0-pre1', '1.0-pre.2',
+        '1.0_nightly', '1.0-a1', '1.0-A1', '2.0.b2', '1.0a1', '2.3.0-b170201.1204', '1.0-b12_jdk8',
+    ]
+    const stable = [
+        '1.0-java11', '2.0-scala2.13', '32.1.2-jre', '32.1.2-android', '2.0.1.MR', '5.6.15.Final',
+        '1.0-context', '1.0-nextgen', '1.0-presto', '1.0-spree', '1.0-a', '1.0-ab12', '1.0-b12cd',
+        '1.0-insider', '1.0-1', '4.18.2',
+    ]
+
+    it.each(prereleases)('%s is a pre-release', version => {
+        expect(isPrerelease('maven', version)).toBe(true)
+    })
+
+    it.each(stable)('%s is a release', version => {
+        expect(isPrerelease('maven', version)).toBe(false)
+    })
+
+    it.each(['1.1.0.pre1', '2.0.nightly', '1.0.b2'])('applies to maven only: gem %s stays a release', version => {
+        expect(isPrerelease('gem', version)).toBe(false)
+    })
+})
+
 function v(version: string, releasedAt: string | null, extra: Partial<VersionLike> = {}): VersionLike {
     return {
         version,

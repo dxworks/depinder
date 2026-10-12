@@ -8,7 +8,7 @@ import {toLibraryInfo} from '../src/resolver/adapter'
 
 /**
  * Upgrade guidance skips a pre-release by the flag the resolver ships (core's `isPrerelease`),
- * not by a rule of its own. The cases are the ones where the CLI's former keyword rule disagreed.
+ * not by a rule of its own.
  */
 
 const finding: Vulnerability = {
@@ -49,10 +49,13 @@ describe('the pre-release rule upgrade guidance uses', () => {
         expect(fromResolver('npm', ['1.0.0', '1.0.1', '2.0.0-0']).longTerm).toBe('1.0.1')
     })
 
-    it.each(['nightly', 'canary', 'unstable'])('counts maven -%s as stable, as the resolver does', qualifier => {
+    it.each(['nightly', 'canary', 'unstable', 'next', 'a1', 'b2'])('skips maven -%s, as the resolver does', qualifier => {
         const guidance = fromResolver('maven', ['1.0.0', '1.0.1', `1.1.0-${qualifier}`])
-        expect(guidance.shortTerm).toBe(`1.1.0-${qualifier}`)
-        expect(guidance.longTerm).toBe(`1.1.0-${qualifier}`)
+        expect(guidance.longTerm).toBe('1.0.1')
+    })
+
+    it('recommends a maven flavour such as -java11', () => {
+        expect(fromResolver('maven', ['1.0.0', '1.0.1', '1.1.0-java11']).longTerm).toBe('1.1.0-java11')
     })
 
     it('trusts the flag over the version string', () => {

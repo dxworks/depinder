@@ -45,6 +45,14 @@ const PRERELEASE_KEYWORD = /(alpha|beta|rc|milestone|snapshot|preview|dev|m\d+|c
 /** A semver core followed by a `-pre.release` part (build metadata stripped first). */
 const SEMVER_PRERELEASE = /^\d+(\.\d+){0,2}-[0-9A-Za-z.-]+$/
 
+/**
+ * Maven qualifiers that name a pre-release beyond the keyword rule, each matched as a whole part
+ * (bounded by `-`, `.`, `_`, a digit run or the ends) so `java11` or `1.0-context` never match.
+ * `a1` / `b2` are `ComparableVersion`'s short forms of alpha and beta.
+ */
+const MAVEN_PRERELEASE_QUALIFIER =
+    /(?:^|[.\-_]|\d)(?:(?:nightly|canary|unstable|next|insiders|experimental|pre)(?=$|[.\-_]|\d)|[ab]\d+(?=$|[.\-_]))/i
+
 /** PEP 440 pre-release and developmental-release segments: `1.0a1`, `2.0.0rc2`, `1.0.0.dev3`. */
 const PEP440_PRERELEASE = /(?:^|[.\-_]|\d)(a|b|c|rc|alpha|beta|pre|preview|dev)[.\-_]?\d*$/i
 
@@ -57,7 +65,8 @@ const VERSION_ORDERED = new Set(['nuget', 'composer'])
  * Two ecosystem carve-outs:
  *  - maven is exempt from the semver rule, because `-` there separates a qualifier rather than a
  *    pre-release tag: `32.1.2-jre` and `32.1.2-android` are guava's two shipping flavours, not
- *    release candidates. Maven still gets the keyword rule, which catches `-SNAPSHOT`, `-RC1`, `-M2`.
+ *    release candidates. Maven gets the keyword rule (`-SNAPSHOT`, `-RC1`, `-M2`) plus its own
+ *    qualifiers (`-nightly`, `-next`, `-pre`, `1.0-a1`, ...).
  *  - composer treats `dev-<branch>` and `<branch>-dev` as pre-releases by definition.
  */
 export function isPrerelease(type: string, version: string): boolean {
@@ -65,6 +74,7 @@ export function isPrerelease(type: string, version: string): boolean {
     if (!v) return false
     if (isBranch(type, v)) return true
     if (type === 'pypi' && PEP440_PRERELEASE.test(v)) return true
+    if (type === 'maven' && MAVEN_PRERELEASE_QUALIFIER.test(v)) return true
     if (type !== 'maven' && SEMVER_PRERELEASE.test(stripBuildMetadata(v))) return true
     return PRERELEASE_KEYWORD.test(v)
 }
