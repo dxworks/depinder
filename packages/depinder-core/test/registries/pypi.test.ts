@@ -140,6 +140,16 @@ describe('pypi license precedence', () => {
             .toEqual(['MIT'])
     })
 
+    it('takes the classifiers over a `license` that only says it is dual', () => {
+        // python-dateutil, verbatim.
+        const dateutil = {
+            license: 'Dual License',
+            classifiers: ['License :: OSI Approved :: Apache Software License', 'License :: OSI Approved :: BSD License'],
+        }
+        expect(projectLicenses(dateutil)).toEqual(['Apache-2.0', 'BSD-3-Clause'])
+        expect(projectLicenses({license: 'Dual License', classifiers: []})).toEqual(['Dual License'])
+    })
+
     it('falls back to the classifiers, mapped to SPDX ids', () => {
         expect(
             classifierLicenses([

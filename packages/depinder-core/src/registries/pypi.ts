@@ -129,7 +129,8 @@ function repoUrlFrom(projectUrls: Record<string, unknown>): string | undefined {
  *
  *  1. `license_expression` (PEP 639) — an SPDX expression, authoritative when present.
  *  2. `license` — a free-text field. Thousands of projects paste the entire license *text* into
- *     it, so anything long or multi-line is text rather than a name and is ignored.
+ *     it, so anything long or multi-line is text rather than a name and is ignored. So is a
+ *     `Dual License` that the classifiers spell out.
  *  3. `License ::` trove classifiers, mapped to SPDX ids.
  */
 export function projectLicenses(info: ProjectInfo): string[] {
@@ -137,10 +138,15 @@ export function projectLicenses(info: ProjectInfo): string[] {
     if (expression) return normaliseLicenses(expression)
 
     const license = stringOrUndefined(info.license)
+    const classifiers = classifierLicenses(info.classifiers)
+    if (license && DUAL_LICENSE.test(license.trim()) && classifiers.length > 0) return classifiers
     if (license && license.length < 100 && !license.includes('\n')) return normaliseLicenses(license)
 
-    return classifierLicenses(info.classifiers)
+    return classifiers
 }
+
+/** Says that there are two licences but not which: python-dateutil's `Dual License`. */
+const DUAL_LICENSE = /^dual[\s-]licen[cs]ed?$/i
 
 /**
  * The classifiers that actually turn up. Anything not in here keeps the text after the last `::`,

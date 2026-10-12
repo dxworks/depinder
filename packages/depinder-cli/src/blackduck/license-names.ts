@@ -113,15 +113,27 @@ export const UNKNOWN: KnownLicense = {name: 'Unknown License', family: 'UNKNOWN'
  * Spellings that no amount of normalising reaches: a short name with no version (`BSD` -- Black
  * Duck reads it as BSD-3-Clause), a run-together one (`LGPLv3`), a classifier, an old crates.io
  * shorthand. Every entry here occurs in the run being compared; this is not a general SPDX table.
+ * A key matches the text exactly once both are reduced by `slug`.
  */
-const ALIASES: {readonly [slug: string]: string} = {
+const ALIASES: {readonly [spelling: string]: string} = {
     'bsd': 'BSD-3-Clause',
     'new bsd': 'BSD-3-Clause',
     'bsd 3 clause': 'BSD-3-Clause',
     '3 clause bsd': 'BSD-3-Clause',
+    'BSD 3-clause New License': 'BSD-3-Clause',
+    'BSD New license': 'BSD-3-Clause',
+    'Modified BSD': 'BSD-3-Clause',
     'bsd 2 clause': 'BSD-2-Clause',
     'apache2': 'Apache-2.0',
     'asl 2.0': 'Apache-2.0',
+    'ALv2': 'Apache-2.0',
+    'the Apache License, ASL Version 2.0': 'Apache-2.0',
+    'Eclipse Public License v. 2.0': 'EPL-2.0',
+    'Eclipse Distribution License v. 1.0': 'EDL-1.0',
+    'The Universal Permissive License (UPL), Version 1.0': 'UPL-1.0',
+    'Public Domain, per Creative Commons CC0': 'CC0-1.0',
+    'GNU Library General Public License v2.1 or later': 'LGPL-2.1-or-later',
+    'GNU Library or Lesser General Public License (LGPL) V2.1': 'LGPL-2.1',
     'lgplv3': 'LGPL-3.0',
     'lgplv2.1': 'LGPL-2.1',
     'gplv3': 'GPL-3.0',
@@ -138,6 +150,10 @@ const ALIASES: {readonly [slug: string]: string} = {
     'gpl 2.0 only with classpath exception': 'GPL-2.0-with-classpath-exception',
     'gpl 2.0 with classpath exception 2.0': 'GPL-2.0-with-classpath-exception',
     'gpl 2.0 only with classpath exception 2.0': 'GPL-2.0-with-classpath-exception',
+    'GPL2 w/ CPE': 'GPL-2.0-with-classpath-exception',
+    'GPLv2+CE': 'GPL-2.0-with-classpath-exception',
+    'GNU General Public License, version 2 with the GNU Classpath Exception': 'GPL-2.0-with-classpath-exception',
+    'The GNU General Public License (GPL), Version 2, With Classpath Exception': 'GPL-2.0-with-classpath-exception',
     'zlib libpng': 'Zlib',
 }
 
@@ -179,6 +195,8 @@ const BY_SLUG: {[slug: string]: string} = (() => {
     return index
 })()
 
+const ALIAS_BY_SLUG = new Map(Object.entries(ALIASES).map(([spelling, id]) => [slug(spelling), id]))
+
 /**
  * The SPDX id a piece of text names, or `''` when it names none we can read.
  *
@@ -202,7 +220,7 @@ export function canonicalId(raw: string): string {
     const exact = Object.keys(LICENSES).find(it => it.toLowerCase() === text.toLowerCase())
     if (exact) return exact
     const key = slug(text)
-    return BY_SLUG[key] ?? ALIASES[key] ?? ''
+    return BY_SLUG[key] ?? ALIAS_BY_SLUG.get(key) ?? ''
 }
 
 /** The longest licence NAME in the reference export is 57 characters; past this it is prose. */
