@@ -72,6 +72,6 @@ export {
 export {buildVulnerabilityIndex, type PackageKeyer} from './vuln/merge.js'
 export type {GrypeReport} from './vuln/grype.js'
 export type {TrivyReport} from './vuln/trivy.js'
-export {scannerFailureReason, type ScannerFailure} from './vuln/scanner-failure.js'
+export {scannerFailureReason} from './vuln/scanner-failure.js'
 export {PINNED_SCANNER_VERSIONS} from './vuln/scanner-versions.js'
 export type {ScannedPackage, Vulnerability} from './vuln/vulnerability.js'
