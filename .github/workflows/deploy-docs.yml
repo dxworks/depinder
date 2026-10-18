@@ -1,6 +1,6 @@
 name: Deploy Docs
 
-# Docs source lives in docs/ + mkdocs.yml, edited in normal PRs. On a docs change on
+# Docs source lives in packages/depinder-cli (docs/ + mkdocs.yml), edited in normal PRs. On a docs change on
 # `main` or `dev`, build the site and deploy it straight to GitHub Pages as an artifact —
 # no gh-pages branch, no force-push. Both branches publish to the same site, so the last
 # push wins; `dev` is where the docs move, `main` catches up on release.
@@ -9,9 +9,10 @@ on:
   push:
     branches: [main, dev]
     paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
-      - 'requirements-docs.txt'
+      - 'packages/depinder-cli/docs/**'
+      - 'packages/depinder-cli/mkdocs.yml'
+      - 'packages/depinder-cli/requirements-docs.txt'
+      - 'packages/depinder-cli/project.json'
       - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:      # allow a manual redeploy from the Actions tab
 
@@ -33,13 +34,19 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
-      - name: Install MkDocs
-        run: pip install -r requirements-docs.txt
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+          cache: 'npm'
+      - name: Install MkDocs and the workspace
+        run: |
+          pip install -r packages/depinder-cli/requirements-docs.txt
+          npm ci
       - name: Build (strict — fails on broken links or nav)
-        run: mkdocs build --strict --site-dir site
+        run: npx nx run depinder-cli:docs --skip-nx-cache
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: site
+          path: packages/depinder-cli/site
 
   deploy:
     name: Deploy to Pages

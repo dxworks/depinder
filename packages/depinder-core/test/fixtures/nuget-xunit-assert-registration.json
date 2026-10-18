@@ -1,0 +1,990 @@
+{
+ "@id": "https://api.nuget.org/v3/registration5-gz-semver2/xunit.assert/index.json",
+ "count": 2,
+ "items": [
+  {
+   "@id": "https://api.nuget.org/v3/registration5-gz-semver2/xunit.assert/index.json#page/2.0.0-alpha-build2548/2.5.1-pre.11",
+   "lower": "2.0.0-alpha-build2548",
+   "upper": "2.5.1-pre.11",
+   "count": 64,
+   "items": [
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-alpha-build2548.json",
+      "version": "2.0.0-alpha-build2548",
+      "published": "2013-11-25T01:18:41.587+00:00",
+      "listed": true,
+      "projectUrl": "http://xunit.codeplex.com",
+      "licenseExpression": "",
+      "licenseUrl": "http://xunit.codeplex.com/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-alpha-build2552.json",
+      "version": "2.0.0-alpha-build2552",
+      "published": "2013-12-08T01:11:38.26+00:00",
+      "listed": true,
+      "projectUrl": "http://xunit.codeplex.com",
+      "licenseExpression": "",
+      "licenseUrl": "http://xunit.codeplex.com/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-alpha-build2562.json",
+      "version": "2.0.0-alpha-build2562",
+      "published": "2014-01-03T23:11:40.857+00:00",
+      "listed": true,
+      "projectUrl": "http://xunit.codeplex.com",
+      "licenseExpression": "",
+      "licenseUrl": "http://xunit.codeplex.com/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-alpha-build2569.json",
+      "version": "2.0.0-alpha-build2569",
+      "published": "2014-01-17T22:46:03.187+00:00",
+      "listed": true,
+      "projectUrl": "http://xunit.codeplex.com",
+      "licenseExpression": "",
+      "licenseUrl": "http://xunit.codeplex.com/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-alpha-build2576.json",
+      "version": "2.0.0-alpha-build2576",
+      "published": "2014-01-19T00:17:02.567+00:00",
+      "listed": true,
+      "projectUrl": "http://xunit.codeplex.com",
+      "licenseExpression": "",
+      "licenseUrl": "http://xunit.codeplex.com/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-alpha-build2595.json",
+      "version": "2.0.0-alpha-build2595",
+      "published": "2014-03-09T23:17:58.34+00:00",
+      "listed": true,
+      "projectUrl": "http://xunit.codeplex.com",
+      "licenseExpression": "",
+      "licenseUrl": "http://xunit.codeplex.com/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-alpha-build2606.json",
+      "version": "2.0.0-alpha-build2606",
+      "published": "2014-03-16T00:52:50.847+00:00",
+      "listed": true,
+      "projectUrl": "http://xunit.codeplex.com",
+      "licenseExpression": "",
+      "licenseUrl": "http://xunit.codeplex.com/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-beta-build2616.json",
+      "version": "2.0.0-beta-build2616",
+      "published": "2014-03-22T23:38:13.637+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-beta-build2650.json",
+      "version": "2.0.0-beta-build2650",
+      "published": "2014-04-29T03:05:46.72+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-beta-build2700.json",
+      "version": "2.0.0-beta-build2700",
+      "published": "2014-06-30T16:19:29.14+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-beta4-build2738.json",
+      "version": "2.0.0-beta4-build2738",
+      "published": "2014-08-10T21:41:36.983+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-beta5-build2785.json",
+      "version": "2.0.0-beta5-build2785",
+      "published": "2014-11-20T01:38:58.607+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-rc1-build2826.json",
+      "version": "2.0.0-rc1-build2826",
+      "published": "2015-01-20T05:06:19.59+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-rc2-build2857.json",
+      "version": "2.0.0-rc2-build2857",
+      "published": "2015-02-17T18:35:10.367+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-rc3-build2880.json",
+      "version": "2.0.0-rc3-build2880",
+      "published": "2015-02-23T18:41:15.993+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0-rc4-build2924.json",
+      "version": "2.0.0-rc4-build2924",
+      "published": "2015-03-09T21:59:29.597+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.0.0.json",
+      "version": "2.0.0",
+      "published": "2015-03-16T21:11:25.86+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.1.0-beta1-build2945.json",
+      "version": "2.1.0-beta1-build2945",
+      "published": "2015-03-21T23:51:40.883+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.1.0-beta2-build2981.json",
+      "version": "2.1.0-beta2-build2981",
+      "published": "2015-05-03T21:21:17.457+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.1.0-beta3-build3029.json",
+      "version": "2.1.0-beta3-build3029",
+      "published": "2015-06-30T21:44:08.617+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.1.0-beta4-build3109.json",
+      "version": "2.1.0-beta4-build3109",
+      "published": "2015-08-05T00:22:48.08+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.1.0-rc1-build3168.json",
+      "version": "2.1.0-rc1-build3168",
+      "published": "2015-09-06T22:08:04.323+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.1.0-rc2-build3176.json",
+      "version": "2.1.0-rc2-build3176",
+      "published": "2015-09-20T20:30:50.557+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.1.0.json",
+      "version": "2.1.0",
+      "published": "2015-09-27T18:30:09.19+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.2.0-beta1-build3239.json",
+      "version": "2.2.0-beta1-build3239",
+      "published": "2015-12-20T22:10:51.91+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.2.0-beta2-build3300.json",
+      "version": "2.2.0-beta2-build3300",
+      "published": "2016-06-27T18:58:28.253+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.2.0-beta3-build3402.json",
+      "version": "2.2.0-beta3-build3402",
+      "published": "2016-10-05T22:05:55.863+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.2.0-beta4-build3444.json",
+      "version": "2.2.0-beta4-build3444",
+      "published": "2016-11-06T23:25:28.637+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.2.0-beta5-build3474.json",
+      "version": "2.2.0-beta5-build3474",
+      "published": "2017-01-16T20:00:36.377+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.2.0-rc1-build3507.json",
+      "version": "2.2.0-rc1-build3507",
+      "published": "2017-02-12T05:08:32.15+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.2.0-rc2-build3523.json",
+      "version": "2.2.0-rc2-build3523",
+      "published": "2017-02-13T19:36:30.96+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.2.0-rc3-build3528.json",
+      "version": "2.2.0-rc3-build3528",
+      "published": "2017-02-16T06:49:01.227+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.2.0-rc4-build3536.json",
+      "version": "2.2.0-rc4-build3536",
+      "published": "2017-02-18T00:49:02.48+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.2.0.json",
+      "version": "2.2.0",
+      "published": "2017-02-20T03:11:36.703+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.3.0-beta1-build3642.json",
+      "version": "2.3.0-beta1-build3642",
+      "published": "2017-04-06T23:15:23.05+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.3.0-beta2-build3683.json",
+      "version": "2.3.0-beta2-build3683",
+      "published": "2017-05-09T05:45:03.12+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.3.0-beta3-build3705.json",
+      "version": "2.3.0-beta3-build3705",
+      "published": "2017-06-08T21:46:03.453+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.3.0-beta4-build3742.json",
+      "version": "2.3.0-beta4-build3742",
+      "published": "2017-08-14T19:50:13.667+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.3.0-beta5-build3769.json",
+      "version": "2.3.0-beta5-build3769",
+      "published": "2017-09-01T18:59:13.527+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.3.0-rc1-build3809.json",
+      "version": "2.3.0-rc1-build3809",
+      "published": "2017-10-02T13:39:09.13+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.3.0-rc2-build3812.json",
+      "version": "2.3.0-rc2-build3812",
+      "published": "2017-10-04T21:19:33.35+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.3.0-rc3-build3818.json",
+      "version": "2.3.0-rc3-build3818",
+      "published": "2017-10-05T10:17:15.527+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.3.0.json",
+      "version": "2.3.0",
+      "published": "2017-10-06T22:16:59.43+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.3.1-rc1-build3843.json",
+      "version": "2.3.1-rc1-build3843",
+      "published": "2017-10-20T01:59:24.183+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.3.1-rc2-build3844.json",
+      "version": "2.3.1-rc2-build3844",
+      "published": "2017-10-20T07:50:52.34+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.3.1.json",
+      "version": "2.3.1",
+      "published": "2017-10-27T05:56:48.34+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.4.0-beta.1.build3958.json",
+      "version": "2.4.0-beta.1.build3958",
+      "published": "2018-02-12T03:22:19.54+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.4.0-beta.2.build4010.json",
+      "version": "2.4.0-beta.2.build4010",
+      "published": "2018-05-29T03:11:36.18+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.4.0-rc.1.build4038.json",
+      "version": "2.4.0-rc.1.build4038",
+      "published": "2018-07-02T04:11:46.3+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.4.0-rc.2.build4045.json",
+      "version": "2.4.0-rc.2.build4045",
+      "published": "2018-07-13T02:23:20.473+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.4.0.json",
+      "version": "2.4.0",
+      "published": "2018-07-17T05:02:26.43+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.4.1-pre.build.4059.json",
+      "version": "2.4.1-pre.build.4059",
+      "published": "2018-08-26T21:27:14.553+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.4.1-pre.build.4071.json",
+      "version": "2.4.1-pre.build.4071",
+      "published": "2018-10-07T04:09:48.837+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.4.1.json",
+      "version": "2.4.1",
+      "published": "2018-10-29T04:18:25.24+00:00",
+      "listed": true,
+      "projectUrl": "https://github.com/xunit/xunit",
+      "licenseExpression": "",
+      "licenseUrl": "https://raw.githubusercontent.com/xunit/xunit/master/license.txt"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.4.2-pre.12.json",
+      "version": "2.4.2-pre.12",
+      "published": "2021-10-03T21:47:16.403+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.4.2-pre.12/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.4.2-pre.27.json",
+      "version": "2.4.2-pre.27",
+      "published": "2022-07-24T23:00:05.01+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.4.2-pre.27/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.4.2.json",
+      "version": "2.4.2",
+      "published": "2022-08-01T21:42:33.14+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.4.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.0-pre.11.json",
+      "version": "2.5.0-pre.11",
+      "published": "2023-05-06T21:45:22.833+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.0-pre.11/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.0-pre.22.json",
+      "version": "2.5.0-pre.22",
+      "published": "2023-05-31T21:22:55.453+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.0-pre.22/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.0-pre.26.json",
+      "version": "2.5.0-pre.26",
+      "published": "2023-06-15T01:34:09.517+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.0-pre.26/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.0-pre.37.json",
+      "version": "2.5.0-pre.37",
+      "published": "2023-06-21T22:09:33.727+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.0-pre.37/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.0-pre.44.json",
+      "version": "2.5.0-pre.44",
+      "published": "2023-07-03T20:12:12.763+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.0-pre.44/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.0.json",
+      "version": "2.5.0",
+      "published": "2023-07-06T22:03:21.22+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.1-pre.11.json",
+      "version": "2.5.1-pre.11",
+      "published": "2023-07-21T07:13:24.447+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.1-pre.11/license"
+     }
+    }
+   ]
+  },
+  {
+   "@id": "https://api.nuget.org/v3/registration5-gz-semver2/xunit.assert/index.json#page/2.5.1-pre.12/2.9.3",
+   "lower": "2.5.1-pre.12",
+   "upper": "2.9.3",
+   "count": 24,
+   "items": [
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.1-pre.12.json",
+      "version": "2.5.1-pre.12",
+      "published": "2023-07-21T18:10:52.4+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.1-pre.12/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.1-pre.20.json",
+      "version": "2.5.1-pre.20",
+      "published": "2023-08-07T19:16:34.033+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.1-pre.20/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.1-pre.26.json",
+      "version": "2.5.1-pre.26",
+      "published": "2023-09-02T15:06:42.217+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.1-pre.26/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.1-pre.33.json",
+      "version": "2.5.1-pre.33",
+      "published": "2023-09-10T04:55:45.263+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.1-pre.33/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.1.json",
+      "version": "2.5.1",
+      "published": "2023-09-18T01:03:10.7+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.2-pre.2.json",
+      "version": "2.5.2-pre.2",
+      "published": "2023-09-23T19:17:46.57+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.2-pre.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.2-pre.6.json",
+      "version": "2.5.2-pre.6",
+      "published": "2023-10-08T21:25:02.733+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.2-pre.6/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.2.json",
+      "version": "2.5.2",
+      "published": "2023-10-13T02:38:44.377+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.5.3.json",
+      "version": "2.5.3",
+      "published": "2023-10-16T21:49:29.18+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.5.3/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.6.0.json",
+      "version": "2.6.0",
+      "published": "2023-10-31T21:55:29.423+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.6.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.6.1.json",
+      "version": "2.6.1",
+      "published": "2023-11-02T19:27:03.757+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.6.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.6.2.json",
+      "version": "2.6.2",
+      "published": "2023-11-18T22:04:51.653+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.6.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.6.3.json",
+      "version": "2.6.3",
+      "published": "2023-12-09T02:46:28.563+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.6.3/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.6.4.json",
+      "version": "2.6.4",
+      "published": "2023-12-22T23:37:21.22+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.6.4/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.6.5.json",
+      "version": "2.6.5",
+      "published": "2024-01-05T04:58:00.573+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.6.5/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.6.6.json",
+      "version": "2.6.6",
+      "published": "2024-01-15T06:54:48.243+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.6.6/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.7.0.json",
+      "version": "2.7.0",
+      "published": "2024-02-16T00:39:44.94+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.7.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.7.1.json",
+      "version": "2.7.1",
+      "published": "2024-04-11T22:11:30.22+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.7.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.8.0.json",
+      "version": "2.8.0",
+      "published": "2024-04-27T19:08:46.277+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.8.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.8.1.json",
+      "version": "2.8.1",
+      "published": "2024-05-25T03:48:47.67+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.8.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.9.0.json",
+      "version": "2.9.0",
+      "published": "2024-07-08T17:17:17.507+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.9.0/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.9.1.json",
+      "version": "2.9.1",
+      "published": "2024-09-22T21:57:18.357+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.9.1/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.23.17.18.06/xunit.assert.2.9.2.json",
+      "version": "2.9.2",
+      "published": "2024-09-27T03:50:59.46+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.9.2/license"
+     }
+    },
+    {
+     "catalogEntry": {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2026.04.10.00.22.07/xunit.assert.2.9.3.json",
+      "version": "2.9.3",
+      "published": "2025-01-08T17:32:16.063+00:00",
+      "listed": true,
+      "projectUrl": "",
+      "licenseExpression": "Apache-2.0",
+      "licenseUrl": "https://www.nuget.org/packages/xunit.assert/2.9.3/license"
+     }
+    }
+   ]
+  }
+ ]
+}

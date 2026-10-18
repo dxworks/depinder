@@ -1,0 +1,73 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "depinder-cli",
+  "projectType": "application",
+  "sourceRoot": "packages/depinder-cli/src",
+  "tags": [
+    "scope:client"
+  ],
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "options": {
+        "main": "packages/depinder-cli/src/index.ts",
+        "additionalEntryPoints": [
+          "packages/depinder-cli/src/depinder.ts"
+        ],
+        "outputPath": "packages/depinder-cli/dist",
+        "tsConfig": "packages/depinder-cli/tsconfig.build.json",
+        "format": [
+          "cjs"
+        ],
+        "platform": "node",
+        "target": "es2022",
+        "bundle": true,
+        "thirdParty": false,
+        "sourcemap": true,
+        "declaration": true,
+        "declarationRootDir": "packages/depinder-cli/src",
+        "generatePackageJson": false,
+        "esbuildConfig": "packages/depinder-cli/esbuild.config.cjs"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
+      "options": {
+        "cwd": "{projectRoot}",
+        "commands": [
+          "tsc -p tsconfig.build.json --noEmit",
+          "tsc -p tsconfig.json"
+        ],
+        "parallel": false
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "eslint src"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "vitest run"
+      }
+    },
+    "docs": {
+      "executor": "nx:run-commands",
+      "outputs": [
+        "{projectRoot}/site"
+      ],
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "mkdocs build --strict --site-dir site"
+      }
+    }
+  }
+}

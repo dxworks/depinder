@@ -1,0 +1,19 @@
+import {VulnerabilityChecker} from './vulnerability-checker'
+
+export interface Plugin {
+    name: string // the name of the technology (could be language name or package manager name)
+    aliases?: string[] // potential aliases to use from CLI
+    /**
+     * Namespace under which this plugin's LibraryInfo is cached. Plugins of the same registry fetch
+     * identical data for identical library names and MUST share this value, or every library is
+     * fetched once per plugin. Defaults to `name`, which keeps every pre-existing cache entry valid.
+     */
+    ecosystem?: string
+    /** The purl type of the SBOM components this plugin analyses, e.g. `maven`. */
+    purlType: string
+    checker?: VulnerabilityChecker // checks for vulnerabilities for the found dependencies
+}
+
+export function ecosystemOf(plugin: Plugin): string {
+    return plugin.ecosystem ?? plugin.name
+}

@@ -1,0 +1,18 @@
+{
+  "purl": "pkg:cargo/itoa",
+  "ecosystem": "cargo",
+  "pattern": "cargo: an ordinary crate (MIT OR Apache-2.0), no yanks",
+  "expect": "found",
+  "recordedAt": "2026-10-03T13:08:35.726Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://crates.io/api/v1/crates/itoa",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": "crate.json"
+    }
+  ]
+}

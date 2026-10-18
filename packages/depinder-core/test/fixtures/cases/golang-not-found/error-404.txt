@@ -1,0 +1,4 @@
+not found: module github.com/depinder-fixture/no-such-module-7f3c9a: git ls-remote -q --end-of-options https://github.com/depinder-fixture/no-such-module-7f3c9a in /tmp/gopath/pkg/mod/cache/vcs/b1acfd3eee953ada82d7553fa3aab10578c4058cef32cbbcd7fc4d63d6e0d687: exit status 128:
+	fatal: could not read Username for 'https://github.com': terminal prompts disabled
+Confirm the import path was entered correctly.
+If this is a private repository, see https://go.dev/doc/faq#git_https for additional information.

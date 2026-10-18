@@ -1,0 +1,41 @@
+{
+  "purl": "pkg:maven/org.springframework.boot/spring-boot",
+  "ecosystem": "maven",
+  "pattern": "maven: <release>/<latest> is the milestone 4.2.0-M2, deployed 2026-09-24 after the final 4.1.1; latest must be 4.1.1 with 4.2.0-M2 only as prerelease",
+  "expect": "found",
+  "recordedAt": "2026-10-03T13:08:27.472Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://repo1.maven.org/maven2/org/springframework/boot/spring-boot/maven-metadata.xml",
+      "status": 200,
+      "headers": {
+        "content-type": "text/xml",
+        "etag": "W/\"db41c8df9daedc6140fa2c490ed381a9\"",
+        "last-modified": "Thu, 24 Sep 2026 09:08:21 GMT"
+      },
+      "body": "metadata.xml"
+    },
+    {
+      "method": "GET",
+      "url": "https://repo1.maven.org/maven2/org/springframework/boot/spring-boot/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html",
+        "last-modified": "Thu, 24 Sep 2026 11:36:23 GMT"
+      },
+      "body": "listing.html"
+    },
+    {
+      "method": "GET",
+      "url": "https://repo1.maven.org/maven2/org/springframework/boot/spring-boot/4.1.1/spring-boot-4.1.1.pom",
+      "status": 200,
+      "headers": {
+        "content-type": "text/xml",
+        "etag": "W/\"bdd8043a305aa2c424d566d0d3e785c6\"",
+        "last-modified": "Thu, 20 Aug 2026 12:51:48 GMT"
+      },
+      "body": "spring-boot-4.1.1.pom"
+    }
+  ]
+}

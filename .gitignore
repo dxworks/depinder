@@ -69,9 +69,15 @@ web_modules/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
+# Env files at any depth (.env, .env.*, *.env, *.env.*), except those with "example" in the name
 .env
-.env.test
+.env.*
+*.env
+*.env.*
+!.env*example*
+!*.env*example*
+!*example*.env
+!*example*.env.*
 
 # GitHub advisory tokens — a dotenv-style file of live PATs, never commit it
 .github-tokens*
@@ -124,7 +130,18 @@ dist
 
 # custom
 results
-# root-level runtime cache only - src/cache/ is source and must stay trackable
+# the runtime cache of a run from the root only; packages/depinder-cli/src/cache/ is source
 /cache/
 results-*
 /.blacklist
+
+# Nx cache and workspace data
+/.nx/
+# MkDocs output of the docs target
+site/
+
+# Local-only tools and agent notes
+/bench/
+/packages/parity/
+CLAUDE.md
+.DS_Store

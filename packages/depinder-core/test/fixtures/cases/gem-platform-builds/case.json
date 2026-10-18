@@ -1,0 +1,29 @@
+{
+  "purl": "pkg:gem/nokogiri",
+  "ecosystem": "gem",
+  "pattern": "gem: each release is published once per platform (1185 builds over 20 platforms, 11 builds of 1.19.4); one version per release, not one per build",
+  "expect": "found",
+  "recordedAt": "2026-10-03T13:08:31.443Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://rubygems.org/api/v1/versions/nokogiri.json",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "etag": "\"ce5e38db8cb2fd46b10412ddb604bb56\"",
+        "last-modified": "Thu, 18 Jun 2026 15:18:59 GMT"
+      },
+      "body": "versions.json"
+    },
+    {
+      "method": "GET",
+      "url": "https://rubygems.org/api/v1/gems/nokogiri.json",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8"
+      },
+      "body": "gem.json"
+    }
+  ]
+}

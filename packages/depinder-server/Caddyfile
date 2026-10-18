@@ -1,0 +1,38 @@
+# One address in front of the two servers (docker-compose.yml). Both check the token themselves;
+# Caddy passes the Authorization header through untouched.
+#
+# No `encode` anywhere: both servers compress their own answers, and /resolve flushes its own
+# br/gzip stream per batch. Re-encoding here would buffer it.
+{$SITE_ADDRESS::8080} {
+	request_body {
+		# The servers' own bodyLimit is 10 MB; this only stops anything bigger at the door.
+		max_size 11MB
+	}
+
+	handle /vulnerabilities {
+		reverse_proxy vuln:8080 {
+			transport http {
+				read_timeout 120s
+				write_timeout 120s
+			}
+		}
+	}
+
+	# Both servers have a /health; this is the vuln one.
+	handle /vuln/health {
+		rewrite * /health
+		reverse_proxy vuln:8080
+	}
+
+	# /resolve, /feeds, /queue and /health. /resolve is an NDJSON stream that lasts up to its
+	# deadline_ms (60 s at most): every write goes to the client at once, nothing is buffered.
+	handle {
+		reverse_proxy resolver:8080 {
+			flush_interval -1
+			transport http {
+				read_timeout 120s
+				write_timeout 120s
+			}
+		}
+	}
+}

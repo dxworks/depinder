@@ -1,0 +1,36 @@
+{
+ "packages": {
+  "amirami/localizator": [
+   {
+    "name": "amirami/localizator",
+    "description": "Localizator is a small tool for Laravel that gives you the ability to extract untranslated strings from project files. It works using the artisan command line and the provided localize command.",
+    "homepage": "https://github.com/amiranagram/localizator",
+    "version": "0.x-dev",
+    "version_normalized": "0.9999999.9999999.9999999-dev",
+    "license": [
+     "MIT"
+    ],
+    "source": {
+     "url": "https://github.com/amiranagram/localizator.git",
+     "type": "git"
+    },
+    "time": "2025-03-06T12:51:22+00:00"
+   },
+   {
+    "name": "amirami/localizator",
+    "description": "Localizator is a small tool for Laravel that gives you the ability to extract untranslated strings from project files. It works using the artisan command line and the provided localize command.",
+    "homepage": "https://github.com/amiranagram/localizator",
+    "version": "dev-master",
+    "version_normalized": "dev-master",
+    "license": [
+     "MIT"
+    ],
+    "source": {
+     "url": "https://github.com/amiranagram/localizator.git",
+     "type": "git"
+    },
+    "time": "2022-02-15T08:16:58+00:00"
+   }
+  ]
+ }
+}

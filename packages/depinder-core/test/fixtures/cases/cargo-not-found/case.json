@@ -1,0 +1,18 @@
+{
+  "purl": "pkg:cargo/depinder-fixture-no-such-crate-7f3c9a",
+  "ecosystem": "cargo",
+  "pattern": "cargo: 404 for an unknown crate; both roads must say not found",
+  "expect": "not_found",
+  "recordedAt": "2026-10-03T13:08:38.177Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://crates.io/api/v1/crates/depinder-fixture-no-such-crate-7f3c9a",
+      "status": 404,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": "error-404.json"
+    }
+  ]
+}

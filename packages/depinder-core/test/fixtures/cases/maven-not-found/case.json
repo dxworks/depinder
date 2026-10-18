@@ -1,0 +1,19 @@
+{
+  "purl": "pkg:maven/org.depinder.fixture/no-such-artifact-7f3c9a",
+  "ecosystem": "maven",
+  "pattern": "maven: 404 for an unknown artifact; both roads must say not found",
+  "expect": "not_found",
+  "recordedAt": "2026-10-03T13:08:40.963Z",
+  "responses": [
+    {
+      "method": "GET",
+      "url": "https://repo1.maven.org/maven2/org/depinder/fixture/no-such-artifact-7f3c9a/maven-metadata.xml",
+      "status": 404,
+      "headers": {
+        "content-type": "text/html",
+        "last-modified": "Sat, 11 Oct 2025 00:20:51 GMT"
+      },
+      "body": "error-404.html"
+    }
+  ]
+}

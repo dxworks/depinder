@@ -1,0 +1,30 @@
+{
+  "@id": "https://api.nuget.org/v3/catalog0/data/2022.12.08.16.43.03/newtonsoft.json.12.0.1-beta1.json",
+  "@type": [
+    "PackageDetails",
+    "catalog:Permalink"
+  ],
+  "authors": "James Newton-King",
+  "catalog:commitId": "0e847b40-06dc-481b-9dee-fd9e9991bee8",
+  "catalog:commitTimeStamp": "2022-12-08T16:43:03.7673271Z",
+  "copyright": "Copyright \u00a9 James Newton-King 2008",
+  "created": "2018-10-30T00:37:50.85Z",
+  "description": "Json.NET is a popular high-performance JSON framework for .NET",
+  "iconUrl": "https://www.newtonsoft.com/content/images/nugeticon.png",
+  "id": "Newtonsoft.Json",
+  "isPrerelease": true,
+  "lastEdited": "2022-12-08T16:42:44.683Z",
+  "licenseUrl": "https://raw.github.com/JamesNK/Newtonsoft.Json/master/LICENSE.md",
+  "listed": false,
+  "minClientVersion": "2.12",
+  "packageHash": "cmCtkmZzWoHcwh96riskpZW9RqrAERDTCrWWXwfTdnKqOUIy2AMFF6Jje2jjKIoSVekwoTmf+WRr9cGRx8hRsQ==",
+  "packageHashAlgorithm": "SHA512",
+  "packageSize": 3401484,
+  "projectUrl": "https://www.newtonsoft.com/json",
+  "published": "1900-01-01T00:00:00Z",
+  "repository": "",
+  "requireLicenseAcceptance": false,
+  "title": "Json.NET",
+  "verbatimVersion": "12.0.1-beta1",
+  "version": "12.0.1-beta1"
+}

@@ -24,12 +24,11 @@ jobs:
           node-version: '24.x'
           cache: 'npm'
 
-      - name: Build Node App
+      # typecheck, lint, test, build, size guard, dependency check and knip of every Nx project
+      - name: Check and build
         run: |
           npm ci
-          npm run create
+          npm run check
         env:
 #          GH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
           CI: true
-
-

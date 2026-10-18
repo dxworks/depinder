@@ -1,0 +1,10 @@
+{
+  "actions": [
+    {"type": "update", "package": "atk4/audit~dev", "time": 1789554422},
+    {"type": "update", "package": "monolog/monolog", "time": 1789554429},
+    {"type": "update", "package": "monolog/monolog~dev", "time": 1789554440},
+    {"type": "delete", "package": "raxon/boot", "time": 1789554432},
+    {"type": "update", "package": "not-a-package-name", "time": 1789554450}
+  ],
+  "timestamp": 17895544800011
+}

@@ -37,26 +37,27 @@ jobs:
       - name: Npm CI
         run: npm ci
 
-      - name: Build
-        run: npm run build --if-present
-
+      # Before the build: the bundle inlines package.json, so `depinder --version` reads it from there.
       - name: Setup Version
-        run: node_modules/.bin/json -I -f package.json -e "this.version='$VERSION'"
+        run: npm pkg set version="$VERSION" --workspace packages/depinder-cli
         env:
           VERSION: ${{ steps.semver_parser.outputs.semver }}
 
+      - name: Build
+        run: npx nx build depinder-cli --skip-nx-cache
+
       - name: Publish on NPM
-        run: npm publish --access public
+        run: npm publish --access public --workspace packages/depinder-cli
 
       - name: Prepare Release Notes
-        run: touch ${{ github.workspace }}/releaseNotes/v${{ steps.semver_parser.outputs.semver }}.md
+        run: touch ${{ github.workspace }}/packages/depinder-cli/releaseNotes/v${{ steps.semver_parser.outputs.semver }}.md
 
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
           name: Depinder ${{ steps.semver_parser.outputs.semver }}
-          body_path: ${{ github.workspace }}/releaseNotes/v${{ steps.semver_parser.outputs.semver }}.md
+          body_path: ${{ github.workspace }}/packages/depinder-cli/releaseNotes/v${{ steps.semver_parser.outputs.semver }}.md
           body: ""
           prerelease: false
           draft: false
