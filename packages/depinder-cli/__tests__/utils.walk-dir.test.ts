@@ -30,10 +30,14 @@ describe('walkDir', () => {
         ])
     })
 
-    it('does not follow symlinks', () => {
+    it('does not follow directory links or supported file symlinks', () => {
         write('real/package.json')
-        fs.symlinkSync(path.join(root, 'real'), path.join(root, 'linked-dir'))
-        fs.symlinkSync(path.join(root, 'real/package.json'), path.join(root, 'linked.json'))
+        // A directory junction needs no privilege on Windows; a file symlink does, so it is POSIX-only.
+        fs.symlinkSync(path.join(root, 'real'), path.join(root, 'linked-dir'),
+            process.platform === 'win32' ? 'junction' : 'dir')
+        if (process.platform !== 'win32') {
+            fs.symlinkSync(path.join(root, 'real/package.json'), path.join(root, 'linked.json'), 'file')
+        }
 
         expect(walkDir(root)).toEqual([path.join(root, 'real/package.json')])
     })

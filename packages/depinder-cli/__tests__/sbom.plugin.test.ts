@@ -5,6 +5,7 @@ import {clearSbomCache, parseSbomProjects, sbomPluginsForPurlTypes} from '../src
 import {clearLocalScanCache} from '../src/plugins/sbom/local-scan'
 import {DepinderProject} from '../src/extension-points/extract'
 import {Plugin} from '../src/extension-points/plugin'
+import {writeNodeScanner} from './helpers/node-scanner'
 
 const [sbomJava] = sbomPluginsForPurlTypes(['maven'])
 const [sbomNpm] = sbomPluginsForPurlTypes(['npm'])
@@ -12,8 +13,15 @@ const [sbomNpm] = sbomPluginsForPurlTypes(['npm'])
 /**
  * Covers the sbom plugin wiring: whether a local scan ran is a property of the parsed project
  * (`exactVersionVulnerabilities`), not something analyse.ts has to infer from an undefined field.
- * Scanners are stubbed with shell scripts so the tests stay hermetic and never need real binaries.
+ * Scanners are stubbed with Node subprocess fixtures (spawned via the .scanner.cjs launcher in
+ * helpers/node-scanner) so the tests stay hermetic and never need real binaries or a POSIX shell.
  */
+
+vi.mock('child_process', async importOriginal => {
+    const actual = await importOriginal<typeof import('child_process')>()
+    const {nodeScannerExecFile} = await import('./helpers/node-scanner')
+    return {...actual, execFile: nodeScannerExecFile(actual.execFile)}
+})
 
 let tmpDir: string
 let sbomFile: string
@@ -52,19 +60,17 @@ const trivyReport = {
 }
 
 /**
- * A stub binary that prints `report` and, if given, appends a line to `counterFile` per SCAN.
+ * A stub scanner that prints `report` and, if given, appends a line to `counterFile` per SCAN.
  * Version probes and the one-off database refresh (`trivy image --download-db-only`, `grype db
  * update`) are not scans, so they are not counted.
  * The preflight probe invokes the same binary with `--version`, which must not count as a scan.
  */
 function stubScanner(name: string, report: unknown, counterFile?: string): string {
-    const file = path.join(tmpDir, name)
     const count = counterFile
-        ? `[ "$1" = --version ] || [ "$1" = version ] || [ "$1" = image ] || [ "$1" = db ] || echo x >> ${counterFile}\n`
+        ? `if (['--version', 'version', 'image', 'db'].indexOf(args[0]) === -1) fs.appendFileSync(${JSON.stringify(counterFile)}, 'x\\n')\n`
         : ''
-    fs.writeFileSync(file, `#!/bin/sh\n${count}cat <<'EOF'\n${JSON.stringify(report)}\nEOF\n`)
-    fs.chmodSync(file, 0o755)
-    return file
+    return writeNodeScanner(tmpDir, name,
+        `const fs = require('fs')\nconst args = process.argv.slice(2)\n${count}process.stdout.write(${JSON.stringify(JSON.stringify(report))})\n`)
 }
 
 async function parse(plugin: Plugin): Promise<DepinderProject> {
@@ -104,12 +110,12 @@ describe('sbom parser and the local scan', () => {
 
         expect(project.exactVersionVulnerabilities).toBeFalsy()
         expect(Object.values(project.dependencies).length).toBeGreaterThan(0)
-        // Undefined, not [] — analyse.ts must fall through to the GHSA advisory path.
+        // Undefined, not [] - analyse.ts must fall through to the GHSA advisory path.
         Object.values(project.dependencies).forEach(dep => expect(dep.vulnerabilities).toBeUndefined())
     })
 
     it('sets the flag and attaches findings when a scanner ran', async () => {
-        process.env.TRIVY_BIN = stubScanner('trivy-stub.sh', trivyReport)
+        process.env.TRIVY_BIN = stubScanner('trivy-stub', trivyReport)
         process.env.GRYPE_BIN = path.join(tmpDir, 'nonexistent-grype')
 
         const project = await parse(sbomJava)
@@ -117,19 +123,19 @@ describe('sbom parser and the local scan', () => {
         expect(project.exactVersionVulnerabilities).toBe(true)
         const deps = project.dependencies
         expect(deps['org.apache.logging.log4j:log4j-core@2.11.1'].vulnerabilities).toHaveLength(1)
-        // A dependency the scan did not match carries [] — absence is a result, not a gap.
+        // A dependency the scan did not match carries [] - absence is a result, not a gap.
         expect(deps['org.slf4j:slf4j-api@1.7.35'].vulnerabilities).toEqual([])
     })
 
     it('scans each SBOM file only once, across projects and plugins', async () => {
         const counter = path.join(tmpDir, 'calls.txt')
         fs.writeFileSync(counter, '')
-        process.env.TRIVY_BIN = stubScanner('trivy-counted.sh', trivyReport, counter)
+        process.env.TRIVY_BIN = stubScanner('trivy-counted', trivyReport, counter)
         process.env.GRYPE_BIN = path.join(tmpDir, 'nonexistent-grype')
 
         await parse(sbomJava)
         await parse(sbomNpm)
 
-        expect(fs.readFileSync(counter, 'utf8').trim().split('\n')).toHaveLength(1)
+        expect(fs.readFileSync(counter, 'utf8').split('\n').filter(Boolean)).toEqual(['x'])
     })
 })

@@ -161,7 +161,7 @@ describe('planRuns', () => {
         const runs = planRuns(classifyInputs([trivy, syft, lock, pom]), getPluginsFromNames(), {results, refresh: false}, results, [tmpDir])
 
         expect(runs.map(it => it.source)).toEqual(['trivy', 'syft'])
-        expect(runs.map(it => it.folder)).toEqual(['/out/trivy', '/out/syft'])
+        expect(runs.map(it => it.folder)).toEqual([path.join(results, 'trivy'), path.join(results, 'syft')])
         expect(runs[0].plugins.map(it => it.name)).toEqual(['sbom-npm'])
         expect(runs[0].sboms.map(it => it.file)).toEqual([trivy])
         expect(runs[0].sboms.map(it => it.repo)).toEqual(['repo'])

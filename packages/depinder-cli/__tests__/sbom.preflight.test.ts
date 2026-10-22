@@ -8,15 +8,24 @@ import {PROVENANCE_FILE, ScannedFileRecord, writeScanProvenance} from '../src/pl
 import {ScannerPreflight, preflightScanners} from '../src/plugins/sbom/scanner-preflight'
 import {log} from '../src/utils/logging'
 import {parseVulnSources} from '../src/vuln-sources/selection'
+import {writeNodeScanner} from './helpers/node-scanner'
 
 /**
  * The preflight is the only thing standing between a user with no scanners and a completed run
  * with silently empty vulnerability columns, so what it SAYS is the behaviour under test, not just
- * whether it detected something. Scanners are stubbed with shell scripts — no real binaries.
+ * whether it detected something. Scanners are stubbed with Node subprocess fixtures (spawned via
+ * the .scanner.cjs launcher in helpers/node-scanner) - no real binaries, and nothing POSIX-only.
  *
  * Version/DB payloads mirror real `trivy --version --format json`, `grype version -o json` and
- * `grype db status -o json` output measured against the pinned pair.
+ * `grype db status -o json` output measured against the pinned pair. The temp dir name contains a
+ * space on purpose: fixture, SBOM and log paths must survive real argument passing unquoted.
  */
+
+vi.mock('child_process', async importOriginal => {
+    const actual = await importOriginal<typeof import('child_process')>()
+    const {nodeScannerExecFile} = await import('./helpers/node-scanner')
+    return {...actual, execFile: nodeScannerExecFile(actual.execFile)}
+})
 
 let tmpDir: string
 let sbomFile: string
@@ -44,40 +53,21 @@ const trivyReport = {
 
 /** A stub trivy: answers `--version` with a version document, anything else with a scan report. */
 function stubTrivy(name: string, version: string): string {
-    const file = path.join(tmpDir, name)
-    fs.writeFileSync(file, `#!/bin/sh
-if [ "$1" = --version ]; then
-  cat <<'EOF'
-${trivyVersionJson(version)}
-EOF
-  exit 0
-fi
-cat <<'EOF'
-${JSON.stringify(trivyReport)}
-EOF
+    return writeNodeScanner(tmpDir, name, `
+const args = process.argv.slice(2)
+if (args[0] === '--version') process.stdout.write(${JSON.stringify(trivyVersionJson(version))})
+else process.stdout.write(${JSON.stringify(JSON.stringify(trivyReport))})
 `)
-    fs.chmodSync(file, 0o755)
-    return file
 }
 
-/** A stub grype: answers `version` and `db status`, anything else with an empty match set. */
+/** A stub grype: answers `version` and `db`, anything else with an empty match set. */
 function stubGrype(name: string, version: string): string {
-    const file = path.join(tmpDir, name)
-    fs.writeFileSync(file, `#!/bin/sh
-case "$1" in
-  version) cat <<'EOF'
-${grypeVersionJson(version)}
-EOF
-  exit 0 ;;
-  db) cat <<'EOF'
-${grypeDbStatusJson}
-EOF
-  exit 0 ;;
-esac
-echo '{"matches":[]}'
+    return writeNodeScanner(tmpDir, name, `
+const args = process.argv.slice(2)
+if (args[0] === 'version') process.stdout.write(${JSON.stringify(grypeVersionJson(version))})
+else if (args[0] === 'db') process.stdout.write(${JSON.stringify(grypeDbStatusJson)})
+else process.stdout.write('{"matches":[]}')
 `)
-    fs.chmodSync(file, 0o755)
-    return file
 }
 
 const missing = (name: string) => path.join(tmpDir, `nonexistent-${name}`)
@@ -94,7 +84,7 @@ const record = (statuses: {trivy?: 'ok' | 'skipped', grype?: 'ok' | 'skipped'}):
 })
 
 beforeAll(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder-preflight-'))
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder preflight-'))
     sbomFile = path.join(tmpDir, 'p.cdx.json')
     fs.writeFileSync(sbomFile, JSON.stringify({metadata: {}, components: [], dependencies: []}))
 })
@@ -114,8 +104,8 @@ afterEach(() => {
 
 describe('scanner preflight detection', () => {
     it('reads versions and DB build dates from both scanners', async () => {
-        process.env.TRIVY_BIN = stubTrivy('trivy-pinned.sh', PINNED_SCANNER_VERSIONS.trivy)
-        process.env.GRYPE_BIN = stubGrype('grype-pinned.sh', PINNED_SCANNER_VERSIONS.grype)
+        process.env.TRIVY_BIN = stubTrivy('trivy-pinned', PINNED_SCANNER_VERSIONS.trivy)
+        process.env.GRYPE_BIN = stubGrype('grype-pinned', PINNED_SCANNER_VERSIONS.grype)
 
         const preflight = await preflightScanners()
 
@@ -146,8 +136,8 @@ describe('scanner preflight detection', () => {
 
 describe('preflight messages', () => {
     it('states both scanners and their DBs when everything is present and pinned', async () => {
-        process.env.TRIVY_BIN = stubTrivy('trivy-ok.sh', PINNED_SCANNER_VERSIONS.trivy)
-        process.env.GRYPE_BIN = stubGrype('grype-ok.sh', PINNED_SCANNER_VERSIONS.grype)
+        process.env.TRIVY_BIN = stubTrivy('trivy-ok', PINNED_SCANNER_VERSIONS.trivy)
+        process.env.GRYPE_BIN = stubGrype('grype-ok', PINNED_SCANNER_VERSIONS.grype)
 
         const preflight = await preflightScanners()
         const messages = scannerPreflightMessages(preflight, false)
@@ -164,7 +154,7 @@ describe('preflight messages', () => {
     })
 
     it('warns that results are partial and names the missing tool', async () => {
-        process.env.TRIVY_BIN = stubTrivy('trivy-partial.sh', PINNED_SCANNER_VERSIONS.trivy)
+        process.env.TRIVY_BIN = stubTrivy('trivy-partial', PINNED_SCANNER_VERSIONS.trivy)
         process.env.GRYPE_BIN = missing('grype')
 
         const preflight = await preflightScanners()
@@ -208,8 +198,8 @@ describe('preflight messages', () => {
     })
 
     it('warns on a version that differs from the pinned pair, without disabling anything', async () => {
-        process.env.TRIVY_BIN = stubTrivy('trivy-drifted.sh', '0.99.9')
-        process.env.GRYPE_BIN = stubGrype('grype-pinned2.sh', PINNED_SCANNER_VERSIONS.grype)
+        process.env.TRIVY_BIN = stubTrivy('trivy-drifted', '0.99.9')
+        process.env.GRYPE_BIN = stubGrype('grype-pinned2', PINNED_SCANNER_VERSIONS.grype)
 
         const preflight = await preflightScanners()
         const warnings = scannerPreflightMessages(preflight, false).filter(it => it.level === 'warn')
@@ -224,7 +214,7 @@ describe('preflight messages', () => {
 
 describe('scan provenance', () => {
     it('records tool and DB versions, the files scanned and whether each scanner ran', async () => {
-        process.env.TRIVY_BIN = stubTrivy('trivy-prov.sh', PINNED_SCANNER_VERSIONS.trivy)
+        process.env.TRIVY_BIN = stubTrivy('trivy-prov', PINNED_SCANNER_VERSIONS.trivy)
         process.env.GRYPE_BIN = missing('grype')
 
         const result = await scanSbomFileOnce(sbomFile)
@@ -248,7 +238,7 @@ describe('scan provenance', () => {
     })
 
     it('lists only the given SBOMs, each with the tool that wrote it, for a per-source file', async () => {
-        process.env.TRIVY_BIN = stubTrivy('trivy-prov-src.sh', PINNED_SCANNER_VERSIONS.trivy)
+        process.env.TRIVY_BIN = stubTrivy('trivy-prov-src', PINNED_SCANNER_VERSIONS.trivy)
         process.env.GRYPE_BIN = missing('grype')
         const other = path.join(tmpDir, 'other.cdx.json')
         fs.writeFileSync(other, JSON.stringify({metadata: {}, components: [], dependencies: []}))
@@ -291,32 +281,26 @@ describe('scan provenance', () => {
 describe('scanner database refresh', () => {
     /** A trivy stub that records every invocation and fails the scan the way a broken DB does. */
     function stubTrivyRecording(name: string, callLog: string, scanFails: boolean): string {
-        const file = path.join(tmpDir, name)
-        fs.writeFileSync(file, `#!/bin/sh
-echo "$@" >> ${callLog}
-if [ "$1" = "--version" ]; then
-  cat <<'EOF'
-${trivyVersionJson(PINNED_SCANNER_VERSIONS.trivy)}
-EOF
-  exit 0
-fi
-if [ "$1" = "image" ]; then exit 0; fi
-${scanFails
-        ? `echo "FATAL\tinit error: DB error: failed to download vulnerability DB" 1>&2
-exit 1`
-        : `cat <<'EOF'
-${JSON.stringify(trivyReport)}
-EOF
-exit 0`}
+        const scan = scanFails
+            ? "process.stderr.write('FATAL\\tinit error: DB error: failed to download vulnerability DB\\n')\nprocess.exit(1)"
+            : `process.stdout.write(${JSON.stringify(JSON.stringify(trivyReport))})`
+        return writeNodeScanner(tmpDir, name, `
+const fs = require('fs')
+const args = process.argv.slice(2)
+fs.appendFileSync(${JSON.stringify(callLog)}, args.join(' ') + '\\n')
+if (args[0] === '--version') {
+    process.stdout.write(${JSON.stringify(trivyVersionJson(PINNED_SCANNER_VERSIONS.trivy))})
+    process.exit(0)
+}
+if (args[0] === 'image') process.exit(0)
+${scan}
 `)
-        fs.chmodSync(file, 0o755)
-        return file
     }
 
     it('downloads the database once for the whole run, however many files are scanned at once', async () => {
         const callLog = path.join(tmpDir, 'calls-once.txt')
         fs.writeFileSync(callLog, '')
-        process.env.TRIVY_BIN = stubTrivyRecording('trivy-recording.sh', callLog, false)
+        process.env.TRIVY_BIN = stubTrivyRecording('trivy-recording', callLog, false)
         process.env.GRYPE_BIN = missing('grype')
 
         const second = path.join(tmpDir, 'q.cdx.json')
@@ -325,7 +309,7 @@ exit 0`}
 
         const calls = fs.readFileSync(callLog, 'utf8').split('\n').filter(Boolean)
         expect(calls.filter(it => it.startsWith('image --download-db-only'))).toHaveLength(1)
-        // Both files were still scanned — the refresh gates the scans, it does not replace them.
+        // Both files were still scanned - the refresh gates the scans, it does not replace them.
         expect(calls.filter(it => it.startsWith('sbom --format json'))).toHaveLength(2)
     })
 
@@ -336,28 +320,38 @@ exit 0`}
         const grypeDb = path.join(tmpDir, 'grype-db-state')
         fs.writeFileSync(trivyDb, '2026-09-19T19:00:16Z')
         fs.rmSync(grypeDb, {force: true})
-        const trivy = path.join(tmpDir, 'trivy-stale.sh')
-        fs.writeFileSync(trivy, `#!/bin/sh
-if [ "$1" = --version ]; then
-  echo '{"Version":"${PINNED_SCANNER_VERSIONS.trivy}","VulnerabilityDB":{"Version":2,"UpdatedAt":"'$(cat ${trivyDb})'"}}'
-  exit 0
-fi
-if [ "$1" = image ]; then echo '2026-10-01T19:00:16Z' > ${trivyDb}; exit 0; fi
-echo '{"Results":[]}'
+        process.env.TRIVY_BIN = writeNodeScanner(tmpDir, 'trivy-stale', `
+const fs = require('fs')
+const args = process.argv.slice(2)
+if (args[0] === '--version') {
+    process.stdout.write('{"Version":${JSON.stringify(PINNED_SCANNER_VERSIONS.trivy)},"VulnerabilityDB":{"Version":2,"UpdatedAt":"' + fs.readFileSync(${JSON.stringify(trivyDb)}, 'utf8').trim() + '"}}')
+    process.exit(0)
+}
+if (args[0] === 'image') {
+    fs.writeFileSync(${JSON.stringify(trivyDb)}, '2026-10-01T19:00:16Z')
+    process.exit(0)
+}
+process.stdout.write('{"Results":[]}')
 `)
-        const grype = path.join(tmpDir, 'grype-empty.sh')
-        fs.writeFileSync(grype, `#!/bin/sh
-case "$1 $2" in
-  "version -o") echo '{"version":"${PINNED_SCANNER_VERSIONS.grype}"}'; exit 0 ;;
-  "db status") [ -f ${grypeDb} ] || exit 1; echo '{"schemaVersion":"v6.1.9","built":"'$(cat ${grypeDb})'"}'; exit 0 ;;
-  "db update") echo '2026-10-01T06:33:48Z' > ${grypeDb}; exit 0 ;;
-esac
-echo '{"matches":[]}'
+        process.env.GRYPE_BIN = writeNodeScanner(tmpDir, 'grype-empty', `
+const fs = require('fs')
+const args = process.argv.slice(2)
+const cmd = args.slice(0, 2).join(' ')
+if (cmd === 'version -o') {
+    process.stdout.write('{"version":${JSON.stringify(PINNED_SCANNER_VERSIONS.grype)}}')
+    process.exit(0)
+}
+if (cmd === 'db status') {
+    if (!fs.existsSync(${JSON.stringify(grypeDb)})) process.exit(1)
+    process.stdout.write('{"schemaVersion":"v6.1.9","built":"' + fs.readFileSync(${JSON.stringify(grypeDb)}, 'utf8').trim() + '"}')
+    process.exit(0)
+}
+if (cmd === 'db update') {
+    fs.writeFileSync(${JSON.stringify(grypeDb)}, '2026-10-01T06:33:48Z')
+    process.exit(0)
+}
+process.stdout.write('{"matches":[]}')
 `)
-        fs.chmodSync(trivy, 0o755)
-        fs.chmodSync(grype, 0o755)
-        process.env.TRIVY_BIN = trivy
-        process.env.GRYPE_BIN = grype
 
         const before = await preflightScanners()
         expect(before.trivy.dbBuiltAt).toBe('2026-09-19T19:00:16Z')
@@ -374,7 +368,7 @@ echo '{"matches":[]}'
     it('keeps the scanner\'s own reason in the warning when a scan fails', async () => {
         const callLog = path.join(tmpDir, 'calls-failing.txt')
         fs.writeFileSync(callLog, '')
-        process.env.TRIVY_BIN = stubTrivyRecording('trivy-failing.sh', callLog, true)
+        process.env.TRIVY_BIN = stubTrivyRecording('trivy-failing', callLog, true)
         process.env.GRYPE_BIN = missing('grype')
         const warn = vi.spyOn(log, 'warn').mockImplementation(() => log)
 

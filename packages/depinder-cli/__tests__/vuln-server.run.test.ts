@@ -10,14 +10,21 @@ import {collectSbomTargets, startServerVulnerabilities, vulnSummaryLine, writeSe
 import {VulnServerConfig} from '../src/vuln-sources/server'
 import {resetVulnSources} from '../src/vuln-sources/selection'
 import {log} from '../src/utils/logging'
+import {writeNodeScanner} from './helpers/node-scanner'
 
 const [sbomNpm] = sbomPluginsForPurlTypes(['npm'])
 
 /**
  * Where an SBOM run's findings come from when a vulnerability server is configured: the server,
  * with no local scanner touched; or, when it fails, the local scan exactly as before. The local
- * scanners are stub shell scripts that log every call, so "not run" is observable.
+ * scanners are Node subprocess fixtures that log every call, so "not run" is observable.
  */
+
+vi.mock('child_process', async importOriginal => {
+    const actual = await importOriginal<typeof import('child_process')>()
+    const {nodeScannerExecFile} = await import('./helpers/node-scanner')
+    return {...actual, execFile: nodeScannerExecFile(actual.execFile)}
+})
 
 let tmpDir: string
 let sbomFile: string
@@ -42,12 +49,14 @@ const trivyReport = {
     }],
 }
 
-/** A stub scanner that records every invocation in `callLog`, then answers like the real one. */
+/** A stub scanner that records every invocation in `callLog`, then runs the given Node source. */
 function stub(name: string, script: string): string {
-    const file = path.join(tmpDir, name)
-    fs.writeFileSync(file, `#!/bin/sh\necho "${name} $*" >> '${callLog}'\n${script}`)
-    fs.chmodSync(file, 0o755)
-    return file
+    return writeNodeScanner(tmpDir, name, `
+const fs = require('fs')
+const args = process.argv.slice(2)
+fs.appendFileSync(${JSON.stringify(callLog)}, ${JSON.stringify(name)} + ' ' + args.join(' ') + '\\n')
+${script}
+`)
 }
 
 const serverFinding = {
@@ -68,17 +77,22 @@ beforeAll(() => {
         ],
         dependencies: [{ref: 'root', dependsOn: ['a', 'b']}],
     }))
-    process.env.TRIVY_BIN = stub('trivy', `if [ "$1" = --version ]; then echo '{"Version":"${PINNED_SCANNER_VERSIONS.trivy}"}'; exit 0; fi
-if [ "$1" = image ]; then exit 0; fi
-cat <<'EOF'
-${JSON.stringify(trivyReport)}
-EOF
+    process.env.TRIVY_BIN = stub('trivy', `if (args[0] === '--version') {
+    process.stdout.write('{"Version":${JSON.stringify(PINNED_SCANNER_VERSIONS.trivy)}}')
+    process.exit(0)
+}
+if (args[0] === 'image') process.exit(0)
+process.stdout.write(${JSON.stringify(JSON.stringify(trivyReport))})
 `)
-    process.env.GRYPE_BIN = stub('grype', `case "$1" in
-  version) echo '{"version":"${PINNED_SCANNER_VERSIONS.grype}"}'; exit 0 ;;
-  db) echo '{}'; exit 0 ;;
-esac
-echo '{"matches":[]}'
+    process.env.GRYPE_BIN = stub('grype', `if (args[0] === 'version') {
+    process.stdout.write('{"version":${JSON.stringify(PINNED_SCANNER_VERSIONS.grype)}}')
+    process.exit(0)
+}
+if (args[0] === 'db') {
+    process.stdout.write('{}')
+    process.exit(0)
+}
+process.stdout.write('{"matches":[]}')
 `)
 })
 

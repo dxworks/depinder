@@ -30,9 +30,12 @@ describe('the SQLite cache', () => {
 
         // Another connection sees the row: nothing waits for a save at the end of the run.
         const other = openCacheDb(dbFile)
-        expect(other.libKeys()).toContain('npm:left-pad')
-        expect(other.getLib('npm:left-pad')?.name).toBe('left-pad')
-        other.close()
+        try {
+            expect(other.libKeys()).toContain('npm:left-pad')
+            expect(other.getLib('npm:left-pad')?.name).toBe('left-pad')
+        } finally {
+            other.close()
+        }
 
         expect(sqliteCache.has('npm:left-pad')).toBe(true)
         sqliteCache.set('npm:right-pad', library('right-pad'))
@@ -49,26 +52,39 @@ describe('the SQLite cache', () => {
         // A second import (as `depinder cache import` would do) keeps what the database holds.
         sqliteCache.set('npm:left-pad', {...library('left-pad'), homepageUrl: 'refreshed'})
         fs.writeFileSync(legacy, JSON.stringify({'npm:left-pad': library('left-pad'), 'npm:new': library('new')}))
-        const counts = openCacheDb(dbFile).importLegacy(path.dirname(legacy))
-        expect(counts.libs).toBe(1)
+        const db = openCacheDb(dbFile)
+        try {
+            const counts = db.importLegacy(path.dirname(legacy))
+            expect(counts.libs).toBe(1)
+        } finally {
+            db.close()
+        }
         expect(sqliteCache.get('npm:left-pad')?.homepageUrl).toBe('refreshed')
         expect(sqliteCache.has('npm:new')).toBe(true)
     })
 
     it('lists the keys last written before a cutoff, for `update`', () => {
         const db = openCacheDb(dbFile)
-        db.setLib('npm:old', library('old'))
-        const cutoff = Date.now() + 1
-        while (Date.now() <= cutoff) { /* let the clock pass the cutoff */ }
-        db.setLib('npm:new', library('new'))
-        expect(db.libKeysUpdatedBefore(cutoff)).toEqual(['npm:old'])
-        expect(db.libKeysUpdatedBefore(0)).toEqual([])
-        db.close()
+        try {
+            db.setLib('npm:old', library('old'))
+            const cutoff = Date.now() + 1
+            while (Date.now() <= cutoff) { /* let the clock pass the cutoff */ }
+            db.setLib('npm:new', library('new'))
+            expect(db.libKeysUpdatedBefore(cutoff)).toEqual(['npm:old'])
+            expect(db.libKeysUpdatedBefore(0)).toEqual([])
+        } finally {
+            db.close()
+        }
     })
 
     it('reads DEPINDER_CACHE_DB, so a run can be pointed at its own database', () => {
         expect(sharedCacheDb().file).toBe(dbFile)
-        expect(openCacheDb(dbFile).stats().file).toBe(dbFile)
+        const other = openCacheDb(dbFile)
+        try {
+            expect(other.stats().file).toBe(dbFile)
+        } finally {
+            other.close()
+        }
         expect(fs.existsSync(dbFile)).toBe(true)
     })
 })
