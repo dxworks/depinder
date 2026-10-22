@@ -1,4 +1,6 @@
-import {PROVENANCE_FILE} from './scan-provenance'
+import {DEFAULT_VULN_SOURCE, parseVulnSources, VulnSourceSelection} from '../../vuln-sources/selection'
+import {localScanOutcome, LocalScanner} from './scan-outcomes'
+import {PROVENANCE_FILE, ScannedFileRecord} from './scan-provenance'
 import {ScannerPreflight, ScannerStatus} from './scanner-preflight'
 
 /** What the user is told about the local scanners: the verdict up front and the reminder at the end. */
@@ -17,6 +19,13 @@ function describe(status: ScannerStatus): string {
 
 const BANNER = '='.repeat(78)
 
+/** What callers that never passed a selection asked for: both local scanners, no GitHub. */
+const DEFAULT_SELECTION = parseVulnSources(DEFAULT_VULN_SOURCE)
+
+function selectedScanners(preflight: ScannerPreflight, selection: VulnSourceSelection): ScannerStatus[] {
+    return [preflight.trivy, preflight.grype].filter(status => selection[status.tool])
+}
+
 /**
  * The user-facing verdict, as a list of lines for the caller to log.
  *
@@ -24,11 +33,18 @@ const BANNER = '='.repeat(78)
  * user learns that vulnerability data is missing, and a run that ends with silently empty columns
  * is the failure mode this exists to prevent.
  */
-export function scannerPreflightMessages(preflight: ScannerPreflight, hasGithubToken: boolean): PreflightMessage[] {
+export function scannerPreflightMessages(
+    preflight: ScannerPreflight,
+    hasGithubToken: boolean,
+    selection: VulnSourceSelection = DEFAULT_SELECTION,
+): PreflightMessage[] {
     const messages: PreflightMessage[] = []
-    const {trivy, grype} = preflight
-    const installed = [trivy, grype].filter(it => it.installed)
-    const missing = [trivy, grype].filter(it => !it.installed)
+    const selected = selectedScanners(preflight, selection)
+    const installed = selected.filter(it => it.installed)
+    const missing = selected.filter(it => !it.installed)
+
+    // No selected local scanner at all (a GitHub-only run): nothing local to report.
+    if (selected.length === 0) return messages
 
     if (installed.length > 0) {
         messages.push({level: 'info', text: `Vulnerability scanners: ${installed.map(describe).join(', ')}`})
@@ -44,7 +60,7 @@ export function scannerPreflightMessages(preflight: ScannerPreflight, hasGithubT
         })
     }
 
-    if (missing.length === 1) {
+    if (installed.length > 0 && missing.length > 0) {
         const gone = missing[0]
         messages.push({level: 'warn', text: BANNER})
         messages.push({level: 'warn', text: `PARTIAL vulnerability analysis: ${gone.tool} is not available`})
@@ -57,11 +73,20 @@ export function scannerPreflightMessages(preflight: ScannerPreflight, hasGithubT
         messages.push({level: 'warn', text: BANNER})
     }
 
-    if (missing.length === 2) {
+    if (installed.length === 0) {
         messages.push({level: 'warn', text: BANNER})
-        messages.push({level: 'warn', text: 'NO local vulnerability scanner available — neither Trivy nor Grype could be run'})
+        if (missing.length === 1) {
+            messages.push({level: 'warn', text: `NO selected local vulnerability scanner available: ${missing[0].tool} could not be run`})
+        } else {
+            messages.push({level: 'warn', text: 'NO local vulnerability scanner available — neither Trivy nor Grype could be run'})
+        }
         for (const gone of missing) messages.push({level: 'warn', text: `  ${gone.tool}: ${gone.error ?? 'unavailable'}`})
-        if (hasGithubToken) {
+        if (selection.github) {
+            messages.push({
+                level: 'warn',
+                text: '  GitHub Advisories is selected; vulnerabilities can still come from its local advisory cache.',
+            })
+        } else if (hasGithubToken) {
             messages.push({
                 level: 'warn',
                 text: '  FALLBACK: GH_TOKEN is set, so vulnerabilities come from the GitHub Advisory\n'
@@ -82,20 +107,36 @@ export function scannerPreflightMessages(preflight: ScannerPreflight, hasGithubT
     return messages
 }
 
-/** The one-line reminder repeated at the end of the run, where the results paths are printed. */
-export function scannerSummaryLine(preflight: ScannerPreflight, hasGithubToken: boolean): PreflightMessage {
-    const installed = [preflight.trivy, preflight.grype].filter(it => it.installed)
-    if (installed.length === 2) {
-        return {level: 'info', text: `Vulnerability data source: ${installed.map(it => `${it.tool} ${it.version ?? '?'}`).join(' + ')}`}
+/**
+ * The one-line reminder repeated at the end of the run, where the results paths are printed.
+ * Final status from recorded reports; preflight supplies version labels only.
+ */
+export function scannerSummaryLine(
+    preflight: ScannerPreflight,
+    hasGithubToken: boolean,
+    selection: VulnSourceSelection,
+    records: readonly ScannedFileRecord[],
+): PreflightMessage {
+    const outcome = localScanOutcome(records, selection, hasGithubToken)
+    if (outcome.requested.length === 0) {
+        return {level: 'info', text: 'Vulnerability data source: GitHub Advisories'}
     }
-    if (installed.length === 1) {
-        const gone = [preflight.trivy, preflight.grype].find(it => !it.installed) as ScannerStatus
+    const describe = (tool: LocalScanner) => `${tool} ${preflight[tool].version ?? '?'}`
+    if (outcome.vulnerabilityAnalysis === 'complete') {
+        return {level: 'info', text: `Vulnerability data source: ${outcome.successful.map(describe).join(' + ')}`}
+    }
+    if (outcome.vulnerabilityAnalysis === 'partial') {
         return {
             level: 'warn',
-            text: `Vulnerability data source: ${installed[0].tool} only — PARTIAL, ${gone.tool} was not available`,
+            text: `Vulnerability data source: ${outcome.successful.map(describe).join(' + ')}`
+                + ` - PARTIAL, ${outcome.incomplete.join(' + ')} did not complete every SBOM`,
         }
     }
-    return hasGithubToken
-        ? {level: 'warn', text: 'Vulnerability data source: GitHub Advisories (fallback) — no local scanner ran'}
-        : {level: 'warn', text: 'Vulnerability data source: NONE — the vulnerability columns are empty because no scanner ran'}
+    if (selection.github) {
+        return {level: 'warn', text: 'Vulnerability data source: GitHub Advisories - selected local scanners produced no reports'}
+    }
+    if (outcome.githubAdvisoryFallback) {
+        return {level: 'warn', text: 'Vulnerability data source: GitHub Advisories (fallback) - no selected local scanner produced a report'}
+    }
+    return {level: 'warn', text: 'Vulnerability data source: NONE - no selected local scanner produced a report'}
 }

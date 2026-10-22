@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import {SbomDescription} from '../plugins/sbom/describe'
+import {normalizeInputPath} from '../utils/input-path'
 import {log} from '../utils/logging'
 import {readRepoManifests, RepoFiles, RepoManifests} from './manifests'
 
@@ -24,11 +25,13 @@ export function readDepMinerIndex(indexFile: string): Map<string, RepoFiles> {
     const folder = path.dirname(indexFile)
     const repos = new Map<string, RepoFiles>()
     for (const [copy, original] of Object.entries(entries)) {
-        const slash = original.indexOf('/')
+        // Index values are repo-relative paths in the scanned host's spelling.
+        const relative = normalizeInputPath(original)
+        const slash = relative.indexOf('/')
         if (slash <= 0) continue
-        const repo = original.slice(0, slash)
+        const repo = relative.slice(0, slash)
         if (!repos.has(repo)) repos.set(repo, new Map())
-        repos.get(repo)?.set(original.slice(slash + 1), path.join(folder, copy))
+        repos.get(repo)?.set(relative.slice(slash + 1), path.join(folder, copy))
     }
     return repos
 }

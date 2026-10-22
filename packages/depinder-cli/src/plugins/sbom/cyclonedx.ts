@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import {DepinderDependency, DepinderProject} from '../../extension-points/extract'
+import {normalizeInputPath} from '../../utils/input-path'
 import {log} from '../../utils/logging'
 import {normalizePurl, purlCoordinates, type PurlCoordinates} from './purl'
 
@@ -58,6 +59,15 @@ export interface BomGraph {
 
 export function readBomGraph(sbomFile: string): BomGraph {
     const bom = JSON.parse(fs.readFileSync(sbomFile, 'utf8')) as CycloneDxBom
+    // Normalize imported Syft locations once;
+    // graph refs and other properties stay verbatim.
+    for (const component of bom.components ?? []) {
+        for (const property of component.properties ?? []) {
+            if (/^syft:location:\d+:path$/.test(property.name)) {
+                property.value = normalizeInputPath(property.value)
+            }
+        }
+    }
     const byRef = new Map<string, CycloneDxComponent>((bom.components ?? []).map(c => [c['bom-ref'], c]))
     const edges = new Map<string, string[]>()
     for (const entry of bom.dependencies ?? []) {

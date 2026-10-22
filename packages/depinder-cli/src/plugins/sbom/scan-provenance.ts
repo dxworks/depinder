@@ -2,7 +2,9 @@ import fs from 'fs'
 import path from 'path'
 import {PINNED_SCANNER_VERSIONS} from '@depinder/core'
 import {SbomDescription} from './describe'
+import {localScanOutcome} from './scan-outcomes'
 import {preflightScanners} from './scanner-preflight'
+import {describeVulnSources, vulnSources} from '../../vuln-sources/selection'
 
 /** What one SBOM file's scan actually produced — the per-file half of the provenance record. */
 export interface ScannedFileRecord {
@@ -33,6 +35,14 @@ export function clearScannedFiles(): void {
     scannedFiles.clear()
 }
 
+/** Copies of recorded scans, optionally limited to the supplied SBOM files. */
+export function recordedScans(files?: readonly string[]): ScannedFileRecord[] {
+    const records = [...scannedFiles.values()].map(record => ({...record}))
+    if (files === undefined) return records
+    const wanted = new Set(files.map(file => path.resolve(file)))
+    return records.filter(record => wanted.has(path.resolve(record.file)))
+}
+
 /**
  * Records how the vulnerability numbers in the CSVs were produced.
  *
@@ -53,6 +63,8 @@ export async function writeScanProvenance(
             return sbom ? [{...record, producer: sbom.producer, producerVersion: sbom.toolVersion, repo: sbom.repo}] : []
         })
         : [...scannedFiles.values()]
+    const selection = vulnSources()
+    const {githubAdvisoryFallback, vulnerabilityAnalysis} = localScanOutcome(sbomFiles, selection, hasGithubToken)
     const provenance = {
         generatedAt: new Date().toISOString(),
         ...(sboms?.length ? {source: sboms[0].producer} : {}),
@@ -63,10 +75,9 @@ export async function writeScanProvenance(
             trivy: preflight.trivy,
             grype: preflight.grype,
         },
-        githubAdvisoryFallback: preflight.installedCount === 0 && hasGithubToken,
-        vulnerabilityAnalysis: preflight.installedCount > 0
-            ? (preflight.installedCount === 2 ? 'complete' : 'partial')
-            : (hasGithubToken ? 'github-advisories-only' : 'disabled'),
+        selectedSources: describeVulnSources(selection).split(', '),
+        githubAdvisoryFallback,
+        vulnerabilityAnalysis,
         sbomFiles,
     }
     const file = path.resolve(resultFolder, PROVENANCE_FILE)

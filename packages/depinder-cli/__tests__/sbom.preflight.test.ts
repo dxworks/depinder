@@ -4,9 +4,10 @@ import path from 'path'
 import {PINNED_SCANNER_VERSIONS} from '@depinder/core'
 import {clearLocalScanCache, scanSbomFileOnce} from '../src/plugins/sbom/local-scan'
 import {scannerPreflightMessages, scannerSummaryLine} from '../src/plugins/sbom/preflight-messages'
-import {PROVENANCE_FILE, writeScanProvenance} from '../src/plugins/sbom/scan-provenance'
+import {PROVENANCE_FILE, ScannedFileRecord, writeScanProvenance} from '../src/plugins/sbom/scan-provenance'
 import {ScannerPreflight, preflightScanners} from '../src/plugins/sbom/scanner-preflight'
 import {log} from '../src/utils/logging'
+import {parseVulnSources} from '../src/vuln-sources/selection'
 
 /**
  * The preflight is the only thing standing between a user with no scanners and a completed run
@@ -83,6 +84,15 @@ const missing = (name: string) => path.join(tmpDir, `nonexistent-${name}`)
 const textOf = (preflight: ScannerPreflight, ghToken: boolean) =>
     scannerPreflightMessages(preflight, ghToken).map(it => it.text).join('\n')
 
+/** The recorded outcome a scenario implies: the summary line reports produced reports, not installed binaries. */
+const record = (statuses: {trivy?: 'ok' | 'skipped', grype?: 'ok' | 'skipped'}): ScannedFileRecord => ({
+    file: sbomFile,
+    trivy: statuses.trivy ?? 'skipped',
+    grype: statuses.grype ?? 'skipped',
+    findingEntries: 0,
+    packageKeys: 0,
+})
+
 beforeAll(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder-preflight-'))
     sbomFile = path.join(tmpDir, 'p.cdx.json')
@@ -147,7 +157,10 @@ describe('preflight messages', () => {
         expect(messages[0].text).toBe(
             `Vulnerability scanners: trivy ${PINNED_SCANNER_VERSIONS.trivy} (DB 2, built 2026-08-18T12:56:24Z), `
             + `grype ${PINNED_SCANNER_VERSIONS.grype} (DB v6.1.9, built 2026-08-18T06:15:38Z)`)
-        expect(scannerSummaryLine(preflight, false).level).toBe('info')
+        expect(scannerSummaryLine(preflight, false, parseVulnSources('trivy,grype'), [record({trivy: 'ok', grype: 'ok'})])).toEqual({
+            level: 'info',
+            text: `Vulnerability data source: trivy ${PINNED_SCANNER_VERSIONS.trivy} + grype ${PINNED_SCANNER_VERSIONS.grype}`,
+        })
     })
 
     it('warns that results are partial and names the missing tool', async () => {
@@ -160,9 +173,9 @@ describe('preflight messages', () => {
         expect(text).toContain('PARTIAL vulnerability analysis: grype is not available')
         expect(text).toContain('install grype, or set GRYPE_BIN')
         expect(text).toContain('substantially different sets of vulnerabilities')
-        expect(scannerSummaryLine(preflight, false)).toEqual({
+        expect(scannerSummaryLine(preflight, false, parseVulnSources('trivy,grype'), [record({trivy: 'ok'})])).toEqual({
             level: 'warn',
-            text: 'Vulnerability data source: trivy only — PARTIAL, grype was not available',
+            text: `Vulnerability data source: trivy ${PINNED_SCANNER_VERSIONS.trivy} - PARTIAL, grype did not complete every SBOM`,
         })
     })
 
@@ -177,8 +190,8 @@ describe('preflight messages', () => {
         expect(text).toContain('VULNERABILITY ANALYSIS IS DISABLED')
         expect(text).toContain('Set GH_TOKEN to fall back')
         expect(text).not.toContain('FALLBACK: GH_TOKEN is set')
-        expect(scannerSummaryLine(preflight, false).text)
-            .toBe('Vulnerability data source: NONE — the vulnerability columns are empty because no scanner ran')
+        expect(scannerSummaryLine(preflight, false, parseVulnSources('trivy,grype'), []).text)
+            .toBe('Vulnerability data source: NONE - no selected local scanner produced a report')
     })
 
     it('says it fell back to advisories when scanners are missing but GH_TOKEN is set', async () => {
@@ -190,8 +203,8 @@ describe('preflight messages', () => {
 
         expect(text).toContain('FALLBACK: GH_TOKEN is set')
         expect(text).not.toContain('VULNERABILITY ANALYSIS IS DISABLED')
-        expect(scannerSummaryLine(preflight, true).text)
-            .toBe('Vulnerability data source: GitHub Advisories (fallback) — no local scanner ran')
+        expect(scannerSummaryLine(preflight, true, parseVulnSources('trivy,grype'), []).text)
+            .toBe('Vulnerability data source: GitHub Advisories (fallback) - no selected local scanner produced a report')
     })
 
     it('warns on a version that differs from the pinned pair, without disabling anything', async () => {

@@ -1,12 +1,13 @@
 import {Command} from 'commander'
 import fs from 'fs'
 import path from 'path'
+import {errorMessage} from '@depinder/core'
 import {getPluginsFromNames} from '../plugins'
 import {deferSbomFindings, parseSbomProjects, sbomFilesToParse, sbomPluginsForPurlTypes} from '../plugins/sbom'
 import {assignPurl} from '../plugins/sbom/dependency-purl'
 import {SbomDescription} from '../plugins/sbom/describe'
 import {scannerSummaryLine} from '../plugins/sbom/preflight-messages'
-import {writeScanProvenance} from '../plugins/sbom/scan-provenance'
+import {recordedScans, writeScanProvenance} from '../plugins/sbom/scan-provenance'
 import {ScannerPreflight} from '../plugins/sbom/scanner-preflight'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
 import {availableVersions, LibraryInfo, usedVersionTimestamp} from '../extension-points/library-info'
@@ -29,6 +30,7 @@ import {
     describeVulnSources,
     parseVulnSources,
     setVulnSources,
+    vulnSources,
 } from '../vuln-sources/selection'
 import {ecosystemsInSboms} from '../vuln-sources/github/scan'
 import {refreshEcosystems} from '../vuln-sources/github/download'
@@ -38,6 +40,8 @@ import {AnalysedEcosystem} from '../blackduck/model'
 import {writeBlackDuckForSource} from '../blackduck/run'
 import {licenseIdentity} from '../blackduck/licenses'
 import {classifyInputs, inputFolderOf, SbomSource} from './sources'
+import {EnrichmentProject, EnrichmentReport, writeEnrichmentReport} from './enrichment-report'
+import {logEnrichmentSummaries} from './enrichment-summary'
 import {csvRow} from '../utils/csv'
 import {log} from '../utils/logging'
 import {count, enableProfile, logProfile, startPhase, timePhase, timePhaseSync} from '../utils/profile'
@@ -173,12 +177,21 @@ export function convertDepToRow(proj: DepinderProject, dep: DepinderDependency):
 }
 
 // Phase 1 — one plugin's parse: its projects from every SBOM of the run, in file order.
-async function parsePluginProjects(plugin: Plugin, sbomFiles: string[]): Promise<DepinderProject[]> {
-    const projects: DepinderProject[] = []
+
+/** A parsed project and the SBOM it came from: the enrichment report tells projects apart by file. */
+interface ParsedSbomProject {
+    project: DepinderProject
+    sbomFile: string
+}
+
+async function parsePluginProjects(plugin: Plugin, sbomFiles: string[]): Promise<ParsedSbomProject[]> {
+    const projects: ParsedSbomProject[] = []
     for (const sbomFile of sbomFiles) {
         log.info(`Parsing the ${plugin.purlType} projects of ${sbomFile}`)
         try {
-            projects.push(...await parseSbomProjects(sbomFile, plugin.purlType))
+            for (const project of await parseSbomProjects(sbomFile, plugin.purlType)) {
+                projects.push({project, sbomFile: path.resolve(sbomFile)})
+            }
         } catch (e: any) {
             log.warn(`Exception parsing the ${plugin.purlType} projects of ${sbomFile}`)
             log.error(e)
@@ -460,14 +473,18 @@ async function analyseFiles(folders: string[], options: AnalyseOptions): Promise
         timePhaseSync('cache:prune', () => session.misses.prune())
     }
 
+    logProfile()
+
     // Repeated here because the preflight banner is thousands of log lines back by now, and
     // because a CSV is only readable next to the matcher and DB build that produced it.
+    // Limit the final status to this invocation's planned SBOMs.
+    const scans = recordedScans(runs.flatMap(run => run.sboms.map(sbom => sbom.file)))
     const summary = prep.preflight
-        ? scannerSummaryLine(prep.preflight, prep.hasGithubToken)
-        : vulnOutcome && vulnSummaryLine(vulnOutcome, prep.hasGithubToken)
+        ? scannerSummaryLine(prep.preflight, prep.hasGithubToken, vulnSources(), scans)
+        : vulnOutcome && vulnSummaryLine(vulnOutcome, prep.hasGithubToken, scans)
     if (summary) log[summary.level](summary.text)
+    logEnrichmentSummaries(runs.map(run => run.folder))
     log.info('Done')
-    logProfile()
 }
 
 /**
@@ -488,16 +505,20 @@ export async function runAnalysis(
     // Phase 1 — parse: SBOMs → DepinderProject[] per plugin, side by side. Nothing leaves the machine
     // yet. Every plugin finishes parsing before any enrichment starts, because a bulk question is
     // only worth asking once it can cover the whole run.
-    const pluginProjects: PluginProjects[] = await Promise.all(
-        plugins.map(async (plugin): Promise<PluginProjects> => {
+    const pluginProjects = await Promise.all(
+        plugins.map(async (plugin) => {
             log.info(`Plugin ${plugin.name} starting`)
-            const projects: DepinderProject[] = await timePhase(`parse:${plugin.name}`, () =>
+            const parsedProjects = await timePhase(`parse:${plugin.name}`, () =>
                 parsePluginProjects(plugin, sbomFiles))
-            return {plugin, projects}
+            return {plugin, projects: parsedProjects.map(it => it.project), parsedProjects}
         }))
 
     // Phase 1b — the purl for every dependency: the SBOM's own, else one spelled from its name.
     const named = assignPurls(pluginProjects)
+
+    // Every parsed package counted once per source, by (purl type, name, version): the outcome
+    // recorded in phase 3 decides whether it resolved. One collector per run, never shared.
+    const enrichment = new EnrichmentReport()
 
     // Phase 2 — the bulk resolver, when one is configured: local cache → our server → registries.
     // What the cache cannot answer is asked of the server once per purl per process, bounded by the
@@ -521,7 +542,7 @@ export async function runAnalysis(
     // Phase 3 — enrichment: per dep, cache → miss cache → registry fallback. The plugins run side by
     // side, each registry behind its ecosystem's limits, so a registry that stalls does not hold the
     // others up. Whatever phase 2 cached is a plain cache hit here and never reaches a registry.
-    const results = await Promise.all(pluginProjects.map(async ({plugin, projects}): Promise<AnalysisResult> => {
+    const results = await Promise.all(pluginProjects.map(async ({plugin, projects, parsedProjects}): Promise<AnalysisResult> => {
         // A library the resolver just refreshed counts as refreshed: without this, `--refresh`
         // would discard the answer that was fetched seconds ago and go back to the registry.
         const keyPrefix = `${ecosystemOf(plugin)}:`
@@ -533,10 +554,17 @@ export async function runAnalysis(
 
 
         const enrich = startPhase(`enrich:${plugin.name}`)
-        for (const project of projects) {
+        for (const {project, sbomFile} of parsedProjects) {
+            const reference: EnrichmentProject = {
+                name: project.name, version: project.version, path: project.path, sbomFile,
+            }
             log.info(`Plugin ${plugin.name} analyzing project ${project.name}@${project.version}`)
             const dependencies = Object.values(project.dependencies)
-            const filteredDependencies = dependencies.filter(it => !blacklistedGlobs.some(glob => minimatch(it.name, glob)))
+            const filteredDependencies = dependencies.filter(dep => {
+                const skipped = blacklistedGlobs.some(glob => minimatch(dep.name, glob))
+                if (skipped) enrichment.observe(purlType, reference, dep, {status: 'skipped'})
+                return !skipped
+            })
             const depProgressBar = progress.create(filteredDependencies.length, 0, {
                 name: 'Deps',
                 state: 'Analysing deps',
@@ -568,6 +596,10 @@ export async function runAnalysis(
                         // keeps whatever the parser gave it, untouched.
                         count('cache:known-miss')
                         log.warn(`Skipping ${dep.name}: its registry lookup failed within the last ${MISS_TTL_HOURS}h (--refresh to retry)`)
+                        enrichment.observe(purlType, reference, dep, {
+                            status: 'cached_miss',
+                            reason: `Metadata lookup failed within ${MISS_TTL_HOURS}h; original reason is not stored (--refresh to retry)`,
+                        })
                         return
                     } else {
                         // An expired entry is a miss like any other; the count only tells them apart.
@@ -600,13 +632,15 @@ export async function runAnalysis(
                     }
                     dep.libraryInfo = lib
                     dep.vulnerabilities = resolveVulnerabilities(project, dep, lib)
+                    enrichment.observe(purlType, reference, dep, {status: 'resolved'})
                 } catch (e: any) {
                     count('registry:error')
+                    enrichment.observe(purlType, reference, dep, {status: 'lookup_failed', reason: errorMessage(e)})
                     logLookupFailure(dep.name, ecosystemOf(plugin), e)
                 } finally {
                     depProgressBar.increment()
                     depsWithInfo++
-                    log.info(`Got remote information on ${dep.name} (${depsWithInfo}/${filteredDependencies.length})`)
+                    log.info(`Processed ${dep.name} (${depsWithInfo}/${filteredDependencies.length})`)
                 }
             }
 
@@ -692,6 +726,7 @@ export async function runAnalysis(
         return {purlType, projects}
     }))
     progress.stop()
+    writeEnrichmentReport(resultFolder, enrichment)
     log.info(`Results are written to ${resultFolder}`)
     return results
 }

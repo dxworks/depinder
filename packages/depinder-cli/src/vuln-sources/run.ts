@@ -12,7 +12,7 @@ import {assignPurl} from '../plugins/sbom/dependency-purl'
 import {SbomDescription} from '../plugins/sbom/describe'
 import {scanSbomFileOnce} from '../plugins/sbom/local-scan'
 import {PreflightMessage, scannerPreflightMessages, scannerSummaryLine} from '../plugins/sbom/preflight-messages'
-import {PROVENANCE_FILE} from '../plugins/sbom/scan-provenance'
+import {PROVENANCE_FILE, ScannedFileRecord} from '../plugins/sbom/scan-provenance'
 import {preflightScanners, ScannerPreflight} from '../plugins/sbom/scanner-preflight'
 import type {VulnDatabaseBuild} from '@depinder/core'
 import {log} from '../utils/logging'
@@ -24,7 +24,7 @@ import {
     VulnServerAnswer,
     VulnServerConfig,
 } from './server'
-import {vulnSources} from './selection'
+import {describeVulnSources, vulnSources} from './selection'
 
 /**
  * Where an SBOM run's vulnerabilities come from: the vulnerability server, or — when it is not
@@ -96,7 +96,7 @@ export type VulnOutcome =
  */
 export async function localScannerPreflight(hasGithubToken: boolean): Promise<ScannerPreflight> {
     const preflight = await timePhase('preflight', () => preflightScanners())
-    for (const message of scannerPreflightMessages(preflight, hasGithubToken)) log[message.level](message.text)
+    for (const message of scannerPreflightMessages(preflight, hasGithubToken, vulnSources())) log[message.level](message.text)
     return preflight
 }
 
@@ -234,6 +234,7 @@ export function writeServerProvenance(
         databases: {trivy: oldest(answer.databases.trivy), grype: oldest(answer.databases.grype)},
         ...(several ? {databaseBuilds: answer.databases} : {}),
         githubAdvisories: vulnSources().github,
+        selectedSources: describeVulnSources(vulnSources()).split(', '),
         vulnerabilityAnalysis: 'complete',
         sbomFiles,
     }
@@ -243,7 +244,11 @@ export function writeServerProvenance(
 }
 
 /** The end-of-run reminder of where the vulnerability columns came from. */
-export function vulnSummaryLine(outcome: VulnOutcome, hasGithubToken: boolean): PreflightMessage | undefined {
+export function vulnSummaryLine(
+    outcome: VulnOutcome,
+    hasGithubToken: boolean,
+    records: readonly ScannedFileRecord[],
+): PreflightMessage | undefined {
     if (outcome.source === 'server') {
         const stale = staleBuildWarnings(outcome.answer).length > 0
         return {
@@ -253,7 +258,7 @@ export function vulnSummaryLine(outcome: VulnOutcome, hasGithubToken: boolean): 
         }
     }
     if (!outcome.preflight) return undefined
-    const local = scannerSummaryLine(outcome.preflight, hasGithubToken)
+    const local = scannerSummaryLine(outcome.preflight, hasGithubToken, vulnSources(), records)
     return outcome.fallbackReason
         ? {level: 'warn', text: `${local.text} (local scan: the vulnerability server failed: ${outcome.fallbackReason})`}
         : local

@@ -34,6 +34,15 @@ Each source `analyse` finds — Trivy SBOMs, Syft SBOMs — gets its own subfold
 `syft/`). Each also holds `security.csv`, one row per (component, advisory), and the
 [Black Duck-shaped files](blackduck-export/index.md).
 
+Each source folder also includes:
+
+- `summary.json`: unique package totals and metadata resolution counts by ecosystem.
+- `unresolved-packages.csv`: unresolved packages, reasons and affected projects, including the SBOM file each came from.
+- `sbom-scan-provenance.json`: selected vulnerability sources and recorded scan outcomes.
+
+Counts use unique ecosystem/name/version. The final log highlights unresolved packages
+and links their CSVs.
+
 ## Ecosystems
 
 | Plugin | purl type | Aliases for `-p` |

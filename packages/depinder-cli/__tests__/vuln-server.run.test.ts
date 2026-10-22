@@ -5,7 +5,7 @@ import os from 'os'
 import path from 'path'
 import {clearSbomCache, deferSbomFindings, parseSbomProjects, sbomPluginsForPurlTypes} from '../src/plugins/sbom'
 import {clearLocalScanCache} from '../src/plugins/sbom/local-scan'
-import {PROVENANCE_FILE} from '../src/plugins/sbom/scan-provenance'
+import {PROVENANCE_FILE, recordedScans} from '../src/plugins/sbom/scan-provenance'
 import {collectSbomTargets, startServerVulnerabilities, vulnSummaryLine, writeServerProvenance} from '../src/vuln-sources/run'
 import {VulnServerConfig} from '../src/vuln-sources/server'
 import {resetVulnSources} from '../src/vuln-sources/selection'
@@ -167,7 +167,7 @@ describe('vulnerabilities from the server', () => {
             databases: {grype: {built_at: '2026-09-01T06:33:48Z', stale: true}, trivy: {built_at: '2026-10-01T19:00:16Z', stale: false}},
             sbomFiles: [{file: sbomFile, purls: 2, vulnerablePurls: 1, findingEntries: 1}],
         })
-        expect(vulnSummaryLine(result, false)).toEqual({
+        expect(vulnSummaryLine(result, false, [])).toEqual({
             level: 'warn',
             text: expect.stringContaining('vulnerability server vuln.example:8080, trivy 0.74.0'),
         })
@@ -193,7 +193,7 @@ describe('vulnerabilities from the server', () => {
         expect(project.dependencies['lodash@4.17.15'].vulnerabilities?.map(it => it.identifiers?.[0].value)).toEqual(['CVE-2021-23337'])
         expect(project.dependencies['lodash@4.17.15'].vulnerabilities?.[0].source).toBe('trivy')
         expect(project.dependencies['left-pad@1.3.0'].vulnerabilities).toEqual([])
-        expect(vulnSummaryLine(result, false)?.text).toContain('the vulnerability server failed: HTTP 500')
+        expect(vulnSummaryLine(result, false, recordedScans([sbomFile]))?.text).toContain('the vulnerability server failed: HTTP 500')
     })
 
     it('falls back too when the server cannot be reached at all', async () => {
