@@ -4,7 +4,7 @@ import path from 'path'
  * Stubs the scanners at execFile: version/DB probes, DB-warm commands and per-file scan reports
  * ('ok' an empty report, 'fail' a throw, 'bad' non-JSON stdout), per the suite's control.
  */
-export type ScanMode = 'ok' | 'fail' | 'bad'
+type ScanMode = 'ok' | 'fail' | 'bad'
 
 export interface ScannerProcessControl {
     installed: {trivy: boolean, grype: boolean}

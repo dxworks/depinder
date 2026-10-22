@@ -1,5 +1,5 @@
 import {parse} from 'csv-parse/sync'
-import {convertDepToRow} from '../src/commands/analyse'
+import {analysisCsvReports} from '../src/commands/analysis-csv'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
 import {LibraryInfo} from '../src/extension-points/library-info'
 
@@ -26,11 +26,12 @@ function dependency(overrides: Partial<DepinderDependency> = {}): DepinderDepend
 const COLUMNS = 15
 
 function cellsOf(dep: DepinderDependency): string[] {
-    const rows: string[][] = parse(convertDepToRow(project, dep), {relaxColumnCount: false})
-    return rows[0]
+    const rows: string[][] = parse(
+        analysisCsvReports([{...project, dependencies: {[dep.id]: dep}}]).libs, {relaxColumnCount: false})
+    return rows[1]
 }
 
-describe('convertDepToRow', () => {
+describe('dependency CSV rows', () => {
     it('keeps a comma-containing version in one cell', () => {
         // A Maven range string, as seen in real SBOM data.
         const cells = cellsOf(dependency({version: '[4.1,4.2000)'}))

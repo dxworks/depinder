@@ -1,5 +1,5 @@
 import {parse} from 'csv-parse/sync'
-import {convertDepToRow} from '../src/commands/analyse'
+import {analysisCsvReports} from '../src/commands/analysis-csv'
 import {operationalRisk} from '../src/blackduck/risk'
 import {fixedReportNow, parseReportNow, REPORT_NOW_ENV, reportNow} from '../src/utils/report-clock'
 import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
@@ -67,7 +67,7 @@ describe('ages under a fixed report date', () => {
                 ],
             } as unknown as LibraryInfo,
         }
-        const [cells]: string[][] = parse(convertDepToRow(project, dep))
-        expect([cells[8], cells[9]]).toEqual(['26', '12'])
+        const rows: string[][] = parse(analysisCsvReports([{...project, dependencies: {[dep.id]: dep}}]).libs)
+        expect([rows[1][8], rows[1][9]]).toEqual(['26', '12'])
     })
 })

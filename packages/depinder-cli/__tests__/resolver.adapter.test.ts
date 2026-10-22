@@ -3,7 +3,9 @@ import {componentLinkOf, toLibraryInfo} from '../src/resolver/adapter'
 import {LibraryInfo} from '../src/extension-points/library-info'
 import {newerVersionCounts} from '../src/blackduck/versions'
 import {comparatorForPurlType} from '../src/blackduck/model'
-import {licenseOf} from '../src/commands/analyse'
+import {parse} from 'csv-parse/sync'
+import {analysisCsvReports} from '../src/commands/analysis-csv'
+import {DepinderDependency, DepinderProject} from '../src/extension-points/extract'
 
 /**
  * The resolver speaks purls and Postgres rows; everything downstream of `analyse` — the cache, the
@@ -207,6 +209,16 @@ describe('the resolver package record adapter', () => {
  * produced when every version arrived as `{version, released_at, licenses, prerelease, yanked}` —
  * so this fails if the expansion loses a date, a license, a version, or the millisecond scale.
  */
+/** The license the reports' grouping rules put this package under. */
+function reportedLicense(info: LibraryInfo): string {
+    const dep: DepinderDependency = {
+        id: 'lib@1.0.0', name: info.name, version: '1.0.0', requestedBy: ['proj@1.0.0'], libraryInfo: info,
+    }
+    const project: DepinderProject = {name: 'proj', version: '1.0.0', path: '/repo', dependencies: {[dep.id]: dep}}
+    const rows: string[][] = parse(analysisCsvReports([project]).licenses)
+    return rows[1][0]
+}
+
 describe('the readers of an expanded record, against the shape they used to get', () => {
     const compare = comparatorForPurlType('npm')
 
@@ -272,20 +284,20 @@ describe('the readers of an expanded record, against the shape they used to get'
     })
 
     it('reports the same license', () => {
-        expect(licenseOf(toLibraryInfo(compact))).toBe('MIT')
-        expect(licenseOf(toLibraryInfo(compact))).toBe(licenseOf(oldShape))
+        expect(reportedLicense(toLibraryInfo(compact))).toBe('MIT')
+        expect(reportedLicense(toLibraryInfo(compact))).toBe(reportedLicense(oldShape))
     })
 
     it('still falls back to a per-version license when the package has none', () => {
-        // Maven fills only the per-version lists, and `licenseOf` has always fallen
+        // Maven fills only the per-version lists, and license grouping has always fallen
         // back to them. A package-level `[]` expands into every three-element tuple, so the
         // fallback has to find the version that shipped a fourth element.
         const perVersionOnly = toLibraryInfo(record({
             licenses: [],
             versions: [['1.0.0', at('2020-01-01T00:00:00Z'), 0], ['1.1.0', at('2021-01-01T00:00:00Z'), 0, ['Apache-2.0']]],
         }))
-        expect(licenseOf(perVersionOnly)).toBe('Apache-2.0')
-        expect(licenseOf(perVersionOnly)).toBe(licenseOf({
+        expect(reportedLicense(perVersionOnly)).toBe('Apache-2.0')
+        expect(reportedLicense(perVersionOnly)).toBe(reportedLicense({
             name: 'left-pad',
             licenses: [],
             versions: [

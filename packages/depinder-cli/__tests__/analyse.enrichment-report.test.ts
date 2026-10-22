@@ -114,6 +114,7 @@ describe('per-source metadata completeness report', () => {
     })
 
     afterEach(() => {
+        vi.unstubAllEnvs()
         blacklistedGlobs.splice(0, blacklistedGlobs.length, ...originalBlacklist)
         deferSbomFindings(false)
         resetSharedCacheDb()
@@ -240,5 +241,45 @@ describe('per-source metadata completeness report', () => {
             {name: 'web', version: '1.0.0', path: 'web/package-lock.json', sbomFile: fileA},
             {name: 'web', version: '1.0.0', path: 'web/package-lock.json', sbomFile: fileB},
         ])
+    })
+
+    it('writes all three plugin CSVs with the existing headers and rows', async () => {
+        vi.stubEnv('DEPINDER_REPORT_NOW', '2024-03-15T12:00:00Z')
+        fs.writeFileSync(bomFile, JSON.stringify(cachedOnlyBom()))
+        session().cache.set('npm:cached-lib', {
+            name: 'cached-lib',
+            licenses: ['MIT'],
+            versions: [
+                {version: '1.0.0', timestamp: Date.parse('2020-01-15T12:00:00Z'), latest: false},
+                {version: '2.0.0', timestamp: Date.parse('2021-03-15T12:00:00Z'), latest: true},
+            ],
+        })
+
+        await runAnalysis([bomFile], plugins(), syftFolder,
+            {results: 'results', refresh: false}, session(), undefined, undefined, everythingAnswers())
+
+        const csv = (name: string) =>
+            fs.readFileSync(path.join(syftFolder, `${plugins()[0].name}-${name}.csv`), 'utf8')
+        expect(csv('licenses')).toBe(
+            'License,Libraries,Library Names\nMIT,1,cached-lib')
+        expect(csv('libs')).toBe(
+            'Project Path,Project,Library,Used Version,Latest Version,Used Version Release Date,Latest Version Release Date,Latest-Used,Now-Used,Now-latest,Vulnerabilities,Vulnerability Details,DirectDependency,Type,Licenses\n'
+            + 'only/package-lock.json,only,cached-lib,1.0.0,2.0.0,Jan 2020,Mar 2021,14,50,36,0,,true,,MIT')
+        expect(csv('project-stats')).toBe(
+            'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct Out of Support, Indirect Out of Support\n'
+            + 'only/package-lock.json,only,1,0,0,0,0,0,0,0,1,0')
+    })
+
+    it('writes header-only plugin CSVs when no projects are parsed', async () => {
+        await runAnalysis([], plugins(), syftFolder,
+            {results: 'results', refresh: false}, session(), undefined, undefined, everythingAnswers())
+
+        const csv = (name: string) =>
+            fs.readFileSync(path.join(syftFolder, `${plugins()[0].name}-${name}.csv`), 'utf8')
+        expect(csv('licenses')).toBe('License,Libraries,Library Names\n')
+        expect(csv('libs')).toBe(
+            'Project Path,Project,Library,Used Version,Latest Version,Used Version Release Date,Latest Version Release Date,Latest-Used,Now-Used,Now-latest,Vulnerabilities,Vulnerability Details,DirectDependency,Type,Licenses\n')
+        expect(csv('project-stats')).toBe(
+            'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct Out of Support, Indirect Out of Support\n')
     })
 })
