@@ -72,9 +72,7 @@ export interface AnalyseOptions extends ResolverOptions, CacheMaxAgeOptions {
     githubMaxAge?: string
     /** Print per-phase wall-clock, cache and HTTP request counts at the end of the run. */
     profile?: boolean
-    /** SBOM sources: the `Project path` value and the head of every dependency path. */
-    projectName?: string
-    /** SBOM sources: DepMiner's `index.json` for Black Duck's `Path` prefix; `false` for `--no-depminer-index`. */
+    /** DepMiner's index for manifest-based own-code filtering; false disables lookup. */
     depminerIndex?: string | false
     /** `false` for `--no-vuln-server`, `true` for `--vuln-server` (kept on under `--no-resolver`), else unset. */
     vulnServer?: boolean
@@ -96,11 +94,8 @@ export function createAnalyseCommand(): Command {
             'Cached packages older than this are fetched again: <n>[s|m|h|d], a bare number being seconds; '
             + 'DEPINDER_CACHE_MAX_AGE when unset, else 1d')
         .option('-p, --plugins [plugins...]', 'A list of plugins')
-        .option('--project-name <name>',
-            'SBOM sources: the name to write in the Project path column and at the head of every dependency path')
-        .option('--depminer-index <file>', 'SBOM sources: DepMiner\'s index.json (or its folder), whose manifests give Path '
-            + 'its Black Duck project prefix and drop own code from the chain; found beside the input when unset')
-        .option('--no-depminer-index', 'SBOM sources: do not read the DepMiner index; Path keeps the plain directory prefix')
+        .option('--depminer-index <file>', 'DepMiner index.json or its folder for own-code filtering; found beside input when unset')
+        .option('--no-depminer-index', 'Do not use DepMiner manifests for own-code filtering')
         .option('--vuln-source <sources>',
             'Vulnerability sources for the SBOM route: a comma-separated list of trivy, grype, github, all',
             DEFAULT_VULN_SOURCE)
@@ -215,7 +210,7 @@ export interface PlannedRun {
     source: string
     /** Absolute: `<results>/<source>`. */
     folder: string
-    /** The input folder the source's files came from — the project-name fallback. */
+    /** The input folder the source's files came from, used as the report label for multiple repos. */
     inputFolder: string
     plugins: Plugin[]
     sboms: SbomDescription[]

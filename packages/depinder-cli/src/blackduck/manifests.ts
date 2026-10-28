@@ -3,32 +3,22 @@ import path from 'path'
 import type {PurlCoordinates} from '../plugins/sbom/purl'
 
 /**
- * What the scanned repository says about itself, read off its manifests (see `depminer-index.ts`).
+ * Repository manifests, read from DepMiner's results (see `depminer-index.ts`), identify own code
+ * to omit from dependency source paths.
  *
- * Two things in the Black Duck export cannot be read from an SBOM, and both come from here:
+ * A pnpm or yarn workspace member (`docs@0.0.0`), the uv project itself (`example-app@1.0a0`),
+ * or the Cargo crate (`example-cli@1.0.0`) can appear in the SBOM as an ordinary component:
+ * `manifest -> own package -> library -> transitive dependency`.
+ * Black Duck treats the own package as a project and starts the chain at the library. We omit
+ * it from `_dependencies_sources.csv` rows and chains too, leaving the edge table unchanged.
+ * SBOM self-anchors are handled in `paths.ts`; manifests identify additional own packages.
+ * A matching manifest's ecosystem, name and version establish ownership. Python versions are
+ * normalised, so pyproject's `1.0-a.0` matches the SBOM's `1.0a0`.
  *
- *  1. **The project prefix of `Path`.** Black Duck writes
- *     `<project name>/<project version>/<dir relative to the scan root>/-<pm>/<chain>`, and the
- *     name and version are the manifest's — `n8n-monorepo/2.37.0/js-pnpm-n8n/-pnpm/…`,
- *     `saleor/3.24.0a0/…/-uv/…`, `PublicApi/dotnet-eshoponweb/src/PublicApi/PublicApi.csproj/-nuget/…`.
- *     Neither Syft nor Trivy records a lockfile's own name or version.
- *  2. **Own code.** A pnpm or yarn workspace member (`docs@0.0.0`), the uv project itself
- *     (`saleor@3.24.0a0`), the Cargo crate (`ripgrep@15.2.0`) sit in the SBOM as ordinary
- *     components, on the chain between the manifest and the real dependencies. Black Duck does
- *     not list them: it treats each as a project of its own and starts the chain after it. The
- *     only place that says a component is the repository's own is a manifest under the
- *     repository that declares that name.
- *
- * Own code is a property of a tree, not of the repository: `@nestjs/core` is own code in the
- * root `package-lock.json` tree of nest and a real dependency of `tools/benchmarks`, which has
- * a lockfile of its own. So a manifest belongs to the nearest enclosing directory that holds a
- * lockfile of the same family, and to no tree beyond it.
- *
- * The prefix shapes below were read off one real export (`zzy-v050-split-output`, 10,188 rows),
- * per package manager tag, and nothing was inferred by analogy. Where Detect writes something no
- * manifest can explain — `eShopOnWeb/…` solution-level duplicates next to the per-project rows,
- * the air-gap `../instruments/…` path of its uv detector, the `<workspace dir>/local/<root>`
- * sub-projects of a yarn workspace — the plain `<dir>` prefix stays.
+ * Own code is a property of a tree, not of the repository: `@example/core` declared at the root
+ * is own code in the root `package-lock.json` tree. In `tools/benchmarks`, which has a lockfile
+ * of its own, that same package is an external dependency. A manifest belongs to the nearest
+ * enclosing directory that holds a lockfile of the same family, and to no tree beyond it.
  */
 
 export interface RepoManifest {
@@ -64,19 +54,6 @@ const FAMILIES: {purlType: string, manifests: RegExp, lockfiles: RegExp}[] = [
     {purlType: 'gem', manifests: /^Gemfile$/, lockfiles: /^Gemfile\.lock$/},
     {purlType: 'composer', manifests: /^composer\.json$/, lockfiles: /^composer\.lock$/},
 ]
-
-/** The family a `Path` tag (`-yarn`, `-uv`, `-gradle`, …) belongs to. */
-function familyOfTag(tag: string): string {
-    switch (tag) {
-    case 'npm': case 'yarn': case 'pnpm': return 'npm'
-    case 'uv': case 'pip': case 'poetry': return 'pypi'
-    case 'maven': case 'gradle': return 'maven'
-    case 'go_mod': return 'golang'
-    case 'rubygems': return 'gem'
-    case 'packagist': return 'composer'
-    default: return tag
-    }
-}
 
 /** Repo-relative path (`/`-separated) -> the file on disk that holds its content. */
 export type RepoFiles = Map<string, string>
@@ -181,58 +158,6 @@ function gradleCoordinates(files: RepoFiles, dir: string, text: string): {name?:
     }
     const version = text.match(/^version\s*=?\s*["']([^"']+)["']/m)?.[1]
     return {name, version}
-}
-
-/** The manifest of one tree: the one of the tag's family that sits in the tree's own directory. */
-export function manifestOfTree(repo: RepoManifests | undefined, treeDir: string, tag: string): RepoManifest | undefined {
-    const family = familyOfTag(tag)
-    const candidates = (repo?.manifests ?? []).filter(m => m.dir === treeDir && m.purlType === family)
-    if (family === 'maven') {
-        // A directory with both a POM and a Gradle script is described by the one the tag names.
-        const wanted = tag === 'gradle' ? /^build\.gradle/ : /^pom\.xml$/
-        return candidates.find(m => wanted.test(m.file)) ?? candidates[0]
-    }
-    return candidates[0]
-}
-
-/**
- * The part of `Path` before `-<tag>/`, as Black Duck writes it for this tree. `projectPath` is
- * `<repo>` or `<repo>/<dir>`, which is what the plain prefix is when there is nothing to add.
- *
- * Read off the reference export, tag by tag:
- *   pnpm     `n8n-monorepo/2.37.0/js-pnpm-n8n/`; a package.json without a version → `./js-pnpm-n8n/.github/scripts/`
- *   npm      `@nestjs/benchmarks/1.0.0/js-npm-nest/tools/benchmarks/`; name without version → `teammates-dev-docs/java-gradle-teammates/docs/`
- *   uv       `saleor/3.24.0a0/<dir>/` — the pypi-normalised version, not the pyproject spelling
- *   nuget    `PublicApi/dotnet-eshoponweb/src/PublicApi/PublicApi.csproj/`
- *   maven    `org.springframework.samples:spring-petclinic:4.0.0-SNAPSHOT:java-maven-spring-petclinic:`
- *   gradle   `java-gradle-teammates:unspecified:` — no directory segment
- *   go_mod   `github.com/caddyserver/caddy/v2:go-caddy:`
- *   yarn, rubygems, packagist, cargo, pip   the plain directory
- * Without manifests (no DepMiner index), every tag gets the plain directory.
- */
-export function blackDuckPrefix(tag: string, projectPath: string, manifest: RepoManifest | undefined): string {
-    const plain = `${projectPath}/`
-    if (!manifest) return plain
-    const {name, version} = manifest
-    switch (tag) {
-    case 'pnpm':
-        return name && version ? `${name}/${version}/${projectPath}/` : `./${projectPath}/`
-    case 'npm':
-        if (name && version) return `${name}/${version}/${projectPath}/`
-        return name ? `${name}/${projectPath}/` : plain
-    case 'uv': case 'poetry':
-        return name && version ? `${name}/${pep440(version)}/${projectPath}/` : plain
-    case 'nuget':
-        return name ? `${name}/${projectPath}/${manifest.file}/` : plain
-    case 'maven':
-        return name && version ? `${name}:${version}:${projectPath}:` : plain
-    case 'gradle':
-        return `${name ?? path.posix.basename(projectPath)}:${version ?? 'unspecified'}:`
-    case 'go_mod':
-        return name ? `${name}:${projectPath}:` : plain
-    default:
-        return plain
-    }
 }
 
 /**

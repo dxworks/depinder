@@ -6,14 +6,16 @@ A folder of CycloneDX SBOMs in, a folder of CSVs out.
 
 - Depinder [installed](install.md).
 - A folder of CycloneDX SBOMs (`*.cdx.json`, or any `.json` declaring `bomFormat`). A [DepMiner](https://dxworks.org/depminer/) results zip has them
-  under `depminer/results/syft/` and `depminer/results/trivy/`. The DepMiner results are all you
-  need: the manifests Black Duck's paths take their prefix from are in
-  [its index](commands/analyse.md#the-depminer-index), so the scanned repositories are not.
+  under `depminer/results/syft/` and `depminer/results/trivy/`. The SBOMs contain the input data
+  needed by `analyse`.
+- Optionally, DepMiner's [index and harvested manifests](commands/analyse.md#the-depminer-index)
+  for filtering repository-owned packages from dependency source paths. These are included in
+  the DepMiner results; no access to the scanned repositories is required.
 - Trivy and/or Grype on `PATH`, for vulnerabilities.
 - Optionally, `DEPINDER_RESOLVER_TOKEN` set, for our server (see [Installing](install.md#4-resolver-token-optional)).
 
-Without DepMiner, generate the SBOMs with Syft or Trivy yourself. Black Duck's path prefix then
-falls back to the project name ([why](commands/analyse.md#the-depminer-index)).
+Without DepMiner, generate the SBOMs with Syft or Trivy yourself. Dependency paths use the
+repository and module directory in either case.
 
 ```bash
 syft dir:<repo> -o cyclonedx-json=<repo>.cdx.json
@@ -29,7 +31,7 @@ trivy fs <repo> --format cyclonedx --output <repo>.trivy.cdx.json
 
 ```bash
 depinder analyse /path/to/depminer/results -r results \
-    --vuln-source trivy,grype,github --project-name my-project
+    --vuln-source trivy,grype,github
 ```
 
 Each file is sorted by its content: a Trivy SBOM or a Syft SBOM; anything else is ignored.
@@ -109,7 +111,6 @@ results/
     _dependencies_sources.csv
     _vulnerability_details.csv
     _upgrade_guidance.csv
-    security.csv                 one row per (component, advisory)
     _dependency_edges.csv
     _component_versions.csv
     _vulnerability_findings.json

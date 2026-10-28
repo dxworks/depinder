@@ -3,7 +3,7 @@
 [`analyse`](../commands/analyse.md) writes, for each SBOM source it finds, the four shareable CSVs
 [`transformBlackDuckReports`](../commands/blackduck-reports.md) produces from a real Black Duck
 export — same header line, same cell conventions, so a downstream reader processes either folder
-the same way — plus the raw-shaped `security.csv` and files Black Duck has no counterpart for.
+the same way — plus files Black Duck has no counterpart for.
 
 ## Files
 
@@ -11,12 +11,13 @@ the same way — plus the raw-shaped `security.csv` and files Black Duck has no 
 |---|---|---|
 | `_dependencies.csv` | (component, version, origin) | The transform's 25 columns |
 | `_dependencies_sources.csv` | (component, path) | The transform's 23 columns; one chain per component, from the SBOM's `dependsOn` edges |
-| `_vulnerability_details.csv` | (component, advisory) | The transform's 23 columns: `security.csv` without Black Duck's ids, triage and CISA block |
+| `_vulnerability_details.csv` | (component, advisory) | The transform's 22 columns, without Black Duck's ids, project path, triage and CISA block |
 | `_upgrade_guidance.csv` | component with a finding | Short and long term recommended versions |
-| `security.csv` | (component, advisory) | Black Duck's raw `security_*.csv` header; triage and CISA columns empty |
 | `_dependency_edges.csv` | (parent, child) | **Ours.** Every edge: `Repo, Tree, Ecosystem, Parent Origin Id, Child Origin Id, Child Depth` |
 | `_component_versions.csv` | component | **Ours.** `Release Date` (plain ISO), `Newer Versions`, `Newer Versions (semver)` |
 | `_vulnerability_findings.json` | component with a finding | **Ours.** The findings as the exporter saw them, fix versions included |
+
+The exporter never writes raw `security.csv`. Vulnerability rows are in `_vulnerability_details.csv`.
 
 A column not derivable from an SBOM plus a public registry is **empty**, never guessed.
 
@@ -27,9 +28,9 @@ command wrote it:
 
 | Rule | Where |
 |---|---|
-| `Match type` is `Direct`, `Transitive` or `Direct,Transitive` | `_dependencies.csv`, `_dependencies_sources.csv`. `_vulnerability_details.csv` and `security.csv` keep `Direct Dependency` / `Transitive Dependency`, as the transform does |
+| `Match type` is `Direct`, `Transitive` or `Direct,Transitive` | `_dependencies.csv`, `_dependencies_sources.csv`. `_vulnerability_details.csv` keeps `Direct Dependency` / `Transitive Dependency`, as the transform does |
 | A zero per-severity vulnerability count is blank; `Total` and `Critical and High` are always a number. `Total` is every finding, as in libs.csv and `_upgrade_guidance.csv`; a finding with no recognised severity is in no per-severity cell | both dependency files |
-| Dates are `\tYYYY-MM-DD` — the leading tab keeps Excel from re-reading them | `Release Date`, `Published on`, `Updated on`. `security.csv` keeps Black Duck's raw `7/24/26` |
+| Dates are `\tYYYY-MM-DD` — the leading tab keeps Excel from re-reading them | `Release Date`, `Published on`, `Updated on` |
 | `Version id` is empty | Black Duck's internal version UUID; nothing on our side corresponds to it |
 | `VerifiedPath` empty, `VerifiedPathMethod` = `not-checked` | What the transform writes when no `--basePath` verifies paths on disk; we verify none |
 | Every file ends with a newline | all |
@@ -53,49 +54,52 @@ command wrote it:
 | `Release Date` | registry | `\tYYYY-MM-DD`. Go pseudo-versions, which the proxy never lists: the commit time they carry |
 | `Newer Versions` | registry | Versions **published after** the installed one, Black Duck's rule. The count by version number is in `_component_versions.csv` |
 | `Component Link` | registry | Declared project homepage, per component. Empty when none, as Black Duck. Go: derived from the module path |
-| `Path` | `dependsOn` | `<project>/-<pm>/<name>/<version>/…` — see [paths](#paths) |
-| `ProjectPath` | — | Project name, plus `/<module>` when named |
+| `Path` | `dependsOn` | `<repo>/<module>/-<pm>/<name>/<version>/…` — see [paths](#paths) |
+| `ProjectPath` | SBOM | `<repo>/<manifest path>`, such as `example-service/api/Pipfile.lock`; repo name alone when no manifest location is recorded |
 | `VerifiedPath`, `VerifiedPathMethod` | — | empty, `not-checked` |
 | Open Hub columns, `Has License Conflicts` | — | empty or constant |
 
-## `security.csv` and `_vulnerability_details.csv`
+## `_vulnerability_details.csv`
 
-`security.csv` is Black Duck's raw `security_*.csv` shape. `_vulnerability_details.csv` is the
-23-column view the transform makes of it: `Component origin id` becomes
+`_vulnerability_details.csv` follows the 22-column view the transform makes of Black Duck's raw
+`security_*.csv`: `Component origin id` becomes
 `Component Version Origin Id`, `Published on` and `Updated on` become `\tYYYY-MM-DD`, and the
-id, triage and CISA columns are dropped. The derivations are the same:
+id, project path, triage and CISA columns are dropped.
 
 | Column | Derivation |
 |---|---|
 | `Vulnerability id` | `GHSA-… (CVE-…)`, Black Duck's `BDSA-… (CVE-…)` shape |
 | `Vulnerability source` | `GHSA`, `TRIVY`, `GRYPE`; a finding two sources agree on reports `GHSA` |
-| `Published on` | Black Duck's `7/24/26` date shape in `security.csv`; `\tYYYY-MM-DD` in `_vulnerability_details.csv` |
+| `Published on` | `\tYYYY-MM-DD` |
 | `Base score` | GHSA's score first, then NVD. Black Duck's is NVD CVSS 3.x |
 | `Exploitability`, `Impact` | CVSS 3.1 sub-scores; empty for v4 and v2 |
 | `URL` | NVD page when a CVE is known, else the scanner's |
 | `CWE Ids` | `[CWE-400, CWE-834]` |
 | `Solution available` | `true` when a fixed version is named |
 | `CVSS Version` | `CVSS 3.x` / `CVSS 4` / `CVSS 2.x` |
-| `Match type` | Two-valued here, `Direct Dependency` / `Transitive Dependency`, in both files; a component reached both ways is `Direct Dependency` |
+| `Match type` | `Direct Dependency` / `Transitive Dependency`; a component reached both ways is `Direct Dependency` |
 | `Remediation status` | `New` |
-| `Updated on`, `Overall score`, `Workaround`, `Exploit available`, tags, CISA | empty |
+| `Updated on`, `Overall score`, `Workaround available`, `Exploit available`, `Vulnerability tags` | empty |
 
 ## Paths
 
 `Path` is the shortest chain from the manifest to the component, one row per (component,
 project), as Black Duck writes it. Ties go to the greater parent. Segments join name and version
 like the origin id (`lodash/4.17.21`, `org.eclipse.angus:angus-mail:2.0.5`), except that a Go
-module keeps its full import path (`golang.org/x/sys:v0.47.0`). The project's own artifact is never
-a segment. The tag after the project is the package manager whose manifest was walked:
+module keeps its full import path (`golang.org/x/sys:v0.47.0`). Project anchors identified by
+the SBOM are omitted. Manifests from [DepMiner's index](../commands/analyse.md#the-depminer-index)
+identify additional own packages to omit from source rows and chains. The tag after the project is
+the package manager whose manifest was walked:
 `-yarn`, `-npm`, `-pnpm`, `-rubygems`, `-maven`, `-gradle`, `-packagist`, `-cargo`, `-go_mod`,
 `-nuget`, `-uv`, `-poetry`, `-pip`. It is read off the manifest's file name (Trivy's manifest node,
-Syft's `syft:location:0:path`), else it is the origin name. With the manifests from [DepMiner's index](../commands/analyse.md#the-depminer-index),
-found beside the input by default, the project segment becomes Black Duck's
-`<name>/<version>/<dir>/` prefix and own code leaves the chain. The DepMiner results are enough;
-the scanned repositories are not needed.
+Syft's `syft:location:0:path`), else it is the origin name. The prefix always uses
+`<repo>/<module>/-<pm>/`, with no module segment at the repository root.
+DepMiner's index is discovered beside the input by default. Its harvested manifests are enough
+for own-code filtering; the scanned repositories are not needed.
 
-**Direct** is what the manifest declares. When an SBOM carries workspace nodes (Syft, yarn berry),
-their edges define it; otherwise the lockfile root's do. Syft SBOMs carry chains only where they
+**Direct** is a one-component chain after SBOM anchors and manifest-declared own code are omitted.
+Workspace edges define the project's declared dependencies when present; otherwise the lockfile
+root's edges do. Syft SBOMs carry chains only where they
 carry edges (yarn workspaces, Maven modules); everything else gets a one-hop path.
 
 ## Risk columns

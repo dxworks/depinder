@@ -35,7 +35,7 @@ export const DEPENDENCIES_SOURCES_COLUMNS = [
 export const VULNERABILITY_DETAILS_COLUMNS = [
     'Component name', 'Component version name', 'Component Version Origin Id', 'Vulnerability id',
     'Description', 'Published on', 'Updated on', 'Base score', 'Exploitability', 'Impact',
-    'Vulnerability source', 'Remediation status', 'URL', 'Security Risk', 'Project path',
+    'Vulnerability source', 'Remediation status', 'URL', 'Security Risk',
     'Overall score', 'CWE Ids', 'Solution available', 'Workaround available', 'Exploit available',
     'CVSS Version', 'Match type', 'Vulnerability tags',
 ] as const

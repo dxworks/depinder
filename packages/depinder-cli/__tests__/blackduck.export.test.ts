@@ -1,7 +1,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {BLACKDUCK_FILES, blackDuckDate, upgradeGuidanceRows, vulnerabilityFindings, vulnerabilityUrl, writeBlackDuckExport, writeSecurityCsv, writeUpgradeGuidanceCsv} from '../src/blackduck/export'
+import {BLACKDUCK_FILES, upgradeGuidanceRows, vulnerabilityFindings, vulnerabilityUrl, writeBlackDuckExport, writeUpgradeGuidanceCsv} from '../src/blackduck/export'
 import {COMPONENT_VERSIONS_COLUMNS, DEPENDENCIES_COLUMNS, DEPENDENCIES_SOURCES_COLUMNS, UPGRADE_GUIDANCE_COLUMNS, VULNERABILITY_DETAILS_COLUMNS} from '../src/blackduck/columns'
 import {cvss3SubScores} from '../src/blackduck/cvss'
 import {licenseColumns} from '../src/blackduck/licenses'
@@ -404,6 +404,31 @@ describe('dependency paths', () => {
         return file
     }
 
+    it.each([
+        {manifest: 'package-lock.json', type: 'npm', purl: 'pkg:npm/lib@1.0.0', segment: 'lib/1.0.0', tag: 'npm'},
+        {manifest: 'pnpm-lock.yaml', type: 'npm', purl: 'pkg:npm/lib@1.0.0', segment: 'lib/1.0.0', tag: 'pnpm'},
+        {manifest: 'uv.lock', type: 'pypi', purl: 'pkg:pypi/lib@1.0.0', segment: 'lib/1.0.0', tag: 'uv'},
+        {manifest: 'Client.csproj', type: 'nuget', purl: 'pkg:nuget/lib@1.0.0', segment: 'lib/1.0.0', tag: 'nuget'},
+        {manifest: 'pom.xml', type: 'maven', purl: 'pkg:maven/com.vendor/lib@1.0.0', segment: 'com.vendor:lib:1.0.0', tag: 'maven'},
+        {manifest: 'build.gradle', type: 'maven', purl: 'pkg:maven/com.vendor/lib@1.0.0', segment: 'com.vendor:lib:1.0.0', tag: 'gradle'},
+        {manifest: 'go.mod', type: 'golang', purl: 'pkg:golang/example.com/lib@v1.0.0', segment: 'example.com/lib:v1.0.0', tag: 'go_mod'},
+    ])('uses the repository and module prefix for $manifest', ({manifest, type, purl, segment, tag}) => {
+        const input = write({
+            metadata: {component: {'bom-ref': 'root'}},
+            components: [
+                {'bom-ref': 'app', type: 'application', name: `apps/client/${manifest}`},
+                {'bom-ref': 'dep', purl},
+                {'bom-ref': 'other', purl: purl.replace('/lib@', '/other@')},
+            ],
+            dependencies: [{ref: 'root', dependsOn: ['app']}, {ref: 'app', dependsOn: ['dep', 'other']}],
+        })
+        const tree = sbomTree(input, 'repo', new Set([type]))
+        expect(tree.paths.map(row => row.path)).toContain(`repo/apps/client/-${tag}/${segment}`)
+        expect(tree.paths.map(row => row.projectPath)).toEqual([
+            `repo/apps/client/${manifest}`, `repo/apps/client/${manifest}`,
+        ])
+    })
+
     it('walks dependsOn from a Trivy application node, tagged with its package manager', () => {
         const file = write({
             metadata: {component: {'bom-ref': 'root'}},
@@ -419,9 +444,9 @@ describe('dependency paths', () => {
             ],
         })
         expect(sbomTree(file, 'demo', new Set(['npm'])).paths).toEqual([
-            {name: 'express', version: '4.18.0', purlType: 'npm', projectPath: 'demo',
+            {name: 'express', version: '4.18.0', purlType: 'npm', projectPath: 'demo/yarn.lock',
                 matchType: 'Direct Dependency', path: 'demo/-yarn/express/4.18.0'},
-            {name: 'qs', version: '6.10.2', purlType: 'npm', projectPath: 'demo',
+            {name: 'qs', version: '6.10.2', purlType: 'npm', projectPath: 'demo/yarn.lock',
                 matchType: 'Transitive Dependency', path: 'demo/-yarn/express/4.18.0/qs/6.10.2'},
         ])
     })
@@ -505,12 +530,12 @@ describe('dependency paths', () => {
             ],
         })
         expect(sbomTree(file, 'go-caddy', new Set(['golang'])).paths).toEqual([
-            {name: 'github.com/caddyserver/certmagic', version: 'v0.25.4', purlType: 'golang', projectPath: 'go-caddy',
+            {name: 'github.com/caddyserver/certmagic', version: 'v0.25.4', purlType: 'golang', projectPath: 'go-caddy/go.mod',
                 matchType: 'Direct Dependency', path: 'go-caddy/-go_mod/github.com/caddyserver/certmagic:v0.25.4'},
         ])
     })
 
-    it('names the module in the project path for a manifest below the top level', () => {
+    it('includes the manifest in the project path below the top level', () => {
         const file = write({
             metadata: {component: {'bom-ref': 'root'}},
             components: [
@@ -525,7 +550,7 @@ describe('dependency paths', () => {
             ],
         })
         expect(sbomTree(file, 'rust-ripgrep', new Set(['cargo'])).paths[0]).toMatchObject({
-            projectPath: 'rust-ripgrep/fuzz', path: 'rust-ripgrep/fuzz/-cargo/libfuzzer-sys/0.4.7',
+            projectPath: 'rust-ripgrep/fuzz/Cargo.lock', path: 'rust-ripgrep/fuzz/-cargo/libfuzzer-sys/0.4.7',
         })
     })
 
@@ -635,7 +660,7 @@ describe('the written files', () => {
         folder = fs.mkdtempSync(path.join(os.tmpdir(), 'depinder-bd-'))
     })
 
-    it('writes the seven CSVs and the findings sidecar', () => {
+    it('writes the six CSVs and the findings sidecar', () => {
         const model = buildModel('demo', [ecosystem(dependency())], [])
         const written = writeBlackDuckExport(model, folder)
         expect(written.map(it => it.file)).toEqual([...BLACKDUCK_FILES])
@@ -689,18 +714,18 @@ describe('the written files', () => {
         expect(cells['Total Vulnerability Count']).toBe('1')
     })
 
-    it('writes _vulnerability_details.csv with the transform conventions and security.csv untouched', () => {
+    it('writes _vulnerability_details.csv with the transform conventions', () => {
         writeBlackDuckExport(buildModel('demo', [ecosystem(dependency())], []), folder)
         const [, row] = readCsv(folder, '_vulnerability_details.csv')
         const cells = row.split(',')
-        expect(cells).toHaveLength(VULNERABILITY_DETAILS_COLUMNS.length)
+        expect(cells).toHaveLength(22)
         const cell = (name: string) => cells[VULNERABILITY_DETAILS_COLUMNS.indexOf(name as any)]
         expect(cell('Component Version Origin Id')).toBe('qs/6.10.2')
         expect(cell('Published on')).toBe('\t2022-11-27')
         expect(cell('Updated on')).toBe('')
         expect(cell('Match type')).toBe('Direct Dependency')
         expect(cell('Vulnerability id')).toBe('GHSA-hrpp-h998-j3pp (CVE-2022-24999)')
-        expect(readCsv(folder, 'security.csv')[1]).toContain(',11/27/22,')
+        expect(readCsv(folder, '_vulnerability_details.csv')[0].split(',')).not.toContain('Project path')
     })
 
     it('counts every finding in Total, only the four severities per column, and writes a zero total as 0', () => {
@@ -719,7 +744,6 @@ describe('the written files', () => {
         // The two-finding row is the quoted-licence one; parse it by its known tail instead.
         const detail = readCsv(folder, '_vulnerability_details.csv')
         expect(detail).toHaveLength(3)                      // header + both findings survive here
-        expect(readCsv(folder, 'security.csv')).toHaveLength(3)
         const qsCounts = readCsv(folder, '_dependencies.csv').find(it => it.startsWith('qs,'))!
         expect(qsCounts).toContain(',OK,2,1,,1,,,\t2021-10-06,')  // Total 2, C&H 1, High 1; UNKNOWN in no severity cell
     })
@@ -733,7 +757,7 @@ describe('the written files', () => {
 
     it('writes the vulnerability id as Black Duck pairs a GHSA with its CVE', () => {
         writeBlackDuckExport(buildModel('demo', [ecosystem(dependency())], []), folder)
-        const [, row] = readCsv(folder, 'security.csv')
+        const [, row] = readCsv(folder, '_vulnerability_details.csv')
         expect(row).toContain('GHSA-hrpp-h998-j3pp (CVE-2022-24999)')
         expect(row).toContain('[CWE-1321]')
         expect(row).toContain('CVSS 3.x')
@@ -741,11 +765,11 @@ describe('the written files', () => {
         expect(row).toContain('GHSA')
     })
 
-    it('writes the NVD page, the Black Duck date shape and the CVSS 3 sub-scores', () => {
+    it('writes the NVD page, the transform date shape and the CVSS 3 sub-scores', () => {
         writeBlackDuckExport(buildModel('demo', [ecosystem(dependency())], []), folder)
-        const [, row] = readCsv(folder, 'security.csv')
+        const [, row] = readCsv(folder, '_vulnerability_details.csv')
         expect(row).toContain('https://nvd.nist.gov/vuln/detail/CVE-2022-24999')  // not the GHSA permalink
-        expect(row).toContain(',11/27/22,')                                        // Black Duck: 7/24/26, not ISO
+        expect(row).toContain(',\t2022-11-27,')
         expect(row).toContain(',9.8,3.9,5.9,')                                    // Base score, Exploitability, Impact
     })
 
@@ -774,10 +798,15 @@ describe('the written files', () => {
         expect(vulnerabilityFindings(model).components).toEqual([])
     })
 
-    it('writes security.csv on its own for the analyse command', () => {
-        const written = writeSecurityCsv(buildModel('demo', [ecosystem(dependency())], []), folder)
-        expect(written).toEqual({file: 'security.csv', rows: 1})
-        expect(fs.existsSync(path.join(folder, '_dependencies.csv'))).toBe(false)
+    it.each([
+        {timestamp: Date.parse('2026-07-24T23:59:59Z'), expected: '\t2026-07-24'},
+        {timestamp: Date.parse('2026-12-01T00:00:00Z'), expected: '\t2026-12-01'},
+        {timestamp: undefined, expected: ''},
+        {timestamp: NaN, expected: ''},
+    ])('writes publication date $expected for timestamp $timestamp', ({timestamp, expected}) => {
+        writeBlackDuckExport(buildModel('demo', [ecosystem(dependency({vulnerabilities: [{...advisory, timestamp}]}))], []), folder)
+        const [, row] = readCsv(folder, '_vulnerability_details.csv')
+        expect(row.split(',')[VULNERABILITY_DETAILS_COLUMNS.indexOf('Published on')]).toBe(expected)
     })
 
     it('drops a path whose component no plugin enriched', () => {
@@ -796,13 +825,6 @@ describe('vulnerability cells', () => {
             .toBe('https://github.com/advisories/GHSA-hrpp-h998-j3pp')
         expect(vulnerabilityUrl({...advisory, identifiers: [{value: 'cve-2022-24999', type: 'CVE'}]}))
             .toBe('https://nvd.nist.gov/vuln/detail/CVE-2022-24999')
-    })
-
-    it('writes dates unpadded with a two-digit year, and nothing for no date', () => {
-        expect(blackDuckDate(Date.parse('2026-07-24T23:59:59Z'))).toBe('7/24/26')
-        expect(blackDuckDate(Date.parse('2026-12-01T00:00:00Z'))).toBe('12/1/26')
-        expect(blackDuckDate(undefined)).toBe('')
-        expect(blackDuckDate(NaN)).toBe('')
     })
 
     it('computes the CVSS 3.1 sub-scores Black Duck prints, rounded to one decimal', () => {

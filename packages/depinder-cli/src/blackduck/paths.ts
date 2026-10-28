@@ -8,7 +8,8 @@ import {
 } from '../plugins/sbom/cyclonedx'
 import {purlCoordinates, type PurlCoordinates} from '../plugins/sbom/purl'
 import {log} from '../utils/logging'
-import {blackDuckPrefix, manifestOfTree, ownCodeMatcher, RepoManifests} from './manifests'
+import {normalizeInputPath} from '../utils/input-path'
+import {ownCodeMatcher, RepoManifests} from './manifests'
 import {originFor, pathSegment} from './origins'
 
 /**
@@ -39,13 +40,12 @@ export interface SbomPath {
     version: string
     purlType: string
     /**
-     * `<repo>/-<package manager>/<name>/<version>/…` — the chain, as Black Duck writes it
-     * (`<name>:<version>` where the origin id uses a colon). With the repository's manifests (from
-     * DepMiner's index) the prefix is Black Duck's project prefix, `<name>/<version>/<repo>/…`; see
-     * `blackDuckPrefix`.
+     * `<repo>/<module>/-<package manager>/<name>/<version>/…`.
+     * Omit `<module>/` when the manifest is at the repository root.
+     * A segment uses `<name>:<version>` where the origin id uses a colon.
      */
     path: string
-    /** `<repo>`, or `<repo>/<module>` when the SBOM names its modules. */
+    /** `<repo>/<manifest path>`, or `<repo>` when the SBOM records no manifest. */
     projectPath: string
     matchType: 'Direct Dependency' | 'Transitive Dependency'
 }
@@ -245,13 +245,8 @@ function treeEdges(
 /**
  * The paths and edges of one project, for one ecosystem.
  *
- * With `manifests` — the scanned repository read off disk — two things change in `Path` only,
- * never in the edges: the chain drops the repository's own code (a workspace member, the uv
- * project, the Cargo crate) the way it already drops the anchors, because Black Duck files each
- * of those as a project of its own and starts the chain after it; and the prefix becomes Black
- * Duck's `<name>/<version>/<dir>` where the tree's manifest declares a name. The edge table keeps
- * the graph as the SBOM records it; the own-code rule for edges is the viewer's, applied from the
- * ground truth to every source alike.
+ * Repository manifests identify own code to omit from paths, in addition to SBOM anchors.
+ * The prefix uses the repository and module directory. Manifest filtering leaves edges unchanged.
  */
 function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType: string, manifests?: RepoManifests): {paths: SbomPath[], edges: SbomEdge[]} {
     if (node.scopeRefs) {
@@ -267,24 +262,21 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
         const parsed = purl ? purlCoordinates(purl) : undefined
         return parsed && parsed.type === purlType ? parsed : undefined
     }
-    const projectPath = node.module ? `${repo}/${node.module}` : repo
+    const projectDirectory = node.module ? `${repo}/${node.module}` : repo
     const anchors = new Set(node.anchorRefs)
     const ownCode = ownCodeMatcher(manifests, node.module, purlType)
-    // The project's own artifacts: the anchors the SBOM marks, and what the repository's manifests declare.
     const isOwn = (ref: string) => anchors.has(ref) || ownCode(coordinatesOf(ref))
     // Trivy's node is the manifest; a Syft component knows the manifest it was read from.
     const tagOf = (ref: string, target: PurlCoordinates) =>
         packageManagerTag(node.path)
         ?? packageManagerTag(locationOf(graph.byRef.get(ref) ?? {'bom-ref': ref}))
         ?? originFor(purlType, target.name).name
-    const prefixOf = (tag: string) => blackDuckPrefix(tag, projectPath, manifestOfTree(manifests, node.module, tag))
 
     const results: SbomPath[] = []
     const seen = new Set<string>()
     const emit = (chain: string[]) => {
         const last = chain[chain.length - 1]
         const target = coordinatesOf(last)
-        // Own code is a project, not a component: Black Duck has no row for it.
         if (!target || isOwn(last)) return
         const segments = chain
             .filter(ref => !isOwn(ref))
@@ -292,7 +284,7 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
             .filter((it): it is PurlCoordinates => !!it)
         if (segments.length === 0) return
         const tag = tagOf(last, target)
-        const rendered = `${prefixOf(tag)}-${tag}/`
+        const rendered = `${projectDirectory}/-${tag}/`
             + segments.map(it => pathSegment(originFor(purlType, it.name), it.name, it.version)).join('/')
         // Syft lists a package once per location it was seen in; one path per package is enough.
         const key = `${target.name}|${target.version}|${rendered}`
@@ -303,7 +295,7 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
             version: target.version,
             purlType,
             path: rendered,
-            projectPath,
+            projectPath: node.path === node.name ? repo : path.posix.join(repo, normalizeInputPath(node.path)),
             matchType: segments.length === 1 ? 'Direct Dependency' : 'Transitive Dependency',
         })
     }
@@ -343,7 +335,7 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
     }
     const treeOf = (ref: string) => {
         const it = coordinatesOf(ref)
-        return `${projectPath}/-${it ? tagOf(ref, it) : 'unknown'}`
+        return `${projectDirectory}/-${it ? tagOf(ref, it) : 'unknown'}`
     }
     const flat = node.allComponents ? [...graph.byRef.keys()].filter(keep) : undefined
     return {paths: results, edges: treeEdges(contracted, seeds, flat, render, treeOf, repo, purlType)}
@@ -355,9 +347,7 @@ export interface SbomTreeOptions {
 
 /**
  * Every (component, path) pair and every parent-child edge in one SBOM, restricted to the purl
- * types being exported. `repo` is the label the chain starts from — the project name, which is
- * what Black Duck puts first. `manifests`, when given, are the scanned repository's: they
- * supply Black Duck's project prefix and the own-code rule (see `manifests.ts`).
+ * types being exported. Repository manifests, when supplied, identify own code to omit from paths.
  */
 export function sbomTree(sbomFile: string, repo: string, purlTypes: Set<string>, options: SbomTreeOptions = {}): {paths: SbomPath[], edges: SbomEdge[]} {
     let graph: BomGraph

@@ -65,17 +65,21 @@ describe('the analyse command line', () => {
         expect((await parseArgs('/repo')).options.cacheMaxAge).toBeUndefined()
     })
 
-    it('accepts the SBOM export options --project-name and --depminer-index', async () => {
-        const {options} = await parseArgs('/sboms', '--project-name', 'mastodon', '--depminer-index', '/dm/index.json', '--github-token-file', 'f')
-        expect(options.projectName).toBe('mastodon')
-        expect(options.depminerIndex).toBe('/dm/index.json')
+    it('accepts --github-token-file', async () => {
+        const {options} = await parseArgs('/sboms', '--github-token-file', 'f')
         expect(options.githubTokenFile).toBe('f')
-        expect((await parseArgs('/sboms')).options.projectName).toBeUndefined()
     })
 
-    it('leaves the DepMiner index to be found unless --no-depminer-index turns it off', async () => {
-        expect((await parseArgs('/sboms')).options.depminerIndex).toBeUndefined()
+    it('rejects the removed --project-name option', async () => {
+        const command = createAnalyseCommand().exitOverride().configureOutput({writeErr: () => {}})
+        await expect(command.parseAsync(['/sboms', '--project-name', 'example'], {from: 'user'}))
+            .rejects.toMatchObject({code: 'commander.unknownOption'})
+    })
+
+    it('accepts an explicit DepMiner index and supports disabling automatic lookup', async () => {
+        expect((await parseArgs('/sboms', '--depminer-index', '/dm/index.json')).options.depminerIndex).toBe('/dm/index.json')
         expect((await parseArgs('/sboms', '--no-depminer-index')).options.depminerIndex).toBe(false)
+        expect((await parseArgs('/sboms')).options.depminerIndex).toBeUndefined()
     })
 
     it('defaults --vuln-source to trivy and grype', async () => {

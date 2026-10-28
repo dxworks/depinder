@@ -20,9 +20,8 @@ needs its token in `DEPINDER_RESOLVER_TOKEN`, a secret set once in your shell
 | `[folders...]` | Folders to walk for CycloneDX SBOMs | — |
 | `-r, --results <folder>` | Output folder; one subfolder per source appears under it | `results` |
 | `-p, --plugins [plugins...]` | Use these `sbom-*` plugins, by name or [alias](../index.md#ecosystems) (`java` selects `sbom-java`) | from the SBOMs |
-| `--project-name <name>` | SBOM sources: `ProjectPath` value and head of every `Path` | the SBOMs' repo name |
-| `--depminer-index <file>` | SBOM sources: DepMiner's `index.json`, or the folder holding it; its manifests give `Path` Black Duck's project prefix and drop own code from the chain ([more](#the-depminer-index)) | `depminer/index.json` beside the input |
-| `--no-depminer-index` | SBOM sources: do not read the DepMiner index; `Path` keeps the plain prefix and own code | off |
+| `--depminer-index <file>` | DepMiner index file or its folder for manifest-based own-code filtering | discovered beside input |
+| `--no-depminer-index` | Disable manifest-based own-code filtering | off |
 | `--refresh` | Ignore the cache | off |
 | `--cache-max-age <duration>` | Cached libraries older than this are fetched again: `90s`, `30m`, `12h`, `7d`; a bare number is seconds | `DEPINDER_CACHE_MAX_AGE`, else `1d` |
 | `--vuln-source <sources>` | `trivy`, `grype`, `github`, `all`, comma-separated | `trivy,grype` |
@@ -64,7 +63,6 @@ results/
     _dependencies_sources.csv
     _vulnerability_details.csv
     _upgrade_guidance.csv
-    security.csv
     _dependency_edges.csv
     _component_versions.csv
     _vulnerability_findings.json
@@ -81,9 +79,8 @@ A subfolder appears only when its source had input.
 | `sbom-<eco>-project-stats.csv` | project |
 | `_dependencies.csv` | (component, version, origin) — the transform's 25 columns |
 | `_dependencies_sources.csv` | (component, path) — the transform's 23 columns |
-| `_vulnerability_details.csv` | (component, advisory) — the transform's 23 columns |
+| `_vulnerability_details.csv` | (component, advisory) — the transform's 22 columns |
 | `_upgrade_guidance.csv` | component with a finding |
-| `security.csv` | (component, advisory), Black Duck's raw `security_*.csv` header |
 | `_dependency_edges.csv` | (parent, child) — every edge of the graph |
 | `_component_versions.csv` | component — `Newer Versions` next to `Newer Versions (semver)` |
 | `_vulnerability_findings.json` | component with a finding — the findings as seen, fix versions included |
@@ -94,27 +91,35 @@ The four `_*.csv` files have the header line and cell conventions of
 depinder subfolder and a transformed Black Duck folder the same way. Columns and derivations:
 [Black Duck Export](../blackduck-export/index.md).
 
+`ProjectPath` comes directly from the SBOM's repository and manifest path, for example
+`example-service/api/Pipfile.lock`. When no manifest location is recorded, it is the repository name.
+
+`Path` follows the SBOM dependency graph with a `<repo>/<module>/-<pm>/` prefix. Project anchors
+identified by the SBOM are omitted. Repository manifests can identify additional own packages
+to omit from source paths, as described below.
+
 Plugins come from the purl types in the SBOMs; `-p` picks them instead. Trivy and Grype scan each
 file once; findings are unioned by (package, id). Syft SBOMs carry edges only for yarn
 workspaces and Maven modules; Trivy SBOMs carry the graph for every lockfile.
 
 ## The DepMiner index
 
-Black Duck prefixes every path with `<name>/<version>/<dir>/-<pm>/`, read from the manifest, and
-treats the repository's own code as the project. An SBOM has no manifest, but DepMiner keeps
-every manifest and lockfile it mined: flat copies in `depminer/results/depminer/`, and an
-`index.json` that maps each copy back to `<repo>/<path>`. `analyse` reads the manifests from
-there, so **the DepMiner results are all it needs; no access to the scanned repositories is
-required.**
+DepMiner keeps flat copies of harvested manifests and lockfiles in `depminer/results/depminer/`.
+Its `index.json` maps each copy back to `<repo>/<path>`. The DepMiner results are all `analyse`
+needs for own-code filtering; no access to the scanned repositories is required. Each SBOM uses
+the manifests listed under its repository name.
 
-The index is found on its own: `analyse` looks for `depminer/index.json` from each SBOM's folder
-upwards, up to the folder holding the input, so both `depminer/results` and
-`depminer/results/syft` find `depminer/results/depminer/index.json`. `--depminer-index` points at
-an index somewhere else; `--no-depminer-index` turns it off. Each SBOM's manifests are those
-listed under its repository name.
+`analyse` uses those manifests to match own packages by ecosystem, name and version.
+A manifest without a version matches by name. Matched packages are omitted from
+`_dependencies_sources.csv` rows and chains; the shortened chain determines each source row's
+direct/transitive classification.
+This filtering leaves other reports, `ProjectPath` and `_dependency_edges.csv` unchanged.
 
-With the index, `Path` matches Black Duck's. Without one, the prefix is `<project-name>/-<pm>/`
-and own code stays in the chain. `ProjectPath` and `_dependency_edges.csv` are the same either way.
+The index is discovered by looking for `depminer/index.json` from each SBOM's directory
+upwards to the parent of the input folder. `--depminer-index` selects a file or its containing
+folder; `--no-depminer-index` disables lookup. Without manifests, only SBOM anchors are omitted.
+Both `depminer/results` and `depminer/results/syft` find `depminer/results/depminer/index.json`.
+The path prefix always uses the repository and module directory.
 
 ## Examples
 
@@ -122,8 +127,11 @@ and own code stays in the chain. `ProjectPath` and `_dependency_edges.csv` are t
 # A DepMiner results folder: Trivy and Syft SBOMs side by side, one run, two subfolders
 depinder analyse ./depminer/results/trivy ./depminer/results/syft -r results --vuln-source trivy,grype,github
 
-# SBOMs copied away from their DepMiner results: name the index to keep Black Duck's exact paths
-depinder analyse ./sboms -r exports/my-project --project-name my-project --depminer-index ./depminer/results/depminer
+# Standalone CycloneDX SBOMs
+depinder analyse ./sboms -r exports/my-project
+
+# SBOMs copied away from DepMiner results: name the index to retain own-code filtering
+depinder analyse ./sboms -r exports/my-project --depminer-index ./depminer/results/depminer
 
 # Only three ecosystems; the aliases select sbom-npm, sbom-ruby and sbom-java
 depinder analyse ./sboms -r results -p npm ruby java
