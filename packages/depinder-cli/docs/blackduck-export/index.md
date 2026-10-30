@@ -2,15 +2,15 @@
 
 [`analyse`](../commands/analyse.md) writes, for each SBOM source it finds, the four shareable CSVs
 [`transformBlackDuckReports`](../commands/blackduck-reports.md) produces from a real Black Duck
-export — same header line, same cell conventions, so a downstream reader processes either folder
-the same way — plus files Black Duck has no counterpart for.
+export, using the same cell conventions. `_dependencies_sources.csv` adds `ProjectFilePath`.
+Other files have no Black Duck counterpart.
 
 ## Files
 
 | File | One row per | Notes |
 |---|---|---|
 | `_dependencies.csv` | (component, version, origin) | The transform's 25 columns |
-| `_dependencies_sources.csv` | (component, path) | The transform's 23 columns; one chain per component, from the SBOM's `dependsOn` edges |
+| `_dependencies_sources.csv` | (component, path) | The transform's 23 columns plus `ProjectFilePath`; one chain per component, from the SBOM's `dependsOn` edges |
 | `_vulnerability_details.csv` | (component, advisory) | The transform's 22 columns, without Black Duck's ids, project path, triage and CISA block |
 | `_upgrade_guidance.csv` | component with a finding | Short and long term recommended versions |
 | `_dependency_edges.csv` | (parent, child) | **Ours.** Every edge: `Repo, Tree, Ecosystem, Parent Origin Id, Child Origin Id, Child Depth` |
@@ -55,7 +55,8 @@ command wrote it:
 | `Newer Versions` | registry | Versions **published after** the installed one, Black Duck's rule. The count by version number is in `_component_versions.csv` |
 | `Component Link` | registry | Declared project homepage, per component. Empty when none, as Black Duck. Go: derived from the module path |
 | `Path` | `dependsOn` | `<repo>/<module>/-<pm>/<name>/<version>/…` — see [paths](#paths) |
-| `ProjectPath` | SBOM | `<repo>/<manifest path>`, such as `example-service/api/Pipfile.lock`; repo name alone when no manifest location is recorded |
+| `ProjectFilePath` | SBOM | `<repo>/<manifest path>`, such as `example-service/api/Pipfile.lock`; empty when no manifest location is recorded |
+| `ProjectPath` | SBOM | Parent directory of `ProjectFilePath`, such as `example-service/api`; repo name alone when no manifest location is recorded |
 | `VerifiedPath`, `VerifiedPathMethod` | — | empty, `not-checked` |
 | Open Hub columns, `Has License Conflicts` | — | empty or constant |
 

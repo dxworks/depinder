@@ -2,9 +2,8 @@
  * The shareable Black Duck report shape, in one place.
  *
  * `transformBlackDuckReports` reshapes a real Black Duck export into four `_*.csv` files, and
- * `analyse` writes the same four files from SBOMs. Both import their headers and their
- * cell conventions from here, so the two commands cannot drift into two spellings of one column
- * and a downstream reader can process either folder the same way.
+ * `analyse` writes the same four files from SBOMs, adding `ProjectFilePath` to source rows.
+ * Both import their headers and cell conventions from here.
  *
  * This is a leaf module: it knows nothing about the model or the raw export, only about the
  * header lines and the shape of a cell.
@@ -30,6 +29,10 @@ export const DEPENDENCIES_SOURCES_COLUMNS = [
     'Total Vulnerability Count', 'Critical and High Vulnerability Count', 'Operational Risk',
     'Release Date', 'Newer Versions', 'OpenHubURL',
 ] as const
+
+/** `analyse` source rows also carry the SBOM's manifest file path. */
+export const SBOM_DEPENDENCIES_SOURCES_COLUMNS = DEPENDENCIES_SOURCES_COLUMNS.flatMap(column =>
+    column === 'ProjectPath' ? ['ProjectFilePath', column] : [column])
 
 /** `_vulnerability_details.csv`: one row per (component, advisory), without Black Duck's ids and triage. */
 export const VULNERABILITY_DETAILS_COLUMNS = [

@@ -51,9 +51,12 @@ it.each(['trivy', 'syft'])('exports paths from %s', producer => {
     const sources = readCsv('_dependencies_sources.csv')
 
     expect(sources).toHaveLength(4)
-    expect(sources.map(row => row.ProjectPath)).toEqual([
+    expect(sources.map(row => row.ProjectFilePath)).toEqual([
         'example-app/Pipfile.lock', 'example-app/Pipfile.lock',
         'example-service/api/Pipfile.lock', 'example-service/api/Pipfile.lock',
+    ])
+    expect(sources.map(row => row.ProjectPath)).toEqual([
+        'example-app', 'example-app', 'example-service/api', 'example-service/api',
     ])
     expect(sources.map(row => row.Path)).toEqual([
         'example-app/-pip/parent/1.0.0', 'example-app/-pip/parent/1.0.0/child/2.0.0',
@@ -63,7 +66,7 @@ it.each(['trivy', 'syft'])('exports paths from %s', producer => {
     expect(readCsv('_vulnerability_details.csv')[0]).not.toHaveProperty('Project path')
 })
 
-it('keeps the repository as the project path when the SBOM has no manifest location', () => {
+it('leaves the project file path empty and keeps the repository directory when the SBOM has no manifest location', () => {
     const file = writeSbom('syft', 'example-app', 'Pipfile.lock')
     const bom = JSON.parse(fs.readFileSync(file, 'utf8'))
     for (const component of bom.components) delete component.properties
@@ -72,6 +75,7 @@ it('keeps the repository as the project path when the SBOM has no manifest locat
 
     const sources: Record<string, string>[] = parse(fs.readFileSync(path.join(folder, '_dependencies_sources.csv'), 'utf8'), {columns: true})
     expect(sources.map(row => row.ProjectPath)).toEqual(['example-app', 'example-app'])
+    expect(sources.map(row => row.ProjectFilePath)).toEqual(['', ''])
     expect(parse(fs.readFileSync(path.join(folder, '_vulnerability_details.csv'), 'utf8'), {columns: true})).toHaveLength(0)
 })
 
@@ -98,7 +102,8 @@ it.each(['trivy', 'syft'])('filters manifest-declared own code in %s paths while
         expect(rows.map(row => [row['Component name'], row.Path, row['Match type']])).toEqual([
             ['child', 'example-app/-uv/child/2.0.0', 'Direct'],
         ])
-        expect(rows[0].ProjectPath).toBe('example-app/uv.lock')
+        expect(rows[0].ProjectFilePath).toBe('example-app/uv.lock')
+        expect(rows[0].ProjectPath).toBe('example-app')
         const edges = fs.readFileSync(path.join(folder, '_dependency_edges.csv'), 'utf8')
         writeBlackDuckForSource(descriptions, analysed, folder, folder, {depminerIndex: false})
         const unfiltered: Record<string, string>[] = parse(fs.readFileSync(path.join(folder, '_dependencies_sources.csv'), 'utf8'), {columns: true})

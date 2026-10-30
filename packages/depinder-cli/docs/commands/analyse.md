@@ -78,7 +78,7 @@ A subfolder appears only when its source had input.
 | `sbom-<eco>-licenses.csv` | licence |
 | `sbom-<eco>-project-stats.csv` | project |
 | `_dependencies.csv` | (component, version, origin) — the transform's 25 columns |
-| `_dependencies_sources.csv` | (component, path) — the transform's 23 columns |
+| `_dependencies_sources.csv` | (component, path) — the transform's 23 columns plus `ProjectFilePath` |
 | `_vulnerability_details.csv` | (component, advisory) — the transform's 22 columns |
 | `_upgrade_guidance.csv` | component with a finding |
 | `_dependency_edges.csv` | (parent, child) — every edge of the graph |
@@ -86,13 +86,14 @@ A subfolder appears only when its source had input.
 | `_vulnerability_findings.json` | component with a finding — the findings as seen, fix versions included |
 | `sbom-scan-provenance.json` | run |
 
-The four `_*.csv` files have the header line and cell conventions of
-[`transformBlackDuckReports`](blackduck-reports.md), so a downstream reader processes a
-depinder subfolder and a transformed Black Duck folder the same way. Columns and derivations:
+The four `_*.csv` files follow the cell conventions of
+[`transformBlackDuckReports`](blackduck-reports.md). `_dependencies_sources.csv` adds
+`ProjectFilePath` to the transform's columns. Columns and derivations:
 [Black Duck Export](../blackduck-export/index.md).
 
-`ProjectPath` comes directly from the SBOM's repository and manifest path, for example
-`example-service/api/Pipfile.lock`. When no manifest location is recorded, it is the repository name.
+`ProjectFilePath` combines the SBOM's repository and manifest path, for example
+`example-service/api/Pipfile.lock`. `ProjectPath` is its parent directory, `example-service/api`.
+When no manifest location is recorded, `ProjectFilePath` is empty and `ProjectPath` is the repository name.
 
 `Path` follows the SBOM dependency graph with a `<repo>/<module>/-<pm>/` prefix. Project anchors
 identified by the SBOM are omitted. Repository manifests can identify additional own packages
@@ -113,7 +114,7 @@ the manifests listed under its repository name.
 A manifest without a version matches by name. Matched packages are omitted from
 `_dependencies_sources.csv` rows and chains; the shortened chain determines each source row's
 direct/transitive classification.
-This filtering leaves other reports, `ProjectPath` and `_dependency_edges.csv` unchanged.
+This filtering leaves other reports, `ProjectFilePath`, `ProjectPath` and `_dependency_edges.csv` unchanged.
 
 The index is discovered by looking for `depminer/index.json` from each SBOM's directory
 upwards to the parent of the input folder. `--depminer-index` selects a file or its containing

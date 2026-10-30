@@ -5,7 +5,7 @@ import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {csvDocument, NamedRow} from '../utils/csv'
 import {log} from '../utils/logging'
 import {
-    COMPONENT_VERSIONS_COLUMNS, countCell, DEPENDENCIES_COLUMNS, DEPENDENCIES_SOURCES_COLUMNS, isoToTabIso,
+    COMPONENT_VERSIONS_COLUMNS, countCell, DEPENDENCIES_COLUMNS, SBOM_DEPENDENCIES_SOURCES_COLUMNS, isoToTabIso,
     normalizeMatchType, UPGRADE_GUIDANCE_COLUMNS, VULNERABILITY_DETAILS_COLUMNS,
 } from './columns'
 import {licenseColumns, licenseRisk} from './licenses'
@@ -18,9 +18,8 @@ import {remainingAt, upgradeGuidance} from './upgrade'
  * The Black Duck-shaped CSVs, written from one model.
  *
  * The four shareable files — `_dependencies.csv`, `_dependencies_sources.csv`,
- * `_vulnerability_details.csv`, `_upgrade_guidance.csv` — carry the header line and the cell
- * conventions `transformBlackDuckReports` writes from a real Black Duck export (`columns.ts`,
- * shared with it), so a downstream reader processes either folder the same way.
+ * `_vulnerability_details.csv`, `_upgrade_guidance.csv` — follow the cell conventions of
+ * `transformBlackDuckReports`. Source rows add `ProjectFilePath` to its shared columns.
  * `_dependency_edges.csv` and `_component_versions.csv` are ours.
  *
  * Columns we cannot fill are written empty rather than guessed; `docs/blackduck-export/index.md`
@@ -222,7 +221,8 @@ function dependencySourceRows(model: BlackDuckModel): NamedRow[] {
             'Component Version Origin Id': component.originId,
             'Match type': normalizeMatchType(sbomPath.matchType),
             'Path': sbomPath.path,
-            'ProjectPath': sbomPath.projectFilePath,
+            'ProjectFilePath': sbomPath.projectFilePath,
+            'ProjectPath': sbomPath.projectPath,
             // What the transform writes when no --basePath verifies the path on disk; we verify none.
             'VerifiedPath': '',
             'VerifiedPathMethod': 'not-checked',
@@ -359,7 +359,7 @@ export function writeBlackDuckExport(model: BlackDuckModel, resultFolder: string
     }
     return [
         write(resultFolder, DEPENDENCIES_FILE, DEPENDENCIES_COLUMNS, dependencyRows(model)),
-        write(resultFolder, DEPENDENCIES_SOURCES_FILE, DEPENDENCIES_SOURCES_COLUMNS, dependencySourceRows(model)),
+        write(resultFolder, DEPENDENCIES_SOURCES_FILE, SBOM_DEPENDENCIES_SOURCES_COLUMNS, dependencySourceRows(model)),
         write(resultFolder, DEPENDENCY_EDGES_FILE, DEPENDENCY_EDGES_HEADERS, dependencyEdgeRows(model)),
         write(resultFolder, COMPONENT_VERSIONS_FILE, COMPONENT_VERSIONS_COLUMNS, componentVersionRows(model)),
         writeUpgradeGuidanceCsv(model.components, resultFolder),

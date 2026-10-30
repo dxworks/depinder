@@ -45,8 +45,10 @@ export interface SbomPath {
      * A segment uses `<name>:<version>` where the origin id uses a colon.
      */
     path: string
-    /** `<repo>/<manifest path>`, or `<repo>` when the SBOM records no manifest. */
+    /** `<repo>/<manifest path>`, or empty when the SBOM records no manifest. */
     projectFilePath: string
+    /** Parent directory of `projectFilePath`, or `<repo>` when no manifest is recorded. */
+    projectPath: string
     matchType: 'Direct Dependency' | 'Transitive Dependency'
 }
 
@@ -263,6 +265,8 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
         return parsed && parsed.type === purlType ? parsed : undefined
     }
     const projectDirectory = node.module ? `${repo}/${node.module}` : repo
+    const projectFilePath = node.path === node.name ? '' : path.posix.join(repo, normalizeInputPath(node.path))
+    const projectPath = projectFilePath ? path.posix.dirname(projectFilePath) : repo
     const anchors = new Set(node.anchorRefs)
     const ownCode = ownCodeMatcher(manifests, node.module, purlType)
     const isOwn = (ref: string) => anchors.has(ref) || ownCode(coordinatesOf(ref))
@@ -295,7 +299,8 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
             version: target.version,
             purlType,
             path: rendered,
-            projectFilePath: node.path === node.name ? repo : path.posix.join(repo, normalizeInputPath(node.path)),
+            projectFilePath,
+            projectPath,
             matchType: segments.length === 1 ? 'Direct Dependency' : 'Transitive Dependency',
         })
     }

@@ -2,7 +2,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import {BLACKDUCK_FILES, upgradeGuidanceRows, vulnerabilityFindings, vulnerabilityUrl, writeBlackDuckExport, writeUpgradeGuidanceCsv} from '../src/blackduck/export'
-import {COMPONENT_VERSIONS_COLUMNS, DEPENDENCIES_COLUMNS, DEPENDENCIES_SOURCES_COLUMNS, UPGRADE_GUIDANCE_COLUMNS, VULNERABILITY_DETAILS_COLUMNS} from '../src/blackduck/columns'
+import {COMPONENT_VERSIONS_COLUMNS, DEPENDENCIES_COLUMNS, SBOM_DEPENDENCIES_SOURCES_COLUMNS, UPGRADE_GUIDANCE_COLUMNS, VULNERABILITY_DETAILS_COLUMNS} from '../src/blackduck/columns'
 import {cvss3SubScores} from '../src/blackduck/cvss'
 import {licenseColumns} from '../src/blackduck/licenses'
 import {AnalysedEcosystem, buildModel, comparatorForPurlType} from '../src/blackduck/model'
@@ -427,6 +427,7 @@ describe('dependency paths', () => {
         expect(tree.paths.map(row => row.projectFilePath)).toEqual([
             `repo/apps/client/${manifest}`, `repo/apps/client/${manifest}`,
         ])
+        expect(tree.paths.map(row => row.projectPath)).toEqual(['repo/apps/client', 'repo/apps/client'])
     })
 
     it('walks dependsOn from a Trivy application node, tagged with its package manager', () => {
@@ -444,9 +445,9 @@ describe('dependency paths', () => {
             ],
         })
         expect(sbomTree(file, 'demo', new Set(['npm'])).paths).toEqual([
-            {name: 'express', version: '4.18.0', purlType: 'npm', projectFilePath: 'demo/yarn.lock',
+            {name: 'express', version: '4.18.0', purlType: 'npm', projectFilePath: 'demo/yarn.lock', projectPath: 'demo',
                 matchType: 'Direct Dependency', path: 'demo/-yarn/express/4.18.0'},
-            {name: 'qs', version: '6.10.2', purlType: 'npm', projectFilePath: 'demo/yarn.lock',
+            {name: 'qs', version: '6.10.2', purlType: 'npm', projectFilePath: 'demo/yarn.lock', projectPath: 'demo',
                 matchType: 'Transitive Dependency', path: 'demo/-yarn/express/4.18.0/qs/6.10.2'},
         ])
     })
@@ -530,12 +531,12 @@ describe('dependency paths', () => {
             ],
         })
         expect(sbomTree(file, 'go-caddy', new Set(['golang'])).paths).toEqual([
-            {name: 'github.com/caddyserver/certmagic', version: 'v0.25.4', purlType: 'golang', projectFilePath: 'go-caddy/go.mod',
+            {name: 'github.com/caddyserver/certmagic', version: 'v0.25.4', purlType: 'golang', projectFilePath: 'go-caddy/go.mod', projectPath: 'go-caddy',
                 matchType: 'Direct Dependency', path: 'go-caddy/-go_mod/github.com/caddyserver/certmagic:v0.25.4'},
         ])
     })
 
-    it('includes the manifest in the project path below the top level', () => {
+    it('separates the manifest file path from its project directory below the top level', () => {
         const file = write({
             metadata: {component: {'bom-ref': 'root'}},
             components: [
@@ -550,7 +551,8 @@ describe('dependency paths', () => {
             ],
         })
         expect(sbomTree(file, 'rust-ripgrep', new Set(['cargo'])).paths[0]).toMatchObject({
-            projectFilePath: 'rust-ripgrep/fuzz/Cargo.lock', path: 'rust-ripgrep/fuzz/-cargo/libfuzzer-sys/0.4.7',
+            projectFilePath: 'rust-ripgrep/fuzz/Cargo.lock', projectPath: 'rust-ripgrep/fuzz',
+            path: 'rust-ripgrep/fuzz/-cargo/libfuzzer-sys/0.4.7',
         })
     })
 
@@ -667,10 +669,10 @@ describe('the written files', () => {
         for (const file of BLACKDUCK_FILES) expect(fs.existsSync(path.join(folder, file))).toBe(true)
     })
 
-    it('writes the header lines transformBlackDuckReports writes, and ends every file with a newline', () => {
+    it('writes report header lines and ends every file with a newline', () => {
         writeBlackDuckExport(buildModel('demo', [ecosystem(dependency())], []), folder)
         expect(readCsv(folder, '_dependencies.csv')[0]).toBe(DEPENDENCIES_COLUMNS.join(','))
-        expect(readCsv(folder, '_dependencies_sources.csv')[0]).toBe(DEPENDENCIES_SOURCES_COLUMNS.join(','))
+        expect(readCsv(folder, '_dependencies_sources.csv')[0]).toBe(SBOM_DEPENDENCIES_SOURCES_COLUMNS.join(','))
         expect(readCsv(folder, '_vulnerability_details.csv')[0]).toBe(VULNERABILITY_DETAILS_COLUMNS.join(','))
         expect(readCsv(folder, '_upgrade_guidance.csv')[0]).toBe(UPGRADE_GUIDANCE_COLUMNS.join(','))
         expect(readCsv(folder, '_component_versions.csv')[0]).toBe(COMPONENT_VERSIONS_COLUMNS.join(','))
@@ -698,14 +700,16 @@ describe('the written files', () => {
     it('fills a dependency source row the way the transform does without --basePath', () => {
         const model = buildModel('demo', [ecosystem(dependency())], [
             {name: 'qs', version: '6.10.2', purlType: 'npm', path: 'demo/-npm/qs/6.10.2',
-                projectFilePath: 'demo', matchType: 'Direct Dependency'},
+                projectFilePath: '', projectPath: 'demo', matchType: 'Direct Dependency'},
         ])
         writeBlackDuckExport(model, folder)
         const [, row] = readCsv(folder, '_dependencies_sources.csv')
-        const cells = Object.fromEntries(DEPENDENCIES_SOURCES_COLUMNS.map((it, i) => [it, row.split(',')[i]]))
+        const cells = Object.fromEntries(SBOM_DEPENDENCIES_SOURCES_COLUMNS.map((it, i) => [it, row.split(',')[i]]))
         expect(cells['Version id']).toBe('')
         expect(cells['Match type']).toBe('Direct')
         expect(cells['Path']).toBe('demo/-npm/qs/6.10.2')
+        expect(cells['ProjectFilePath']).toBe('')
+        expect(cells['ProjectPath']).toBe('demo')
         expect(cells['VerifiedPath']).toBe('')
         expect(cells['VerifiedPathMethod']).toBe('not-checked')
         expect(cells['Release Date']).toBe('\t2021-10-06')
@@ -812,7 +816,7 @@ describe('the written files', () => {
     it('drops a path whose component no plugin enriched', () => {
         const model = buildModel('demo', [ecosystem(dependency())], [
             {name: 'unseen', version: '1.0.0', purlType: 'npm', path: 'demo/-npmjs/unseen/1.0.0',
-                projectFilePath: 'demo', matchType: 'Direct Dependency'},
+                projectFilePath: '', projectPath: 'demo', matchType: 'Direct Dependency'},
         ])
         writeBlackDuckExport(model, folder)
         expect(readCsv(folder, '_dependencies_sources.csv')).toHaveLength(1)
