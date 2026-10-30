@@ -156,7 +156,7 @@ function isoDate(timestamp: number | undefined): string {
  * Ours would otherwise be the scanner's own page (`avd.aquasec.com`, `github.com/advisories`),
  * which says the same thing at a different address; only a finding with no CVE keeps that.
  */
-export function vulnerabilityUrl(vulnerability: Vulnerability): string {
+function vulnerabilityUrl(vulnerability: Vulnerability): string {
     const cve = (vulnerability.identifiers ?? []).map(it => it.value).find(it => /^CVE-\d{4}-\d+$/i.test(it))
     if (cve) return `https://nvd.nist.gov/vuln/detail/${cve.toUpperCase()}`
     return vulnerability.permalink ?? ''
@@ -394,7 +394,7 @@ export interface VulnerabilityFindingsFile {
 
 type VulnerableComponent = Pick<ExportComponent, 'name' | 'version' | 'purlType' | 'origin' | 'originId' | 'vulnerabilities'>
 
-export function vulnerabilityFindings(model: BlackDuckModel): VulnerabilityFindingsFile {
+function vulnerabilityFindings(model: BlackDuckModel): VulnerabilityFindingsFile {
     return {
         schema: 1,
         components: model.components
@@ -411,7 +411,7 @@ function writeVulnerabilityFindings(model: BlackDuckModel, resultFolder: string)
     return {file: VULNERABILITY_FINDINGS_FILE, rows: findings.components.length}
 }
 
-export const BLACKDUCK_FILES = [
+const BLACKDUCK_FILES = [
     DEPENDENCIES_FILE,
     DEPENDENCIES_SOURCES_FILE,
     DEPENDENCY_EDGES_FILE,

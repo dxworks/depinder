@@ -79,7 +79,7 @@ function lineOf(version: string, depth: number): string {
  * EVERY named fix — `2.13.0` sits between the `2.12.2` backport and the `2.15.0` fix and is
  * vulnerable, `4.0.0` is above both and is not.
  */
-export function fixedBy(component: ExportComponent, finding: Vulnerability, candidate: string): boolean {
+function fixedBy(component: ExportComponent, finding: Vulnerability, candidate: string): boolean {
     const fixes = fixesOf(finding)
     if (fixes.length === 0) return false
     const depth = lineDepth(fixes)

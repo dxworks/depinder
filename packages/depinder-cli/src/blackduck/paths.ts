@@ -99,7 +99,7 @@ const PACKAGE_MANAGER_TAGS: readonly [RegExp, string][] = [
 /** What a component with no parent inside its tree is filed under, as `comparison-view` spells it. */
 const EDGE_ROOT = '(root)'
 
-export function packageManagerTag(manifest: string | undefined): string | undefined {
+function packageManagerTag(manifest: string | undefined): string | undefined {
     if (!manifest) return undefined
     const base = path.basename(manifest)
     return PACKAGE_MANAGER_TAGS.find(([pattern]) => pattern.test(base))?.[1]

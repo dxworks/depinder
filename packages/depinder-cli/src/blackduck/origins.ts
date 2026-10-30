@@ -56,7 +56,7 @@ const GO_X_MODULE = /^golang\.org\/x\/([^/]+)/
  */
 const GO_PSEUDO_VERSION = /^v\d+\.\d+\.\d+(?:-(?:[^-]*\.)?0\.|-)\d{14}-([0-9a-f]{12})$/
 
-export function goPseudoVersionCommit(version: string): string {
+function goPseudoVersionCommit(version: string): string {
     return GO_PSEUDO_VERSION.exec(version)?.[1] ?? version
 }
 
@@ -135,7 +135,7 @@ export function componentLink(origin: Origin, name: string, homepage?: string): 
  * invented here: a URL that is not http(s) after unwrapping (`mailto:`, a bare path, a private
  * host) is dropped, because a link that cannot be opened is worse than an empty cell.
  */
-export function canonicalProjectUrl(url?: string): string {
+function canonicalProjectUrl(url?: string): string {
     const raw = (url ?? '').trim()
     if (!raw) return ''
     const unwrapped = raw
