@@ -21,7 +21,7 @@ import type {PurlCoordinates} from '../plugins/sbom/purl'
  * enclosing directory that holds a lockfile of the same family, and to no tree beyond it.
  */
 
-export interface RepoManifest {
+interface RepoManifest {
     /** Repo-relative directory of the manifest, `''` at the root. */
     dir: string
     /** The manifest's basename. */

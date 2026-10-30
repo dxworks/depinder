@@ -95,6 +95,8 @@ The four `_*.csv` files follow the cell conventions of
 `example-service/api/Pipfile.lock`. `ProjectPath` is its parent directory, `example-service/api`.
 When no manifest location is recorded, `ProjectFilePath` is empty and `ProjectPath` is the repository name.
 
+For path verification after analysis, use [`verifyPaths`](blackduck-reports.md#verifypaths).
+
 `Path` follows the SBOM dependency graph with a `<repo>/<module>/-<pm>/` prefix. Project anchors
 identified by the SBOM are omitted. Repository manifests can identify additional own packages
 to omit from source paths, as described below.

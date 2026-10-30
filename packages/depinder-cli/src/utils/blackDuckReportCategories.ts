@@ -30,20 +30,23 @@ export async function addCategoriesToBlackDuckReports(reportDir: string, repoCat
     const dependenciesSourcesRaw = await fs.readFile(path.join(reportDir, DEPENDENCIES_SOURCES_FILE), 'utf-8');
     const repoCategoriesRaw = await fs.readFile(repoCategoriesPath, 'utf-8');
 
-    const dependencies = parseCsv(dependenciesRaw);
-    const dependenciesSources = parseCsv(dependenciesSourcesRaw);
     const repoCategories = parseRepoCategories(repoCategoriesRaw);
+    const reports = createCategoryReports(dependenciesRaw, dependenciesSourcesRaw, repoCategories);
+    for (const [fileName, content] of Object.entries(reports)) {
+        await fs.writeFile(path.join(reportDir, fileName), content);
+    }
+}
 
-    const outputs = addCategoriesToReports(dependencies, dependenciesSources, repoCategories);
-
-    await fs.writeFile(
-        path.join(reportDir, DEPENDENCIES_SOURCES_BY_CATEGORY_FILE),
-        csvDocumentFromRows(outputs.dependenciesSourcesByCategory)
-    );
-    await fs.writeFile(
-        path.join(reportDir, DEPENDENCIES_BY_CATEGORY_FILE),
-        csvDocumentFromRows(outputs.dependenciesByCategory)
-    );
+export function createCategoryReports(
+    dependenciesRaw: string,
+    dependenciesSourcesRaw: string,
+    repoCategories: Map<string, string>
+): Record<string, string> {
+    const outputs = addCategoriesToReports(parseCsv(dependenciesRaw), parseCsv(dependenciesSourcesRaw), repoCategories);
+    return {
+        [DEPENDENCIES_SOURCES_BY_CATEGORY_FILE]: csvDocumentFromRows(outputs.dependenciesSourcesByCategory),
+        [DEPENDENCIES_BY_CATEGORY_FILE]: csvDocumentFromRows(outputs.dependenciesByCategory)
+    };
 }
 
 export function addCategoriesToReports(
@@ -83,7 +86,21 @@ export function addCategoriesToReports(
 }
 
 export function parseRepoCategories(raw: string): Map<string, string> {
-    const rows = parse(raw, CSV_PARSE_OPTIONS) as CsvRecord[];
+    if (!raw.trim()) throw new Error('repo-to-category.csv is empty');
+    const rows = parse(raw, {
+        ...CSV_PARSE_OPTIONS,
+        bom: true,
+        columns: (headers: string[]) => {
+            const columns = headers.map(header => header.trim());
+            if (!columns.includes('repo') || !columns.includes('category')) {
+                throw new Error('repo-to-category.csv needs repo and category columns');
+            }
+            if (new Set(columns).size !== columns.length) {
+                throw new Error('repo-to-category.csv contains duplicate columns');
+            }
+            return columns;
+        }
+    }) as CsvRecord[];
     const repoCategories = new Map<string, string>();
 
     for (const row of rows) {
