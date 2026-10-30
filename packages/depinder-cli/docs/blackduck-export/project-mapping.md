@@ -2,7 +2,7 @@
 
 [`transformBlackDuckReports`](../commands/blackduck-reports.md#transformblackduckreports) reads the
 project each dependency belongs to from its Black Duck `Path`, writes it as `ProjectPath`, and,
-with `--basePath`, checks that the folder exists on disk (`VerifiedPath`, `VerifiedPathMethod`).
+with `--basePath`, checks that path exists on disk (`VerifiedPath`, `VerifiedPathMethod`).
 
 The project path is what comes before the package-manager tag (`-yarn`, `-npm`, `-maven`,
 `-nuget`, `-pip`, …), without a trailing manifest file (`.csproj`, `pom.xml`, `build.gradle`) or
@@ -20,8 +20,9 @@ Or with the short options:
 depinder transformBlackDuckReports <path-to-reports> -b <base-path> -m <path-to-mappings.json>
 ```
 
-`--basePath` is the folder the repositories are checked out under. Without it nothing is checked
-and every row gets `not-checked`. `--pathMappings` is optional.
+`--basePath` points to root containing code stubs or constructed dependency files.
+Without it, transform writes `not-checked`. `--pathMappings` is optional.
+For existing reports, use [`verifyPaths`](../commands/blackduck-reports.md#verifypaths).
 
 | `VerifiedPathMethod` | `VerifiedPath` is |
 |---|---|
@@ -32,7 +33,7 @@ and every row gets `not-checked`. `--pathMappings` is optional.
 | `none` | Empty: no candidate exists |
 | `not-checked` | Empty: no `--basePath` |
 
-They are tried in that order; the first folder that exists wins. A mapped folder that does not
+They are tried in that order; the first path that exists wins. A mapped path that does not
 exist gives `none`; the later ones are not tried.
 
 ## Path mappings file
@@ -99,6 +100,6 @@ package-manager tag depinder recognises. Check that `source_*.csv` is the file f
 zip, unedited. If it is, the path uses a package manager depinder does not know yet;
 [open an issue](https://github.com/dxworks/depinder/issues) with the path from the message.
 
-**Project path not found on disk** (`none`). Check that `--basePath` is the folder holding the
-repositories. If the extracted path differs from the real folder, add it to the
+**Project path not found on disk** (`none`). Check `--basePath` and target paths.
+If extracted path differs from actual path, add it to the
 [path mappings file](#path-mappings-file).

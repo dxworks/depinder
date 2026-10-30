@@ -1,11 +1,12 @@
 import fs from 'fs/promises';
-import * as fsSync from 'fs';
 import path from 'path';
 import { Command } from 'commander';
 import { parse } from 'csv-parse/sync';
 import { csvDocumentFromRows, csvLines } from '../utils/csv';
-import { extractProjectInfo, PathMappings, createPathMappings } from '../utils/projectMapping';
-import { addCategoriesToBlackDuckReports } from '../utils/blackDuckReportCategories';
+import { extractProjectInfo } from '../utils/projectMapping';
+import { loadVerificationOptions, printVerificationSummary, ReportVerificationOptions, verifySourcePaths } from '../utils/reportVerification';
+import { createCategoryReports } from '../utils/blackDuckReportCategories';
+import { addReportVerificationOptions } from './reportVerificationOptions';
 import {
     blackDuckDateToTabIso,
     countCell,
@@ -211,14 +212,11 @@ function transformDependencies(components: ComponentRecord[]): Record<string, st
  * Transforms sources and components data into dependencies_sources records
  * @param sources Raw source records from Black Duck
  * @param components Raw component records from Black Duck
- * @param basePath Optional base path for verifying project paths
  * @returns Transformed dependency source records
  */
 function transformDependenciesSources(
     sources: SourceRecord[],
-    components: ComponentRecord[],
-    basePath?: string,
-    pathMappings?: PathMappings
+    components: ComponentRecord[]
 ): Record<string, string>[] {
     const validSources = sources.filter(src =>
         components.some(c => c['Version id'] === src['Version id'])
@@ -229,9 +227,7 @@ function transformDependenciesSources(
         const counts = calculateVulnerabilityCounts(comp);
 
         // Extract project information from path
-        const projectInfo = basePath
-            ? extractProjectInfo(src['Path'], src['Origin name'], basePath, pathMappings)
-            : extractProjectInfo(src['Path'], src['Origin name']);
+        const projectInfo = extractProjectInfo(src['Path'], src['Origin name']);
 
         return {
             'Component name': src['Component name'],
@@ -378,13 +374,13 @@ function validateRequiredFiles(entries: string[]): {
  * @param reportDir Directory containing Black Duck report files
  * @param options Command options including optional basePath and pathMappings
  */
-async function transformBlackDuckReports(reportDir: string, options?: { basePath?: string, pathMappings?: string, repoCategories?: string }): Promise<void> {
+async function transformBlackDuckReports(reportDir: string, options?: ReportVerificationOptions): Promise<void> {
     try {
         // Find and validate required input files
         const entries = await fs.readdir(reportDir);
         const { componentFile, sourceFile, securityFile, upgradeFile } = validateRequiredFiles(entries);
 
-        let pathMappings: PathMappings | undefined = loadPathMappings(options);
+        const config = loadVerificationOptions(options);
 
         // Read input files 
         const componentsRawData = await fs.readFile(path.join(reportDir, componentFile), 'utf-8');
@@ -397,42 +393,36 @@ async function transformBlackDuckReports(reportDir: string, options?: { basePath
         const sources: SourceRecord[] = parse(sourcesRawData, CSV_PARSE_OPTIONS);
         const securityRecords: SecurityRecord[] = parse(securityRawData, CSV_PARSE_OPTIONS);
 
-        // Transform and write _dependencies_sources.csv
-        const dependenciesSourcesRecords = transformDependenciesSources(sources, components, options?.basePath, pathMappings);
-
-        const emptyVerifiedPaths = dependenciesSourcesRecords.filter(record => record['VerifiedPath'] === '');
-        if (emptyVerifiedPaths.length > 0) {
-            console.warn(`Found ${emptyVerifiedPaths.length} out of ${dependenciesSourcesRecords.length} dependencies with empty verified paths.`);
-        }
+        // Prepare every report before writing, including optional category reports.
+        const dependenciesSourcesRecords = verifySourcePaths(
+            transformDependenciesSources(sources, components), config.basePath, config.pathMappings
+        );
 
         const formattedDependenciesSources = formatRecordsWithColumnOrder(
             dependenciesSourcesRecords,
             DEPENDENCIES_SOURCES_COLUMN_ORDER
         );
         const dependenciesSourcesCSV = csvDocumentFromRows(formattedDependenciesSources);
-        await fs.writeFile(path.join(reportDir, '_dependencies_sources.csv'), dependenciesSourcesCSV);
-
-        // Transform and write _dependencies.csv
         const dependencyRecords = transformDependencies(components);
         const formattedDependencies = formatRecordsWithColumnOrder(
             dependencyRecords,
             DEPENDENCIES_COLUMN_ORDER
         );
         const dependenciesCSV = csvDocumentFromRows(formattedDependencies);
-        await fs.writeFile(path.join(reportDir, '_dependencies.csv'), dependenciesCSV);
-
-        // Transform and write _vulnerability_details.csv
         const vulnerabilityRecords = transformVulnerabilityDetails(securityRecords);
         const vulnerabilityCSV = csvDocumentFromRows(vulnerabilityRecords);
-        await fs.writeFile(path.join(reportDir, '_vulnerability_details.csv'), vulnerabilityCSV);
-
-        // Transform and write _upgrade_guidance.csv
         const upgradeGuidanceCSV = transformUpgradeGuidance(upgradeRawData);
-        await fs.writeFile(path.join(reportDir, '_upgrade_guidance.csv'), upgradeGuidanceCSV);
-
-        if (options?.repoCategories) {
-            await addCategoriesToBlackDuckReports(reportDir, options.repoCategories);
+        const reports = {
+            '_dependencies_sources.csv': dependenciesSourcesCSV,
+            '_dependencies.csv': dependenciesCSV,
+            '_vulnerability_details.csv': vulnerabilityCSV,
+            '_upgrade_guidance.csv': upgradeGuidanceCSV,
+            ...(config.repoCategories ? createCategoryReports(dependenciesCSV, dependenciesSourcesCSV, config.repoCategories) : {})
+        };
+        for (const [fileName, content] of Object.entries(reports)) {
+            await fs.writeFile(path.join(reportDir, fileName), content);
         }
+        printVerificationSummary(reportDir, dependenciesSourcesRecords);
     } catch (error) {
         if (error instanceof Error) {
             throw new Error(`Failed to transform Black Duck reports: ${error.message}`);
@@ -441,37 +431,12 @@ async function transformBlackDuckReports(reportDir: string, options?: { basePath
     }
 }
 
-export const transformBlackDuckReportsCommand = new Command()
-    .command('transformBlackDuckReports')
-    .description('Transforms Black Duck CSV reports to shareable format')
-    .argument('<reportPath>', 'Path to the directory with Black Duck CSVs')
-    .option('-b, --basePath <path>', 'Base path for verifying project paths')
-    .option('-m, --pathMappings <path>', 'Path to JSON file containing path mappings')
-    .option('--repoCategories <path>', 'Path to repo-to-category.csv')
-    .action(transformBlackDuckReports);
-
-function loadPathMappings(options: { basePath?: string; pathMappings?: string; repoCategories?: string; } | undefined) {
-    let pathMappings: PathMappings | undefined = undefined;
-    if (options?.pathMappings) {
-        try {
-            console.log(`Loading path mappings from ${options.pathMappings}`);
-
-            if (!fsSync.existsSync(options.pathMappings)) {
-                console.warn(`Path mapping file not found: ${options.pathMappings}`);
-            } else {
-                const fileContent = fsSync.readFileSync(options.pathMappings, 'utf8');
-                const mappingData = JSON.parse(fileContent);
-
-                if (!mappingData.pathMappings || !Array.isArray(mappingData.pathMappings)) {
-                    console.warn(`Invalid path mapping file format: ${options.pathMappings}`);
-                } else {
-                    pathMappings = createPathMappings(mappingData.pathMappings);
-                    console.log(`Loaded ${pathMappings.size} path mappings from ${options.pathMappings}`);
-                }
-            }
-        } catch (error) {
-            console.error(`Error loading path mappings: ${error}`);
-        }
-    }
-    return pathMappings;
+export function createTransformBlackDuckReportsCommand(): Command {
+    const command = new Command()
+        .command('transformBlackDuckReports')
+        .description('Transforms Black Duck CSV reports to shareable format')
+        .argument('<reportPath>', 'Path to the directory with Black Duck CSVs');
+    return addReportVerificationOptions(command).action(transformBlackDuckReports);
 }
+
+export const transformBlackDuckReportsCommand = createTransformBlackDuckReportsCommand();

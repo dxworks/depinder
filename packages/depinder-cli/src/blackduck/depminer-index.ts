@@ -65,7 +65,7 @@ export function depMinerManifests(indexOption: string | false | undefined, input
         const indexFile = explicit ?? findDepMinerIndex(sbom.file, inputFolder)
         if (!indexFile) {
             if (!reportedMissing) log.info(`No DepMiner ${INDEX_UNDER_RESULTS} beside ${inputFolder}; `
-                + 'Path keeps the plain directory prefix and the repository\'s own code')
+                + 'manifest-based own-code filtering is unavailable')
             reportedMissing = true
             return undefined
         }
@@ -74,7 +74,7 @@ export function depMinerManifests(indexOption: string | false | undefined, input
         const key = `${indexFile}\0${sbom.repo}`
         if (!manifests.has(key)) {
             const files = repos?.get(sbom.repo)
-            if (repos && !files) log.warn(`${indexFile} lists no files of ${sbom.repo}; its paths get no project prefix`)
+            if (repos && !files) log.warn(`${indexFile} lists no files of ${sbom.repo}; manifest-based own-code filtering is unavailable`)
             manifests.set(key, files && readRepoManifests(files))
         }
         return manifests.get(key)
@@ -92,7 +92,7 @@ function loadIndex(indexFile: string): Map<string, RepoFiles> | undefined {
         log.info(`DepMiner index ${indexFile}: manifests of ${repos.size} repo(s)`)
         return repos
     } catch (e: any) {
-        log.warn(`Could not read DepMiner index ${indexFile}: ${e?.message ?? e}; paths get no project prefix`)
+        log.warn(`Could not read DepMiner index ${indexFile}: ${e?.message ?? e}; manifest-based own-code filtering is unavailable`)
         return undefined
     }
 }

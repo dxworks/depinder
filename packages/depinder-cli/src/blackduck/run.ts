@@ -15,15 +15,8 @@ import {SbomEdge, SbomPath, sbomTree} from './paths'
  * and runs the serialisers (`export.ts`). Nothing here knows how the projects were enriched.
  */
 
-export interface BlackDuckRunOptions {
-    /** `Project path` and the head of every dependency path. Defaults to `defaultProjectName`. */
-    projectName?: string
-    /** DepMiner's `index.json` (or its folder); `false` turns it off; unset finds it beside the input. */
-    depminerIndex?: string | false
-}
-
 /**
- * The export's root label, which becomes the `Project path` column. The SBOMs' shared repo name
+ * The export's project label. The SBOMs' shared repo name
  * when there is one; the input folder's name when the run spans several repos.
  */
 export function defaultProjectName(sboms: SbomDescription[], inputFolder: string): string {
@@ -32,22 +25,25 @@ export function defaultProjectName(sboms: SbomDescription[], inputFolder: string
     return path.basename(path.resolve(inputFolder))
 }
 
+export interface BlackDuckRunOptions {
+    /** DepMiner's index file or folder; false disables lookup, undefined discovers it beside input. */
+    depminerIndex?: string | false
+}
+
 export function writeBlackDuckForSource(
     sboms: SbomDescription[],
     analysed: AnalysedEcosystem[],
     resultFolder: string,
     inputFolder: string,
-    options: BlackDuckRunOptions,
+    options: BlackDuckRunOptions = {},
 ): WrittenFile[] {
-    const projectName = options.projectName ?? defaultProjectName(sboms, inputFolder)
+    const projectName = defaultProjectName(sboms, inputFolder)
     const exportedTypes = new Set(analysed.map(it => it.purlType))
-    // One source can hold several repos' SBOMs, and the repo a path belongs to is the SBOM's own
-    // repo, not the run's label — so each file contributes its paths under its own repo. An
-    // explicit --project-name still overrides, for a run that really is a single project.
-    // DepMiner's index holds each repo's manifests, under the SBOM's repo name.
+    // Repository identity comes from each SBOM; the report label must not replace it.
     const manifestsOf = depMinerManifests(options.depminerIndex, inputFolder)
-    const trees = timePhaseSync('blackduck:paths', () => sboms.map(sbom =>
-        sbomTree(sbom.file, options.projectName ?? sbom.repo, exportedTypes, {manifests: manifestsOf(sbom)})))
+    const trees = timePhaseSync('blackduck:paths', () => sboms
+        .filter(sbom => [...sbom.purlTypes].some(type => exportedTypes.has(type)))
+        .map(sbom => sbomTree(sbom.file, sbom.repo, exportedTypes, {manifests: manifestsOf(sbom)})))
     const paths: SbomPath[] = trees.flatMap(it => it.paths)
     const edges: SbomEdge[] = trees.flatMap(it => it.edges)
 

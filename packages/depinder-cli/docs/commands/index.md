@@ -9,5 +9,6 @@
 | [`cache`](cache.md) | Inspect the SQLite cache; import legacy JSON | — |
 | [`update`](cache.md#update) | Refresh stale libraries in the SQLite cache | Resolver; registries for what it does not answer; GitHub with `GH_TOKEN` |
 | [`transformBlackDuckReports`](blackduck-reports.md) | Reshape a raw Black Duck export | None |
+| [`verifyPaths`](blackduck-reports.md#verifypaths) | Verify report project paths | None |
 | [`addCategoriesToBlackDuckReports`](blackduck-reports.md) | Add repository categories to it | None |
 | [`extractFrameworkVersion`](extract-framework-version.md) | .NET and Java versions per manifest, to CSV | None |

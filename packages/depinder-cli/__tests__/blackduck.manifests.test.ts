@@ -2,13 +2,11 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import {readDepMinerIndex} from '../src/blackduck/depminer-index'
-import {blackDuckPrefix, manifestOfTree, ownCodeMatcher, pep440, readRepoManifests, RepoManifests} from '../src/blackduck/manifests'
+import {ownCodeMatcher, pep440, readRepoManifests, RepoManifests} from '../src/blackduck/manifests'
 import {sbomTree} from '../src/blackduck/paths'
 
 /**
- * The two things `Path` takes from the scanned repository rather than from the SBOM: Black Duck's
- * project prefix, and which components are the repository's own code. Both are read off the
- * reference export `zzy-v050-split-output`; the shapes asserted here are the ones it contains.
+ * Repository manifests identify own code within each dependency tree.
  * The repository is laid out as DepMiner leaves it: flat copies and an `index.json`.
  */
 
@@ -111,41 +109,6 @@ describe('readRepoManifests', () => {
     })
 })
 
-describe('blackDuckPrefix', () => {
-    const manifest = (name?: string, version?: string, file = 'package.json') => ({dir: '', file, purlType: 'npm', name, version})
-
-    it('writes the plain directory when there is no manifest to read', () => {
-        expect(blackDuckPrefix('pnpm', 'js-pnpm-n8n', undefined)).toBe('js-pnpm-n8n/')
-        expect(blackDuckPrefix('gradle', 'java-gradle-teammates', undefined)).toBe('java-gradle-teammates/')
-    })
-
-    // Each line is one prefix of the reference export, and the manifest that produced it.
-    it('reproduces the reference export, tag by tag', () => {
-        expect(blackDuckPrefix('pnpm', 'js-pnpm-n8n', manifest('n8n-monorepo', '2.37.0'))).toBe('n8n-monorepo/2.37.0/js-pnpm-n8n/')
-        expect(blackDuckPrefix('pnpm', 'js-pnpm-n8n/.github/scripts', manifest('workflow-scripts'))).toBe('./js-pnpm-n8n/.github/scripts/')
-        expect(blackDuckPrefix('npm', 'js-npm-nest/tools/benchmarks', manifest('@nestjs/benchmarks', '1.0.0'))).toBe('@nestjs/benchmarks/1.0.0/js-npm-nest/tools/benchmarks/')
-        expect(blackDuckPrefix('npm', 'java-gradle-teammates/docs', manifest('teammates-dev-docs'))).toBe('teammates-dev-docs/java-gradle-teammates/docs/')
-        expect(blackDuckPrefix('npm', 'python-saleor', manifest('saleor', '3.24.0-a.0'))).toBe('saleor/3.24.0-a.0/python-saleor/')
-        expect(blackDuckPrefix('yarn', 'js-yarn-excalidraw', manifest('excalidraw-monorepo'))).toBe('js-yarn-excalidraw/')
-        expect(blackDuckPrefix('yarn', 'js-yarn-excalidraw/dev-docs', manifest('docs', '0.0.0'))).toBe('js-yarn-excalidraw/dev-docs/')
-        expect(blackDuckPrefix('uv', 'python-saleor', {dir: '', file: 'pyproject.toml', purlType: 'pypi', name: 'saleor', version: '3.24.0-a.0'})).toBe('saleor/3.24.0a0/python-saleor/')
-        expect(blackDuckPrefix('nuget', 'dotnet-eshoponweb/src/PublicApi', {dir: 'src/PublicApi', file: 'PublicApi.csproj', purlType: 'nuget', name: 'PublicApi'})).toBe('PublicApi/dotnet-eshoponweb/src/PublicApi/PublicApi.csproj/')
-        expect(blackDuckPrefix('maven', 'java-maven-spring-petclinic', {dir: '', file: 'pom.xml', purlType: 'maven', name: 'org.springframework.samples:spring-petclinic', version: '4.0.0-SNAPSHOT'})).toBe('org.springframework.samples:spring-petclinic:4.0.0-SNAPSHOT:java-maven-spring-petclinic:')
-        expect(blackDuckPrefix('gradle', 'java-gradle-teammates', {dir: '', file: 'build.gradle', purlType: 'maven'})).toBe('java-gradle-teammates:unspecified:')
-        expect(blackDuckPrefix('go_mod', 'go-caddy', {dir: '', file: 'go.mod', purlType: 'golang', name: 'github.com/caddyserver/caddy/v2'})).toBe('github.com/caddyserver/caddy/v2:go-caddy:')
-        expect(blackDuckPrefix('cargo', 'rust-ripgrep', {dir: '', file: 'Cargo.toml', purlType: 'cargo', name: 'ripgrep', version: '15.2.0'})).toBe('rust-ripgrep/')
-        expect(blackDuckPrefix('rubygems', 'ruby-mastodon', {dir: '', file: 'Gemfile', purlType: 'gem'})).toBe('ruby-mastodon/')
-    })
-
-    it('picks the POM or the Gradle script by the tag when a directory has both', () => {
-        put('pom.xml', '<project><groupId>g</groupId><artifactId>a</artifactId><version>1</version></project>')
-        put('build.gradle', 'version = "2"\n')
-        const repo = indexedRepo()
-        expect(manifestOfTree(repo, '', 'maven')?.file).toBe('pom.xml')
-        expect(manifestOfTree(repo, '', 'gradle')?.file).toBe('build.gradle')
-    })
-})
-
 describe('pep440', () => {
     it('normalises the spellings a pyproject may use to what uv.lock and the SBOM carry', () => {
         expect(pep440('3.24.0-a.0')).toBe('3.24.0a0')
@@ -221,15 +184,14 @@ describe('sbomTree paths with the repository\'s manifests', () => {
             ['js-yarn-excalidraw/dev-docs/-yarn/docs/0.0.0/@docusaurus/core/2.2.0/eta/1.12.3', 'Transitive Dependency'],
         ])
         const withRepo = sbomTree(file, 'js-yarn-excalidraw', new Set(['npm']), {manifests: indexedRepo()}).paths
-        expect(withRepo.map(it => [it.path, it.matchType, it.projectPath])).toEqual([
-            ['js-yarn-excalidraw/dev-docs/-yarn/@docusaurus/core/2.2.0', 'Direct Dependency', 'js-yarn-excalidraw/dev-docs'],
-            ['js-yarn-excalidraw/dev-docs/-yarn/@docusaurus/core/2.2.0/eta/1.12.3', 'Transitive Dependency', 'js-yarn-excalidraw/dev-docs'],
+        expect(withRepo.map(it => [it.path, it.matchType, it.projectFilePath])).toEqual([
+            ['js-yarn-excalidraw/dev-docs/-yarn/@docusaurus/core/2.2.0', 'Direct Dependency', 'js-yarn-excalidraw/dev-docs/yarn.lock'],
+            ['js-yarn-excalidraw/dev-docs/-yarn/@docusaurus/core/2.2.0/eta/1.12.3', 'Transitive Dependency', 'js-yarn-excalidraw/dev-docs/yarn.lock'],
         ])
     })
 
-    // saleor: the uv project is the chain's first segment in both tools' SBOMs; Black Duck's
-    // prefix is `saleor/3.24.0a0/…/-uv/` and the chain starts at the real dependency.
-    it('writes the project prefix and starts the chain after the project itself', () => {
+    // Match the SBOM's normalised project version to pyproject.toml before omitting own code.
+    it('matches the normalised project version and starts the chain after the project itself', () => {
         put('pyproject.toml', '[project]\nname = "saleor"\nversion = "3.24.0-a.0"\n')
         put('uv.lock', '')
         const file = sbom({
@@ -249,21 +211,8 @@ describe('sbomTree paths with the repository\'s manifests', () => {
         })
         const paths = sbomTree(file, 'python-saleor', new Set(['pypi']), {manifests: indexedRepo()}).paths
         expect(paths.map(it => [it.path, it.matchType])).toEqual([
-            ['saleor/3.24.0a0/python-saleor/-uv/django-stubs/5.2.2', 'Direct Dependency'],
-            ['saleor/3.24.0a0/python-saleor/-uv/django-stubs/5.2.2/types-pyyaml/6.0.12', 'Transitive Dependency'],
+            ['python-saleor/-uv/django-stubs/5.2.2', 'Direct Dependency'],
+            ['python-saleor/-uv/django-stubs/5.2.2/types-pyyaml/6.0.12', 'Transitive Dependency'],
         ])
-    })
-
-    it('leaves the plain prefix and the full chain without the repository\'s manifests', () => {
-        const file = sbom({
-            metadata: {component: {'bom-ref': 'root'}},
-            components: [
-                {'bom-ref': 'app', type: 'application', name: 'pnpm-lock.yaml'},
-                {'bom-ref': 'zx', name: 'zx', version: '8.8.5', purl: 'pkg:npm/zx@8.8.5'},
-            ],
-            dependencies: [{ref: 'root', dependsOn: ['app']}, {ref: 'app', dependsOn: ['zx']}],
-        })
-        expect(sbomTree(file, 'js-pnpm-n8n', new Set(['npm'])).paths.map(it => it.path))
-            .toEqual(['js-pnpm-n8n/-pnpm/zx/8.8.5'])
     })
 })

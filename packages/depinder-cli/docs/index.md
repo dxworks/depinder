@@ -31,8 +31,8 @@ Per ecosystem found, three CSVs named after the plugin, `sbom-<eco>`:
 - `<plugin>-project-stats.csv` — per project: dependency, outdated and vulnerable counts
 
 Each source `analyse` finds — Trivy SBOMs, Syft SBOMs — gets its own subfolder (`trivy/`,
-`syft/`). Each also holds `security.csv`, one row per (component, advisory), and the
-[Black Duck-shaped files](blackduck-export/index.md).
+`syft/`). Each holds the [Black Duck-shaped files](blackduck-export/index.md), including
+`_vulnerability_details.csv`, one row per (component, advisory).
 
 Each source folder also includes:
 

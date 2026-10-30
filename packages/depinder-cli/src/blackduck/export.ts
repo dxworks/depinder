@@ -5,7 +5,7 @@ import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {csvDocument, NamedRow} from '../utils/csv'
 import {log} from '../utils/logging'
 import {
-    COMPONENT_VERSIONS_COLUMNS, countCell, DEPENDENCIES_COLUMNS, DEPENDENCIES_SOURCES_COLUMNS, isoToTabIso,
+    COMPONENT_VERSIONS_COLUMNS, countCell, DEPENDENCIES_COLUMNS, SBOM_DEPENDENCIES_SOURCES_COLUMNS, isoToTabIso,
     normalizeMatchType, UPGRADE_GUIDANCE_COLUMNS, VULNERABILITY_DETAILS_COLUMNS,
 } from './columns'
 import {licenseColumns, licenseRisk} from './licenses'
@@ -18,11 +18,9 @@ import {remainingAt, upgradeGuidance} from './upgrade'
  * The Black Duck-shaped CSVs, written from one model.
  *
  * The four shareable files — `_dependencies.csv`, `_dependencies_sources.csv`,
- * `_vulnerability_details.csv`, `_upgrade_guidance.csv` — carry the header line and the cell
- * conventions `transformBlackDuckReports` writes from a real Black Duck export (`columns.ts`,
- * shared with it), so a downstream reader processes either folder the same way. `security.csv`
- * keeps Black Duck's raw `security_*.csv` header, byte for byte; `_dependency_edges.csv` and
- * `_component_versions.csv` are ours.
+ * `_vulnerability_details.csv`, `_upgrade_guidance.csv` — follow the cell conventions of
+ * `transformBlackDuckReports`. Source rows add `ProjectFilePath` to its shared columns.
+ * `_dependency_edges.csv` and `_component_versions.csv` are ours.
  *
  * Columns we cannot fill are written empty rather than guessed; `docs/blackduck-export/index.md`
  * lists which.
@@ -32,7 +30,6 @@ const DEPENDENCIES_FILE = '_dependencies.csv'
 const DEPENDENCIES_SOURCES_FILE = '_dependencies_sources.csv'
 const DEPENDENCY_EDGES_FILE = '_dependency_edges.csv'
 const UPGRADE_GUIDANCE_FILE = '_upgrade_guidance.csv'
-const SECURITY_FILE = 'security.csv'
 const VULNERABILITY_DETAILS_FILE = '_vulnerability_details.csv'
 const COMPONENT_VERSIONS_FILE = '_component_versions.csv'
 const VULNERABILITY_FINDINGS_FILE = '_vulnerability_findings.json'
@@ -45,22 +42,6 @@ const VULNERABILITY_FINDINGS_FILE = '_vulnerability_findings.json'
  */
 const DEPENDENCY_EDGES_HEADERS = [
     'Repo', 'Tree', 'Ecosystem', 'Parent Origin Id', 'Child Origin Id', 'Child Depth',
-] as const
-
-/**
- * `security.csv`: Black Duck's `security_*.csv` header, byte for byte, so the two diff directly.
- * The internal ids, the triage workflow fields and the CISA KEV block are empty for us.
- */
-const SECURITY_HEADERS = [
-    'Used by', 'Component id', 'Version id', 'Origin id', 'Component name',
-    'Component version name', 'Component origin name', 'Component origin id',
-    'Component origin version name', 'Vulnerability id', 'Description', 'Published on',
-    'Updated on', 'Base score', 'Exploitability', 'Impact', 'Vulnerability source',
-    'Remediation status', 'Status justification', 'Remediation target date',
-    'Remediation actual date', 'Remediation comment', 'URL', 'Security Risk', 'Project path',
-    'Overall score', 'CWE Ids', 'Solution available', 'Workaround available', 'Exploit available',
-    'CVSS Version', 'Match type', 'Reachable', 'Vulnerability tags', 'CISA Vulnerability ID',
-    'CISA Exploit Added', 'CISA Due Date', 'CISA Required Action', 'CISA Vulnerability Name',
 ] as const
 
 /** Black Duck's constant for every component in a dependency scan; nothing here varies it. */
@@ -171,18 +152,6 @@ function isoDate(timestamp: number | undefined): string {
 }
 
 /**
- * The date shape of Black Duck's raw `security_*.csv`: `7/24/26`, month and day unpadded,
- * two-digit year, UTC. Only `security.csv` uses it; the four shareable files write
- * `\tYYYY-MM-DD`, the shape `transformBlackDuckReports` turns this one into.
- */
-export function blackDuckDate(timestamp: number | undefined): string {
-    const iso = isoDate(timestamp)
-    if (!iso) return ''
-    const [year, month, day] = iso.split('-')
-    return `${Number(month)}/${Number(day)}/${year.slice(2)}`
-}
-
-/**
  * Black Duck links every finding that has a CVE to its NVD page, whatever catalogue it came from.
  * Ours would otherwise be the scanner's own page (`avd.aquasec.com`, `github.com/advisories`),
  * which says the same thing at a different address; only a finding with no CVE keeps that.
@@ -252,6 +221,7 @@ function dependencySourceRows(model: BlackDuckModel): NamedRow[] {
             'Component Version Origin Id': component.originId,
             'Match type': normalizeMatchType(sbomPath.matchType),
             'Path': sbomPath.path,
+            'ProjectFilePath': sbomPath.projectFilePath,
             'ProjectPath': sbomPath.projectPath,
             // What the transform writes when no --basePath verifies the path on disk; we verify none.
             'VerifiedPath': '',
@@ -336,16 +306,16 @@ export function upgradeGuidanceRows(components: ExportComponent[]): NamedRow[] {
     })
 }
 
-/** The cells of a `security.csv` row we can fill; `securityRow` adds Black Duck's empties. */
-function findingRow(model: BlackDuckModel, {component, vulnerability}: ExportFinding): NamedRow {
+/** Vulnerability details use the transform's dates, trimmed cells and two-valued match type. */
+function vulnerabilityDetailRow({component, vulnerability}: ExportFinding): NamedRow {
     const subScores = cvss3SubScores(vulnerability.cvssVector)
     return {
         'Component name': component.name,
         'Component version name': component.version,
         'Component Version Origin Id': component.originId,
         'Vulnerability id': vulnerabilityId(vulnerability),
-        'Description': vulnerability.description || vulnerability.summary || '',
-        'Published on': blackDuckDate(vulnerability.timestamp),
+        'Description': (vulnerability.description || vulnerability.summary || '').trim(),
+        'Published on': isoToTabIso(isoDate(vulnerability.timestamp)),
         'Updated on': '',
         'Base score': vulnerability.score === undefined ? '' : String(vulnerability.score),
         'Exploitability': subScores?.exploitability === undefined ? '' : String(subScores.exploitability),
@@ -355,7 +325,6 @@ function findingRow(model: BlackDuckModel, {component, vulnerability}: ExportFin
         'Remediation status': 'New',
         'URL': vulnerabilityUrl(vulnerability),
         'Security Risk': (vulnerability.severity ?? '').toUpperCase(),
-        'Project path': model.projectName,
         'Overall score': '',
         'CWE Ids': cweIds(vulnerability),
         'Solution available': vulnerability.firstPatchedVersion ? 'true' : 'false',
@@ -365,31 +334,6 @@ function findingRow(model: BlackDuckModel, {component, vulnerability}: ExportFin
         'CVSS Version': cvssVersion(vulnerability),
         'Match type': dependencyMatchType(component),
         'Vulnerability tags': '',
-    }
-}
-
-function securityRow(model: BlackDuckModel, finding: ExportFinding): NamedRow {
-    const {component} = finding
-    return {
-        ...findingRow(model, finding),
-        'Component origin name': component.origin.name,
-        'Component origin id': component.originId,
-        'Component origin version name': component.version,
-    }
-}
-
-/**
- * A `_vulnerability_details.csv` row: the `security.csv` cells the transform keeps, with its
- * conventions — dates as `\tYYYY-MM-DD`, cells trimmed. `Match type` stays two-valued
- * (`Direct Dependency`) here, as the transform leaves it in this file.
- */
-function vulnerabilityDetailRow(model: BlackDuckModel, finding: ExportFinding): NamedRow {
-    const row = findingRow(model, finding)
-    return {
-        ...row,
-        'Description': row['Description'].trim(),
-        'Published on': isoToTabIso(isoDate(finding.vulnerability.timestamp)),
-        'Updated on': '',
     }
 }
 
@@ -406,22 +350,21 @@ function write(resultFolder: string, file: string, headers: readonly string[], r
     return {file, rows: rows.length}
 }
 
-/** Writes every file into `resultFolder`, in `BLACKDUCK_FILES` order, and reports what went where. */
+/** Writes reports in `BLACKDUCK_FILES` order. */
 export function writeBlackDuckExport(model: BlackDuckModel, resultFolder: string): WrittenFile[] {
     const unknown = model.components.reduce((n, it) => n + severityCounts(it.vulnerabilities).unknown, 0)
     if (unknown > 0) {
         log.warn(`${unknown} finding(s) carry no recognised severity: counted in Total Vulnerability Count,`
-            + ` in no per-severity column; see security.csv, ${VULNERABILITY_DETAILS_FILE} and ${VULNERABILITY_FINDINGS_FILE}`)
+            + ` in no per-severity column; see ${VULNERABILITY_DETAILS_FILE} and ${VULNERABILITY_FINDINGS_FILE}`)
     }
     return [
         write(resultFolder, DEPENDENCIES_FILE, DEPENDENCIES_COLUMNS, dependencyRows(model)),
-        write(resultFolder, DEPENDENCIES_SOURCES_FILE, DEPENDENCIES_SOURCES_COLUMNS, dependencySourceRows(model)),
+        write(resultFolder, DEPENDENCIES_SOURCES_FILE, SBOM_DEPENDENCIES_SOURCES_COLUMNS, dependencySourceRows(model)),
         write(resultFolder, DEPENDENCY_EDGES_FILE, DEPENDENCY_EDGES_HEADERS, dependencyEdgeRows(model)),
         write(resultFolder, COMPONENT_VERSIONS_FILE, COMPONENT_VERSIONS_COLUMNS, componentVersionRows(model)),
         writeUpgradeGuidanceCsv(model.components, resultFolder),
-        writeSecurityCsv(model, resultFolder),
         write(resultFolder, VULNERABILITY_DETAILS_FILE, VULNERABILITY_DETAILS_COLUMNS,
-            model.findings.map(it => vulnerabilityDetailRow(model, it))),
+            model.findings.map(vulnerabilityDetailRow)),
         writeVulnerabilityFindings(model, resultFolder),
     ]
 }
@@ -436,8 +379,8 @@ export function writeUpgradeGuidanceCsv(components: ExportComponent[], resultFol
  * exporter saw it — including the fields no CSV carries (`patchedVersions`, the fix per line).
  *
  * The scanners run inside `analyse` and their answer lives nowhere else: the saved SBOM
- * has no vulnerabilities and `security.csv` names no fixed version. So a change to the upgrade
- * guidance rule could only be seen by re-running the scanners, which puts today's databases under
+ * has no vulnerabilities and `_vulnerability_details.csv` names no fixed version. So a change to
+ * the upgrade guidance rule could only be seen by re-running the scanners, which puts today's databases under
  * a run made against yesterday's — no longer the run that was compared with Black Duck. This file
  * is the sidecar that would let a later recompute re-derive
  * `_upgrade_guidance.csv` from the findings of the day, the way `_graph_rebuild.json` lets the
@@ -468,22 +411,12 @@ function writeVulnerabilityFindings(model: BlackDuckModel, resultFolder: string)
     return {file: VULNERABILITY_FINDINGS_FILE, rows: findings.components.length}
 }
 
-/**
- * Just `security.csv`: the only place the CVSS vector, CWE ids, fixed version and publication
- * date behind the two libs.csv vulnerability columns survive. Written for every SBOM source
- * through `writeBlackDuckExport`; exposed on its own for callers that have only findings.
- */
-export function writeSecurityCsv(model: BlackDuckModel, resultFolder: string): WrittenFile {
-    return write(resultFolder, SECURITY_FILE, SECURITY_HEADERS, model.findings.map(it => securityRow(model, it)))
-}
-
 export const BLACKDUCK_FILES = [
     DEPENDENCIES_FILE,
     DEPENDENCIES_SOURCES_FILE,
     DEPENDENCY_EDGES_FILE,
     COMPONENT_VERSIONS_FILE,
     UPGRADE_GUIDANCE_FILE,
-    SECURITY_FILE,
     VULNERABILITY_DETAILS_FILE,
     VULNERABILITY_FINDINGS_FILE,
 ] as const

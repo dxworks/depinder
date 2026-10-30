@@ -239,7 +239,7 @@ function getEndDelimiterIndex(segments: string[]) {
  * Extract the artifact name from a Black Duck Maven path.
  * Expected prefix: groupId:artifactId:version:projectPath:-maven
  */
-function getMavenArtifactName(dependencyPath: string): string | undefined {
+export function getMavenArtifactName(dependencyPath: string): string | undefined {
   const normalizedPath = dependencyPath.replace(/\\/g, '/');
   const match = normalizedPath.match(/^[^:]+:([^:]+):[^:]+:.+:-maven(?:\/|$)/i);
   return match?.[1];
