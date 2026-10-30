@@ -424,7 +424,7 @@ describe('dependency paths', () => {
         })
         const tree = sbomTree(input, 'repo', new Set([type]))
         expect(tree.paths.map(row => row.path)).toContain(`repo/apps/client/-${tag}/${segment}`)
-        expect(tree.paths.map(row => row.projectPath)).toEqual([
+        expect(tree.paths.map(row => row.projectFilePath)).toEqual([
             `repo/apps/client/${manifest}`, `repo/apps/client/${manifest}`,
         ])
     })
@@ -444,9 +444,9 @@ describe('dependency paths', () => {
             ],
         })
         expect(sbomTree(file, 'demo', new Set(['npm'])).paths).toEqual([
-            {name: 'express', version: '4.18.0', purlType: 'npm', projectPath: 'demo/yarn.lock',
+            {name: 'express', version: '4.18.0', purlType: 'npm', projectFilePath: 'demo/yarn.lock',
                 matchType: 'Direct Dependency', path: 'demo/-yarn/express/4.18.0'},
-            {name: 'qs', version: '6.10.2', purlType: 'npm', projectPath: 'demo/yarn.lock',
+            {name: 'qs', version: '6.10.2', purlType: 'npm', projectFilePath: 'demo/yarn.lock',
                 matchType: 'Transitive Dependency', path: 'demo/-yarn/express/4.18.0/qs/6.10.2'},
         ])
     })
@@ -530,7 +530,7 @@ describe('dependency paths', () => {
             ],
         })
         expect(sbomTree(file, 'go-caddy', new Set(['golang'])).paths).toEqual([
-            {name: 'github.com/caddyserver/certmagic', version: 'v0.25.4', purlType: 'golang', projectPath: 'go-caddy/go.mod',
+            {name: 'github.com/caddyserver/certmagic', version: 'v0.25.4', purlType: 'golang', projectFilePath: 'go-caddy/go.mod',
                 matchType: 'Direct Dependency', path: 'go-caddy/-go_mod/github.com/caddyserver/certmagic:v0.25.4'},
         ])
     })
@@ -550,7 +550,7 @@ describe('dependency paths', () => {
             ],
         })
         expect(sbomTree(file, 'rust-ripgrep', new Set(['cargo'])).paths[0]).toMatchObject({
-            projectPath: 'rust-ripgrep/fuzz/Cargo.lock', path: 'rust-ripgrep/fuzz/-cargo/libfuzzer-sys/0.4.7',
+            projectFilePath: 'rust-ripgrep/fuzz/Cargo.lock', path: 'rust-ripgrep/fuzz/-cargo/libfuzzer-sys/0.4.7',
         })
     })
 
@@ -698,7 +698,7 @@ describe('the written files', () => {
     it('fills a dependency source row the way the transform does without --basePath', () => {
         const model = buildModel('demo', [ecosystem(dependency())], [
             {name: 'qs', version: '6.10.2', purlType: 'npm', path: 'demo/-npm/qs/6.10.2',
-                projectPath: 'demo', matchType: 'Direct Dependency'},
+                projectFilePath: 'demo', matchType: 'Direct Dependency'},
         ])
         writeBlackDuckExport(model, folder)
         const [, row] = readCsv(folder, '_dependencies_sources.csv')
@@ -812,7 +812,7 @@ describe('the written files', () => {
     it('drops a path whose component no plugin enriched', () => {
         const model = buildModel('demo', [ecosystem(dependency())], [
             {name: 'unseen', version: '1.0.0', purlType: 'npm', path: 'demo/-npmjs/unseen/1.0.0',
-                projectPath: 'demo', matchType: 'Direct Dependency'},
+                projectFilePath: 'demo', matchType: 'Direct Dependency'},
         ])
         writeBlackDuckExport(model, folder)
         expect(readCsv(folder, '_dependencies_sources.csv')).toHaveLength(1)

@@ -222,7 +222,7 @@ function dependencySourceRows(model: BlackDuckModel): NamedRow[] {
             'Component Version Origin Id': component.originId,
             'Match type': normalizeMatchType(sbomPath.matchType),
             'Path': sbomPath.path,
-            'ProjectPath': sbomPath.projectPath,
+            'ProjectPath': sbomPath.projectFilePath,
             // What the transform writes when no --basePath verifies the path on disk; we verify none.
             'VerifiedPath': '',
             'VerifiedPathMethod': 'not-checked',

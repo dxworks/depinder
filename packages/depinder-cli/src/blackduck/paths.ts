@@ -46,7 +46,7 @@ export interface SbomPath {
      */
     path: string
     /** `<repo>/<manifest path>`, or `<repo>` when the SBOM records no manifest. */
-    projectPath: string
+    projectFilePath: string
     matchType: 'Direct Dependency' | 'Transitive Dependency'
 }
 
@@ -295,7 +295,7 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
             version: target.version,
             purlType,
             path: rendered,
-            projectPath: node.path === node.name ? repo : path.posix.join(repo, normalizeInputPath(node.path)),
+            projectFilePath: node.path === node.name ? repo : path.posix.join(repo, normalizeInputPath(node.path)),
             matchType: segments.length === 1 ? 'Direct Dependency' : 'Transitive Dependency',
         })
     }

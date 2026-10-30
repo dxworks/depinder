@@ -184,7 +184,7 @@ describe('sbomTree paths with the repository\'s manifests', () => {
             ['js-yarn-excalidraw/dev-docs/-yarn/docs/0.0.0/@docusaurus/core/2.2.0/eta/1.12.3', 'Transitive Dependency'],
         ])
         const withRepo = sbomTree(file, 'js-yarn-excalidraw', new Set(['npm']), {manifests: indexedRepo()}).paths
-        expect(withRepo.map(it => [it.path, it.matchType, it.projectPath])).toEqual([
+        expect(withRepo.map(it => [it.path, it.matchType, it.projectFilePath])).toEqual([
             ['js-yarn-excalidraw/dev-docs/-yarn/@docusaurus/core/2.2.0', 'Direct Dependency', 'js-yarn-excalidraw/dev-docs/yarn.lock'],
             ['js-yarn-excalidraw/dev-docs/-yarn/@docusaurus/core/2.2.0/eta/1.12.3', 'Transitive Dependency', 'js-yarn-excalidraw/dev-docs/yarn.lock'],
         ])
