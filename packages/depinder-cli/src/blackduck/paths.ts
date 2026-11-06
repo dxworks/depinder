@@ -11,6 +11,7 @@ import {log} from '../utils/logging'
 import {normalizeInputPath} from '../utils/input-path'
 import {ownCodeMatcher, RepoManifests} from './manifests'
 import {originFor, pathSegment} from './origins'
+import {componentMatches, SbomMatch} from './matches'
 
 /**
  * The `Path` column of `_dependencies_sources.csv`: where in the dependency graph a component was
@@ -25,7 +26,7 @@ import {originFor, pathSegment} from './origins'
  *
  * The walk starts from the same project nodes the parser builds projects from (`findProjectNodes`),
  * with the same self-anchors: a project's own artifact is not a segment of its own paths, and a
- * one-segment path here means exactly what `Direct` means in `_dependencies.csv`.
+ * a one-segment path means `Direct`, including artificial fallback paths.
  *
  * A Syft SBOM has no manifest node to walk from: its `metadata.component` is a `file` and never
  * appears in `dependencies[]`. It is walked instead from every ref nothing points at, together
@@ -50,6 +51,12 @@ export interface SbomPath {
     /** Parent directory of `projectFilePath`, or `<repo>` when no manifest is recorded. */
     projectPath: string
     matchType: 'Direct Dependency' | 'Transitive Dependency'
+}
+
+interface SbomTree {
+    paths: SbomPath[]
+    edges: SbomEdge[]
+    matches: SbomMatch[]
 }
 
 /**
@@ -250,7 +257,7 @@ function treeEdges(
  * Repository manifests identify own code to omit from paths, in addition to SBOM anchors.
  * The prefix uses the repository and module directory. Manifest filtering leaves edges unchanged.
  */
-function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType: string, manifests?: RepoManifests): {paths: SbomPath[], edges: SbomEdge[]} {
+function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType: string, manifests?: RepoManifests): SbomTree {
     if (node.scopeRefs) {
         const scope = new Set(node.scopeRefs)
         graph = {...graph,
@@ -323,7 +330,8 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
     // root level with a one-hop path.
     if (node.allComponents) {
         for (const ref of graph.byRef.keys()) {
-            if (!reached.has(ref) && !isOwn(ref)) emit([ref])
+            if (reached.has(ref) || isOwn(ref)) continue
+            emit([ref])
         }
     }
 
@@ -343,7 +351,10 @@ function projectTree(graph: BomGraph, node: ProjectNode, repo: string, purlType:
         return `${projectDirectory}/-${it ? tagOf(ref, it) : 'unknown'}`
     }
     const flat = node.allComponents ? [...graph.byRef.keys()].filter(keep) : undefined
-    return {paths: results, edges: treeEdges(contracted, seeds, flat, render, treeOf, repo, purlType)}
+    const isDependency = (ref: string) => !isOwn(ref) && !!coordinatesOf(ref) && (node.allComponents || reached.has(ref))
+    const parents = [...contract(graph, isDependency)].filter(([ref]) => isDependency(ref))
+    return {paths: results, edges: treeEdges(contracted, seeds, flat, render, treeOf, repo, purlType),
+        matches: componentMatches(results, parents, coordinatesOf)}
 }
 
 export interface SbomTreeOptions {
@@ -354,15 +365,15 @@ export interface SbomTreeOptions {
  * Every (component, path) pair and every parent-child edge in one SBOM, restricted to the purl
  * types being exported. Repository manifests, when supplied, identify own code to omit from paths.
  */
-export function sbomTree(sbomFile: string, repo: string, purlTypes: Set<string>, options: SbomTreeOptions = {}): {paths: SbomPath[], edges: SbomEdge[]} {
+export function sbomTree(sbomFile: string, repo: string, purlTypes: Set<string>, options: SbomTreeOptions = {}): SbomTree {
     let graph: BomGraph
     try {
         graph = readBomGraph(sbomFile)
     } catch (e: any) {
         log.warn(`Could not read ${path.basename(sbomFile)} for dependency paths: ${e?.message ?? e}`)
-        return {paths: [], edges: []}
+        return {paths: [], edges: [], matches: []}
     }
     const trees = [...purlTypes].flatMap(purlType =>
         findProjectNodes(graph, sbomFile, purlType).map(node => projectTree(graph, node, repo, purlType, options.manifests)))
-    return {paths: trees.flatMap(it => it.paths), edges: trees.flatMap(it => it.edges)}
+    return {paths: trees.flatMap(it => it.paths), edges: trees.flatMap(it => it.edges), matches: trees.flatMap(it => it.matches)}
 }

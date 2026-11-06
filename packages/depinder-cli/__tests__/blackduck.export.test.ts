@@ -25,7 +25,10 @@ describe('Black Duck report files', () => {
                 projectFilePath: '', projectPath: 'demo', matchType: 'Direct Dependency'},
             {name: 'unseen', version: '1.0.0', purlType: 'npm', path: 'demo/-npm/unseen/1.0.0',
                 projectFilePath: '', projectPath: 'demo', matchType: 'Direct Dependency'},
-        ], [{repo: 'demo', tree: 'demo/-npm', purlType: 'npm', parent: '(root)', child: 'qs/6.10.2', depth: 1}])
+        ], [{repo: 'demo', tree: 'demo/-npm', purlType: 'npm', parent: '(root)', child: 'qs/6.10.2', depth: 1}], [
+            {name: 'qs', version: '6.10.2', purlType: 'npm', matchType: 'Direct Dependency,Transitive Dependency'},
+            {name: 'clean', version: '1.0.0', purlType: 'npm', matchType: 'Transitive Dependency'},
+        ])
 
         const written = writeBlackDuckExport(model, folder)
 

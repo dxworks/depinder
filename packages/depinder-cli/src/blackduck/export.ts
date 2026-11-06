@@ -163,9 +163,7 @@ function vulnerabilityUrl(vulnerability: Vulnerability): string {
 }
 
 /**
- * The vulnerability files carry one value, not the three-valued column: Black Duck's own
- * `security_*.csv` only ever says `Direct Dependency` or `Transitive Dependency`, so a component
- * reached both ways is reported here as direct.
+ * Mixed usage is direct in vulnerability files.
  */
 function dependencyMatchType(component: ExportComponent): string {
     return component.matchType.startsWith('Direct') ? 'Direct Dependency' : 'Transitive Dependency'

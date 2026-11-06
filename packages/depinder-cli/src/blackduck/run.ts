@@ -47,7 +47,7 @@ export function writeBlackDuckForSource(
     const paths: SbomPath[] = trees.flatMap(it => it.paths)
     const edges: SbomEdge[] = trees.flatMap(it => it.edges)
 
-    const model = timePhaseSync('blackduck:model', () => buildModel(projectName, analysed, paths, edges))
+    const model = timePhaseSync('blackduck:model', () => buildModel(projectName, analysed, paths, edges, trees.flatMap(it => it.matches)))
     const written = timePhaseSync('blackduck:csv', () => writeBlackDuckExport(model, resultFolder))
     for (const {file, rows} of written) {
         log.info(`${String(rows).padStart(6)} row(s) -> ${file}`)

@@ -28,7 +28,7 @@ command wrote it:
 
 | Rule | Where |
 |---|---|
-| `Match type` is `Direct`, `Transitive` or `Direct,Transitive` | `_dependencies.csv`, `_dependencies_sources.csv`. `_vulnerability_details.csv` keeps `Direct Dependency` / `Transitive Dependency`, as the transform does |
+| `Match type` is `Direct`, `Transitive`, or `Direct,Transitive` | `_dependencies.csv`, `_dependencies_sources.csv`. `_vulnerability_details.csv` keeps `Direct Dependency` / `Transitive Dependency` |
 | A zero per-severity vulnerability count is blank; `Total` and `Critical and High` are always a number. `Total` is every finding, as in libs.csv and `_upgrade_guidance.csv`; a finding with no recognised severity is in no per-severity cell | both dependency files |
 | Dates are `\tYYYY-MM-DD` — the leading tab keeps Excel from re-reading them | `Release Date`, `Published on`, `Updated on` |
 | `Version id` is empty | Black Duck's internal version UUID; nothing on our side corresponds to it |
@@ -47,7 +47,7 @@ command wrote it:
 | `License names` | registry, else SBOM | SPDX id → Black Duck display name; unmapped ids written as-is |
 | `License families` | same table | `PERMISSIVE` / `WEAK_RECIPROCAL` / `RECIPROCAL` / `RESTRICTED_PROPRIETARY` / `UNKNOWN` |
 | `License Risk` | families | `OK` / `MEDIUM` / `HIGH` / `UNKNOWN` — see [risk](#risk-columns) |
-| `Match type` | `requestedBy` | `Direct`, `Transitive`, or `Direct,Transitive` |
+| `Match type` | SBOM graph after own-code filtering, else `requestedBy` | `Direct`, `Transitive`, or `Direct,Transitive`; see [paths](#paths) |
 | `Usage` | — | `DYNAMICALLY_LINKED` |
 | `Operational Risk` | date + newer versions | `OK` / `LOW` / `MEDIUM` / `HIGH` — see [risk](#risk-columns) |
 | Vulnerability counts | findings | Per severity, blank when zero; `Total` is every finding; `Critical and High` is the sum of those two. The run warns how many findings had no recognised severity |

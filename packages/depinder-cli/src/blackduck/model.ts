@@ -8,6 +8,7 @@ import {Origin, originFor, originId} from './origins'
 import {SbomEdge, SbomPath} from './paths'
 import {newerVersionCounts} from './versions'
 import {hasKnownLicense} from './licenses'
+import {SbomMatch} from './matches'
 
 /**
  * The one in-memory model every Black Duck-shaped CSV is written from.
@@ -24,12 +25,9 @@ import {hasKnownLicense} from './licenses'
  */
 
 /**
- * Black Duck's own wording, character for character, so the column can be compared across the two
- * exports without a translation step on either side. `security.csv` already used these words; `_dependencies.csv` and `_dependencies_sources.csv`
- * used the bare `Direct` / `Transitive`, which made every shared row differ on this column alone.
+ * Shared graph/component classification labels.
  */
-type MatchType =
-    'Direct Dependency' | 'Transitive Dependency' | 'Direct Dependency,Transitive Dependency'
+type MatchType = SbomMatch['matchType']
 
 export interface ExportComponent {
     name: string
@@ -85,25 +83,30 @@ export interface AnalysedEcosystem {
     projects: DepinderProject[]
 }
 
-/**
- * Direct or transitive, by the same rule `<plugin>-libs.csv` uses, but three-valued as Black Duck
- * reports it: a component reached both straight from the project and through another dependency
- * is `Direct Dependency,Transitive Dependency`.
- */
+function renderMatchType(types: Set<'Direct' | 'Transitive'>): MatchType {
+    if (types.has('Direct') && types.has('Transitive')) return 'Direct Dependency,Transitive Dependency'
+    return types.has('Direct') ? 'Direct Dependency' : 'Transitive Dependency'
+}
+
+/** Preserve requester-based classification when SBOM graph evidence is unavailable. */
 function matchTypesOf(project: DepinderProject, dependency: DepinderDependency): Set<'Direct' | 'Transitive'> {
     const projectId = `${project.name}@${project.version}`
     const requestedBy = dependency.requestedBy ?? []
     if (requestedBy.length === 0) return new Set(['Direct'])
-    const types = new Set<'Direct' | 'Transitive'>()
-    for (const requester of requestedBy) {
-        types.add(requester.startsWith(projectId) ? 'Direct' : 'Transitive')
-    }
-    return types
+    return new Set(requestedBy.map(requester => requester.startsWith(projectId) ? 'Direct' : 'Transitive'))
 }
 
-function renderMatchType(types: Set<'Direct' | 'Transitive'>): MatchType {
-    if (types.has('Direct') && types.has('Transitive')) return 'Direct Dependency,Transitive Dependency'
-    return types.has('Direct') ? 'Direct Dependency' : 'Transitive Dependency'
+/** Source paths and their retained parent evidence share the same own-code filtering. */
+function matchTypesFromGraph(matches: SbomMatch[]): Map<string, Set<'Direct' | 'Transitive'>> {
+    const result = new Map<string, Set<'Direct' | 'Transitive'>>()
+    for (const row of matches) {
+        const id = originId(originFor(row.purlType, row.name), row.name, row.version)
+        const types = result.get(id) ?? new Set<'Direct' | 'Transitive'>()
+        if (row.matchType.includes('Direct')) types.add('Direct')
+        if (row.matchType.includes('Transitive')) types.add('Transitive')
+        result.set(id, types)
+    }
+    return result
 }
 
 /**
@@ -140,9 +143,11 @@ export function buildModel(
     projectName: string,
     ecosystems: AnalysedEcosystem[],
     paths: SbomPath[],
-    edges: SbomEdge[] = []
+    edges: SbomEdge[] = [],
+    matches: SbomMatch[] = paths,
 ): BlackDuckModel {
     const components = new Map<string, ExportComponent>()
+    const graphMatchTypes = matchTypesFromGraph(matches)
     const matchTypes = new Map<string, Set<'Direct' | 'Transitive'>>()
 
     for (const {purlType, projects} of ecosystems) {
@@ -151,9 +156,9 @@ export function buildModel(
                 const origin = originFor(purlType, dependency.name)
                 const id = originId(origin, dependency.name, dependency.version)
 
-                const seen = matchTypes.get(id) ?? new Set<'Direct' | 'Transitive'>()
-                for (const type of matchTypesOf(project, dependency)) seen.add(type)
-                matchTypes.set(id, seen)
+                const types = matchTypes.get(id) ?? new Set<'Direct' | 'Transitive'>()
+                for (const type of graphMatchTypes.get(id) ?? matchTypesOf(project, dependency)) types.add(type)
+                matchTypes.set(id, types)
 
                 const existing = components.get(id)
                 if (existing) {
@@ -164,7 +169,8 @@ export function buildModel(
                     }
                     continue
                 }
-                components.set(id, toComponent(origin, purlType, id, dependency))
+                const matchType = renderMatchType(types)
+                components.set(id, toComponent(origin, purlType, id, dependency, matchType))
             }
         }
     }
@@ -181,7 +187,7 @@ export function buildModel(
     return {projectName, components: ordered, findings, paths, edges}
 }
 
-function toComponent(origin: Origin, purlType: string, id: string, dependency: DepinderDependency): ExportComponent {
+function toComponent(origin: Origin, purlType: string, id: string, dependency: DepinderDependency, matchType: MatchType): ExportComponent {
     const library = dependency.libraryInfo
     const versions = library?.versions ?? []
     const current = versions.find(it => it.version === dependency.version.trim())
@@ -205,7 +211,7 @@ function toComponent(origin: Origin, purlType: string, id: string, dependency: D
         purlType,
         origin,
         originId: id,
-        matchType: 'Transitive Dependency',
+        matchType,
         licenses: preferredLicenses(versionLicenses, libraryLicenses),
         releaseDate: isoDate(usedVersionTimestamp(versions, dependency.version)),
         newerVersions: newer.byDate,
