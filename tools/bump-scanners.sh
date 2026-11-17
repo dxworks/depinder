@@ -18,13 +18,26 @@ sha256() {
   else shasum -a 256 "$1" | awk '{print $1}'; fi
 }
 
+# GET <api path> for a public repo; anonymous retry if the token is refused (e.g. an org IP allow list).
+public_api() {
+  local out
+  if out="$(gh api "$1" 2>/dev/null)"; then printf '%s\n' "$out"; return; fi
+  curl -fsSL --retry 3 -H 'Accept: application/vnd.github+json' "https://api.github.com/$1"
+}
+
+# Downloads <files...> of <owner/repo> release <tag> into <dir> over public HTTPS, no token needed.
+fetch_assets() {
+  local repo="$1" tag="$2" dir="$3" f; shift 3
+  for f in "$@"; do curl -fsSL --retry 3 -o "$dir/$f" "https://github.com/$repo/releases/download/$tag/$f"; done
+}
+
 # Newest non-draft, non-prerelease tag of <owner/repo> published at least MIN_AGE_DAYS before the
 # last daily 05:00 UTC (same cutoff as the depinder server), without the leading "v".
 newest_settled() {
   local now day=86400 run=18000 cutoff   # run: 05:00 UTC
   now=$(date -u +%s)
   cutoff=$(( now - (now - run) % day - MIN_AGE_DAYS * day ))
-  gh api "repos/$1/releases?per_page=30" --jq "
+  public_api "repos/$1/releases?per_page=30" | jq -r "
     [ .[] | select(.draft == false and .prerelease == false)
           | select((.published_at | fromdateiso8601) <= $cutoff) ][0].tag_name // empty" \
     | sed 's/^v//'
@@ -49,8 +62,7 @@ verified_digest() {
   local repo="$1" tool="$2" version="$3" image="$4" inner="$5" amd64="$6" arm64="$7"
   local dir="$WORK/$tool" sums="${tool}_${version}_checksums.txt"
   mkdir -p "$dir"
-  gh release download "v$version" -R "$repo" -D "$dir" \
-    -p "$sums" -p "$sums.sigstore.json" -p "$amd64" -p "$arm64" >&2
+  fetch_assets "$repo" "v$version" "$dir" "$sums" "$sums.sigstore.json" "$amd64" "$arm64"
   cosign verify-blob "$dir/$sums" \
     --bundle "$dir/$sums.sigstore.json" \
     --certificate-identity-regexp "^https://github\.com/${repo//./\\.}/\.github/workflows/" \
