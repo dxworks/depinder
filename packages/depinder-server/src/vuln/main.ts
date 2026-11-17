@@ -168,6 +168,9 @@ async function openVuln(config: VulnConfig, versions: ScannerVersions, staleHour
                 source: active.source,
                 previous: state.previous,
                 auto_update: binaries.selfUpdate[tool],
+                // Same fields with self-update off, so /health keeps one shape.
+                updating: false, last_check_at: null, last_ok_at: null, last_error: null,
+                next_check_at: null, latest_release: null, last_result: state.lastResult,
                 ...scannerUpdaters[tool]?.status(),
             },
         }

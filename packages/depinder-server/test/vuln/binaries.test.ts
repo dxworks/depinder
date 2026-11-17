@@ -64,7 +64,7 @@ describe('scanner binaries', () => {
     it('starts on the image\'s scanners with nothing downloaded', async () => {
         const binaries = await open()
         expect(binaries.active()).toEqual(IMAGE)
-        expect(binaries.state('trivy')).toEqual({active: null, previous: null, rejected: {}})
+        expect(binaries.state('trivy')).toEqual({active: null, previous: null, rejected: {}, lastResult: null})
     })
 
     it('switches to a downloaded binary, executable, keeping the image\'s as the one before', async () => {

@@ -98,7 +98,11 @@ export function createScannerUpdater(deps: ScannerUpdaterDeps): ScannerUpdater {
     const now = (): number => deps.clock?.now() ?? Date.now()
     const iso = (ms: number): string => new Date(ms).toISOString()
     const trialFailures = new Map<string, number>()
-    const checked = {last_check_at: null as string | null, latest_release: null as string | null, last_result: null as string | null}
+    const checked = {last_check_at: null as string | null, latest_release: null as string | null, last_result: binaries.state(tool).lastResult}
+    const result = async (text: string): Promise<void> => {
+        checked.last_result = text
+        await binaries.recordResult(tool, text).catch(e => log.warn('scanner result not saved', {tool, error: errorMessage(e)}))
+    }
 
     /** The active downloaded binary still runs, or it is rolled back. */
     const health = async (signal: AbortSignal): Promise<void> => {
@@ -111,7 +115,7 @@ export function createScannerUpdater(deps: ScannerUpdaterDeps): ScannerUpdater {
             if (signal.aborted) throw e
             const reason = `stopped working: ${errorMessage(e)}`
             await binaries.rollback(tool, reason, deps.dbSource)
-            checked.last_result = `rolled back ${current.version} (${reason})`
+            await result(`rolled back ${current.version} (${reason})`)
         }
     }
 
@@ -152,7 +156,7 @@ export function createScannerUpdater(deps: ScannerUpdaterDeps): ScannerUpdater {
         } catch (e) {
             if (e instanceof Refused && !signal.aborted) {
                 await binaries.reject(tool, release.version, e.message, deps.dbSource)
-                checked.last_result = `refused ${release.version}: ${e.message}`
+                await result(`refused ${release.version}: ${e.message}`)
                 log.error('scanner release refused', {tool, version: release.version, reason: e.message})
                 throw new Error(`refused ${tool} ${release.version}: ${e.message}`)
             }
@@ -160,7 +164,7 @@ export function createScannerUpdater(deps: ScannerUpdaterDeps): ScannerUpdater {
         } finally {
             if (staging) await rm(staging, {recursive: true, force: true}).catch(() => undefined)
         }
-        checked.last_result = `installed ${release.version}, replacing ${current.version}`
+        await result(`installed ${release.version}, replacing ${current.version}`)
         log.info('scanner updated', {tool, from: current.version, to: release.version, took_ms: now() - started})
     }
 
@@ -184,7 +188,7 @@ export function createScannerUpdater(deps: ScannerUpdaterDeps): ScannerUpdater {
         if (!candidate) return
         const db = deps.currentDb()
         if (!db) {
-            checked.last_result = `${candidate.version} waits for a ${tool} database`
+            await result(`${candidate.version} waits for a ${tool} database`)
             return
         }
         await install(current, candidate, db, signal)

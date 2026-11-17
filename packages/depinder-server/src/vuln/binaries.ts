@@ -51,6 +51,8 @@ interface ToolState {
     active: string | null
     previous: string | null
     rejected: Record<string, Rejection>
+    /** The last update pass's outcome, kept across restarts for `/health`. */
+    lastResult: string | null
 }
 
 /** Rejections remembered per tool; the oldest go first. */
@@ -72,6 +74,7 @@ export interface ScannerBinaries {
     reject(tool: ScannerName, version: string, reason: string, db: string): Promise<void>
     /** The active downloaded binary is broken: back to `previous`, or to the image's. */
     rollback(tool: ScannerName, reason: string, db: string): Promise<void>
+    recordResult(tool: ScannerName, result: string): Promise<void>
 }
 
 export function createScannerBinaries(options: {
@@ -91,16 +94,12 @@ export function createScannerBinaries(options: {
     const stateFile = join(root, 'state.json')
     const binPath = (tool: ScannerName, version: string): string => join(root, tool, version, tool)
 
-    const state: Record<ScannerName, ToolState> = {
-        trivy: {active: null, previous: null, rejected: {}},
-        grype: {active: null, previous: null, rejected: {}},
-    }
+    const state: Record<ScannerName, ToolState> = {trivy: emptyToolState(), grype: emptyToolState()}
     const active: ActiveScanners = {...image}
 
     const save = async (): Promise<void> => {
-        const tmp = `${stateFile}.tmp`
-        await writeFile(tmp, JSON.stringify(state, null, 1) + '\n')
-        await rename(tmp, stateFile)
+        await writeFile(`${stateFile}.tmp`, JSON.stringify(state, null, 1) + '\n')
+        await rename(`${stateFile}.tmp`, stateFile)
     }
 
     const point = (tool: ScannerName): void => {
@@ -189,7 +188,15 @@ export function createScannerBinaries(options: {
             await prune(tool)
             log.warn('scanner rolled back', {tool, from: broken, to: active[tool].version, reason})
         },
+        async recordResult(tool, result) {
+            state[tool].lastResult = result
+            return save()
+        },
     }
+}
+
+function emptyToolState(): ToolState {
+    return {active: null, previous: null, rejected: {}, lastResult: null}
 }
 
 /** `state.json`, with anything that is not a plain `x.y.z` version dropped: it names folders. Throws if it does not parse. */
@@ -205,6 +212,7 @@ function parseState(text: string): Record<ScannerName, ToolState> {
             active: version(saved?.active),
             previous: version(saved?.previous),
             rejected: rejected && typeof rejected === 'object' && !Array.isArray(rejected) ? rejected : {},
+            lastResult: typeof saved?.lastResult === 'string' ? saved.lastResult.slice(0, 1000) : null,
         }
     }
     return state

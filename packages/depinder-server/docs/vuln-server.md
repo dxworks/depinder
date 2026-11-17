@@ -271,8 +271,8 @@ reason is on `/health` as the tool's `scanner.last_error`.
   with `TRIVY_BIN` / `GRYPE_BIN`) and restart.
 - **A newer image wins.** If the image's binary is at least the downloaded one's version (CI bumped
   the Dockerfile), the image's is used and the downloads are deleted.
-- **Disk:** ~0.55 GB at most for two versions of each tool (Trivy 0.76.2's binary is 176 MB,
-  Grype 0.122.0's 95 MB), plus the trial's database download while it runs.
+- **Disk:** ~0.55 GB at most for two versions of each tool (Trivy 0.76.2's binary is 176 MB on
+  x64 and 163 MB on arm64, Grype 0.122.0's 95 MB), plus the trial's database download while it runs.
 - **Egress:** `api.github.com`, `github.com` and its release-asset CDN, `tuf-repo-cdn.sigstore.dev`,
   and the database sources.
 

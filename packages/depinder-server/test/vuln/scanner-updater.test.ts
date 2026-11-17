@@ -120,6 +120,20 @@ describe('scanner updater', () => {
         ])
     })
 
+    it('keeps the last result across a restart', async () => {
+        await updater().u.runOnce()
+        reports.set(installedPath('0.76.2'), '0.76.2')
+        binaries = createScannerBinaries({
+            dataDir,
+            image: {trivy: {bin: 'trivy', version: '0.74.0', source: 'image'}, grype: {bin: 'grype', version: '0.118.0', source: 'image'}},
+            selfUpdate: {trivy: true, grype: true},
+            probe: async (_tool, bin) => reports.get(bin) ?? Promise.reject(new Error('ENOENT')),
+            log: nullLogger,
+        })
+        await binaries.open()
+        expect(updater({binaries}).u.status().last_result).toBe('installed 0.76.2, replacing 0.74.0')
+    })
+
     it('downloads, verifies, tries and switches to a newer release, then has nothing to do', async () => {
         const {u, calls} = updater()
         await u.runOnce()
