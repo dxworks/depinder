@@ -281,33 +281,42 @@ export interface ScannerVersions {
  * names the setting to fix and the process exits.
  */
 export async function scannerVersions(config: Pick<VulnConfig, 'trivyBin' | 'grypeBin'>): Promise<ScannerVersions> {
-    const probe = async (tool: ScannerName, bin: string, args: string[], env: NodeJS.ProcessEnv, field: string) => {
-        let stdout: string
-        try {
-            ;({stdout} = await runScanner(tool, bin, args, env, {timeoutMs: PROBE_TIMEOUT_MS}))
-        } catch (e) {
-            const reason = e instanceof ScanError ? e.reason : String(e)
-            if (reason.includes('ENOENT')) {
-                throw new Error(`binary '${bin}' not found — set ${tool.toUpperCase()}_BIN`)
-            }
-            throw new Error(`'${bin} ${args.join(' ')}' failed: ${reason}`)
-        }
-        let version: unknown
-        try {
-            version = (JSON.parse(stdout) as Record<string, unknown>)[field]
-        } catch {
-            version = undefined
-        }
-        if (typeof version !== 'string' || !version) {
-            throw new Error(`'${bin} ${args.join(' ')}' did not report a version — is ${tool.toUpperCase()}_BIN really ${tool}?`)
-        }
-        return version
-    }
     const [trivy, grype] = await Promise.all([
-        probe('trivy', config.trivyBin, ['--version', '--format', 'json'], process.env, 'Version'),
-        probe('grype', config.grypeBin, ['version', '-o', 'json'], grypeEnv(), 'version'),
+        scannerVersion('trivy', config.trivyBin),
+        scannerVersion('grype', config.grypeBin),
     ])
     return {trivy, grype}
+}
+
+/**
+ * What one binary says its version is (`0.74.0`): `scannerVersions` at startup, and a freshly
+ * downloaded scanner before it may replace the current one. Throws an `Error` that names the
+ * setting to fix.
+ */
+export async function scannerVersion(tool: ScannerName, bin: string, signal?: AbortSignal): Promise<string> {
+    const [args, env, field]: [string[], NodeJS.ProcessEnv, string] = tool === 'trivy'
+        ? [['--version', '--format', 'json'], process.env, 'Version']
+        : [['version', '-o', 'json'], grypeEnv(), 'version']
+    let stdout: string
+    try {
+        ;({stdout} = await runScanner(tool, bin, args, env, {timeoutMs: PROBE_TIMEOUT_MS, signal}))
+    } catch (e) {
+        const reason = e instanceof ScanError ? e.reason : String(e)
+        if (reason.includes('ENOENT')) {
+            throw new Error(`binary '${bin}' not found — set ${tool.toUpperCase()}_BIN`)
+        }
+        throw new Error(`'${bin} ${args.join(' ')}' failed: ${reason}`)
+    }
+    let version: unknown
+    try {
+        version = (JSON.parse(stdout) as Record<string, unknown>)[field]
+    } catch {
+        version = undefined
+    }
+    if (typeof version !== 'string' || !version) {
+        throw new Error(`'${bin} ${args.join(' ')}' did not report a version — is ${tool.toUpperCase()}_BIN really ${tool}?`)
+    }
+    return version
 }
 
 /**

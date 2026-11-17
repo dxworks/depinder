@@ -2,7 +2,7 @@
 
 Pick your OS in any tab; every block on the page follows.
 
-## 1. Node.js 24+
+## 1. Node.js 26+
 
 === "macOS"
 

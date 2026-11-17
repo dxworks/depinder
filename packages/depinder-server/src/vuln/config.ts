@@ -20,6 +20,7 @@ export interface VulnConfig {
     apiToken: string
     port: number
     logLevel: LogLevel
+    /** The image's scanner, or the one an operator pinned: the baseline the self-update starts from. */
     trivyBin: string
     grypeBin: string
     /** One folder per build, `staging/` and `current.json` (`store.ts`). */
@@ -46,6 +47,16 @@ export interface VulnConfig {
     trivyDbRepository: string
     /** Grype's `latest.json`: checked by us, and handed to `grype db update` as `GRYPE_DB_UPDATE_URL`. */
     grypeDbUpdateUrl: string
+    /**
+     * Per tool: does the server keep its scanner binary current itself (`scanner-updater.ts`).
+     * `SCANNER_UPDATE`, default on, and off for a tool whose `TRIVY_BIN`/`GRYPE_BIN` is set: an
+     * operator who names a binary has pinned it.
+     */
+    scannerUpdate: {trivy: boolean, grype: boolean}
+    /** How often each tool asks GitHub for a newer release. */
+    scannerUpdateIntervalMin: number
+    /** A release younger than this is not taken yet: the supply-chain cooldown. */
+    scannerMinReleaseAgeDays: number
 }
 
 /**
@@ -73,6 +84,8 @@ export function loadVulnConfig(env: NodeJS.ProcessEnv = process.env): VulnConfig
     if (!/^https?:\/\/[^/]+/.test(grypeDbUpdateUrl) || !URL.canParse(grypeDbUpdateUrl)) {
         throw new ConfigError(`GRYPE_DB_UPDATE_URL must be an http(s) URL (got "${grypeDbUpdateUrl}").`)
     }
+
+    const scannerUpdate = flag(env, 'SCANNER_UPDATE', true)
 
     // Half the cores: each scan is two processes, and Grype alone keeps a core busy for most of
     // its run. Inside a container `availableParallelism` can read the host's cores rather than the
@@ -102,5 +115,20 @@ export function loadVulnConfig(env: NodeJS.ProcessEnv = process.env): VulnConfig
         downloadTimeoutMs: int(env, 'VULN_DB_DOWNLOAD_TIMEOUT_MS', 900_000, 60_000, 7_200_000),
         trivyDbRepository,
         grypeDbUpdateUrl,
+        scannerUpdate: {trivy: scannerUpdate && !str(env.TRIVY_BIN), grype: scannerUpdate && !str(env.GRYPE_BIN)},
+        // GitHub allows 60 anonymous API reads an hour per address; this is two per interval.
+        scannerUpdateIntervalMin: int(env, 'SCANNER_UPDATE_INTERVAL_MIN', 360, 60, 10_080),
+        // At least a day: a bad release is usually pulled within days, never within the hour.
+        scannerMinReleaseAgeDays: int(env, 'SCANNER_MIN_RELEASE_AGE_DAYS', 7, 1, 365),
     }
+}
+
+/** A strict on/off setting: anything but the usual spellings is a mistake, not a default. */
+function flag(env: NodeJS.ProcessEnv, name: string, fallback: boolean): boolean {
+    const raw = str(env[name])
+    if (raw === undefined) return fallback
+    const value = raw.toLowerCase()
+    if (['1', 'true', 'yes', 'on'].includes(value)) return true
+    if (['0', 'false', 'no', 'off'].includes(value)) return false
+    throw new ConfigError(`${name} must be true or false (got "${raw}").`)
 }

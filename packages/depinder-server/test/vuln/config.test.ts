@@ -30,6 +30,9 @@ describe('loadVulnConfig', () => {
             downloadTimeoutMs: 900_000,
             trivyDbRepository: 'mirror.gcr.io/aquasec/trivy-db:2',
             grypeDbUpdateUrl: 'https://grype.anchore.io/databases/v6/latest.json',
+            scannerUpdate: {trivy: true, grype: true},
+            scannerUpdateIntervalMin: 360,
+            scannerMinReleaseAgeDays: 7,
         })
     })
 
@@ -93,6 +96,26 @@ describe('loadVulnConfig', () => {
         expect(() => loadVulnConfig({...base, GRYPE_DB_UPDATE_URL: 'ftp://x/latest.json'})).toThrow(/GRYPE_DB_UPDATE_URL/)
     })
 
+    it('reads the scanner self-update settings', () => {
+        expect(loadVulnConfig({...base, SCANNER_UPDATE_INTERVAL_MIN: '60', SCANNER_MIN_RELEASE_AGE_DAYS: '14'})).toMatchObject({
+            scannerUpdate: {trivy: true, grype: true},
+            scannerUpdateIntervalMin: 60,
+            scannerMinReleaseAgeDays: 14,
+        })
+        for (const off of ['false', 'OFF', '0', 'no']) {
+            expect(loadVulnConfig({...base, SCANNER_UPDATE: off}).scannerUpdate, off).toEqual({trivy: false, grype: false})
+        }
+        expect(loadVulnConfig({...base, SCANNER_UPDATE: 'yes'}).scannerUpdate).toEqual({trivy: true, grype: true})
+        expect(() => loadVulnConfig({...base, SCANNER_UPDATE: 'maybe'})).toThrow(/SCANNER_UPDATE must be true or false/)
+    })
+
+    it('leaves a scanner an operator named with TRIVY_BIN or GRYPE_BIN alone', () => {
+        expect(loadVulnConfig({...base, TRIVY_BIN: '/opt/trivy'}).scannerUpdate).toEqual({trivy: false, grype: true})
+        expect(loadVulnConfig({...base, GRYPE_BIN: '/opt/grype'}).scannerUpdate).toEqual({trivy: true, grype: false})
+        // Blank is unset, as for every other setting.
+        expect(loadVulnConfig({...base, TRIVY_BIN: '  '}).scannerUpdate).toEqual({trivy: true, grype: true})
+    })
+
     it('range-checks the numbers', () => {
         const bad: [string, string][] = [
             ['VULN_MAX_PURLS', '0'], ['VULN_MAX_PURLS', '50001'], ['VULN_MAX_PURLS', '1.5'],
@@ -102,6 +125,8 @@ describe('loadVulnConfig', () => {
             ['VULN_TRIVY_STALE_HOURS', '0'], ['VULN_GRYPE_STALE_HOURS', '8761'],
             ['VULN_DB_CHECK_INTERVAL_MIN', '4'], ['VULN_DB_CHECK_INTERVAL_MIN', '1441'],
             ['VULN_DB_DOWNLOAD_TIMEOUT_MS', '59999'], ['VULN_DB_DOWNLOAD_TIMEOUT_MS', '7200001'],
+            ['SCANNER_UPDATE_INTERVAL_MIN', '59'], ['SCANNER_UPDATE_INTERVAL_MIN', '10081'],
+            ['SCANNER_MIN_RELEASE_AGE_DAYS', '0'], ['SCANNER_MIN_RELEASE_AGE_DAYS', '366'], ['SCANNER_MIN_RELEASE_AGE_DAYS', '7d'],
             ['PORT', '0'], ['LOG_LEVEL', 'loud'],
         ]
         for (const [name, value] of bad) {

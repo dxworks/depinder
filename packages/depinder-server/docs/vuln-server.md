@@ -1,7 +1,7 @@
 # Vulnerabilities (`ROLE=vuln`)
 
 For clients and operators of the vulnerability server: its API, concurrency, health, and how it
-keeps its databases fresh.
+keeps its databases and its scanners fresh.
 
 A second server in the same image: purls in, Trivy and Grype findings out. Depinder scans every
 SBOM with both tools on the machine it runs on; this lets it send the purls instead and get the
@@ -21,6 +21,9 @@ A scan never updates its database (Trivy runs with `--skip-db-update`, Grype wit
 `GRYPE_DB_AUTO_UPDATE=false`). The server downloads both databases into `VULN_DATA_DIR` and keeps
 them current itself, with no cron job (see [Keeping the databases fresh](#keeping-the-databases-fresh)).
 
+It also keeps the Trivy and Grype binaries themselves current: newer releases are downloaded,
+verified and tried before they replace the image's (see [Keeping the scanners fresh](#keeping-the-scanners-fresh)).
+
 A missing scanner binary stops the process at startup; missing databases do not — the server
 starts and answers 503 until they are there.
 
@@ -29,7 +32,7 @@ starts and answers 503 until they are there.
 | `ROLE` | — | `vuln` |
 | `RESOLVER_API_TOKEN` | — | **required**, at least 16 characters. The same token and checks as the resolver |
 | `PORT`, `LOG_LEVEL` | `8080`, `info` | as for the resolver |
-| `TRIVY_BIN` / `GRYPE_BIN` | `trivy` / `grype` | the binaries |
+| `TRIVY_BIN` / `GRYPE_BIN` | `trivy` / `grype` | the image's binaries, the baseline. Setting one pins it: no self-update for that tool |
 | `VULN_DATA_DIR` | — | **required**: where the server keeps the databases |
 | `VULN_MAX_PURLS` | `5000` | distinct purls per request, 1..50000. Past it: 413 |
 | `VULN_MAX_SCANS` | half the cores | scans running at once, 1..64. Each scan is one Trivy and one Grype |
@@ -38,7 +41,8 @@ starts and answers 503 until they are there.
 | `VULN_TMP_DIR` | the OS temp dir | where each scan's `depinder-vuln-*` folder goes |
 | `VULN_TRIVY_STALE_HOURS` / `VULN_GRYPE_STALE_HOURS` | `24` / `72` | past this age a build is reported `stale` (and still served), 1..8760 |
 
-The update settings are under [Keeping the databases fresh](#keeping-the-databases-fresh).
+The update settings are under [Keeping the databases fresh](#keeping-the-databases-fresh) and
+[Keeping the scanners fresh](#keeping-the-scanners-fresh).
 
 ```bash
 ROLE=vuln RESOLVER_API_TOKEN=... VULN_DATA_DIR=/var/lib/vuln npm run dev
@@ -73,7 +77,8 @@ ROLE=vuln RESOLVER_API_TOKEN=... VULN_DATA_DIR=/var/lib/vuln npm run dev
 - `unsupported` lists what was not scanned: `invalid` (not a purl, or a maven purl with no group),
   `unsupported_type` (not one of the eight ecosystems), `no_version`.
 - `databases` and `scanners` say what produced the answer: the same purls can legitimately get
-  different findings once a database is newer. Both scanners of one request read exactly the builds
+  different findings once a database or a scanner is newer. `scanners` are the versions of the
+  binaries that ran this scan, taken with its databases; a binary switched meanwhile changes neither. Both scanners of one request read exactly the builds
   named here, even if a newer one was installed while they ran. `age_seconds` is the build's age at
   the moment of the scan, and `stale` says it is past `VULN_*_STALE_HOURS`: old data is served and
   labelled, never refused, and the caller decides what to make of it.
@@ -117,6 +122,11 @@ Unauthenticated.
 - Each tool has its build (`built_at`, `schema`, `age_seconds`, `stale`) and what its update loop
   is doing: `updating`, `last_check_at`, `last_ok_at`, `last_error`, `next_check_at`,
   `upstream_built_at` (what the publisher says its newest build is).
+- Each tool's `scanner` is its binary: `version`, `source` (`image`, `pinned` when its self-update is
+  off, or `updated`), `previous` (the downloaded version kept for rollback; null means the image's),
+  `auto_update`, and its update loop's `updating`, `last_check_at`, `last_ok_at`, `last_error`,
+  `next_check_at`, `latest_release` (the newest stable release, whatever its age) and `last_result`
+  (`installed 0.76.2, replacing 0.74.0`, `refused 0.77.0: …`, `rolled back …`).
 
 ## Keeping the databases fresh
 
@@ -157,6 +167,7 @@ VULN_DATA_DIR/
   grype/<built-at>/6/vulnerability.db           + build.json
   staging/<tool>-<random>/                       downloads land here
   current.json                                   {"trivy": "<folder>", "grype": "<folder>"}
+  scanners/                                      the downloaded scanners (next section)
 ```
 
 - **Switching.** A request leases one Trivy and one Grype build when it gets its scan slot and lets
@@ -203,3 +214,79 @@ echo '{"trivy":"2026-10-01T100405Z","grype":"2026-10-01T063348Z"}' > $D/current.
 if it is newer; Grype is compared by `built` and only downloaded if the publisher has a newer one.
 `canary_findings: null` skips the 90 % rule for that first switch; the measured count is stored
 from then on.
+
+## Keeping the scanners fresh
+
+The image carries Trivy and Grype as a baseline (the versions in its Dockerfile, which CI bumps).
+On Linux (x64 or arm64), the server also keeps them current itself, one loop per tool, every
+`SCANNER_UPDATE_INTERVAL_MIN` and once right after boot:
+
+1. **Health** — a downloaded binary in use must still answer `--version` with its version; if not,
+   it is rolled back (below) and refused.
+2. **Check** — the tool's GitHub releases (one anonymous API read; GitHub allows 60 an hour). The
+   newest release that is not a draft or prerelease, has a plain `x.y.z` tag, was published at
+   least `SCANNER_MIN_RELEASE_AGE_DAYS` before the last 05:00 UTC, is newer than ours, and
+   was never refused. None → done. The age is a supply-chain cooldown: a hijacked release is
+   usually found and pulled within days. Counting it from 05:00 UTC, when the daily CI bump bots
+   run, keeps the server on the same Trivy as depminer (at most a day apart).
+3. **Wait** — no database for the tool yet → done; a binary is only judged against a database.
+4. **Disk** — room for a database download plus 1 GB, or `low disk`.
+5. **Signature** — `<tool>_<version>_checksums.txt` and its Sigstore bundle
+   (`….sigstore.json`). The bundle must verify against Sigstore's public trust root (fetched by
+   TUF from `tuf-repo-cdn.sigstore.dev`, cached in `scanners/tuf/`), over exactly those bytes, with
+   a Rekor log entry, from the publisher's release workflow on GitHub Actions:
+   `aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v<version>` and
+   `anchore/grype/.github/workflows/release.yaml@refs/heads/main`. What `cosign verify-blob`
+   checks.
+6. **sha256** — the Linux `.tar.gz` for this CPU (`process.arch`); its sum must be the signed
+   checksums file's entry for it. A missing entry fails too.
+7. **Unpack** — only the `trivy` or `grype` file comes out of the archive, by our own tar reader;
+   nothing runs through a shell, and no name in the archive can point anywhere else.
+8. **Version** — the new binary must report the release's version.
+9. **Trial** — with the new binary: a database download from `TRIVY_DB_REPOSITORY` /
+   `GRYPE_DB_UPDATE_URL` into staging, read back and smoke-tested (the database update's smoke
+   test, same 90 % rule), then the smoke test against the current database, which is what scans
+   read right after the switch. The trial's download is thrown away.
+10. **Switch** — the binary moves to `scanners/<tool>/<version>/` and `scanners/state.json` names
+    it. New scans and the database loop use it from then on; a scan already running finishes on
+    the binary it started with, and its answer names that one.
+
+A release that fails steps 5–8 or a smoke test is **refused for good** and remembered in
+`state.json`; so is one whose own database download fails three passes running. Anything else
+(network, GitHub, the trust root, the disk) is tried again with the database loop's backoff
+(5 min, 10, 20, … up to the interval). Whatever fails, the current binary keeps serving and the
+reason is on `/health` as the tool's `scanner.last_error`.
+
+- **One thing at a time.** A tool's scanner update and its database update share a lock: a binary is
+  never switched halfway through a database download, and the database a trial reads is never
+  replaced under it.
+- **Database schemas.** Trivy reads only the schema its repository tag names (`trivy-db:2`), Grype
+  only the schema its update URL serves (`v6`). A release that needs a newer schema fails its trial
+  against the configured source and is refused, not switched to. Moving to a new schema is a deploy:
+  set `TRIVY_DB_REPOSITORY` / `GRYPE_DB_UPDATE_URL` to it, and the refusal no longer applies (a
+  refusal is tied to the source it was checked against).
+- **Rollback.** The binary before the switch is kept as `previous`; anything older is deleted. A
+  downloaded binary that stops answering at boot or at a later check is replaced by `previous`, or
+  by the image's, and refused. To force the image's binaries, set `SCANNER_UPDATE=false` (or pin one
+  with `TRIVY_BIN` / `GRYPE_BIN`) and restart.
+- **A newer image wins.** If the image's binary is at least the downloaded one's version (CI bumped
+  the Dockerfile), the image's is used and the downloads are deleted.
+- **Disk:** ~0.55 GB at most for two versions of each tool (Trivy 0.76.2's binary is 176 MB on
+  x64 and 163 MB on arm64, Grype 0.122.0's 95 MB), plus the trial's database download while it runs.
+- **Egress:** `api.github.com`, `github.com` and its release-asset CDN, `tuf-repo-cdn.sigstore.dev`,
+  and the database sources.
+
+```
+VULN_DATA_DIR/scanners/
+  state.json              {"trivy": {"active", "previous", "rejected"}, "grype": {...}}
+  trivy/<version>/trivy   a downloaded binary, never written again once in place
+  grype/<version>/grype
+  staging-<random>/       downloads land here; emptied at boot
+  tuf/                    Sigstore's trust root
+```
+
+| variable | default | meaning |
+|---|---|---|
+| `SCANNER_UPDATE` | `true` | keep the scanner binaries current; `false` uses the image's. Off for a tool whose `TRIVY_BIN` / `GRYPE_BIN` is set, and off on anything but Linux x64/arm64 |
+| `SCANNER_UPDATE_INTERVAL_MIN` | `360` | how often each tool checks GitHub, 60..10080 |
+| `SCANNER_MIN_RELEASE_AGE_DAYS` | `7` | days a release must be out by the last 05:00 UTC before it is taken, 1..365 |

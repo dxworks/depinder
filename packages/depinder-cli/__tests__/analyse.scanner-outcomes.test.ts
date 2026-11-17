@@ -2,6 +2,7 @@ import type {MockInstance} from 'vitest'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import {PINNED_SCANNER_VERSIONS} from '@depinder/core'
 import {createAnalyseCommand} from '../src/commands/analyse'
 import {resetSharedCacheDb, sharedCacheDb} from '../src/cache/sqlite-cache'
 import {clearSbomCache, deferSbomFindings} from '../src/plugins/sbom'
@@ -134,7 +135,7 @@ describe('the final vulnerability summary reports actual scan outcomes', () => {
             level: 'warn',
             text: 'Vulnerability data source: NONE - no selected local scanner produced a report',
         })
-        expect(texts()).not.toContain('Vulnerability data source: trivy 0.74.0')
+        expect(texts()).not.toContain(`Vulnerability data source: trivy ${PINNED_SCANNER_VERSIONS.trivy}`)
     })
 
     it('one scanned and one failed file for the same tool is PARTIAL, per-source provenance split', async () => {
@@ -151,7 +152,7 @@ describe('the final vulnerability summary reports actual scan outcomes', () => {
         expect(provenance('syft').vulnerabilityAnalysis).toBe('disabled')
         expect(messages).toContainEqual({
             level: 'warn',
-            text: 'Vulnerability data source: trivy 0.74.0 - PARTIAL, trivy did not complete every SBOM',
+            text: `Vulnerability data source: trivy ${PINNED_SCANNER_VERSIONS.trivy} - PARTIAL, trivy did not complete every SBOM`,
         })
     })
 
@@ -163,7 +164,7 @@ describe('the final vulnerability summary reports actual scan outcomes', () => {
         await analyse('trivy')
 
         expect(provenance('trivy').vulnerabilityAnalysis).toBe('complete')
-        expect(messages).toContainEqual({level: 'info', text: 'Vulnerability data source: trivy 0.74.0'})
+        expect(messages).toContainEqual({level: 'info', text: `Vulnerability data source: trivy ${PINNED_SCANNER_VERSIONS.trivy}`})
         expect(texts().filter(text => text.startsWith('Vulnerability data source:'))).toHaveLength(1)
         expectFinalOrdering()
     })

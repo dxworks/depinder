@@ -5,7 +5,7 @@
   "description": "The depinder monorepo: the depinder CLI, the resolver and vulnerability server, and their shared core",
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=26.0.0"
   },
   "workspaces": [
     "packages/*",
@@ -29,5 +29,10 @@
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.0.0",
     "vitest": "^5.0.3"
+  },
+  "overrides": {
+    "@tufjs/models": {
+      "minimatch": "10.2.5"
+    }
   }
 }
