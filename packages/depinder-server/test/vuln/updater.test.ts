@@ -7,7 +7,8 @@ import type {DatabaseBuild} from '../../src/vuln/databases.js'
 import {ScanError, type ScannerName} from '../../src/vuln/scanners.js'
 import {judgeSmoke} from '../../src/vuln/smoke.js'
 import {createStore, type Store} from '../../src/vuln/store.js'
-import {type Clock, createUpdater, FIRST_RETRY_MS, type UpdaterDeps} from '../../src/vuln/updater.js'
+import {type Clock, FIRST_RETRY_MS} from '../../src/vuln/loop.js'
+import {createUpdater, type UpdaterDeps} from '../../src/vuln/updater.js'
 import type {UpstreamBuild} from '../../src/vuln/upstream.js'
 
 /**

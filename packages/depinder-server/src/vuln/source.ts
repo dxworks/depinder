@@ -49,6 +49,24 @@ export interface ToolHealth {
     next_check_at?: string | null
     /** What the publisher's metadata says its newest build is (Trivy: the manifest's `created`). */
     upstream_built_at?: string | null
+    /** The tool's scanner binary and what its update loop is doing (`scanner-updater.ts`). */
+    scanner?: ScannerHealth
+}
+
+interface ScannerHealth {
+    version: string
+    /** `image`, `pinned` (`TRIVY_BIN`/`GRYPE_BIN` set) or `updated` (downloaded by the server). */
+    source: string
+    /** The downloaded version kept to roll back to; null means the image's. */
+    previous: string | null
+    auto_update: boolean
+    updating?: boolean
+    last_check_at?: string | null
+    last_ok_at?: string | null
+    last_error?: string | null
+    next_check_at?: string | null
+    latest_release?: string | null
+    last_result?: string | null
 }
 
 interface SourceHealth {

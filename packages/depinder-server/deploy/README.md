@@ -144,3 +144,6 @@ lost because the data lives in Supabase.
 | `VULN_MAX_QUEUED` | Requests that can wait for a scan before the server answers 503 |
 | `VULN_MAX_PURLS` | Max purls per request (5000) |
 | `VULN_CPUS` / `VULN_MEM_LIMIT` | Limits for the vuln container (1.5 / 2500m) |
+| `SCANNER_UPDATE` | vuln keeps Trivy and Grype current itself, after signature, checksum and smoke checks (`true`; `false` = the image's versions) |
+| `SCANNER_UPDATE_INTERVAL_MIN` | How often vuln checks GitHub for scanner releases (360) |
+| `SCANNER_MIN_RELEASE_AGE_DAYS` | Days a scanner release must be out by the last Monday 05:00 UTC before vuln takes it (7) |
