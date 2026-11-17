@@ -5,7 +5,7 @@
   "description": "purl resolver service: facts per package (versions, release dates, licenses) filled on demand and kept fresh from registry change feeds",
   "type": "module",
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=26.0.0"
   },
   "exports": {
     "./in-process": {
@@ -31,7 +31,7 @@
     "pg": "^8.13.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.0.0",
     "@types/pg": "^8.11.10",
     "tsx": "^4.19.0",
     "typescript": "^5.0.0"

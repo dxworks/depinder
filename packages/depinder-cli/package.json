@@ -17,7 +17,7 @@
   },
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=26.0.0"
   },
   "author": "Mario Rivis <mario.rivis@gmail.com>",
   "main": "dist/depinder.js",
@@ -54,7 +54,7 @@
     "@depinder/core": "0.0.0",
     "@types/cli-progress": "^3.11.0",
     "@types/lodash": "^4.17.0",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.0.0",
     "@types/semver": "^7.7.0"
   },
   "dxw": {

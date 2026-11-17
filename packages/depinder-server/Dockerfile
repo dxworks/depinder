@@ -9,7 +9,7 @@ FROM anchore/grype:v0.118.0@sha256:8a93fc48da96bd6ec5981279d099b69de11541dc68fdf
 # links (@depinder/core); it installs the server's dependencies, the core link and core's own.
 
 # Build stage: dev dependencies and the TypeScript compiler, none of which ship.
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/depinder-core/package.json packages/depinder-core/
@@ -25,7 +25,7 @@ RUN npm run build --workspace depinder-server
 # Runtime stage: production dependencies, the compiled server and core, the migrations and the two
 # scanners.
 # The resolver roles never call the scanners; one image for every role is simpler than two.
-FROM node:24-alpine AS runtime
+FROM node:26-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 

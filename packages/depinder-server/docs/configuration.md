@@ -87,7 +87,7 @@ Three services, one address (`localhost:8080`, or `PUBLIC_PORT`), one token:
 No database container — the database is hosted. Both servers read `.env` for the token;
 `docker-compose.yml` sets `ROLE`, `PORT` and the `VULN_*` settings itself.
 
-- **Image.** One image for every role, multi-stage, run on `node:24-alpine` as the unprivileged
+- **Image.** One image for every role, multi-stage, run on `node:26-alpine` as the unprivileged
   `node` user. It carries Trivy 0.74.0 and Grype 0.118.0, copied from their official images pinned
   by multi-arch digest (amd64 and arm64). 572 MB (136 MB compressed); 256 MB before the scanners.
   Those versions are the floor: `vuln` downloads newer, signed releases into its volume once they
