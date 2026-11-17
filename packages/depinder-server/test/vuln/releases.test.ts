@@ -30,10 +30,10 @@ const select = (releases: GithubRelease[], current = '0.74.0', rejected: string[
     selectRelease(releases, {current, minAgeMs: 7 * DAY, now: NOW, rejected: v => rejected.includes(v)})
 
 describe('releaseCutoff', () => {
-    it('is the minimum age before the last Monday 05:00 UTC', () => {
-        expect(releaseCutoff(Date.parse('2026-11-17T12:00:00Z'), 7 * DAY)).toBe(Date.parse('2026-11-09T05:00:00Z'))
-        expect(releaseCutoff(Date.parse('2026-11-16T05:00:00Z'), 7 * DAY)).toBe(Date.parse('2026-11-09T05:00:00Z'))
-        expect(releaseCutoff(Date.parse('2026-11-16T04:59:59Z'), 7 * DAY)).toBe(Date.parse('2026-11-02T05:00:00Z'))
+    it('is the minimum age before the last 05:00 UTC', () => {
+        expect(releaseCutoff(Date.parse('2026-11-17T12:00:00Z'), 7 * DAY)).toBe(Date.parse('2026-11-10T05:00:00Z'))
+        expect(releaseCutoff(Date.parse('2026-11-17T05:00:00Z'), 7 * DAY)).toBe(Date.parse('2026-11-10T05:00:00Z'))
+        expect(releaseCutoff(Date.parse('2026-11-17T04:59:59Z'), 7 * DAY)).toBe(Date.parse('2026-11-09T05:00:00Z'))
     })
 })
 
@@ -56,12 +56,12 @@ describe('selectRelease', () => {
         expect(picked).toMatchObject({candidate: {version: '0.75.0'}, latest: '0.75.0'})
     })
 
-    it('waits out the cooldown, counted from the last Monday 05:00 UTC like the CI bump bots', () => {
-        // NOW is Tue 2026-11-17 12:00; the last Monday run was 2026-11-16 05:00, so the cutoff is 2026-11-09 05:00
+    it('waits out the cooldown, counted from the last 05:00 UTC like the CI bump bots', () => {
+        // NOW is Tue 2026-11-17 12:00; the last daily run was 2026-11-17 05:00, so the cutoff is 2026-11-10 05:00
         const at = (iso: string): GithubRelease => ({...release('v0.75.0', 0), published_at: iso})
-        expect(select([at('2026-11-09T05:00:00Z')]).candidate?.version).toBe('0.75.0')
-        expect(select([at('2026-11-09T05:00:01Z')]).candidate).toBeUndefined()
-        expect(select([at('2026-11-09T12:00:00Z')]).candidate).toBeUndefined() // 8 days old, waits for next Monday
+        expect(select([at('2026-11-10T05:00:00Z')]).candidate?.version).toBe('0.75.0')
+        expect(select([at('2026-11-10T05:00:01Z')]).candidate).toBeUndefined()
+        expect(select([at('2026-11-10T06:00:00Z')]).candidate).toBeUndefined() // 7 days 6 h old, waits for tomorrow's 05:00
     })
 
     it('takes nothing that is not newer than ours, and nothing refused, falling back to the next one', () => {

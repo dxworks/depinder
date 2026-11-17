@@ -52,16 +52,16 @@ interface Selection {
     latest: string | null
 }
 
-const WEEK_MS = 7 * 86_400_000
-/** Monday 1970-01-05 05:00 UTC, when the depminer and depinder bump bots run each week. */
-const WEEKLY_RUN_MS = Date.UTC(1970, 0, 5, 5)
+const DAY_MS = 86_400_000
+/** 05:00 UTC, when the depminer and depinder bump bots run each day. */
+const DAILY_RUN_MS = Date.UTC(1970, 0, 1, 5)
 
 /**
- * Newest publish time a release may have: `minAgeMs` before the last Monday 05:00 UTC, the same
- * cutoff the CI bump bots use, so the server and depminer pick the same Trivy each week.
+ * Newest publish time a release may have: `minAgeMs` before the last 05:00 UTC, the same cutoff
+ * the CI bump bots use, so the server and depminer pick the same Trivy each day.
  */
 export function releaseCutoff(now: number, minAgeMs: number): number {
-    const lastRun = now - ((now - WEEKLY_RUN_MS) % WEEK_MS + WEEK_MS) % WEEK_MS
+    const lastRun = now - ((now - DAILY_RUN_MS) % DAY_MS + DAY_MS) % DAY_MS
     return lastRun - minAgeMs
 }
 

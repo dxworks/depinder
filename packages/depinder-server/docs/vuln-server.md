@@ -225,10 +225,10 @@ On Linux (x64 or arm64), the server also keeps them current itself, one loop per
    it is rolled back (below) and refused.
 2. **Check** — the tool's GitHub releases (one anonymous API read; GitHub allows 60 an hour). The
    newest release that is not a draft or prerelease, has a plain `x.y.z` tag, was published at
-   least `SCANNER_MIN_RELEASE_AGE_DAYS` before the last Monday 05:00 UTC, is newer than ours, and
+   least `SCANNER_MIN_RELEASE_AGE_DAYS` before the last 05:00 UTC, is newer than ours, and
    was never refused. None → done. The age is a supply-chain cooldown: a hijacked release is
-   usually found and pulled within days. Counting it from Monday 05:00, when the CI bump bots run,
-   keeps the server on the same Trivy as depminer.
+   usually found and pulled within days. Counting it from 05:00 UTC, when the daily CI bump bots
+   run, keeps the server on the same Trivy as depminer (at most a day apart).
 3. **Wait** — no database for the tool yet → done; a binary is only judged against a database.
 4. **Disk** — room for a database download plus 1 GB, or `low disk`.
 5. **Signature** — `<tool>_<version>_checksums.txt` and its Sigstore bundle
@@ -289,4 +289,4 @@ VULN_DATA_DIR/scanners/
 |---|---|---|
 | `SCANNER_UPDATE` | `true` | keep the scanner binaries current; `false` uses the image's. Off for a tool whose `TRIVY_BIN` / `GRYPE_BIN` is set, and off on anything but Linux x64/arm64 |
 | `SCANNER_UPDATE_INTERVAL_MIN` | `360` | how often each tool checks GitHub, 60..10080 |
-| `SCANNER_MIN_RELEASE_AGE_DAYS` | `7` | days a release must be out by the last Monday 05:00 UTC before it is taken, 1..365 |
+| `SCANNER_MIN_RELEASE_AGE_DAYS` | `7` | days a release must be out by the last 05:00 UTC before it is taken, 1..365 |
