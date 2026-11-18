@@ -4,7 +4,7 @@
 # published image, pinned by digest, and waits until resolver and vuln report healthy.
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-/opt/depinder}"
+APP_DIR=/opt/depinder   # 07-upload.sh writes the configured APP_DIR here
 REPO=ghcr.io/dxworks/depinder-server
 
 read -r verb version digest extra <<< "${SSH_ORIGINAL_COMMAND:-}"

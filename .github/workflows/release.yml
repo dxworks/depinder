@@ -71,7 +71,18 @@ jobs:
       contents: read
       packages: read
     steps:
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Only code that reached dev goes to production, whatever commit the tag points at.
+      - name: Check the tag is on dev
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/dev \
+            || { echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) is not on dev; not deploying"; exit 1; }
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

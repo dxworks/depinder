@@ -89,9 +89,10 @@ No database container — the database is hosted. Both servers read `.env` for t
 
 - **Image.** One image for every role, multi-stage, run on `node:26-alpine` as the unprivileged
   `node` user. It carries Trivy 0.76.2 and Grype 0.122.0, copied from their official images pinned
-  by multi-arch digest (amd64 and arm64). 572 MB (136 MB compressed); 256 MB before the scanners.
+  by multi-arch digest (amd64 and arm64). About 150 MB compressed; npm is removed from it.
   Those versions are the floor: `vuln` downloads newer, signed releases into its volume once they
-  are a week old and pass its checks (`SCANNER_UPDATE`, docs/vuln-server.md).
+  are a week old and pass its checks (`SCANNER_UPDATE`, docs/vuln-server.md); production turns
+  that off, so there the image's versions are the ones used.
   The `HEALTHCHECK` asks `/health`.
 - **Databases** live in the named volume `vuln-data` at `/var/lib/vuln` (`VULN_DATA_DIR`), not in
   the image: ~4.4 GB, up to ~9 GB while both tools download. The first `up` on an empty volume

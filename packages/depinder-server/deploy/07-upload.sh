@@ -40,6 +40,7 @@ cd '$APP_DIR' && exec docker compose --env-file compose.vars -f compose.yml "\$@
 SHORTCUT
 
 step "depinder-deploy, the release deploy key's only command"
-upload "$DEPLOY_DIR/depinder-deploy.sh" /usr/local/bin/depinder-deploy
-remote "chmod 755 /usr/local/bin/depinder-deploy"
+[[ "$APP_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]] || die "APP_DIR '$APP_DIR' must be a plain absolute path"
+sed "s|^APP_DIR=.*|APP_DIR='$APP_DIR'|" "$DEPLOY_DIR/depinder-deploy.sh" \
+  | remote "cat > /usr/local/bin/depinder-deploy && chmod 755 /usr/local/bin/depinder-deploy"
 remote "ls -la '$APP_DIR'; echo \"version: \$(cat '$APP_DIR/src/VERSION')\""

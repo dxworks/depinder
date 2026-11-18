@@ -229,8 +229,8 @@ deploy. Elsewhere, on Linux (x64 or arm64), the server keeps them current itself
    newest release that is not a draft or prerelease, has a plain `x.y.z` tag, was published at
    least `SCANNER_MIN_RELEASE_AGE_DAYS` before the last 05:00 UTC, is newer than ours, and
    was never refused. None → done. The age is a supply-chain cooldown: a hijacked release is
-   usually found and pulled within days. Counting it from 05:00 UTC, when the daily CI bump bots
-   run, keeps the server on the same Trivy as depminer (at most a day apart).
+   usually found and pulled within days. It is counted from 05:00 UTC, when the daily CI bump
+   bots run (which may take a release earlier when it fixes a vulnerability).
 3. **Wait** — no database for the tool yet → done; a binary is only judged against a database.
 4. **Disk** — room for a database download plus 1 GB, or `low disk`.
 5. **Signature** — `<tool>_<version>_checksums.txt` and its Sigstore bundle

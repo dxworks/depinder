@@ -92,7 +92,9 @@ One-time setup for release deploys:
    `DEPINDER_DEPLOY_PUBKEY=~/.ssh/depinder-release-deploy.pub ./10-deploy-key.sh`. The key can
    only run `depinder-deploy`.
 3. In GitHub, create the environment `production` with the secrets `10` prints: `DEPLOY_HOST`,
-   `DEPLOY_SSH_KEY` (the private key), `DEPLOY_KNOWN_HOSTS`.
+   `DEPLOY_SSH_KEY` (the private key), `DEPLOY_KNOWN_HOSTS`. Under its deployment branches and
+   tags, allow only `v*` tags, and protect `v*` tags in the repo rules, so no one else's tag can
+   deploy. The job also refuses a tag whose commit is not on `dev`.
 4. After the first release, make the package `depinder-server` public (GitHub > dxworks >
    Packages > settings), so the server pulls it without a login.
 
