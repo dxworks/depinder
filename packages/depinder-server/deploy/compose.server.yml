@@ -15,7 +15,8 @@ services:
     build:
       context: ./src
       dockerfile: packages/depinder-server/Dockerfile
-    image: depinder-server:server
+    # A release deploy sets DEPINDER_IMAGE (depinder-deploy); 07-upload.sh resets it to the local build.
+    image: ${DEPINDER_IMAGE:-depinder-server:server}
     env_file: &app-env
       # raw: every value exactly as written, so a `$` in a password stays a `$`
       - path: server.env
@@ -28,14 +29,16 @@ services:
     restart: unless-stopped
 
   vuln:
-    image: depinder-server:server
-    # Built by the resolver service above; never pulled.
+    image: ${DEPINDER_IMAGE:-depinder-server:server}
+    # Built or pulled for the resolver service above; never pulled itself.
     pull_policy: never
     env_file: *app-env
     environment:
       ROLE: vuln
       PORT: 8080
       VULN_DATA_DIR: /var/lib/vuln
+      # Scanners change only through the image: bot PR, release, deploy.
+      SCANNER_UPDATE: "false"
     volumes:
       - vuln-data:/var/lib/vuln
     cpus: ${VULN_CPUS:-1.5}

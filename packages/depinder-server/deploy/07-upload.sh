@@ -38,4 +38,8 @@ remote "cat > /usr/local/bin/depinder && chmod 755 /usr/local/bin/depinder" <<SH
 # depinder <compose command>, e.g. depinder ps / depinder logs -f resolver / depinder restart
 cd '$APP_DIR' && exec docker compose --env-file compose.vars -f compose.yml "\$@"
 SHORTCUT
+
+step "depinder-deploy, the release deploy key's only command"
+upload "$DEPLOY_DIR/depinder-deploy.sh" /usr/local/bin/depinder-deploy
+remote "chmod 755 /usr/local/bin/depinder-deploy"
 remote "ls -la '$APP_DIR'; echo \"version: \$(cat '$APP_DIR/src/VERSION')\""

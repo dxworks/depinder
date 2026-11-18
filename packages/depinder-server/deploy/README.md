@@ -80,6 +80,24 @@ clients only set `DEPINDER_RESOLVER_TOKEN=<RESOLVER_API_TOKEN>`; for another ser
 
 ## 4. Ship new code or a changed setting
 
+**Normally a release does it.** A `v*` tag runs `release.yml`: after the source and image scans
+pass, it publishes `ghcr.io/dxworks/depinder-server:<version>`, and the `deploy` job switches the
+server to that image by digest and waits for health. Only the image changes this way; a changed
+setting, `compose.server.yml` or the Caddyfile still needs `07` and `08` by hand.
+
+One-time setup for release deploys:
+
+1. `ssh-keygen -t ed25519 -N "" -C depinder-release-deploy -f ~/.ssh/depinder-release-deploy`
+2. `./07-upload.sh` (installs `depinder-deploy`), then
+   `DEPINDER_DEPLOY_PUBKEY=~/.ssh/depinder-release-deploy.pub ./10-deploy-key.sh`. The key can
+   only run `depinder-deploy`.
+3. In GitHub, create the environment `production` with the secrets `10` prints: `DEPLOY_HOST`,
+   `DEPLOY_SSH_KEY` (the private key), `DEPLOY_KNOWN_HOSTS`.
+4. After the first release, make the package `depinder-server` public (GitHub > dxworks >
+   Packages > settings), so the server pulls it without a login.
+
+By hand, from your working tree (local build on the server; the next release switches back):
+
 ```bash
 ./07-upload.sh && ./08-start.sh && ./09-verify.sh
 ```
@@ -144,6 +162,3 @@ lost because the data lives in Supabase.
 | `VULN_MAX_QUEUED` | Requests that can wait for a scan before the server answers 503 |
 | `VULN_MAX_PURLS` | Max purls per request (5000) |
 | `VULN_CPUS` / `VULN_MEM_LIMIT` | Limits for the vuln container (1.5 / 2500m) |
-| `SCANNER_UPDATE` | vuln keeps Trivy and Grype current itself, after signature, checksum and smoke checks (`true`; `false` = the image's versions) |
-| `SCANNER_UPDATE_INTERVAL_MIN` | How often vuln checks GitHub for scanner releases (360) |
-| `SCANNER_MIN_RELEASE_AGE_DAYS` | Days a scanner release must be out by the last 05:00 UTC before vuln takes it (7) |

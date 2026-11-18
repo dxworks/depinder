@@ -218,7 +218,9 @@ from then on.
 ## Keeping the scanners fresh
 
 The image carries Trivy and Grype as a baseline (the versions in its Dockerfile, which CI bumps).
-On Linux (x64 or arm64), the server also keeps them current itself, one loop per tool, every
+The production stack turns the self-update below off (`SCANNER_UPDATE: "false"` in
+`deploy/compose.server.yml`): there the scanners change only through a bot PR, a release and its
+deploy. Elsewhere, on Linux (x64 or arm64), the server keeps them current itself, one loop per tool, every
 `SCANNER_UPDATE_INTERVAL_MIN` and once right after boot:
 
 1. **Health** — a downloaded binary in use must still answer `--version` with its version; if not,

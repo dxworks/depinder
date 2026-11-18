@@ -26,6 +26,8 @@ RUN npm run build --workspace depinder-server
 # scanners.
 # The resolver roles never call the scanners; one image for every role is simpler than two.
 FROM node:26-alpine AS runtime
+# Links the GHCR package (ghcr.io/dxworks/depinder-server) to this repo.
+LABEL org.opencontainers.image.source=https://github.com/dxworks/depinder
 ENV NODE_ENV=production
 WORKDIR /app
 

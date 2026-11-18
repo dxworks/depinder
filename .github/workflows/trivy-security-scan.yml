@@ -1,0 +1,25 @@
+name: Trivy Security Scan
+
+on:
+  pull_request:
+    branches: [dev]
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  trivy-fs:
+    uses: dxworks/pipelines/.github/workflows/trivy-fs-scan.yml@v1
+    with:
+      fail-severity: HIGH,CRITICAL
+
+  # The server image, with the pinned Trivy and Grype in it. Built in build-setup: its Dockerfile is not at the context root.
+  trivy-image:
+    uses: dxworks/pipelines/.github/workflows/trivy-image-scan.yml@v1
+    with:
+      image-ref: depinder-server-test:latest
+      build-setup: docker build -f packages/depinder-server/Dockerfile -t depinder-server-test:latest .
+      fail-severity: HIGH,CRITICAL
+      post-pr-comment: true
