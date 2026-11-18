@@ -1,8 +1,8 @@
 # The scanners ROLE=vuln runs, taken from their publishers' own images. Pinned by the multi-arch
 # index digest, so amd64 and arm64 hosts get the same release and a moved tag changes nothing.
 # Both are static Go binaries: alpine's musl is no obstacle.
-FROM aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 AS trivy
-FROM anchore/grype:v0.118.0@sha256:8a93fc48da96bd6ec5981279d099b69de11541dc68fdf222fb9161f8ff284af7 AS grype
+FROM aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb AS trivy
+FROM anchore/grype:v0.122.1@sha256:661583704a253c0448ed63998b5ea2cd9d5a76ee71eedc4aed439b8ce3e93a1c AS grype
 
 # The build context is the monorepo root (the root .dockerignore lets in only what is copied here).
 # npm ci --workspace depinder-server needs only the manifests of the server and of the workspaces it
