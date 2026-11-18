@@ -1,15 +1,15 @@
 # The scanners ROLE=vuln runs, taken from their publishers' own images. Pinned by the multi-arch
 # index digest, so amd64 and arm64 hosts get the same release and a moved tag changes nothing.
 # Both are static Go binaries: alpine's musl is no obstacle.
-FROM aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 AS trivy
-FROM anchore/grype:v0.118.0@sha256:8a93fc48da96bd6ec5981279d099b69de11541dc68fdf222fb9161f8ff284af7 AS grype
+FROM aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb AS trivy
+FROM anchore/grype:v0.122.0@sha256:013e16ae96bd64108973e3e9fecec63f7ff276358d34c46c25d33e2aac96539f AS grype
 
 # The build context is the monorepo root (the root .dockerignore lets in only what is copied here).
 # npm ci --workspace depinder-server needs only the manifests of the server and of the workspaces it
 # links (@depinder/core); it installs the server's dependencies, the core link and core's own.
 
 # Build stage: dev dependencies and the TypeScript compiler, none of which ship.
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/depinder-core/package.json packages/depinder-core/
@@ -25,7 +25,9 @@ RUN npm run build --workspace depinder-server
 # Runtime stage: production dependencies, the compiled server and core, the migrations and the two
 # scanners.
 # The resolver roles never call the scanners; one image for every role is simpler than two.
-FROM node:24-alpine AS runtime
+FROM node:26-alpine AS runtime
+# Links the GHCR package (ghcr.io/dxworks/depinder-server) to this repo.
+LABEL org.opencontainers.image.source=https://github.com/dxworks/depinder
 ENV NODE_ENV=production
 WORKDIR /app
 
@@ -35,7 +37,9 @@ COPY --from=grype /grype /usr/local/bin/grype
 COPY package.json package-lock.json ./
 COPY packages/depinder-core/package.json packages/depinder-core/
 COPY packages/depinder-server/package.json packages/depinder-server/
-RUN npm ci --omit=dev --workspace depinder-server && npm cache clean --force
+# npm is not needed at runtime: removing it drops the base image's bundled npm dependencies.
+RUN npm ci --omit=dev --workspace depinder-server && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /root/.npm
 # node_modules/@depinder/core links here: the compiled core, no sources.
 COPY --from=build /app/packages/depinder-core/dist packages/depinder-core/dist
 

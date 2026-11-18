@@ -88,7 +88,7 @@ export function registerErrorHandler(app: FastifyInstance, log: Logger): void {
 /**
  * A signal that fires when the caller goes away mid-request.
  *
- * It watches the *reply*, not the request, and that is the whole subtlety. On Node 24 with Fastify
+ * It watches the *reply*, not the request, and that is the whole subtlety. On Node 24+ with Fastify
  * 5 `request.raw` emits `close` as soon as the request body has been read — which for a `/resolve`
  * is before the handler is even entered, `complete` true and `aborted` false — so a handler that
  * listened there would abandon every request immediately; and `aborted`, deprecated since Node 16,

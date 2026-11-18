@@ -5,7 +5,7 @@
   "description": "purl resolver service: facts per package (versions, release dates, licenses) filled on demand and kept fresh from registry change feeds",
   "type": "module",
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=26.0.0"
   },
   "exports": {
     "./in-process": {
@@ -23,11 +23,15 @@
   "dependencies": {
     "@depinder/core": "0.0.0",
     "@fastify/compress": "^9.2.0",
+    "@sigstore/bundle": "5.0.0",
+    "@sigstore/protobuf-specs": "0.5.2",
+    "@sigstore/tuf": "5.0.0",
+    "@sigstore/verify": "4.1.2",
     "fastify": "^5.0.0",
     "pg": "^8.13.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.0.0",
     "@types/pg": "^8.11.10",
     "tsx": "^4.19.0",
     "typescript": "^5.0.0"

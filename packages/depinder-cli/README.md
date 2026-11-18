@@ -9,7 +9,7 @@ command and option, the output files, configuration.
 
 ## Install
 
-Node.js 24 or newer.
+Node.js 26 or newer.
 
 ```shell
 npm i -g @dxworks/depinder

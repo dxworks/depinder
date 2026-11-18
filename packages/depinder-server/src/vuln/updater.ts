@@ -1,6 +1,7 @@
 import {rm} from 'node:fs/promises'
 import {errorMessage, type Logger} from '@depinder/core'
 import type {DatabaseBuild} from './databases.js'
+import {type Clock, createLoop, type LoopStatus, type Mutex} from './loop.js'
 import type {ScannerName} from './scanners.js'
 import type {Store} from './store.js'
 import type {UpstreamBuild} from './upstream.js'
@@ -21,26 +22,9 @@ import type {UpstreamBuild} from './upstream.js'
  *   install   `store.install`: the switch
  *
  * Anything that fails leaves the current build serving: the staging folder is removed, the error
- * is logged and kept for `/health`, and the next try comes sooner — 5 min, then 10, 20, … up to the
- * check interval. At most one update per tool runs at a time.
+ * is logged and kept for `/health`, and the next try comes sooner (`loop.ts`). At most one update
+ * per tool runs at a time, and none while the tool's scanner binary is being updated (`lock`).
  */
-
-export interface Clock {
-    now(): number
-    setTimeout(fn: () => void, ms: number): unknown
-    clearTimeout(handle: unknown): void
-}
-
-const systemClock: Clock = {
-    now: () => Date.now(),
-    setTimeout: (fn, ms) => {
-        const timer = setTimeout(fn, ms)
-        // The loop alone does not keep the process alive; the server does.
-        timer.unref()
-        return timer
-    },
-    clearTimeout: handle => clearTimeout(handle as NodeJS.Timeout),
-}
 
 export interface UpdaterDeps {
     tool: ScannerName
@@ -56,15 +40,13 @@ export interface UpdaterDeps {
     buildBytes: number
     intervalMs: number
     clock?: Clock
+    /** The tool's lock, shared with its scanner update. */
+    lock?: Mutex
     log: Logger
 }
 
-interface UpdaterStatus {
-    updating: boolean
+interface UpdaterStatus extends LoopStatus {
     last_check_at: string | null
-    last_ok_at: string | null
-    last_error: string | null
-    next_check_at: string | null
     upstream_built_at: string | null
 }
 
@@ -78,31 +60,14 @@ export interface Updater {
     status(): UpdaterStatus
 }
 
-/** The first retry after a failure; doubled each time, up to the check interval. */
-export const FIRST_RETRY_MS = 5 * 60_000
-
-class Skip extends Error {}
-
 export function createUpdater(deps: UpdaterDeps): Updater {
     const {tool, store, log} = deps
-    const clock = deps.clock ?? systemClock
+    const now = (): number => deps.clock?.now() ?? Date.now()
     const iso = (ms: number): string => new Date(ms).toISOString()
 
-    let running: Promise<void> | undefined
-    let controller: AbortController | undefined
-    let timer: unknown
-    let stopped = false
-    let failures = 0
     /** An identity whose download turned out not to be newer: not fetched again. */
     let rejectedId: string | undefined
-    const status: UpdaterStatus = {
-        updating: false,
-        last_check_at: null,
-        last_ok_at: null,
-        last_error: null,
-        next_check_at: null,
-        upstream_built_at: null,
-    }
+    const checked = {last_check_at: null as string | null, upstream_built_at: null as string | null}
 
     const newer = (a: string, b: string): boolean => Date.parse(a) > Date.parse(b)
 
@@ -115,14 +80,14 @@ export function createUpdater(deps: UpdaterDeps): Updater {
             } catch (e) {
                 throw new Error(`check failed: ${errorMessage(e)}`)
             }
-            status.last_check_at = iso(clock.now())
-            status.upstream_built_at = upstream.built_at
+            checked.last_check_at = iso(now())
+            checked.upstream_built_at = upstream.built_at
 
             const current = store.current(tool)
-            if (current?.record.upstream_id === upstream.id || upstream.id === rejectedId) throw new Skip()
+            if (current?.record.upstream_id === upstream.id || upstream.id === rejectedId) return
             if (current && upstream.exact && upstream.built_at && !newer(upstream.built_at, current.record.built_at)) {
                 // Grype says its build time up front: no download to learn it is the one we have.
-                throw new Skip()
+                return
             }
 
             const free = await deps.freeBytes(store.dataDir)
@@ -130,7 +95,7 @@ export function createUpdater(deps: UpdaterDeps): Updater {
                 throw new Error(`low disk: ${gb(free)} free in ${store.dataDir}, ${gb(2 * deps.buildBytes)} needed`)
             }
 
-            const started = clock.now()
+            const started = now()
             log.info('database download started', {tool, upstream_built_at: upstream.built_at, upstream_id: upstream.id})
             staging = await store.newStaging(tool)
             await deps.download(staging, signal)
@@ -149,7 +114,7 @@ export function createUpdater(deps: UpdaterDeps): Updater {
                 schema: build.schema,
                 upstream_id: upstream.id,
                 canary_findings: findings,
-                installed_at: iso(clock.now()),
+                installed_at: iso(now()),
             })
             staging = undefined
             log.info('database installed', {
@@ -157,77 +122,23 @@ export function createUpdater(deps: UpdaterDeps): Updater {
                 built_at: build.built_at,
                 previous: previous?.built_at ?? null,
                 canary_findings: findings,
-                took_ms: clock.now() - started,
+                took_ms: now() - started,
             })
         } finally {
             if (staging) await rm(staging, {recursive: true, force: true}).catch(() => undefined)
         }
     }
 
-    const pass = async (): Promise<void> => {
-        controller = new AbortController()
-        status.updating = true
-        try {
-            await attempt(controller.signal)
-            ok()
-        } catch (e) {
-            if (e instanceof Skip) {
-                ok()
-            } else if (stopped) {
-                log.info('database update stopped', {tool})
-            } else {
-                failures++
-                status.last_error = errorMessage(e)
-                log.error('database update failed', {tool, error: status.last_error, retry_in_ms: nextDelay()})
-            }
-        } finally {
-            status.updating = false
-            controller = undefined
-        }
-    }
-
-    const ok = (): void => {
-        failures = 0
-        status.last_error = null
-        status.last_ok_at = iso(clock.now())
-    }
-
-    const nextDelay = (): number => failures === 0
-        ? deps.intervalMs
-        : Math.min(FIRST_RETRY_MS * 2 ** (failures - 1), deps.intervalMs)
-
-    const schedule = (ms: number): void => {
-        if (stopped) return
-        status.next_check_at = iso(clock.now() + ms)
-        timer = clock.setTimeout(() => {
-            timer = undefined
-            void runOnce().then(() => schedule(nextDelay()))
-        }, ms)
-    }
-
-    const runOnce = (): Promise<void> => {
-        running ??= pass().finally(() => {
-            running = undefined
-        })
-        return running
-    }
-
-    return {
-        start() {
-            stopped = false
-            schedule(0)
-        },
-        async stop() {
-            stopped = true
-            if (timer !== undefined) clock.clearTimeout(timer)
-            timer = undefined
-            status.next_check_at = null
-            controller?.abort()
-            await running
-        },
-        runOnce,
-        status: () => ({...status}),
-    }
+    const loop = createLoop({
+        name: 'database update',
+        fields: {tool},
+        intervalMs: deps.intervalMs,
+        clock: deps.clock,
+        log,
+        lock: deps.lock,
+        attempt,
+    })
+    return {...loop, status: () => ({...loop.status(), ...checked})}
 }
 
 function gb(bytes: number): string {

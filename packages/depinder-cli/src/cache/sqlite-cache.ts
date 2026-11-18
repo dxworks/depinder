@@ -15,8 +15,7 @@ import {depinderFolder} from '../utils/utils'
  * is written per row, so there is nothing to save, and it lives in `~/.dxw/depinder/cache/`, so every
  * run on the machine shares it. It is the only cache: each machine has its own.
  *
- * `node:sqlite` is Node's own module (stable API, `ExperimentalWarning` still printed on Node 24;
- * `index.ts` silences that one warning). No native addon, nothing to compile per platform.
+ * `node:sqlite` is Node's own module. No native addon, nothing to compile per platform.
  *
  * `DEPINDER_CACHE_DB=<file>` points a run at another database — a per-run cache paired with a
  * Black Duck export, or a test's temporary one.

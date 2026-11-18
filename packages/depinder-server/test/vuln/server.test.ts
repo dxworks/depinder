@@ -6,6 +6,7 @@ import type {FastifyInstance} from 'fastify'
 import {afterAll, afterEach, beforeAll, describe, expect, it, vi} from 'vitest'
 import {buildVulnerabilityIndex, nullLogger, type GrypeReport, type TrivyReport} from '@depinder/core'
 import {bomRefKeyer} from '../../src/vuln/bom-refs.js'
+import type {ActiveScanners} from '../../src/vuln/binaries.js'
 import type {VulnConfig} from '../../src/vuln/config.js'
 import {createScanLimiter, type ScanLimiter} from '../../src/vuln/limiter.js'
 import type {ScanDirs, ScannerName, ScanReports} from '../../src/vuln/scanners.js'
@@ -136,6 +137,7 @@ async function server(options: {
     now?: number
     status?: Partial<Record<ScannerName, Partial<ToolHealth>>>
     runScan?: RunScan
+    scanners?: () => ActiveScanners
 } = {}): Promise<{app: FastifyInstance, limiter: ScanLimiter, store: Store}> {
     const config: VulnConfig = {
         apiToken: TOKEN,
@@ -155,6 +157,9 @@ async function server(options: {
         downloadTimeoutMs: 900_000,
         trivyDbRepository: 'mirror.gcr.io/aquasec/trivy-db:2',
         grypeDbUpdateUrl: 'https://grype.anchore.io/databases/v6/latest.json',
+        scannerUpdate: {trivy: false, grype: false},
+        scannerUpdateIntervalMin: 360,
+        scannerMinReleaseAgeDays: 7,
     }
     const now = options.now ?? NOW
     const store = await openStore(config.dataDir, now)
@@ -164,7 +169,10 @@ async function server(options: {
         log: nullLogger,
         limiter,
         source: createDatabaseSource(store, tool => options.status?.[tool] ?? {}, {trivy: 24, grype: 72}, () => now),
-        versions: {trivy: '0.74.0', grype: '0.118.0'},
+        scanners: options.scanners ?? (() => ({
+            trivy: {bin: config.trivyBin, version: '0.74.0', source: 'image'},
+            grype: {bin: config.grypeBin, version: '0.118.0', source: 'image'},
+        })),
         runScan: options.runScan,
     })
     await app.ready()
@@ -419,5 +427,40 @@ describe('leased builds', () => {
         await store.settled()
         expect(await readdir(join(dataDir, 'trivy'))).toEqual(['2026-10-01T190016.340316472Z'])
         expect(oldDir).toBe(join(dataDir, 'trivy', '2026-10-01T100405.794145908Z'))
+    })
+
+    it('runs and names the scanner binaries taken with the lease, even when one is switched during the scan', async () => {
+        const reports: ScanReports = {
+            trivy: JSON.parse(await readFile(TRIVY_FIXTURE, 'utf8')) as TrivyReport,
+            grype: JSON.parse(await readFile(GRYPE_FIXTURE, 'utf8')) as GrypeReport,
+            trivyMs: 1,
+            grypeMs: 1,
+        }
+        let active: ActiveScanners = {
+            trivy: {bin: '/usr/local/bin/trivy', version: '0.74.0', source: 'image'},
+            grype: {bin: '/usr/local/bin/grype', version: '0.118.0', source: 'image'},
+        }
+        const ran: string[] = []
+        let unblock: (() => void) | undefined
+        const {app} = await server({
+            scanners: () => active,
+            runScan: async (_sbom, _dirs, _signal, scanners) => {
+                ran.push(scanners.trivy.bin)
+                if (ran.length === 1) await new Promise<void>(r => {
+                    unblock = r
+                })
+                return reports
+            },
+        })
+
+        const first = post(app, SCANNED)
+        while (!unblock) await new Promise(r => setTimeout(r, 5))
+        active = {...active, trivy: {bin: '/data/scanners/trivy/0.76.2/trivy', version: '0.76.2', source: 'updated'}}
+        const second = await post(app, SCANNED)
+        expect(second.json()).toMatchObject({scanners: {trivy: '0.76.2', grype: '0.118.0'}})
+
+        unblock()
+        expect((await first).json()).toMatchObject({scanners: {trivy: '0.74.0', grype: '0.118.0'}})
+        expect(ran).toEqual(['/usr/local/bin/trivy', '/data/scanners/trivy/0.76.2/trivy'])
     })
 })
