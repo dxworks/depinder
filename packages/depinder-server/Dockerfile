@@ -37,7 +37,9 @@ COPY --from=grype /grype /usr/local/bin/grype
 COPY package.json package-lock.json ./
 COPY packages/depinder-core/package.json packages/depinder-core/
 COPY packages/depinder-server/package.json packages/depinder-server/
-RUN npm ci --omit=dev --workspace depinder-server && npm cache clean --force
+# npm is not needed at runtime: removing it drops the base image's bundled npm dependencies.
+RUN npm ci --omit=dev --workspace depinder-server && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /root/.npm
 # node_modules/@depinder/core links here: the compiled core, no sources.
 COPY --from=build /app/packages/depinder-core/dist packages/depinder-core/dist
 
