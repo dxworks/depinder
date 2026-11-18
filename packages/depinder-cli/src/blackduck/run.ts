@@ -28,6 +28,7 @@ export function defaultProjectName(sboms: SbomDescription[], inputFolder: string
 export interface BlackDuckRunOptions {
     /** DepMiner's index file or folder; false disables lookup, undefined discovers it beside input. */
     depminerIndex?: string | false
+    reportDate?: Date
 }
 
 export function writeBlackDuckForSource(
@@ -47,7 +48,7 @@ export function writeBlackDuckForSource(
     const paths: SbomPath[] = trees.flatMap(it => it.paths)
     const edges: SbomEdge[] = trees.flatMap(it => it.edges)
 
-    const model = timePhaseSync('blackduck:model', () => buildModel(projectName, analysed, paths, edges, trees.flatMap(it => it.matches)))
+    const model = timePhaseSync('blackduck:model', () => buildModel(projectName, analysed, paths, edges, trees.flatMap(it => it.matches), options.reportDate ?? new Date()))
     const written = timePhaseSync('blackduck:csv', () => writeBlackDuckExport(model, resultFolder))
     for (const {file, rows} of written) {
         log.info(`${String(rows).padStart(6)} row(s) -> ${file}`)

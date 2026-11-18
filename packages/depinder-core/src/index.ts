@@ -37,7 +37,7 @@ export {
 } from './http/limiter.js'
 export {mapWithConcurrency} from './concurrency.js'
 export {canFetch, fetchPackage} from './fetch-package.js'
-export {isPrerelease} from './registries/latest.js'
+export {isBranch, isPrerelease} from './registries/latest.js'
 export {pseudoVersionTime} from './registries/golang-pseudo-version.js'
 export {mavenMetadataUrl} from './registries/maven/index.js'
 export {stringOrUndefined, toDate} from './registries/normalise.js'

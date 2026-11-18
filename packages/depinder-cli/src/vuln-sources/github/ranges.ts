@@ -1,4 +1,4 @@
-import {VersionComparator} from './versions'
+import {VersionComparator} from '../../versioning'
 
 /**
  * GitHub's `vulnerable_version_range` grammar, which is far smaller than any package manager's

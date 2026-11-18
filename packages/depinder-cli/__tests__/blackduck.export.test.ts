@@ -3,7 +3,7 @@ import os from 'os'
 import path from 'path'
 import {parse} from 'csv-parse/sync'
 import {writeBlackDuckExport, writeUpgradeGuidanceCsv, VulnerabilityFindingsFile} from '../src/blackduck/export'
-import {COMPONENT_VERSIONS_COLUMNS, DEPENDENCIES_COLUMNS, SBOM_DEPENDENCIES_SOURCES_COLUMNS, UPGRADE_GUIDANCE_COLUMNS, VULNERABILITY_DETAILS_COLUMNS} from '../src/blackduck/columns'
+import {COMPONENT_VERSIONS_COLUMNS, SBOM_DEPENDENCIES_COLUMNS, SBOM_DEPENDENCIES_SOURCES_COLUMNS, UPGRADE_GUIDANCE_COLUMNS, VULNERABILITY_DETAILS_COLUMNS} from '../src/blackduck/columns'
 import {buildModel} from '../src/blackduck/model'
 import {advisory, dependency, ecosystem} from './fixtures/blackduck'
 
@@ -15,6 +15,12 @@ const text = (file: string) => fs.readFileSync(path.join(folder, file), 'utf8')
 const csv = (file: string): Record<string, string>[] => parse(text(file), {columns: true})
 
 describe('Black Duck report files', () => {
+    it('writes dependency headers when the model has no components', () => {
+        writeBlackDuckExport(buildModel('empty', [], []), folder)
+
+        expect(text('_dependencies.csv')).toBe(SBOM_DEPENDENCIES_COLUMNS.join(',') + '\n')
+    })
+
     it('exports consistent reports for shared vulnerable components, clean dependencies, and unenriched paths', () => {
         const unknown = {...advisory, severity: 'UNKNOWN', identifiers: [{value: 'GHSA-unkn-0000-0000', type: 'GHSA'}]}
         const model = buildModel('demo', [ecosystem(
@@ -40,7 +46,7 @@ describe('Black Duck report files', () => {
         ])
         expect(fs.readdirSync(folder).sort()).toEqual(written.map(it => it.file).sort())
         const headers = [
-            ['_dependencies.csv', DEPENDENCIES_COLUMNS], ['_dependencies_sources.csv', SBOM_DEPENDENCIES_SOURCES_COLUMNS],
+            ['_dependencies.csv', SBOM_DEPENDENCIES_COLUMNS], ['_dependencies_sources.csv', SBOM_DEPENDENCIES_SOURCES_COLUMNS],
             ['_vulnerability_details.csv', VULNERABILITY_DETAILS_COLUMNS], ['_upgrade_guidance.csv', UPGRADE_GUIDANCE_COLUMNS],
             ['_component_versions.csv', COMPONENT_VERSIONS_COLUMNS],
             ['_dependency_edges.csv', ['Repo', 'Tree', 'Ecosystem', 'Parent Origin Id', 'Child Origin Id', 'Child Depth']],
@@ -50,7 +56,7 @@ describe('Black Duck report files', () => {
         expect(csv('_dependencies.csv')).toEqual([
             expect.objectContaining({'Component name': 'clean', 'Match type': 'Transitive', 'Total Vulnerability Count': '0',
                 'Critical and High Vulnerability Count': '0', 'High Vulnerability Count': ''}),
-            {
+            expect.objectContaining({
                 'Component name': 'qs', 'Component version name': '6.10.2', 'Version id': '',
                 'Component Version Origin Id': 'qs/6.10.2', 'License names': 'BSD 3-clause "New" or "Revised" License',
                 'License families': 'PERMISSIVE', 'Match type': 'Direct,Transitive', 'Usage': 'DYNAMICALLY_LINKED',
@@ -60,7 +66,7 @@ describe('Black Duck report files', () => {
                 'Release Date': '\t2021-10-06', 'Newer Versions': '2', 'Commit Activity': '',
                 'Commits in Past 12 Months': '', 'Contributors in Past 12 Months': '', 'Has License Conflicts': 'false',
                 'Component Link': 'https://github.com/ljharb/qs', 'Open Hub URL': '',
-            },
+            }),
         ])
         expect(csv('_dependencies_sources.csv')).toMatchObject([{
             'Component name': 'qs', 'Component Version Origin Id': 'qs/6.10.2', 'Version id': '', 'Match type': 'Direct',

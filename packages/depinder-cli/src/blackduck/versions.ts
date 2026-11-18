@@ -1,5 +1,5 @@
 import {availableVersions, LibraryInfo, usedVersionTimestamp} from '../extension-points/library-info'
-import {VersionComparator} from '../vuln-sources/github/versions'
+import {VersionComparator} from '../versioning'
 
 type RegistryVersion = LibraryInfo['versions'][number]
 

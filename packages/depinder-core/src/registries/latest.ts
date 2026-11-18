@@ -80,7 +80,7 @@ export function isPrerelease(type: string, version: string): boolean {
 }
 
 /** A composer branch — `dev-master`, `1.x-dev` — rather than a tagged release. */
-function isBranch(type: string, version: string): boolean {
+export function isBranch(type: string, version: string): boolean {
     const v = version.trim()
     return type === 'composer' && (/^dev-/i.test(v) || /-dev$/i.test(v))
 }

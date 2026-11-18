@@ -1,14 +1,12 @@
 import * as pep440 from '@renovatebot/pep440'
 import * as gemVersion from '@renovatebot/ruby-semver'
 import semver, {SemVer} from 'semver'
-import {ComparatorFamily} from './ecosystems'
 
 /**
  * Version ordering, one comparator per ecosystem family, behind a single interface.
  *
- * A comparator returns <0, 0 or >0, like `Array.prototype.sort`'s callback. This is the whole of
- * the version algebra in this source: `ranges.ts` turns a GitHub `vulnerable_version_range` string
- * into (operator, version) pairs and evaluates each one through a comparator obtained from here.
+ * A comparator returns <0, 0 or >0, like `Array.prototype.sort`'s callback. Used by release
+ * measurements, upgrade guidance, and vulnerability matching.
  *
  * Three of the four families are borrowed rather than written, because getting them subtly wrong
  * is how a vulnerability matcher reports confident nonsense:
@@ -197,4 +195,19 @@ export function comparatorFor(family: ComparatorFamily): VersionComparator {
 export function majorOf(version: string): number | undefined {
     const first = tokenizeVersion(version)[0]
     return first?.kind === 'num' ? first.value : undefined
+}
+
+export type ComparatorFamily = 'semver' | 'pep440' | 'gem' | 'generic'
+
+const FAMILY_BY_PURL_TYPE = new Map<string, ComparatorFamily>([
+    ['npm', 'semver'],
+    ['golang', 'semver'],
+    ['cargo', 'semver'],
+    ['pypi', 'pep440'],
+    ['gem', 'gem'],
+])
+
+/** Ecosystem version ordering for a purl type; unknown types use the generic comparator. */
+export function comparatorForPurlType(purlType: string): VersionComparator {
+    return comparatorFor(FAMILY_BY_PURL_TYPE.get(purlType.trim().toLowerCase()) ?? 'generic')
 }

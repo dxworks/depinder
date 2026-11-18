@@ -2,7 +2,7 @@ import {Vulnerability} from '../../extension-points/vulnerability-checker'
 import {cvssOf, GithubAdvisory, identifiersOf, severityOf} from './advisory'
 import {ecosystemByName, ecosystemForPurlType, normalizeName} from './ecosystems'
 import {satisfiesRange} from './ranges'
-import {comparatorFor} from './versions'
+import {comparatorForPurlType} from '../../versioning'
 
 /**
  * Matching SBOM components against cached GitHub advisories.
@@ -101,7 +101,7 @@ export function matchComponent(index: AdvisoryIndex, ecosystem: string, name: st
     const candidates = index.entries.get(keyOf(resolved.name, name)) ?? []
     if (candidates.length === 0) return []
 
-    const compare = comparatorFor(resolved.comparator)
+    const compare = comparatorForPurlType(resolved.purlType)
     const found = new Map<string, Vulnerability>()
     for (const entry of candidates) {
         if (entry.range && !satisfiesRange(version, entry.range, compare)) continue

@@ -4,8 +4,9 @@ import {cvss3SubScores} from './cvss'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
 import {csvDocument, NamedRow} from '../utils/csv'
 import {log} from '../utils/logging'
+import {isoDate} from '../utils/iso-date'
 import {
-    COMPONENT_VERSIONS_COLUMNS, countCell, DEPENDENCIES_COLUMNS, SBOM_DEPENDENCIES_SOURCES_COLUMNS, isoToTabIso,
+    COMPONENT_VERSIONS_COLUMNS, countCell, SBOM_DEPENDENCIES_COLUMNS, SBOM_DEPENDENCIES_SOURCES_COLUMNS, isoToTabIso,
     normalizeMatchType, UPGRADE_GUIDANCE_COLUMNS, VULNERABILITY_DETAILS_COLUMNS,
 } from './columns'
 import {licenseColumns, licenseRisk} from './licenses'
@@ -145,12 +146,6 @@ function cweIds(vulnerability: Vulnerability): string {
     return ids.length > 0 ? `[${ids.join(', ')}]` : ''
 }
 
-function isoDate(timestamp: number | undefined): string {
-    if (timestamp === undefined || !Number.isFinite(timestamp)) return ''
-    const date = new Date(timestamp)
-    return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10)
-}
-
 /**
  * Black Duck links every finding that has a CVE to its NVD page, whatever catalogue it came from.
  * Ours would otherwise be the scanner's own page (`avd.aquasec.com`, `github.com/advisories`),
@@ -186,7 +181,7 @@ function dependencyRows(model: BlackDuckModel): NamedRow[] {
             'License families': families,
             'Match type': normalizeMatchType(component.matchType),
             'Usage': USAGE,
-            'Operational Risk': operationalRisk(component.releaseDate, component.newerVersions),
+            'Operational Risk': operationalRisk(component.releaseDate, component.newerVersions, model.reportDate),
             'Origin name': component.origin.name,
             'License Risk': licenseRisk(component.licenses),
             ...countCells(severityCounts(component.vulnerabilities)),
@@ -198,6 +193,13 @@ function dependencyRows(model: BlackDuckModel): NamedRow[] {
             'Has License Conflicts': 'false',
             'Component Link': componentLink(component.origin, component.name, component.homepageUrl),
             'Open Hub URL': '',
+            'Report Date': isoToTabIso(component.releaseMeasurements?.reportDate ?? ''),
+            'Latest Version': component.releaseMeasurements?.latestVersion ?? '',
+            'Latest Version Release Date': isoToTabIso(component.releaseMeasurements?.latestDate ?? ''),
+            'Most Recent Release Version': component.releaseMeasurements?.recentVersion ?? '',
+            'Most Recent Release Date': isoToTabIso(component.releaseMeasurements?.recentDate ?? ''),
+            'Upgrade Lag (months)': component.releaseMeasurements?.upgradeLag?.toString() ?? '',
+            'Months Since Last Release': component.releaseMeasurements?.inactivity?.toString() ?? '',
         }
     })
 }
@@ -229,7 +231,7 @@ function dependencySourceRows(model: BlackDuckModel): NamedRow[] {
             'License families': families,
             'License Risk': licenseRisk(component.licenses),
             ...countCells(severityCounts(component.vulnerabilities)),
-            'Operational Risk': operationalRisk(component.releaseDate, component.newerVersions),
+            'Operational Risk': operationalRisk(component.releaseDate, component.newerVersions, model.reportDate),
             'Release Date': isoToTabIso(component.releaseDate),
             'Newer Versions': component.newerVersions,
             'OpenHubURL': '',
@@ -313,7 +315,7 @@ function vulnerabilityDetailRow({component, vulnerability}: ExportFinding): Name
         'Component Version Origin Id': component.originId,
         'Vulnerability id': vulnerabilityId(vulnerability),
         'Description': (vulnerability.description || vulnerability.summary || '').trim(),
-        'Published on': isoToTabIso(isoDate(vulnerability.timestamp)),
+        'Published on': isoToTabIso(isoDate(vulnerability.timestamp) ?? ''),
         'Updated on': '',
         'Base score': vulnerability.score === undefined ? '' : String(vulnerability.score),
         'Exploitability': subScores?.exploitability === undefined ? '' : String(subScores.exploitability),
@@ -356,7 +358,7 @@ export function writeBlackDuckExport(model: BlackDuckModel, resultFolder: string
             + ` in no per-severity column; see ${VULNERABILITY_DETAILS_FILE} and ${VULNERABILITY_FINDINGS_FILE}`)
     }
     return [
-        write(resultFolder, DEPENDENCIES_FILE, DEPENDENCIES_COLUMNS, dependencyRows(model)),
+        write(resultFolder, DEPENDENCIES_FILE, SBOM_DEPENDENCIES_COLUMNS, dependencyRows(model)),
         write(resultFolder, DEPENDENCIES_SOURCES_FILE, SBOM_DEPENDENCIES_SOURCES_COLUMNS, dependencySourceRows(model)),
         write(resultFolder, DEPENDENCY_EDGES_FILE, DEPENDENCY_EDGES_HEADERS, dependencyEdgeRows(model)),
         write(resultFolder, COMPONENT_VERSIONS_FILE, COMPONENT_VERSIONS_COLUMNS, componentVersionRows(model)),

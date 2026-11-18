@@ -4,7 +4,7 @@ import {DepinderDependency, DepinderProject} from '../extension-points/extract'
 import {availableVersions, LibraryInfo, usedVersionTimestamp} from '../extension-points/library-info'
 import {licenseIdentity} from '../blackduck/licenses'
 import {csvRow} from '../utils/csv'
-import {reportNow} from '../utils/report-clock'
+import {releaseMeasurements} from './release-measurements'
 
 function extractLicenses(dep: DepinderDependency) {
     // Older cache entries can hold null licenses; skip them.
@@ -31,11 +31,11 @@ function monthsBetween(later: moment.Moment | undefined, earlier: moment.Moment 
 /** The `Type` column of libs.csv stays blank: neither Syft nor Trivy records a dependency scope. */
 const NO_DEPENDENCY_SCOPE = ''
 
-function convertDepToRow(proj: DepinderProject, dep: DepinderDependency): string {
+function convertDepToRow(proj: DepinderProject, dep: DepinderDependency, reportDate: Date): string {
     const latestVersion = dep.libraryInfo?.versions.find(it => it.latest)
     const latestVersionMoment = releaseMoment(latestVersion?.timestamp)
     const currentVersionMoment = releaseMoment(usedVersionTimestamp(dep.libraryInfo?.versions, dep.version))
-    const now = moment(reportNow())
+    const now = moment(reportDate)
 
     const dateFormat = 'MMM YYYY'
     const vulnerabilities = dep.vulnerabilities?.map(v => `${v.severity} - ${v.permalink}`).join('\n')
@@ -64,9 +64,8 @@ function licenseOf(lib: LibraryInfo): string {
 
 interface DependencyInfo extends DepinderDependency {
     direct: boolean
-    latest_used: number
-    now_used: number
-    now_latest: number
+    upgradeLag: number
+    inactivity: number
 }
 
 function licensesReport(projects: DepinderProject[]): string {
@@ -79,30 +78,24 @@ function licensesReport(projects: DepinderProject[]): string {
     ).join('\n')
 }
 
-function libsReport(projects: DepinderProject[]): string {
+function libsReport(projects: DepinderProject[], reportDate: Date): string {
     const header = 'Project Path,Project,Library,Used Version,Latest Version,Used Version Release Date,Latest Version Release Date,Latest-Used,Now-Used,Now-latest,Vulnerabilities,Vulnerability Details,DirectDependency,Type,Licenses\n'
     return header + projects.flatMap(proj =>
-        Object.values(proj.dependencies).map(dep => convertDepToRow(proj, dep))).join('\n')
+        Object.values(proj.dependencies).map(dep => convertDepToRow(proj, dep, reportDate))).join('\n')
 }
 
-function projectStatsReport(projects: DepinderProject[]): string {
-    const projectStatsHeader = 'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct Out of Support, Indirect Out of Support\n'
+function projectStatsReport(projects: DepinderProject[], purlType: string, reportDate: Date): string {
+    const projectStatsHeader = 'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct No Recent Releases, Indirect No Recent Releases\n'
     return projectStatsHeader + projects.map(proj => {
         const enhancedDeps: DependencyInfo[] = Object.values(proj.dependencies).map(dep => {
-            const latestVersion = dep.libraryInfo?.versions.find(it => it.latest)
-            const latestVersionMoment = releaseMoment(latestVersion?.timestamp)
-            const currentVersionMoment = releaseMoment(usedVersionTimestamp(dep.libraryInfo?.versions, dep.version))
-            const now = moment(reportNow())
+            const measurements = releaseMeasurements(dep.libraryInfo, dep.version, purlType, reportDate)
             const directDep: boolean = !dep.requestedBy || dep.requestedBy.some(it => it.startsWith(`${proj.name}@${proj.version}`))
 
-            // A missing date is NaN here, which no threshold below counts as outdated or out
-            // of support.
             return {
                 ...dep,
                 direct: directDep,
-                latest_used: monthsBetween(latestVersionMoment, currentVersionMoment) ?? NaN,
-                now_used: monthsBetween(now, currentVersionMoment) ?? NaN,
-                now_latest: monthsBetween(now, latestVersionMoment) ?? NaN,
+                upgradeLag: measurements.upgradeLag ?? NaN,
+                inactivity: measurements.inactivity ?? NaN,
             } as DependencyInfo
         })
         const directDeps = enhancedDeps.filter(dep => dep.direct)
@@ -110,22 +103,22 @@ function projectStatsReport(projects: DepinderProject[]): string {
 
         const outdatedThreshold = 15
 
-        const directOutdated = directDeps.filter(dep => dep.latest_used > outdatedThreshold)
+        const directOutdated = directDeps.filter(dep => dep.upgradeLag > outdatedThreshold)
         const directOutDatedPercent = directDeps.length == 0 ? 0 : directOutdated.length / directDeps.length * 100
-        const indirectOutdated = indirectDeps.filter(dep => dep.latest_used > outdatedThreshold)
+        const indirectOutdated = indirectDeps.filter(dep => dep.upgradeLag > outdatedThreshold)
         const indirectOutDatedPercent = indirectDeps.length == 0 ? 0 : indirectOutdated.length / indirectDeps.length * 100
         const directVulnerable = directDeps.filter(dep => dep.vulnerabilities && dep.vulnerabilities.length > 0)
         const indirectVulnerable = indirectDeps.filter(dep => dep.vulnerabilities && dep.vulnerabilities.length > 0)
 
-        const outOfSupportThreshold = 24
-        const directOutOfSupport = directDeps.filter(dep => dep.now_latest > outOfSupportThreshold)
-        const indirectOutOfSupport = indirectDeps.filter(dep => dep.now_latest > outOfSupportThreshold)
+        const inactivityThreshold = 24
+        const directNoRecentReleases = directDeps.filter(dep => dep.inactivity > inactivityThreshold)
+        const indirectNoRecentReleases = indirectDeps.filter(dep => dep.inactivity > inactivityThreshold)
 
         return csvRow([
             proj.path, proj.name, directDeps.length, indirectDeps.length,
             directOutdated.length, directOutDatedPercent, indirectOutdated.length,
             indirectOutDatedPercent, directVulnerable.length, indirectVulnerable.length,
-            directOutOfSupport.length, indirectOutOfSupport.length,
+            directNoRecentReleases.length, indirectNoRecentReleases.length,
         ])
     }).join('\n')
 }
@@ -134,10 +127,10 @@ function projectStatsReport(projects: DepinderProject[]): string {
  * The three CSV reports one plugin's enriched projects produce, keyed by report name: the caller
  * writes each document to `<plugin>-<key>.csv` in the results folder.
  */
-export function analysisCsvReports(projects: DepinderProject[]): Record<'licenses' | 'libs' | 'project-stats', string> {
+export function analysisCsvReports(projects: DepinderProject[], purlType = '', reportDate = new Date()): Record<'licenses' | 'libs' | 'project-stats', string> {
     return {
         licenses: licensesReport(projects),
-        libs: libsReport(projects),
-        'project-stats': projectStatsReport(projects),
+        libs: libsReport(projects, reportDate),
+        'project-stats': projectStatsReport(projects, purlType, reportDate),
     }
 }

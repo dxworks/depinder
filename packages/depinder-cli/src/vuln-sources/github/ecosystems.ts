@@ -1,8 +1,7 @@
 import {normalisePypiName} from '@depinder/core'
 
 /**
- * The mapping between GitHub's advisory ecosystem names, Package URL types, and the version
- * comparator family each ecosystem needs.
+ * The mapping between GitHub's advisory ecosystem names and Package URL types.
  *
  * GitHub's REST `GET /advisories` takes `ecosystem=<name>` from a closed vocabulary, and the
  * `vulnerabilities[].package.ecosystem` it echoes back uses the same spelling. SBOMs, meanwhile,
@@ -11,25 +10,11 @@ import {normalisePypiName} from '@depinder/core'
  * zero findings, so it is stated once here and nowhere else.
  */
 
-/**
- * The version-ordering rule an ecosystem obeys. See `versions.ts` for the implementations.
- *
- * `go` and `rust` are `semver` rather than `generic` because both specify SemVer 2.0 outright, and
- * the difference is not academic: a numeric pre-release is BELOW its release under SemVer and
- * ABOVE it under the generic order, which reads `-` as a plain separator. Every Go pseudo-version
- * is exactly that shape — `v0.0.0-20231218163308-9d2ee975ef9f` is a pre-release of `0.0.0`, and
- * the generic order ranked it above `0.0.0`, so an advisory reading
- * `< 0.0.0-20231218163308-9d2ee975ef9f` would clear a module the Go team considers vulnerable.
- * Cargo has the same rule and the same defect.
- */
-export type ComparatorFamily = 'semver' | 'pep440' | 'gem' | 'generic'
-
 export interface GithubEcosystem {
     /** The value GitHub accepts for `?ecosystem=` and echoes in `package.ecosystem`. */
     name: string
     /** The purl type an SBOM component of this ecosystem carries. */
     purlType: string
-    comparator: ComparatorFamily
 }
 
 /**
@@ -38,18 +23,18 @@ export interface GithubEcosystem {
  * in an SBOM could ever match them.
  */
 export const GITHUB_ECOSYSTEMS: readonly GithubEcosystem[] = [
-    {name: 'npm', purlType: 'npm', comparator: 'semver'},
-    {name: 'rubygems', purlType: 'gem', comparator: 'gem'},
-    {name: 'pip', purlType: 'pypi', comparator: 'pep440'},
-    {name: 'maven', purlType: 'maven', comparator: 'generic'},
-    {name: 'nuget', purlType: 'nuget', comparator: 'generic'},
-    {name: 'composer', purlType: 'composer', comparator: 'generic'},
-    {name: 'go', purlType: 'golang', comparator: 'semver'},
-    {name: 'rust', purlType: 'cargo', comparator: 'semver'},
-    {name: 'erlang', purlType: 'hex', comparator: 'generic'},
-    {name: 'actions', purlType: 'github', comparator: 'generic'},
-    {name: 'pub', purlType: 'pub', comparator: 'generic'},
-    {name: 'swift', purlType: 'swift', comparator: 'generic'},
+    {name: 'npm', purlType: 'npm'},
+    {name: 'rubygems', purlType: 'gem'},
+    {name: 'pip', purlType: 'pypi'},
+    {name: 'maven', purlType: 'maven'},
+    {name: 'nuget', purlType: 'nuget'},
+    {name: 'composer', purlType: 'composer'},
+    {name: 'go', purlType: 'golang'},
+    {name: 'rust', purlType: 'cargo'},
+    {name: 'erlang', purlType: 'hex'},
+    {name: 'actions', purlType: 'github'},
+    {name: 'pub', purlType: 'pub'},
+    {name: 'swift', purlType: 'swift'},
 ]
 
 const BY_NAME = new Map(GITHUB_ECOSYSTEMS.map(it => [it.name, it]))

@@ -2,13 +2,14 @@ import {isPrerelease} from '@depinder/core'
 import {DepinderDependency, DepinderProject} from '../extension-points/extract'
 import {availableVersions, usedVersionTimestamp} from '../extension-points/library-info'
 import {Vulnerability} from '../extension-points/vulnerability-checker'
-import {ecosystemForPurlType} from '../vuln-sources/github/ecosystems'
-import {comparatorFor, VersionComparator} from '../vuln-sources/github/versions'
+import {comparatorForPurlType, VersionComparator} from '../versioning'
 import {Origin, originFor, originId} from './origins'
 import {SbomEdge, SbomPath} from './paths'
 import {newerVersionCounts} from './versions'
 import {hasKnownLicense} from './licenses'
 import {SbomMatch} from './matches'
+import {ReleaseMeasurements, releaseMeasurements} from '../commands/release-measurements'
+import {isoDate} from '../utils/iso-date'
 
 /**
  * The one in-memory model every Black Duck-shaped CSV is written from.
@@ -52,15 +53,7 @@ export interface ExportComponent {
     prereleaseVersions: ReadonlySet<string>
     /** This ecosystem's version ordering, so upgrade guidance need not rediscover it. */
     compare: VersionComparator
-}
-
-/**
- * The version ordering for a purl type. `versions.ts` in the GitHub source already owns one
- * comparator per ecosystem family, correct for pre-releases and for the shapes registries emit;
- * reusing it means "newer than" means the same thing in the export as it does in the matcher.
- */
-export function comparatorForPurlType(purlType: string): VersionComparator {
-    return comparatorFor(ecosystemForPurlType(purlType)?.comparator ?? 'generic')
+    releaseMeasurements?: ReleaseMeasurements
 }
 
 export interface ExportFinding {
@@ -69,6 +62,7 @@ export interface ExportFinding {
 }
 
 export interface BlackDuckModel {
+    reportDate: Date
     /** The name Black Duck would call the project version; ours is the export's root label. */
     projectName: string
     components: ExportComponent[]
@@ -123,12 +117,6 @@ function preferredLicenses(versionLicenses: string[], libraryLicenses: string[])
     return libraryLicenses
 }
 
-function isoDate(timestamp: number | undefined): string {
-    if (timestamp === undefined || !Number.isFinite(timestamp)) return ''
-    const date = new Date(timestamp)
-    return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10)
-}
-
 /**
  * Two findings are the same finding when they share any identifier — the rule `merge.ts` already
  * applies across sources, restated here because the same component can be enriched by more than
@@ -145,6 +133,7 @@ export function buildModel(
     paths: SbomPath[],
     edges: SbomEdge[] = [],
     matches: SbomMatch[] = paths,
+    reportDate: Date = new Date(),
 ): BlackDuckModel {
     const components = new Map<string, ExportComponent>()
     const graphMatchTypes = matchTypesFromGraph(matches)
@@ -170,7 +159,7 @@ export function buildModel(
                     continue
                 }
                 const matchType = renderMatchType(types)
-                components.set(id, toComponent(origin, purlType, id, dependency, matchType))
+                components.set(id, toComponent(origin, purlType, id, dependency, matchType, reportDate))
             }
         }
     }
@@ -184,10 +173,10 @@ export function buildModel(
     const findings = ordered.flatMap(component =>
         component.vulnerabilities.map(vulnerability => ({component, vulnerability})))
 
-    return {projectName, components: ordered, findings, paths, edges}
+    return {projectName, reportDate, components: ordered, findings, paths, edges}
 }
 
-function toComponent(origin: Origin, purlType: string, id: string, dependency: DepinderDependency, matchType: MatchType): ExportComponent {
+function toComponent(origin: Origin, purlType: string, id: string, dependency: DepinderDependency, matchType: MatchType, reportDate: Date): ExportComponent {
     const library = dependency.libraryInfo
     const versions = library?.versions ?? []
     const current = versions.find(it => it.version === dependency.version.trim())
@@ -213,7 +202,7 @@ function toComponent(origin: Origin, purlType: string, id: string, dependency: D
         originId: id,
         matchType,
         licenses: preferredLicenses(versionLicenses, libraryLicenses),
-        releaseDate: isoDate(usedVersionTimestamp(versions, dependency.version)),
+        releaseDate: isoDate(usedVersionTimestamp(versions, dependency.version)) ?? '',
         newerVersions: newer.byDate,
         newerVersionsSemver: newer.bySemver,
         homepageUrl: library?.homepageUrl || undefined,
@@ -222,6 +211,7 @@ function toComponent(origin: Origin, purlType: string, id: string, dependency: D
         registryVersions: availableVersions(versions).map(it => it.version).sort(compare),
         prereleaseVersions: prereleasesOf(purlType, versions),
         compare,
+        releaseMeasurements: releaseMeasurements(library, dependency.version, purlType, reportDate),
     }
 }
 

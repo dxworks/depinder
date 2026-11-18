@@ -20,6 +20,11 @@ export const DEPENDENCIES_COLUMNS = [
     'Component Link', 'Open Hub URL',
 ] as const
 
+export const SBOM_DEPENDENCIES_COLUMNS = [
+    ...DEPENDENCIES_COLUMNS, 'Report Date', 'Latest Version', 'Latest Version Release Date',
+    'Most Recent Release Version', 'Most Recent Release Date', 'Upgrade Lag (months)', 'Months Since Last Release',
+] as const
+
 /** `_dependencies_sources.csv`: one row per (component, path). */
 export const DEPENDENCIES_SOURCES_COLUMNS = [
     'Component name', 'Component version name', 'Version id', 'Component Version Origin Id',

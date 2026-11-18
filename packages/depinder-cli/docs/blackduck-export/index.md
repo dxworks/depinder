@@ -9,7 +9,7 @@ Other files have no Black Duck counterpart.
 
 | File | One row per | Notes |
 |---|---|---|
-| `_dependencies.csv` | (component, version, origin) | The transform's 25 columns |
+| `_dependencies.csv` | (component, version, origin) | Transform's 25 columns + seven release fields |
 | `_dependencies_sources.csv` | (component, path) | The transform's 23 columns plus `ProjectFilePath`; one chain per component, from the SBOM's `dependsOn` edges |
 | `_vulnerability_details.csv` | (component, advisory) | The transform's 22 columns, without Black Duck's ids, project path, triage and CISA block |
 | `_upgrade_guidance.csv` | component with a finding | Short and long term recommended versions |
@@ -59,6 +59,25 @@ command wrote it:
 | `ProjectPath` | SBOM | Parent directory of `ProjectFilePath`, such as `example-service/api`; repo name alone when no manifest location is recorded |
 | `VerifiedPath`, `VerifiedPathMethod` | — | empty, `not-checked` |
 | Open Hub columns, `Has License Conflicts` | — | empty or constant |
+
+`analyse` appends seven columns only to `_dependencies.csv`. Dates use `\tYYYY-MM-DD`:
+
+| Column | Meaning |
+|---|---|
+| `Report Date` | Current date captured once at analysis start; shared across reports |
+| `Latest Version`, `Latest Version Release Date` | Highest eligible version, publication date |
+| `Most Recent Release Version`, `Most Recent Release Date` | Most recently published eligible version, date |
+| `Upgrade Lag (months)` | Completed months from installed release to highest eligible release, minimum zero |
+| `Months Since Last Release` | Completed months since most recent eligible publication |
+
+Eligible releases exclude withdrawn/unlisted versions and development branches. Stable preferred;
+prereleases only when no stable remains. Undated releases stay eligible. Missing dates blank dependent
+fields; known fields remain. Multiple eligible releases + any undated -> most recent release unknown.
+Sole undated release keeps version. Report date does not filter releases; no historical reconstruction.
+
+Project stats: lag >15 months -> `Outdated`; inactivity >24 months -> `No Recent Releases`.
+Unknowns count in neither; remain in totals/percentage denominators. Zero lag does not imply installed
+version is highest. Inactivity does not establish support status.
 
 ## `_vulnerability_details.csv`
 
@@ -111,7 +130,7 @@ Neither is Black Duck's model, which is not published; both are inferred from a 
 `RECIPROCAL` → `HIGH`. Several licences: `OR` takes the lowest, `AND` the highest. `UNKNOWN`
 is ours: Black Duck writes `HIGH` for a licence it cannot read.
 
-**Operational Risk**, decoded on every reference row without Open Hub data:
+**Operational Risk**, legacy estimate retained for compatibility. Prefer release measurements above. Calculation decoded on every reference row without Open Hub data:
 
 | Newer versions | Age | Risk |
 |---|---|---|

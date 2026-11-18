@@ -244,7 +244,6 @@ describe('per-source metadata completeness report', () => {
     })
 
     it('writes all three plugin CSVs with the existing headers and rows', async () => {
-        vi.stubEnv('DEPINDER_REPORT_NOW', '2024-03-15T12:00:00Z')
         fs.writeFileSync(bomFile, JSON.stringify(cachedOnlyBom()))
         session().cache.set('npm:cached-lib', {
             name: 'cached-lib',
@@ -256,7 +255,7 @@ describe('per-source metadata completeness report', () => {
         })
 
         await runAnalysis([bomFile], plugins(), syftFolder,
-            {results: 'results', refresh: false}, session(), undefined, undefined, everythingAnswers())
+            {results: 'results', refresh: false}, session(), undefined, undefined, everythingAnswers(), new Date('2024-03-15T12:00:00Z'))
 
         const csv = (name: string) =>
             fs.readFileSync(path.join(syftFolder, `${plugins()[0].name}-${name}.csv`), 'utf8')
@@ -266,7 +265,7 @@ describe('per-source metadata completeness report', () => {
             'Project Path,Project,Library,Used Version,Latest Version,Used Version Release Date,Latest Version Release Date,Latest-Used,Now-Used,Now-latest,Vulnerabilities,Vulnerability Details,DirectDependency,Type,Licenses\n'
             + 'only/package-lock.json,only,cached-lib,1.0.0,2.0.0,Jan 2020,Mar 2021,14,50,36,0,,true,,MIT')
         expect(csv('project-stats')).toBe(
-            'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct Out of Support, Indirect Out of Support\n'
+            'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct No Recent Releases, Indirect No Recent Releases\n'
             + 'only/package-lock.json,only,1,0,0,0,0,0,0,0,1,0')
     })
 
@@ -280,6 +279,6 @@ describe('per-source metadata completeness report', () => {
         expect(csv('libs')).toBe(
             'Project Path,Project,Library,Used Version,Latest Version,Used Version Release Date,Latest Version Release Date,Latest-Used,Now-Used,Now-latest,Vulnerabilities,Vulnerability Details,DirectDependency,Type,Licenses\n')
         expect(csv('project-stats')).toBe(
-            'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct Out of Support, Indirect Out of Support\n')
+            'Project Path,Project,Direct Deps,Indirect Deps,Direct Outdated Deps, Direct Outdated %,Indirect Outdated Deps, Indirect Outdated %, Direct Vulnerable Deps, Indirect Vulnerable Deps, Direct No Recent Releases, Indirect No Recent Releases\n')
     })
 })

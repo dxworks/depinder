@@ -21,11 +21,8 @@ const versions = (used: string, latest: string): LibraryInfo['versions'] => [
     {version: '2.0.0', timestamp: Date.parse(latest), latest: true},
 ]
 
-afterEach(() => vi.unstubAllEnvs())
-
 describe('analysisCsvReports', () => {
-    it('counts only strict >15-month outdated and >24-month out-of-support dependencies', () => {
-        vi.stubEnv('DEPINDER_REPORT_NOW', '2024-03-15T12:00:00Z')
+    it('counts only strict >15-month outdated and >24-month inactive dependencies', () => {
         const vuln = {severity: 'HIGH', description: '', permalink: 'https://example.test/1'}
         const lib = (name: string, used: string, latest: string): LibraryInfo =>
             ({name, licenses: ['MIT'], versions: versions(used, latest)} as LibraryInfo)
@@ -37,7 +34,7 @@ describe('analysisCsvReports', () => {
                     libraryInfo: lib('a', '2020-12-15T12:00:00Z', '2022-03-15T12:00:00Z')}),
                 // Never enriched: still a direct dependency in the denominator, nothing else.
                 directUnknown: dep({id: 'b@1.0.0', name: 'b'}),
-                // 16 months used->latest, 34 latest->now: outdated and out of support.
+                // 16 months used->latest, 34 latest->now: outdated and inactive.
                 indirectOverdue: dep({id: 'c@1.0.0', name: 'c', requestedBy: ['parent@1.0.0'], vulnerabilities: [vuln],
                     libraryInfo: lib('c', '2020-01-15T12:00:00Z', '2021-05-15T12:00:00Z')}),
                 indirectFresh: dep({id: 'd@1.0.0', name: 'd', requestedBy: ['parent@1.0.0'], vulnerabilities: [],
@@ -45,7 +42,7 @@ describe('analysisCsvReports', () => {
             },
         }
 
-        const rows: string[][] = parse(analysisCsvReports([proj])['project-stats'])
+        const rows: string[][] = parse(analysisCsvReports([proj], 'npm', new Date('2024-03-15T12:00:00Z'))['project-stats'])
         expect(rows[1]).toEqual(['/repo', 'proj', '2', '2', '0', '0', '1', '50', '1', '1', '0', '1'])
     })
 

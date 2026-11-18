@@ -1,5 +1,5 @@
 import {Vulnerability} from '../extension-points/vulnerability-checker'
-import {majorOf, tokenizeVersion} from '../vuln-sources/github/versions'
+import {majorOf, tokenizeVersion} from '../versioning'
 import {ExportComponent} from './model'
 
 /**

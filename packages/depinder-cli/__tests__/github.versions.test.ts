@@ -4,10 +4,11 @@ import {
     comparePep440,
     compareSemver,
     comparatorFor,
+    comparatorForPurlType,
     tokenizeVersion,
-} from '../src/vuln-sources/github/versions'
+} from '../src/versioning'
 import {parseRange, satisfiesRange} from '../src/vuln-sources/github/ranges'
-import {ecosystemByName, ecosystemForPurlType} from '../src/vuln-sources/github/ecosystems'
+import {ecosystemByName} from '../src/vuln-sources/github/ecosystems'
 
 /**
  * The version algebra is where a vulnerability matcher fails silently, so every comparator is
@@ -172,11 +173,11 @@ describe('generic comparator (maven, nuget, composer)', () => {
  * `< 0.0.0-20231218163308-9d2ee975ef9f` would then clear a module the Go team calls vulnerable.
  */
 describe('go and cargo version ordering', () => {
-    const compare = comparatorFor(ecosystemForPurlType('golang')?.comparator ?? 'generic')
+    const compare = comparatorForPurlType('golang')
 
     it('uses the semver comparator for go and for cargo', () => {
-        expect(ecosystemByName('go')?.comparator).toBe('semver')
-        expect(ecosystemByName('rust')?.comparator).toBe('semver')
+        expect(comparatorForPurlType(ecosystemByName('go')!.purlType)).toBe(compareSemver)
+        expect(comparatorForPurlType(ecosystemByName('rust')!.purlType)).toBe(compareSemver)
     })
 
     it('puts a pseudo-version below the release it is a pre-release of', () => {

@@ -49,7 +49,6 @@ import {resetBulkResolve} from '../resolver/bulk-memory'
 import {createRegistryFallback, isRateLimit, RegistryFallback} from '../fallback/registry-fallback'
 import {REGISTRY_LIMITS_ENV, resolveRegistryLimits} from '../fallback/registry-limits'
 import {fallbackLookupName, logLookupFailure} from '../fallback/lookup-name'
-import {fixedReportNow, REPORT_NOW_ENV} from '../utils/report-clock'
 import {usesVulnServer, vulnServerConfig, VulnServerConfig} from '../vuln-sources/server'
 import {
     collectSbomTargets,
@@ -80,8 +79,8 @@ export interface AnalyseOptions extends ResolverOptions, CacheMaxAgeOptions {
     registryLimits?: string
 }
 
-/** A factory rather than a single instance, so tests can parse arguments from a clean slate. */
-export function createAnalyseCommand(): Command {
+/** Fresh command per invocation; an injected date controls report ages in tests. */
+export function createAnalyseCommand(reportDate?: Date): Command {
     return new Command()
         .name('analyse')
         .argument('[folders...]', 'Folders to walk for CycloneDX SBOMs')
@@ -119,7 +118,7 @@ export function createAnalyseCommand(): Command {
         .option('--profile', 'Print a phase timing and request count summary at the end', false)
         // Only the two arguments: Commander also passes the Command itself, which must not leak
         // into an optional parameter.
-        .action((folders: string[], options: AnalyseOptions) => analyseFiles(folders, options))
+        .action((folders: string[], options: AnalyseOptions) => analyseFiles(folders, options, reportDate))
 }
 
 export const analyseCommand = createAnalyseCommand()
@@ -340,11 +339,8 @@ function openCacheSession(cutoffMs: number): CacheSession {
  * files under `<results>/<producer>/`; anything that is not a CycloneDX SBOM is ignored. A
  * subfolder exists only when its source had input.
  */
-async function analyseFiles(folders: string[], options: AnalyseOptions): Promise<void> {
+async function analyseFiles(folders: string[], options: AnalyseOptions, reportDate = new Date()): Promise<void> {
     if (options.profile) enableProfile()
-    // Read first, so a malformed fixed date stops the run before any work is done.
-    const fixedNow = fixedReportNow()
-    if (fixedNow) log.info(`Report date fixed at ${fixedNow.toISOString()} (${REPORT_NOW_ENV}); ages in the CSVs are measured from it`)
     const registries = createRegistryFallback(resolveRegistryLimits({flag: options.registryLimits, env: process.env[REGISTRY_LIMITS_ENV]}))
     const resultRoot = path.resolve(process.cwd(), options.results || 'results')
     const allFiles = folders.flatMap(it => walkDir(it))
@@ -381,7 +377,7 @@ async function analyseFiles(folders: string[], options: AnalyseOptions): Promise
     try {
         for (const run of runs) {
             const sbomFiles = run.sboms.map(it => it.file)
-            const analysed = await runAnalysis(sbomFiles, run.plugins, run.folder, options, session, resolver, prep.vulnerabilities, registries)
+            const analysed = await runAnalysis(sbomFiles, run.plugins, run.folder, options, session, resolver, prep.vulnerabilities, registries, reportDate)
             // Already settled: `runAnalysis` waited for it before reading any finding.
             vulnOutcome = prep.vulnerabilities ? await prep.vulnerabilities : undefined
             const preflight = prep.preflight
@@ -402,7 +398,7 @@ async function analyseFiles(folders: string[], options: AnalyseOptions): Promise
             } catch (e: any) {
                 log.warn(`Could not write scan provenance: ${e?.message ?? e}`)
             }
-            writeBlackDuckForSource(run.sboms, analysed, run.folder, run.inputFolder, options)
+            writeBlackDuckForSource(run.sboms, analysed, run.folder, run.inputFolder, {...options, reportDate})
             log.info(`Results for ${run.source} are written to ${run.folder}`)
         }
     } finally {
@@ -431,6 +427,7 @@ export async function runAnalysis(
     sbomFiles: string[], plugins: Plugin[], resultFolder: string, options: AnalyseOptions, session: CacheSession,
     resolver?: ResolverConfig, vulnerabilities?: Promise<unknown>,
     registries: RegistryFallback = createRegistryFallback(resolveRegistryLimits({env: process.env[REGISTRY_LIMITS_ENV]})),
+    reportDate: Date = new Date(),
 ): Promise<AnalysisResult[]> {
     if (!fs.existsSync(resultFolder)) {
         fs.mkdirSync(resultFolder, {recursive: true})
@@ -599,7 +596,7 @@ export async function runAnalysis(
         // Everything below writes the CSV reports.
         const csv = startPhase(`csv:${plugin.name}`)
 
-        for (const [report, document] of Object.entries(analysisCsvReports(projects))) {
+        for (const [report, document] of Object.entries(analysisCsvReports(projects, purlType, reportDate))) {
             fs.writeFileSync(path.resolve(resultFolder, `${plugin.name}-${report}.csv`), document)
         }
         csv.end()
