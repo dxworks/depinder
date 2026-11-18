@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Bumps the Trivy/Grype pins, Dockerfile digests and docs to the newest signed, settled releases.
+# Bumps the Trivy/Grype pins, Dockerfile digests and docs to the newest signed, settled releases;
+# earlier when a release fixes a vulnerability of the pinned one. Needs trivy to compare them.
 set -euo pipefail
 
 MIN_AGE_DAYS="${MIN_AGE_DAYS:-7}"
@@ -9,7 +10,7 @@ DOCKERFILE="$ROOT/packages/depinder-server/Dockerfile"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-for cmd in gh cosign jq docker; do
+for cmd in gh cosign jq docker trivy; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: $cmd is required" >&2; exit 1; }
 done
 
@@ -31,16 +32,27 @@ fetch_assets() {
   for f in "$@"; do curl -fsSL --retry 3 -o "$dir/$f" "https://github.com/$repo/releases/download/$tag/$f"; done
 }
 
-# Newest non-draft, non-prerelease tag of <owner/repo> published at least MIN_AGE_DAYS before the
-# last daily 05:00 UTC (same cutoff as the depinder server), without the leading "v".
-newest_settled() {
-  local now day=86400 run=18000 cutoff   # run: 05:00 UTC
-  now=$(date -u +%s)
-  cutoff=$(( now - (now - run) % day - MIN_AGE_DAYS * day ))
+# Newest non-draft, non-prerelease tag of <owner/repo> published at or before <epoch>, without the "v".
+newest_before() {
   public_api "repos/$1/releases?per_page=30" | jq -r "
     [ .[] | select(.draft == false and .prerelease == false)
-          | select((.published_at | fromdateiso8601) <= $cutoff) ][0].tag_name // empty" \
+          | select((.published_at | fromdateiso8601) <= $2) ][0].tag_name // empty" \
     | sed 's/^v//'
+}
+
+# Cooldown cutoff: MIN_AGE_DAYS before the last daily 05:00 UTC (same as the depinder server).
+NOW=$(date -u +%s)
+CUTOFF=$(( NOW - (NOW - 18000) % 86400 - MIN_AGE_DAYS * 86400 ))
+
+# Downloads <tool> <version>'s checksums file into <dir> and verifies its Sigstore bundle.
+verify_sums() {
+  local repo="$1" tool="$2" version="$3" dir="$4" sums="${2}_${3}_checksums.txt"
+  mkdir -p "$dir"
+  fetch_assets "$repo" "v$version" "$dir" "$sums" "$sums.sigstore.json"
+  cosign verify-blob "$dir/$sums" \
+    --bundle "$dir/$sums.sigstore.json" \
+    --certificate-identity-regexp "^https://github\.com/${repo//./\\.}/\.github/workflows/" \
+    --certificate-oidc-issuer https://token.actions.githubusercontent.com >&2
 }
 
 # Prints <candidate> if it is a plain x.y.z newer than <pinned>, else nothing.
@@ -61,12 +73,8 @@ pinned() { sed -n "s/^ *$1: '\\([^']*\\)',\$/\\1/p" "$PINS"; }
 verified_digest() {
   local repo="$1" tool="$2" version="$3" image="$4" inner="$5" amd64="$6" arm64="$7"
   local dir="$WORK/$tool" sums="${tool}_${version}_checksums.txt"
-  mkdir -p "$dir"
-  fetch_assets "$repo" "v$version" "$dir" "$sums" "$sums.sigstore.json" "$amd64" "$arm64"
-  cosign verify-blob "$dir/$sums" \
-    --bundle "$dir/$sums.sigstore.json" \
-    --certificate-identity-regexp "^https://github\.com/${repo//./\\.}/\.github/workflows/" \
-    --certificate-oidc-issuer https://token.actions.githubusercontent.com >&2
+  verify_sums "$repo" "$tool" "$version" "$dir"
+  fetch_assets "$repo" "v$version" "$dir" "$amd64" "$arm64"
 
   local digest
   digest="$(docker buildx imagetools inspect "$image" --format '{{json .Manifest}}' | jq -r .digest)"
@@ -92,10 +100,79 @@ verified_digest() {
   echo "$digest"
 }
 
+# Trivy findings ("<id> <package> <severity>", sorted) of <tool>'s linux/amd64 binary of <version>:
+# the pinned one from the image digest in the Dockerfile, a newer one from its signed release.
+#   <asset> release asset holding the binary at its root, "@" standing for the version
+#   <inner> where the binary sits in the publisher's image
+findings() {
+  local repo="$1" tool="$2" version="$3" asset="${4//@/$3}" inner="$5" kind="$6"
+  local out="$WORK/scan/$tool-$version"
+  if [ ! -f "$out" ]; then
+    local dir="$WORK/scan/$tool-$version.d" expected ref cid
+    mkdir -p "$dir/bin"
+    if [ "$kind" = pinned ]; then
+      ref="$(sed -n "s/^FROM \([^ ]*\) AS $tool\$/\1/p" "$DOCKERFILE")"
+      [[ "$ref" == *"@sha256:"* ]] || { echo "ERROR: no pinned $tool image in $DOCKERFILE" >&2; exit 1; }
+      docker pull -q --platform linux/amd64 "$ref" >/dev/null
+      cid="$(docker create --platform linux/amd64 "$ref")"
+      docker cp "$cid:$inner" "$dir/bin/$tool" >/dev/null
+      docker rm "$cid" >/dev/null
+    else
+      verify_sums "$repo" "$tool" "$version" "$dir"
+      fetch_assets "$repo" "v$version" "$dir" "$asset"
+      expected="$(awk -v a="$asset" '$2 == a {print $1}' "$dir/${tool}_${version}_checksums.txt")"
+      [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || { echo "ERROR: no sha256 for $asset" >&2; exit 1; }
+      [ "$(sha256 "$dir/$asset")" = "$expected" ] || { echo "ERROR: checksum mismatch for $asset" >&2; exit 1; }
+      tar -xzf "$dir/$asset" -C "$dir/bin" "$tool"
+    fi
+    trivy rootfs --quiet --scanners vuln --format json "$dir/bin" > "$dir/scan.json"
+    jq -r '.Results[]?.Vulnerabilities[]? | "\(.VulnerabilityID) \(.PkgName) \(.Severity)"' "$dir/scan.json" \
+      | LC_ALL=C sort -u > "$out"
+  fi
+  cat "$out"
+}
+
+ids() { awk '{print $1" "$2}' | LC_ALL=C sort -u; }
+
+# HIGH/CRITICAL findings in scan/new that scan/old does not have.
+new_high() {
+  LC_ALL=C comm -13 <(ids < "$WORK/scan/old") \
+    <(awk '$3 == "HIGH" || $3 == "CRITICAL"' "$WORK/scan/new" | ids)
+}
+
+# Picks <tool>'s next version into PICK, with PICK_NOTE (why) and PICK_BLOCK (new HIGH/CRITICAL).
+# The newest release is taken before the cooldown when it fixes a finding of the pinned one and
+# adds no HIGH/CRITICAL; otherwise the newest settled one, blocked if it adds a HIGH/CRITICAL.
+pick() {
+  local repo="$1" tool="$2" pinned="$3" asset="$4" inner="$5" fresh settled fixed
+  PICK=""; PICK_NOTE=""; PICK_BLOCK=""
+  fresh="$(newer "$pinned" "$(newest_before "$repo" "$NOW")")"
+  settled="$(newer "$pinned" "$(newest_before "$repo" "$CUTOFF")")"
+  [ -n "$fresh" ] || return 0
+  findings "$repo" "$tool" "$pinned" "$asset" "$inner" pinned > "$WORK/scan/old"
+  if [ "$fresh" != "$settled" ]; then
+    findings "$repo" "$tool" "$fresh" "$asset" "$inner" candidate > "$WORK/scan/new"
+    fixed="$(LC_ALL=C comm -23 <(ids < "$WORK/scan/old") <(ids < "$WORK/scan/new") | awk '{print $1}' | LC_ALL=C sort -u \
+      | awk 'NR <= 8 {l = l (NR > 1 ? ", " : "") $0} END {if (NR > 8) l = l " and " NR - 8 " more"; print l}')"
+    if [ -n "$fixed" ] && [ -z "$(new_high)" ]; then
+      PICK="$fresh"; PICK_NOTE="$tool $fresh taken before the ${MIN_AGE_DAYS}-day cooldown: it fixes $fixed."
+      return 0
+    fi
+  fi
+  [ -n "$settled" ] || return 0
+  findings "$repo" "$tool" "$settled" "$asset" "$inner" candidate > "$WORK/scan/new"
+  PICK="$settled"
+  PICK_BLOCK="$(new_high | sed "s/^/$tool $settled: /")"
+}
+
+mkdir -p "$WORK/scan"
 trivy_old="$(pinned trivy)"; grype_old="$(pinned grype)"
 [ -n "$trivy_old" ] && [ -n "$grype_old" ] || { echo "ERROR: cannot read pins from $PINS" >&2; exit 1; }
-trivy_new="$(newer "$trivy_old" "$(newest_settled aquasecurity/trivy)")"
-grype_new="$(newer "$grype_old" "$(newest_settled anchore/grype)")"
+notes=(); blocks=()
+pick aquasecurity/trivy trivy "$trivy_old" "trivy_@_Linux-64bit.tar.gz" /usr/local/bin/trivy
+trivy_new="$PICK"; [ -n "$PICK_NOTE" ] && notes+=("$PICK_NOTE"); [ -n "$PICK_BLOCK" ] && blocks+=("$PICK_BLOCK")
+pick anchore/grype grype "$grype_old" "grype_@_linux_amd64.tar.gz" /grype
+grype_new="$PICK"; [ -n "$PICK_NOTE" ] && notes+=("$PICK_NOTE"); [ -n "$PICK_BLOCK" ] && blocks+=("$PICK_BLOCK")
 
 parts=()
 if [ -n "$trivy_new" ]; then
@@ -135,6 +212,15 @@ grep -q "^FROM aquasec/trivy:$(pinned trivy)@sha256:" "$DOCKERFILE" \
 
 summary="$(printf '%s, ' "${parts[@]}")"; summary="${summary%, }"
 echo "Bumped: $summary"
+[ ${#notes[@]} -eq 0 ] || printf '%s\n' "${notes[@]}"
+[ ${#blocks[@]} -eq 0 ] || { echo "Blocked, new HIGH/CRITICAL:"; printf '%s\n' "${blocks[@]}"; }
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
-  { echo "changed=true"; echo "summary=$summary"; } >> "$GITHUB_OUTPUT"
+  {
+    echo "changed=true"; echo "summary=$summary"
+    if [ ${#blocks[@]} -gt 0 ]; then echo "blocked=true"; else echo "blocked=false"; fi
+    echo "notes<<NOTES_EOF"
+    [ ${#notes[@]} -eq 0 ] || printf -- '- %s\n' "${notes[@]}"
+    [ ${#blocks[@]} -eq 0 ] || { echo "- **Not merged automatically:** new HIGH/CRITICAL findings the pinned version does not have:"; printf '%s\n' "${blocks[@]}" | sed 's/^/  - /'; }
+    echo "NOTES_EOF"
+  } >> "$GITHUB_OUTPUT"
 fi

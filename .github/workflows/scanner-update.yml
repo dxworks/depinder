@@ -31,6 +31,16 @@ jobs:
       - uses: sigstore/cosign-installer@v4.1.3
       - uses: docker/setup-buildx-action@v4.4.1
 
+      # The pinned Trivy compares the vulnerabilities of the pinned and the candidate binaries.
+      - name: Read the pinned Trivy
+        id: pins
+        run: |
+          echo "trivy=$(sed -n "s/^ *trivy: '\(.*\)',$/\1/p" packages/depinder-core/src/vuln/scanner-versions.ts)" >> "$GITHUB_OUTPUT"
+
+      - uses: aquasecurity/setup-trivy@v0.3.1
+        with:
+          version: v${{ steps.pins.outputs.trivy }}
+
       - name: Bump pins
         id: bump
         run: ./tools/bump-scanners.sh
@@ -58,19 +68,29 @@ jobs:
             packages/depinder-server/Dockerfile
             packages/depinder-server/docs/configuration.md
             packages/depinder-server/docs/vuln-server.md
-          commit-message: 'Bump pinned scanners: ${{ steps.bump.outputs.summary }}'
-          title: 'Bump pinned scanners: ${{ steps.bump.outputs.summary }}'
+          commit-message: '[BOT] Bump pinned scanners: ${{ steps.bump.outputs.summary }}'
+          title: '[BOT] Bump pinned scanners: ${{ steps.bump.outputs.summary }}'
           body: |
             ${{ steps.bump.outputs.summary }}
 
-            - Newest stable releases at least 7 days old.
+            ${{ steps.bump.outputs.notes }}
+
+            - Newest stable releases at least 7 days old, or newer when that fixes a vulnerability of the pinned version.
             - Each image is pinned by digest only after the binary inside it (linux/amd64 and linux/arm64) matched the publisher's release binary, whose checksum file's Sigstore signature verified against the publisher's release workflow.
             - The server image builds and both scanners start in it.
 
-            Merges itself when the required checks pass; `scanner-release.yml` then tags the next patch release.
+            Merges itself when the required checks pass, unless the new version adds a HIGH/CRITICAL finding. Releases stay manual.
+
+      - name: Report a blocked bump
+        if: steps.pr.outputs.pull-request-number != '' && steps.bump.outputs.blocked == 'true'
+        run: |
+          gh pr merge --disable-auto "${{ steps.pr.outputs.pull-request-url }}" || true   # set by an earlier run
+          echo "::warning::New HIGH/CRITICAL in the candidate; ${{ steps.pr.outputs.pull-request-url }} left for review"
+        env:
+          GH_TOKEN: ${{ secrets.SCANNER_BOT_TOKEN }}
 
       - name: Enable auto-merge
-        if: steps.pr.outputs.pull-request-number != ''
+        if: steps.pr.outputs.pull-request-number != '' && steps.bump.outputs.blocked != 'true'
         run: gh pr merge --auto --squash "${{ steps.pr.outputs.pull-request-url }}"
         env:
           GH_TOKEN: ${{ secrets.SCANNER_BOT_TOKEN }}
