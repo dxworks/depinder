@@ -1,3 +1,2 @@
-# Pinned so `mkdocs build` is byte-reproducible across CI runs and machines.
-# Bump deliberately, not automatically.
-mkdocs-material==9.6.9
+# Pinned to the version the shared dxworks/pipelines docs workflow uses.
+zensical==0.1.1
