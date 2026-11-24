@@ -8,14 +8,18 @@ import {bomRefKeyer} from './bom-refs.js'
 import {BusyError, type ScanLimiter} from './limiter.js'
 import {parseVulnRequest, TooManyPurlsError} from './request.js'
 import {buildSbom} from './sbom.js'
-import {SCAN_DIR_PREFIX, scanBoth, type ScanDirs, ScanError, type ScanReports, type ScannerVersions} from './scanners.js'
+import type {ActiveScanners} from './binaries.js'
+import {SCAN_DIR_PREFIX, scanBoth, type ScanDirs, ScanError, type ScanReports} from './scanners.js'
 import {type DatabaseSource, type Lease, publicBuild} from './source.js'
 
 /** `/health` is the only unauthenticated route: container health checks have no token. */
 const PUBLIC_PATHS = new Set(['/health'])
 
-/** Scans the SBOM at a path against the leased folders. `scanBoth` unless a test says otherwise. */
-export type RunScan = (sbomPath: string, dirs: ScanDirs, signal: AbortSignal) => Promise<ScanReports>
+/**
+ * Scans the SBOM at a path against the leased folders, with the scanner binaries taken with the
+ * lease. `scanBoth` unless a test says otherwise.
+ */
+export type RunScan = (sbomPath: string, dirs: ScanDirs, signal: AbortSignal, scanners: ActiveScanners) => Promise<ScanReports>
 
 interface VulnDeps {
     config: VulnConfig
@@ -23,8 +27,11 @@ interface VulnDeps {
     limiter: ScanLimiter
     /** The builds in the store (`source.ts`). */
     source: DatabaseSource
-    /** Read once at startup (`scannerVersions`), reported on every answer. */
-    versions: ScannerVersions
+    /**
+     * The scanner binaries in use now (`binaries.ts`): taken with each request's lease, run for its
+     * scan and reported in its answer, so a binary switched meanwhile changes neither.
+     */
+    scanners: () => ActiveScanners
     /** Overridden in tests. */
     runScan?: RunScan
 }
@@ -33,7 +40,8 @@ interface VulnDeps {
 export async function createVulnServer(deps: VulnDeps): Promise<FastifyInstance> {
     const {config, log, limiter, source} = deps
     const app = Fastify({bodyLimit: BODY_LIMIT_BYTES, logger: false})
-    const runScan: RunScan = deps.runScan ?? ((sbomPath, dirs, signal) => scanBoth(sbomPath, dirs, config, signal))
+    const runScan: RunScan = deps.runScan ?? ((sbomPath, dirs, signal, scanners) =>
+        scanBoth(sbomPath, dirs, {...config, trivyBin: scanners.trivy.bin, grypeBin: scanners.grype.bin}, signal))
 
     await registerCompress(app)
     registerAuth(app, config.apiToken, log, PUBLIC_PATHS)
@@ -71,17 +79,17 @@ export async function createVulnServer(deps: VulnDeps): Promise<FastifyInstance>
 
         // The builds the answer names are the builds that were scanned: the lease's, never
         // whatever is current by the time the answer is written.
-        const answer = (lease: Lease, vulnerabilities: Record<string, Vulnerability[]>): VulnResponse => ({
+        const answer = (lease: Lease, scanners: ActiveScanners, vulnerabilities: Record<string, Vulnerability[]>): VulnResponse => ({
             vulnerabilities,
             unsupported: parsed.unsupported,
             databases: {trivy: publicBuild(lease.trivy), grype: publicBuild(lease.grype)},
-            scanners: {trivy: deps.versions.trivy, grype: deps.versions.grype},
+            scanners: {trivy: scanners.trivy.version, grype: scanners.grype.version},
         })
         if (parsed.scan.length === 0) {
             const lease = source.lease()
             if (!lease.ready) return reply.code(503).send({error: 'databases not ready', reason: lease.reason})
             lease.release()
-            return answer(lease, {})
+            return answer(lease, deps.scanners(), {})
         }
 
         const signal = clientGone(reply)
@@ -108,6 +116,7 @@ export async function createVulnServer(deps: VulnDeps): Promise<FastifyInstance>
         // Leased only now, so a request that waited in line scans the newest builds. Synchronous:
         // nothing can be installed between the slot and the lease.
         const lease = source.lease()
+        const scanners = deps.scanners()
         if (!lease.ready) {
             release()
             return reply.code(503).send({error: 'databases not ready', reason: lease.reason})
@@ -121,7 +130,7 @@ export async function createVulnServer(deps: VulnDeps): Promise<FastifyInstance>
             dir = await mkdtemp(join(config.tmpDir, SCAN_DIR_PREFIX))
             const sbomPath = join(dir, 'sbom.json')
             await writeFile(sbomPath, buildSbom(parsed.scan))
-            outcome = {reports: await runScan(sbomPath, {trivy: lease.trivy.dir, grype: lease.grype.dir}, signal)}
+            outcome = {reports: await runScan(sbomPath, {trivy: lease.trivy.dir, grype: lease.grype.dir}, signal, scanners)}
         } catch (e) {
             outcome = {failed: e}
         } finally {
@@ -172,7 +181,7 @@ export async function createVulnServer(deps: VulnDeps): Promise<FastifyInstance>
         // The same times, for the caller: depinder's `--profile` counters (`vuln:server-timing:*`) read them.
         reply.header('server-timing',
             `queue;dur=${queueMs}, trivy;dur=${reports.trivyMs}, grype;dur=${reports.grypeMs}, total;dur=${totalMs}`)
-        return answer(lease, Object.fromEntries(index))
+        return answer(lease, scanners, Object.fromEntries(index))
     })
 
     return app

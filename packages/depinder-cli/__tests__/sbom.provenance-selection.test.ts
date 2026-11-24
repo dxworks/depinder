@@ -102,7 +102,7 @@ describe('writeScanProvenance', () => {
         expect(saved.pinnedVersions).toEqual(PINNED_SCANNER_VERSIONS)
         expect(saved.scanners.trivy).toMatchObject({
             installed: true,
-            version: '0.74.0',
+            version: PINNED_SCANNER_VERSIONS.trivy,
             pinnedVersion: PINNED_SCANNER_VERSIONS.trivy,
             versionMatchesPin: true,
             dbVersion: '2',

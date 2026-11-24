@@ -10,8 +10,109 @@ permissions:
   contents: write
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      semver: ${{ steps.parse.outputs.semver }}
+    steps:
+      - id: parse
+        run: |
+          semver="${TAG#v}"; semver="${semver%-voyager}"
+          echo "semver=$semver" >> "$GITHUB_OUTPUT"
+        env:
+          TAG: ${{ github.ref_name }}
+
+  # Build, test and Trivy on the source; HIGH/CRITICAL stops everything below.
+  gate:
+    uses: dxworks/pipelines/.github/workflows/release-gate.yml@v1
+    permissions:
+      contents: read
+      security-events: write
+    with:
+      node-version: '26.x'
+      build-script: ./tools/release-build.sh
+
+  # Trivy on the server image (its pinned Trivy and Grype included); HIGH/CRITICAL stops everything below.
+  image-gate:
+    uses: dxworks/pipelines/.github/workflows/trivy-image-scan.yml@v1
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+    with:
+      image-ref: depinder-server-test:latest
+      build-setup: docker build -f packages/depinder-server/Dockerfile -t depinder-server-test:latest .
+      fail-severity: HIGH,CRITICAL
+
+  # Publishes ghcr.io/dxworks/depinder-server:<version> (amd64 + arm64).
+  image:
+    needs: [version, gate, image-gate]
+    uses: dxworks/pipelines/.github/workflows/release-docker.yml@v1
+    permissions:
+      contents: read
+      packages: write
+    with:
+      version: ${{ needs.version.outputs.semver }}
+      image-name: dxworks/depinder-server
+      dockerfile: packages/depinder-server/Dockerfile
+      push-dockerhub: false
+      push-ghcr: true
+
+  # Switches the server to that image by digest (deploy/depinder-deploy.sh) and waits for health.
+  deploy:
+    needs: [version, image, Publish-and-Release]
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: depinder-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Only code that reached dev goes to production, whatever commit the tag points at.
+      - name: Check the tag is on dev
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/dev \
+            || { echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) is not on dev; not deploying"; exit 1; }
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Resolve the image digest
+        id: image
+        run: |
+          digest="$(docker buildx imagetools inspect "ghcr.io/dxworks/depinder-server:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::no digest for depinder-server:$VERSION"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+        env:
+          VERSION: ${{ needs.version.outputs.semver }}
+
+      - name: Deploy
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "root@$DEPLOY_HOST" "deploy $VERSION $DIGEST"
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          VERSION: ${{ needs.version.outputs.semver }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+
   Publish-and-Release:
     name: Publish NPM Package and Create Release
+    needs: [gate, image-gate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -29,7 +130,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: '24.x'
+          node-version: '26.x'
           registry-url: 'https://registry.npmjs.org'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -137,8 +137,10 @@ results-*
 
 # Nx cache and workspace data
 /.nx/
-# MkDocs output of the docs target
+# Zensical output of the docs target
 site/
+# Shared docs theme, added by the docs workflow at build time
+packages/depinder-cli/docs/stylesheets/dxworks-theme.css
 
 # Local-only tools and agent notes
 /bench/

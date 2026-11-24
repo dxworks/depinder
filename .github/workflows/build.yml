@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: '24.x'
+          node-version: '26.x'
           cache: 'npm'
 
       # typecheck, lint, test, build, size guard, dependency check and knip of every Nx project

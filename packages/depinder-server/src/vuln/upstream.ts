@@ -166,7 +166,7 @@ async function anonymousToken(challenge: string | null, repository: string, sign
     return token
 }
 
-async function json(response: Response, url: string): Promise<unknown> {
+export async function json(response: Response, url: string): Promise<unknown> {
     try {
         return await response.json()
     } catch {
@@ -174,8 +174,11 @@ async function json(response: Response, url: string): Promise<unknown> {
     }
 }
 
-/** Runs `check` under one deadline and turns whatever goes wrong into an `UpstreamError`. */
-async function withDeadline<T>(options: CheckOptions, check: (signal: AbortSignal, fetchFn: typeof fetch) => Promise<T>): Promise<T> {
+/**
+ * Runs `check` under one deadline and turns whatever goes wrong into an `UpstreamError`. Also the
+ * scanner update's reads of GitHub (`releases.ts`).
+ */
+export async function withDeadline<T>(options: CheckOptions, check: (signal: AbortSignal, fetchFn: typeof fetch) => Promise<T>): Promise<T> {
     const timeoutMs = options.timeoutMs ?? CHECK_TIMEOUT_MS
     const deadline = AbortSignal.timeout(timeoutMs)
     const signal = options.signal ? AbortSignal.any([deadline, options.signal]) : deadline

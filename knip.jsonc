@@ -20,7 +20,7 @@
       // A runtime dependency of the bundled core, kept external by thirdParty: false.
       "ignoreDependencies": ["packageurl-js"],
       // The docs build's Python tool.
-      "ignoreBinaries": ["mkdocs"]
+      "ignoreBinaries": ["zensical"]
     }
   }
 }

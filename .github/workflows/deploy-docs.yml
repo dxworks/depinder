@@ -1,60 +1,16 @@
 name: Deploy Docs
 
-# Docs source lives in packages/depinder-cli (docs/ + mkdocs.yml), edited in normal PRs. On a docs change on
-# `main` or `dev`, build the site and deploy it straight to GitHub Pages as an artifact —
-# no gh-pages branch, no force-push. Both branches publish to the same site, so the last
-# push wins; `dev` is where the docs move, `main` catches up on release.
-
+# Publishes the docs by hand only, via the shared dxworks/pipelines workflow
 on:
-  push:
-    branches: [main, dev]
-    paths:
-      - 'packages/depinder-cli/docs/**'
-      - 'packages/depinder-cli/mkdocs.yml'
-      - 'packages/depinder-cli/requirements-docs.txt'
-      - 'packages/depinder-cli/project.json'
-      - '.github/workflows/deploy-docs.yml'
-  workflow_dispatch:      # allow a manual redeploy from the Actions tab
-
-permissions:              # required by the Pages artifact deploy
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:              # a newer run supersedes an in-flight deploy
-  group: pages
-  cancel-in-progress: true
+  workflow_dispatch:
 
 jobs:
-  build:
-    name: Build site
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.x'
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24.x'
-          cache: 'npm'
-      - name: Install MkDocs and the workspace
-        run: |
-          pip install -r packages/depinder-cli/requirements-docs.txt
-          npm ci
-      - name: Build (strict — fails on broken links or nav)
-        run: npx nx run depinder-cli:docs --skip-nx-cache
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: packages/depinder-cli/site
-
-  deploy:
-    name: Deploy to Pages
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v5
+  docs:
+    uses: dxworks/pipelines/.github/workflows/release-docs.yml@v1
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    with:
+      working-directory: packages/depinder-cli
+      strict: true

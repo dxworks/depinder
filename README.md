@@ -3,7 +3,7 @@
 Dependency analysis for CycloneDX SBOMs: licences, newer versions, vulnerabilities, and Black
 Duck-shaped CSV exports.
 
-This repository is an [Nx](https://nx.dev) monorepo (npm workspaces, Node 24):
+This repository is an [Nx](https://nx.dev) monorepo (npm workspaces, Node 26):
 
 | Project | Path | What it is |
 |---|---|---|
@@ -22,11 +22,11 @@ depinder --help
 ## Develop
 
 ```bash
-nvm use                       # Node 24, from .nvmrc
+nvm use                       # Node 26, from .nvmrc
 npm ci
 npx nx run-many -t typecheck lint test build size-guard dependency-check knip   # what CI runs (npm run check)
 npx nx build depinder-cli     # packages/depinder-cli/dist
-npx nx run depinder-cli:docs  # MkDocs site, needs `pip install -r packages/depinder-cli/requirements-docs.txt`
+npx nx run depinder-cli:docs  # Zensical site, needs `pip install -r packages/depinder-cli/requirements-docs.txt`
 npx nx test-integration depinder-server   # server tests plus Postgres ones, on the depinder-pg container
 npx nx docker-build depinder-server       # the server image (build context: this root)
 ```
