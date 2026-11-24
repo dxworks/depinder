@@ -94,6 +94,7 @@ export const LICENSES: {readonly [spdxId: string]: KnownLicense} = {
     // vocabulary, so it is reproduced rather than collapsed.
     'MIT-Expat': {name: 'Expat License', family: 'PERMISSIVE'},
     'Public-Domain': {name: 'Public Domain', family: 'PERMISSIVE'},
+    'Commercial': {name: 'Commercial', family: 'RESTRICTED_PROPRIETARY'},
     'MS-NET-Library': {name: 'Microsoft .NET Library License', family: 'RESTRICTED_PROPRIETARY'},
 }
 
