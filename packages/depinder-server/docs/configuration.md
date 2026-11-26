@@ -88,7 +88,7 @@ No database container — the database is hosted. Both servers read `.env` for t
 `docker-compose.yml` sets `ROLE`, `PORT` and the `VULN_*` settings itself.
 
 - **Image.** One image for every role, multi-stage, run on `node:26-alpine` as the unprivileged
-  `node` user. It carries Trivy 0.76.2 and Grype 0.122.0, copied from their official images pinned
+  `node` user. It carries Trivy 0.76.2 and Grype 0.122.1, copied from their official images pinned
   by multi-arch digest (amd64 and arm64). About 150 MB compressed; npm is removed from it.
   Those versions are the floor: `vuln` downloads newer, signed releases into its volume once they
   are a week old and pass its checks (`SCANNER_UPDATE`, docs/vuln-server.md); production turns

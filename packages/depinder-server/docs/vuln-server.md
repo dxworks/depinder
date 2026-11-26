@@ -65,7 +65,7 @@ ROLE=vuln RESOLVER_API_TOKEN=... VULN_DATA_DIR=/var/lib/vuln npm run dev
     "trivy": {"built_at": "2026-10-01T19:00:16.340316472Z", "schema": "2", "age_seconds": 6449, "stale": false},
     "grype": {"built_at": "2026-10-01T06:33:48Z", "schema": "v6.1.9", "age_seconds": 51238, "stale": false}
   },
-  "scanners": {"trivy": "0.76.2", "grype": "0.122.0"}
+  "scanners": {"trivy": "0.76.2", "grype": "0.122.1"}
 }
 ```
 
