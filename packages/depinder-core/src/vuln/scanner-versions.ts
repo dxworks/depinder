@@ -5,5 +5,5 @@
  */
 export const PINNED_SCANNER_VERSIONS: {readonly trivy: string, readonly grype: string} = {
     trivy: '0.76.2',
-    grype: '0.122.0',
+    grype: '0.122.1',
 }

@@ -2,7 +2,7 @@
 # index digest, so amd64 and arm64 hosts get the same release and a moved tag changes nothing.
 # Both are static Go binaries: alpine's musl is no obstacle.
 FROM aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb AS trivy
-FROM anchore/grype:v0.122.0@sha256:013e16ae96bd64108973e3e9fecec63f7ff276358d34c46c25d33e2aac96539f AS grype
+FROM anchore/grype:v0.122.1@sha256:661583704a253c0448ed63998b5ea2cd9d5a76ee71eedc4aed439b8ce3e93a1c AS grype
 
 # The build context is the monorepo root (the root .dockerignore lets in only what is copied here).
 # npm ci --workspace depinder-server needs only the manifests of the server and of the workspaces it
